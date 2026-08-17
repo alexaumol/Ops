@@ -261,9 +261,10 @@
               <div>
                 <label class="field-label">Entity</label>
                 <select id="mEntity" class="field-input mt-1">
-                  <option>HiTT/OSM</option>
-                  <option>HiTT</option>
-                  <option>OSM</option>
+                  <option>Consulting Services</option>
+                  <option>Market Access</option>
+                  <option>Research Division</option>
+                  <option>Corporate Ops</option>
                 </select>
               </div>
             </div>
@@ -404,9 +405,10 @@
           <label class="field-label">Entity <span class="text-hitt-red">*</span></label>
           <select id="npEntity" class="field-input mt-1">
             <option value="">—</option>
-            <option>HiTT/OSM</option>
-            <option>HiTT</option>
-            <option>OSM</option>
+            <option>Consulting Services</option>
+            <option>Market Access</option>
+            <option>Research Division</option>
+            <option>Corporate Ops</option>
           </select>
         </div>
         <div>
@@ -442,12 +444,12 @@
           <label class="field-label">Project owner <span class="text-hitt-red">*</span></label>
           <select id="npOwner" class="field-input mt-1">
             <option value="">—</option>
-            <option>osola</option>
-            <option>mfont</option>
-            <option>jrius</option>
-            <option>lparedes</option>
-            <option>ecasas</option>
-            <option>dvidal</option>
+            <option>jmarti</option>
+            <option>alopez</option>
+            <option>cferre</option>
+            <option>npons</option>
+            <option>rvidal</option>
+            <option>tsole</option>
           </select>
         </div>
       </div>
@@ -534,15 +536,15 @@ const STAGES = [
 ];
 const STAGE_BY_ID = Object.fromEntries(STAGES.map(s => [s.id, s]));
 
-// Seed data drawn from the project's own naming conventions (client-facing PoC — not real client records)
+// Fictional project names — codes/numbering follow the real system's convention, names are made up
 const SEED = {
-  lead: ["00000-Leads","23079-2a part model obesitat","24059-abt+corti","24091-Drumhead","24106-Cencora Duchenne","24144-End of Life Value","25002-Support Strategy","25007-RESKIN","25013-Deciphera","25014-Suport Resistencies","25017-Corporate Affairs Expert Panel","25022-MPSIII","25043-Rare Disease PREM (H-CARE)","25044-AQUAS-CMP_Adherència Terapèutica","25075-Payer Workshop on Clinical Trial En","25085-HTA - Paper workshop - Unlock New","25093-Ad-Board Contract/Gilead Sciences","25104-IOT","25108-Global TROP2 ADC Multi-Stakehold","25148-EY Project Tender","26018-UOC Avaluació Startups"],
-  oferta: ["24036-CVD-Budget Impactt","24052-ANTICUDE","24100-eu4health","24160-Cost Calculator","25004-Implementation HTAi","25029-MABO Submission Spain","25040-Patient Involvement Trial Design","25141-AZ Tufftts Project","26010-Sanofi MIP","26013-Menarini Lipid Lowering","26015-CNIO Drug Resistance","26020-ICS Suport EAP","26022-Cook Medical Biopsy Needle","26026-Sanofi T2 Disease Model","26036-PRISMA EU Project Univ Berlin","26040-I3S Microtubule Stability","26041-i4Kids FetalSealing","26046-CandaHealth Formació JCA","26065-Trudell Inhalers Model","26073-Pharmacosmos Myeloma","26081-Asphalion Immunoglobulin Price Incr"],
-  guanyat: ["24064-Payer Evidence Panel Consultancy","24082-Budget Impact Generic","25051-D Alternative contracting project","25117-Dolon ATMP durability Narrative","25118-TK2 Consensus statements","25144-TECSAM Xarxa 2025-","25159-UPF-BERG_Estudi de mercat","25161-Regeneron Atopic March Paper","26017-Sanofi Global Advent Forum","26023-Dolon mCRC","26027-ELC HTA Policy Futures Forum","26030-Edimburg","26044-IQS PolyCoartt","26048-CaixaImpulse Consulting Taxol Resi","26049-Collider OnaKit","26051-MSD Global Marketing Meeting (TB","26054-Pfizer PATINA CEM","26057-Book HTA EU","26058-FSJD i4Kids 2026","26059-Mediqualité Vifor Hemocromatosia","26060-Revolution Mediciones Spain Acces","26061-Merck EU MSD Essential Thrombocy"],
-  wip: ["00012-Facturació HITT a FHITT","00013-Facturació HITT a DryOx","00023-Facturació FHITT a DryOx","24017-DIVE Medical","24020-SEHH - ASMD PRO","24092-Marie Curie Proposal","24127-Lofric & Navina","25001-CTST Publication","25016-UIB - HTA (CaixaImpulse)","25026-CEPHEID Market Access Support","25028-Patients HTA Education","25030-New Trial development & HTA","25066-ICS PRL","25077-Prioritats Sistma Sanitari","25096-LifeLung EU Grant","25133-Rhythm Imcivree MA Spain","25137-IGTP Race Plus Doctorat","25140-JnJ HTA new paradigm","25145-AZ Oncology Therapy Coverage Ste","25151-Cepheid Dossier Analysis_MRSA","25152-Alfasigma Filgo®","25156-ISPOR US 2026"],
-  delivered: ["11111-despeses","23022-MA Strategy Egetis","24023-Master Biotech","24034-AZ COPD","24060-Meetings","24075-Precision Medicine Avalere","24094-SANOFI SWITCH Project","24112-Care4Woman","24116-NEED Project","24124-Acadèmia Pacients","24149-Asphalion teysuno","24157-New development paradigm","25009-IONIS - MARKET ACCESS","25015-MEDICHEM","25033-Alexion NF1","25036-Patients Event Madrid","25052-Alternative contracting project San","25054-Glaucoma New Device Potential","25055-Otsuka Consulting","25063-JNJ - MOROCCO","25064-Avaluació Caixaimpulse 2025 OSM","25065-EUCOPE HTA JCA Meeting"],
-  closed: ["23011-Legacy Pricing Study","23044-Rare Disease Toolkit","24003-Payer Landscape Nordics","24019-Value Dossier Refresh","24071-EU Joint Clinical Assessment Prep","25008-Access Roadmap Renewal"],
-  cancelled: ["24006-Budget Freeze Pilot","24088-Discontinued Molecule Review","25011-Tender Withdrawn","25049-Scope Change - Client Pulled Out"]
+  lead: ["00000-Leads","23079-Metabolic Pathway Review","24059-Compound Synergy Study","24091-Neural Signal Mapping","24106-Rare Genetic Disorder Assessment","24144-Palliative Care Value Study","25002-Market Access Strategy","25007-Formulation Refresh","25013-Oncology Target Screening","25014-Resistance Mechanism Study","25017-Government Affairs Panel","25022-Lysosomal Disorder Program","25043-Rare Disease Patient Survey","25044-Therapy Adherence Study","25075-Payer Perspectives Workshop","25085-Market Access Roundtable","25093-Advisory Board Setup","25104-Connected Devices Feasibility","25108-Multi-Site ADC Trial Support","25148-Tender Response Draft","26018-Innovation Grant Evaluation"],
+  oferta: ["24036-Cardiovascular Budget Model","24052-Antibody Uptake Study","24100-Digital Health Framework","24160-Cost Calculator Tool","25004-HTA Implementation Support","25029-Regulatory Submission Support","25040-Patient Involvement Design","25141-Respiratory Trial Support","26010-Immunology Pipeline Review","26013-Lipid Therapy Analysis","26015-Resistance Pathway Study","26020-Care Pathway Support","26022-Biopsy Device Evaluation","26026-Disease Modeling Project","26036-Academic Research Collaboration","26040-Cell Biology Study","26041-Prenatal Device Study","26046-Training Program Design","26065-Inhaler Device Modeling","26073-Hematology Study Support","26081-Pricing Strategy Review"],
+  guanyat: ["24064-Evidence Panel Consultancy","24082-Generic Budget Impact","25051-Alternative Contracting Model","25117-Durability Narrative Study","25118-Consensus Statement Project","25144-Regional Network Initiative","25159-Market Landscape Study","25161-Disease Progression Paper","26017-Global Policy Forum","26023-Oncology Care Pathway","26027-Policy Futures Forum","26030-International Conference Support","26044-Polymer Coating Study","26048-Consulting Engagement","26049-Product Launch Support","26051-Global Marketing Meeting","26054-Market Access Meeting","26057-HTA Reference Guide","26058-Pediatric Innovation Summit","26059-Rare Disease Study","26060-Access Revolution Project","26061-Essential Medicines Review"],
+  wip: ["00012-Internal Billing Cycle A","00013-Internal Billing Cycle B","00023-Internal Billing Cycle C","24017-Medical Device Evaluation","24020-Clinical Outcomes Review","24092-Research Grant Proposal","24127-Product Comparison Study","25001-Clinical Trial Publication","25016-University HTA Collaboration","25026-Diagnostics Market Access","25028-Patient Education Program","25030-Trial Development Support","25066-Regional Health Plan Review","25077-Health System Priorities","25096-EU Research Grant","25133-Rare Disease Access Study","25137-Doctoral Research Support","25140-New Paradigm Assessment","25145-Oncology Coverage Study","25151-Diagnostic Dossier Analysis","25152-Product Registration Support","25156-International Conference Prep"],
+  delivered: ["11111-General Expenses","23022-Strategic Planning Study","24023-Biotech Training Program","24034-Respiratory Disease Study","24060-Internal Meetings Log","24075-Precision Medicine Review","24094-Product Transition Study","24112-Women's Health Initiative","24116-Needs Assessment Project","24124-Patient Academy Program","24149-Formulation Access Study","24157-Development Paradigm Paper","25009-Market Access Evaluation","25015-Chronic Disease Study","25033-Rare Disease Research","25036-Patient Community Event","25052-Alternative Contracting Model B","25054-Device Potential Assessment","25055-Consulting Engagement B","25063-Regional Market Study","25064-Innovation Program Review","25065-Regional Access Meeting"],
+  closed: ["23011-Legacy Pricing Study","23044-Rare Disease Toolkit","24003-Payer Landscape Review","24019-Value Dossier Refresh","24071-Clinical Assessment Prep","25008-Access Roadmap Renewal"],
+  cancelled: ["24006-Budget Freeze Pilot","24088-Molecule Review Discontinued","25011-Tender Withdrawn","25049-Scope Change Cancellation"]
 };
 
 let PROJECTS = [];
@@ -559,12 +561,12 @@ let dragState = null; // { id, fromStage, ghostEl, offsetX, offsetY }
 let activeProjectId = null;
 
 /* -------- Mock enrichment data for the detail modal (deterministic per id) -------- */
-const BUSINESS_PARTNERS = ["NOVARTIS PHARMA AG","SANOFI S.A.","PFIZER EUROPE","MERCK SHARP & DOHME","ROCHE FARMA S.A.","GILEAD SCIENCES","JOHNSON & JOHNSON","ASTRAZENECA AB","BAYER HISPANIA","TAKEDA PHARMACEUTICALS","IPSEN PHARMA","ALEXION PHARMACEUTICALS","MENARINI INTERNATIONAL","CSL BEHRING","UCB BIOPHARMA","GRIFOLS S.A."];
-const USERS = ["osola","mfont","jrius","lparedes","ecasas","dvidal"];
+const BUSINESS_PARTNERS = ["Aurivex Pharma AG","Nortelia Life Sciences","Halberon Bio","Meridex Pharmaceuticals","Cascadia Therapeutics","Vireon Biotech","Oakstone Health Group","Solvane Medical AG","Petralux Pharma","Kaledion Therapeutics","Ambervale Biopharma","Northgate Sciences","Trelmark International","Ferronix Biologics","Calderwood Pharma","Vantis Health S.A."];
+const USERS = ["jmarti","alopez","cferre","npons","rvidal","tsole"];
 const PROJECT_TYPES = ["HiTT_Consulting","HiTT_Grant","OSM_Consulting","Internal"];
 const BIOSPECTRUMS = ["Big pharma","Biotech","Medtech","Academia","Public sector","N/A"];
-const ENTITIES = ["HiTT/OSM","HiTT","OSM"];
-const NOTE_AUTHORS = ["osola","mfont","jrius"];
+const ENTITIES = ["Consulting Services","Market Access","Research Division","Corporate Ops"];
+const NOTE_AUTHORS = ["jmarti","alopez","cferre"];
 
 function seededRand(seed){
   let x = Math.sin(seed * 999) * 10000;
