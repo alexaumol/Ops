@@ -2,11 +2,13 @@
   "name": "hitt-ops-frontend-build",
   "version": "0.1.0",
   "private": true,
-  "description": "Dev-only Tailwind CSS build for public/pages/projects.html. Produces a static compiled stylesheet — nothing here ships to employees or runs at runtime.",
+  "description": "Dev-only tooling. Tailwind CSS build for public/pages/projects.html, and the source of the vendored MSAL browser library. Both produce static output committed under public/ — nothing here ships to employees or runs at runtime.",
   "scripts": {
-    "build:css": "tailwindcss -c tailwind.config.js -i src.css -o ../public/css/projects-tailwind.css --minify"
+    "build:css": "tailwindcss -c tailwind.config.js -i src.css -o ../public/css/projects-tailwind.css --minify",
+    "vendor:msal": "node -e \"require('fs').copyFileSync('node_modules/@azure/msal-browser/lib/msal-browser.min.js', '../public/vendor/msal-browser.min.js')\""
   },
   "devDependencies": {
-    "tailwindcss": "^3.4.13"
+    "tailwindcss": "^3.4.13",
+    "@azure/msal-browser": "^5.19.0"
   }
 }

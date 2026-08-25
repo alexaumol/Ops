@@ -19,18 +19,29 @@ window.HITT_CONFIG = {
   API_BASE_URL: "https://ops-api.fhitt.org", // TODO: replace with real test VPS URL
 
   // Microsoft Entra ID (Azure AD) app registration — used for M365 sign-in.
-  // These are public identifiers, safe to ship in static files.
+  // These are public identifiers, safe to ship in static files (a client ID
+  // / tenant ID identifies an app registration, it doesn't authenticate one).
+  //
+  // The redirect URI below MUST be registered as a "Single-page application"
+  // redirect URI on this app registration in the Entra portal (App
+  // registrations > this app > Authentication > SPA platform), exactly
+  // matching whatever origin actually serves these files — e.g.
+  // http://localhost:5500/index.html for local dev, plus the real
+  // production URL once that's decided. It points at index.html (not
+  // welcome.html) because that's the page with the MSAL library loaded —
+  // the popup posts its result back there, then our own code navigates to
+  // welcome.html, same as the old stub flow.
   MSAL: {
-    tenantId: "REPLACE_WITH_TENANT_ID",     // <- Alex will supply this
-    clientId: "REPLACE_WITH_APP_CLIENT_ID", // <- from the Entra app registration
-    redirectUri: window.location.origin + "/welcome.html",
+    tenantId: "6ab80f28-9ca1-4f48-9be7-7d98f3e1f076",
+    clientId: "841556ac-d3af-47ee-a399-403de65c139c",
+    redirectUri: window.location.origin + "/index.html",
     authority: null, // computed at runtime from tenantId (see auth.js)
   },
 
   // Feature flags for progressive delivery — flip these on as each module
   // of the app becomes real instead of a placeholder.
   FEATURES: {
-    msalLoginEnabled: false,   // true once tenant/client IDs + validation are wired up
+    msalLoginEnabled: true,   // real Entra ID sign-in — see js/auth.js
     projectsLive: true,        // Projects kanban tries the API, falls back to demo data
     businessPartnersLive: true,
     timeAllocationLive: true,

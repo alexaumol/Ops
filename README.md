@@ -7,13 +7,17 @@ independently while the rest keeps working as static placeholder pages.
 
 ## Features
 
-- **Microsoft 365 sign-in** — login flow styled after the M365 experience,
-  wired for Entra ID (Azure AD) via MSAL.js.
+- **Microsoft 365 sign-in** — real Entra ID (Azure AD) sign-in via MSAL.js.
 - **Project portfolio kanban** — drag-and-drop board across pipeline
-  stages (Lead → Oferta → Guanyat → WIP → Delivered → Closed → Cancelled),
-  with search, project detail modal, and progress tracking.
-- **Business partners, Time allocation, Invoicing** — additional modules,
-  brought online one at a time.
+  stages, search, project detail modal (deliverables, notes, quotations),
+  business-partner and invoicing-partner pickers.
+- **Business partners** — searchable directory with contacts, notes, and
+  tax companies per partner.
+- **Time allocation** — weekly project-hours logging and time-off requests
+  (submit/view/withdraw).
+- **Invoicing** — proceed-to-invoice release settings per project, invoice
+  create/edit with auto-derived status and VAT, and PDF generation matching
+  the real HITT invoice template.
 - Corporate design system with light/dark support and a small set of
   reusable UI primitives (buttons, app header, cards).
 
@@ -74,12 +78,30 @@ npm install
 npm run build:css
 ```
 
+**Updating the vendored MSAL library** (`public/vendor/msal-browser.min.js`
+— vendored rather than loaded from a CDN, since this app needs to work from
+a locked-down corporate network):
+
+```bash
+cd build
+npm install
+npm run vendor:msal
+```
+
+Real Microsoft sign-in only works when `public/` is served over http(s) —
+opening `index.html` directly as a `file://` URL cannot complete the Entra
+ID sign-in popup. The exact origin serving the files must also be
+registered as a redirect URI on the Entra app registration (Authentication
+→ Single-page application).
+
 ## Status
 
-Early-stage prototype. The Projects module is wired end-to-end; Business
-partners, Time allocation, and Invoicing are placeholder pages awaiting
-their turn. Microsoft 365 sign-in is UI-only pending an Entra ID app
-registration.
+Early-stage prototype. Projects, Business partners, Time allocation, and
+Invoicing are all wired to a real PostgreSQL test database. Microsoft 365
+sign-in is real (Entra ID via MSAL.js). Not yet built: approve/reject
+workflows (need a manager-relationship concept the data model doesn't have
+yet), invoice-PDF emailing, and server-side validation of the MSAL ID token
+(the API currently trusts a plain header, not a verified bearer token).
 
 ## License
 
