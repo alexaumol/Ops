@@ -20,6 +20,7 @@ const projectsRouter = require("./routes/projects");
 const businessPartnersRouter = require("./routes/businessPartners");
 const timeTrackingRouter = require("./routes/timeTracking");
 const timeOffRouter = require("./routes/timeOff");
+const invoicingRouter = require("./routes/invoicing");
 const employeesRouter = require("./routes/employees");
 
 const app = express();
@@ -53,6 +54,7 @@ app.use("/api/projects", projectsRouter);
 app.use("/api/business-partners", businessPartnersRouter);
 app.use("/api/time-tracking", timeTrackingRouter);
 app.use("/api/time-off", timeOffRouter);
+app.use("/api/invoicing", invoicingRouter);
 app.use("/api/employees", employeesRouter);
 
 // Fallback 404 for unknown API routes.

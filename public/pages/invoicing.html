@@ -5,25 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Invoicing · HITT Ops</title>
 <link rel="stylesheet" href="../css/styles.css" />
-<style>
-  .empty-state {
-    max-width: 520px;
-    margin: 3rem auto 0;
-    text-align: center;
-    background: var(--bg-surface);
-    border: 1px dashed var(--border-subtle);
-    border-radius: var(--radius-lg);
-    padding: 2.5rem 2rem;
-  }
-  .empty-state__icon {
-    width: 56px; height: 56px;
-    border-radius: 50%;
-    background: var(--bg-surface-alt);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 1.6rem;
-    margin: 0 auto 1rem;
-  }
-</style>
+<link rel="stylesheet" href="../css/business-partners.css" />
+<link rel="stylesheet" href="../css/time-allocation.css" />
+<link rel="stylesheet" href="../css/invoicing.css" />
 </head>
 <body>
   <header class="app-header">
@@ -33,6 +17,7 @@
       <a href="invoicing.html" class="active">Invoicing</a>
     </nav>
     <div class="app-header__user">
+      <span id="dataSourcePill" class="data-pill" style="font-size:10px; font-weight:700; padding:2px 8px; border-radius:999px;">…</span>
       <div class="avatar" id="userAvatar">?</div>
       <span id="userName">Signed in</span>
       <button class="btn btn-secondary" id="btnSignOut" style="padding:0.35rem 0.75rem; font-size:0.8rem;">Sign out</button>
@@ -41,29 +26,221 @@
 
   <main class="page-shell">
     <h1 class="page-title">Invoicing</h1>
-    <p class="page-subtitle">Invoice creation, follow-up, previews and proceed-to-invoice workflow.</p>
+    <p class="page-subtitle">Proceed-to-invoice settings and invoice follow-up, per project.</p>
 
-    <div class="empty-state">
-      <div class="empty-state__icon" aria-hidden="true">🚧</div>
-      <h2 style="margin:0 0 0.5rem; font-size:1.1rem;">This module isn't built yet</h2>
-      <p style="color:var(--text-secondary); font-size:0.9rem; margin:0;">
-        Projects is the first module wired to real data. Invoicing is next on the
-        progressive delivery roadmap — the same shared shell (header, sign-in,
-        colours) is already in place so it can be dropped in without reworking
-        the rest of the app.
-      </p>
+    <div class="inv-filters">
+      <button data-bucket="not-released" class="inv-filter-btn" aria-selected="false">Not released</button>
+      <button data-bucket="not-started" class="inv-filter-btn" aria-selected="false">Not started</button>
+      <button data-bucket="partial" class="inv-filter-btn" aria-selected="false">Partially invoiced</button>
+      <button data-bucket="total" class="inv-filter-btn" aria-selected="false">Totally invoiced</button>
+      <button data-bucket="all" class="inv-filter-btn" aria-selected="true">All</button>
+      <div class="inv-filter-spacer"></div>
+      <input id="searchBox" type="text" placeholder="Search by project code or name…" />
+    </div>
+
+    <div class="inv-table-wrap">
+      <table class="inv-table">
+        <thead>
+          <tr>
+            <th>Project</th>
+            <th>Entity</th>
+            <th style="text-align:right;">Budget</th>
+            <th style="text-align:right;">Invoiced</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="invTableBody"></tbody>
+      </table>
+      <div id="invEmpty" class="bp-empty hidden">No projects match this filter.</div>
     </div>
   </main>
 
+  <div id="toastHost" class="toast-host"></div>
+
+  <!-- ============================ PROJECT INVOICING MODAL ============================ -->
+  <div id="modalOverlay" class="modal-overlay hidden">
+    <div class="modal-panel" style="max-width:900px;">
+      <div class="modal-head">
+        <input id="mTitle" type="text" disabled style="opacity:0.9;" />
+        <button id="mClose" class="modal-head-btn modal-head-btn--close" title="Close">✕</button>
+      </div>
+      <div class="modal-tabs">
+        <button data-mtab="release" class="modal-tab" aria-selected="true">Proceed to invoice</button>
+        <button data-mtab="invoices" class="modal-tab" aria-selected="false">Invoices</button>
+      </div>
+      <div class="modal-body">
+        <div id="paneRelease" class="modal-pane">
+          <div class="field-section">
+            <h3>Proceed-to-invoice settings</h3>
+            <div class="field-grid">
+              <div class="span-2">
+                <label style="display:flex; align-items:center; gap:0.4rem; font-size:0.85rem;">
+                  <input id="relProceed" type="checkbox" /> Proceed to invoice
+                </label>
+              </div>
+              <div>
+                <label class="field-label">Scheduling</label>
+                <select id="relSchedule" class="field-input"></select>
+              </div>
+              <div>
+                <label class="field-label">Delivery method</label>
+                <select id="relDelivery" class="field-input"></select>
+              </div>
+              <div>
+                <label class="field-label">Invoices to be issued</label>
+                <input id="relNumInvoices" type="number" min="1" class="field-input" />
+              </div>
+              <div></div>
+              <div>
+                <label class="field-label">First invoice date</label>
+                <input id="relFirstDate" type="date" class="field-input" />
+              </div>
+              <div>
+                <label class="field-label">Last invoice date</label>
+                <input id="relLastDate" type="date" class="field-input" />
+              </div>
+            </div>
+          </div>
+          <button id="relSave" class="btn btn-primary">Save settings</button>
+        </div>
+
+        <div id="paneInvoices" class="modal-pane hidden">
+          <div style="display:flex; justify-content:flex-end; margin-bottom:0.75rem;">
+            <button id="btnNewInvoice" class="btn btn-primary">+ New invoice</button>
+          </div>
+          <table class="mini-table">
+            <thead>
+              <tr>
+                <th>Code</th>
+                <th>Status</th>
+                <th style="text-align:right;">Amount</th>
+                <th style="text-align:right;">VAT</th>
+                <th>Issue date</th>
+                <th>Tax company</th>
+                <th></th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="invoicesTableBody"></tbody>
+          </table>
+          <div id="invoicesEmpty" class="sub-empty hidden">No invoices for this project yet.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================ NEW/EDIT INVOICE MODAL ============================ -->
+  <div id="invoiceOverlay" class="modal-overlay hidden">
+    <div class="modal-panel" style="max-width:640px;">
+      <div class="modal-head">
+        <h2 id="invModalTitle" style="flex:1; font-size:1rem; font-weight:700; color:#fff; margin:0;">New invoice</h2>
+        <button id="invClose" class="modal-head-btn modal-head-btn--close" title="Close">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="field-section">
+          <div class="field-grid">
+            <div class="span-2">
+              <label style="display:flex; align-items:center; gap:0.4rem; font-size:0.85rem;">
+                <input id="invIsCorrective" type="checkbox" /> This is a corrective invoice
+              </label>
+            </div>
+            <div id="invSourceRow" class="span-2 hidden">
+              <label class="field-label">Source invoice (will be cancelled)</label>
+              <select id="invSourceInvoice" class="field-input"></select>
+            </div>
+          </div>
+        </div>
+
+        <div class="field-section">
+          <h3>Dates</h3>
+          <div class="field-grid">
+            <div>
+              <label class="field-label">Issue date</label>
+              <input id="invDate" type="date" class="field-input" />
+            </div>
+            <div>
+              <label class="field-label">Due date</label>
+              <input id="invDueDate" type="date" class="field-input" />
+            </div>
+            <div>
+              <label class="field-label">Sent date</label>
+              <input id="invSentDate" type="date" class="field-input" />
+            </div>
+            <div>
+              <label class="field-label">Deposit (collected) date</label>
+              <input id="invDipositDate" type="date" class="field-input" />
+            </div>
+          </div>
+          <div style="padding:0 0.75rem 0.75rem;">
+            <span class="field-label">Status (auto-computed from the dates above)</span>
+            <div><span id="invStatusPreview" class="inv-status-pill">—</span></div>
+          </div>
+        </div>
+
+        <div class="field-section">
+          <h3>Amount &amp; VAT</h3>
+          <div class="field-grid">
+            <div>
+              <label class="field-label">Amount</label>
+              <input id="invAmount" type="number" step="0.01" class="field-input" />
+            </div>
+            <div>
+              <label class="field-label">VAT type</label>
+              <select id="invVatType" class="field-input"></select>
+            </div>
+            <div class="span-2">
+              <span class="field-label">VAT amount (auto-computed)</span>
+              <div class="field-static" id="invVatAmountPreview">—</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="field-section">
+          <h3>Billing details</h3>
+          <div class="field-grid">
+            <div>
+              <label class="field-label">Tax company (business partner to invoice)</label>
+              <select id="invTaxCompany" class="field-input"></select>
+            </div>
+            <div>
+              <label class="field-label">Deposit account</label>
+              <select id="invDepositAccount" class="field-input"></select>
+            </div>
+            <div>
+              <label class="field-label">Num. OC client</label>
+              <input id="invNumOcClient" type="text" class="field-input" />
+            </div>
+            <div>
+              <label class="field-label">Purchase order</label>
+              <input id="invPurchaseOrder" type="text" class="field-input" />
+            </div>
+            <div class="span-2">
+              <label class="field-label">Description of service</label>
+              <textarea id="invDescription" class="field-input" rows="2"></textarea>
+            </div>
+            <div class="span-2">
+              <label class="field-label">Comments</label>
+              <textarea id="invComments" class="field-input" rows="2"></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style="flex-shrink:0; border-top:1px solid var(--border-subtle); padding:0.75rem 1.1rem; display:flex; justify-content:space-between; gap:0.5rem;">
+        <div style="display:flex; gap:0.5rem;">
+          <button id="invDelete" class="btn btn-secondary hidden" style="color:var(--danger);">Delete invoice</button>
+          <button id="invViewPdf" class="btn btn-secondary hidden">View PDF</button>
+        </div>
+        <div style="display:flex; gap:0.5rem; margin-left:auto;">
+          <button id="invCancel" class="btn btn-secondary">Cancel</button>
+          <button id="invSave" class="btn btn-primary">Save invoice</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="../js/config.js"></script>
   <script src="../js/auth.js"></script>
-  <script>
-    const session = HITT_AUTH.requireSession("../index.html");
-    if (session) {
-      document.getElementById("userName").textContent = session.displayName;
-      document.getElementById("userAvatar").textContent = HITT_AUTH.initials(session);
-    }
-    document.getElementById("btnSignOut").addEventListener("click", () => HITT_AUTH.signOut("../index.html"));
-  </script>
+  <script src="../js/api.js"></script>
+  <script src="../js/invoicing.js"></script>
 </body>
 </html>

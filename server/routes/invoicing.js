@@ -1,0 +1,402 @@
+/**
+ * /api/invoicing
+ * ---------------------------------------------------------------------------
+ * Mirrors Access's Invoicing_Main.frm (project dashboard) + ProceedToInvoice.frm
+ * (per-project release settings) + Invoice-New_Edit.frm (invoice CRUD). Real
+ * schema (confirmed 2026-08-25):
+ *
+ *   invoicingprojectrelease  one row per project once released for invoicing:
+ *                            proceedtoinvoice, invpaymethodid (delivery
+ *                            method), scheduletypeid, numberofinvoices,
+ *                            firstdate, lastdate
+ *   invoices                 invoicecode, invoicestatusid, invoiceyear,
+ *                            invoiceseq, iscorrective, sourceinvoiceid,
+ *                            projectid
+ *   invoicesdetails          1:1 with invoices (invoiceid): amount, the
+ *                            three status-driving dates (invoicedate,
+ *                            invoicesentdate, invoicedipositdate),
+ *                            invoiceduedate, vatid/vatamount, business
+ *                            partner refs, comments
+ *   invoicesstatus / invoicescheduletypes / invoicepaymentmethods /
+ *   invoices_vattypes        small reference tables (see /lookups)
+ *
+ * Status is NEVER set directly — it's always derived from the three dates
+ * via the DB function set_new_invoice_status(), already deployed on this
+ * database (ported from the Access VBA rule). Creating a corrective invoice
+ * (isCorrective + sourceInvoiceId) auto-cancels the source invoice
+ * (status 6), matching Access's CancelInvoice behaviour.
+ *
+ * Invoice numbering simplification: real Access data pools HITT and
+ * HiTT/OSM into one shared per-year sequence with FHiTT separate; that
+ * nuance isn't replicated here. This uses one pooled sequence per
+ * (year, corrective) across all entities — matches the visible pattern in
+ * the test data (consecutive codes like 2026-002/003/004) but hasn't been
+ * verified against the exact historical Access numbering rule. Fine for
+ * this test environment; flag to finance before this goes near production.
+ *
+ * PDF generation (GET /invoices/:id/pdf) matches a real sample invoice
+ * Alex provided directly. The entity letterhead (legal name/address/VAT/
+ * email/web) isn't stored in the DB anywhere — invoicedocumentcontrols/
+ * invoicedocumenttext only hold multi-language field LABELS, not entity
+ * data (confirmed those rows are NULL) — so it's hardcoded in
+ * lib/invoicePdf.js from the sample, for HiTT only. FHiTT/HiTT-OSM
+ * currently fall back to the same HiTT letterhead, which is almost
+ * certainly wrong for a different legal entity — see that file's header
+ * comment before sending one of those to a real client. Not built: a
+ * "send by email" action (Access's cmdSendToEmailPDF) — sending on the
+ * user's behalf needs explicit confirmation each time, not something to
+ * wire up silently.
+ * ---------------------------------------------------------------------------
+ */
+const express = require("express");
+const { pool } = require("../config/db");
+const { streamInvoicePdf } = require("../lib/invoicePdf");
+
+const router = express.Router();
+
+// GET /api/invoicing/lookups
+router.get("/lookups", async (req, res) => {
+  try {
+    const [statuses, scheduleTypes, deliveryMethods, vatTypes, bankAccounts] = await Promise.all([
+      pool.query(`SELECT id, statusdesc AS label FROM invoicesstatus ORDER BY id`),
+      pool.query(`SELECT id, scheduledesc AS label, defaultvalue FROM invoicescheduletypes ORDER BY id`),
+      pool.query(`SELECT id, methoddesc AS label FROM invoicepaymentmethods ORDER BY id`),
+      pool.query(`SELECT id, percentage, vatdescription_short_en AS label FROM invoices_vattypes ORDER BY id`),
+      // dipositaccountid on invoicesdetails references bankaccts.acctid, NOT bankaccts.id.
+      pool.query(`SELECT acctid AS id, bankname || ' — ' || iban AS label FROM bankaccts ORDER BY acctid`),
+    ]);
+    res.json({
+      statuses: statuses.rows,
+      scheduleTypes: scheduleTypes.rows,
+      deliveryMethods: deliveryMethods.rows,
+      vatTypes: vatTypes.rows,
+      bankAccounts: bankAccounts.rows,
+    });
+  } catch (err) {
+    console.error("[GET /api/invoicing/lookups] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
+// GET /api/invoicing/projects — dashboard list: every invoiceable project
+// with its release settings (if any), latest quotation budget, and
+// invoiced-to-date total so the frontend can bucket by
+// not-released/not-started/partial/total.
+router.get("/projects", async (req, res) => {
+  try {
+    const { rows } = await pool.query(`
+      SELECT p.id, p.projectnumber AS code, p.projectname AS name,
+             ent.entitydesc AS "entityLabel", ps.projectstatusdesc AS "projectStatusLabel",
+             q.finalquotation AS budget,
+             r.proceedtoinvoice, r.scheduletypeid, r.numberofinvoices,
+             r.firstdate, r.lastdate, r.invpaymethodid,
+             COUNT(i.id) FILTER (WHERE i.invoicestatusid IS DISTINCT FROM 6) AS "invoiceCount",
+             COALESCE(SUM(d.amount) FILTER (WHERE i.invoicestatusid IS DISTINCT FROM 6), 0) AS "invoicedTotal"
+      FROM projects p
+      LEFT JOIN entity ent ON ent.id = p.entityid::bigint
+      LEFT JOIN projectstatus ps ON ps.id = p.projectstatusid::bigint
+      LEFT JOIN LATERAL (
+        SELECT finalquotation FROM projectquotations
+        WHERE projectid = p.id ORDER BY quotationdate DESC NULLS LAST, id DESC LIMIT 1
+      ) q ON true
+      LEFT JOIN invoicingprojectrelease r ON r.projectid = p.id
+      LEFT JOIN invoices i ON i.projectid = p.id::double precision
+      LEFT JOIN invoicesdetails d ON d.invoiceid = i.id
+      WHERE p.notinvoiceable IS NOT TRUE
+      GROUP BY p.id, ent.entitydesc, ps.projectstatusdesc, q.finalquotation,
+               r.proceedtoinvoice, r.scheduletypeid, r.numberofinvoices,
+               r.firstdate, r.lastdate, r.invpaymethodid
+      ORDER BY p.projectnumber DESC
+    `);
+    res.json(rows);
+  } catch (err) {
+    console.error("[GET /api/invoicing/projects] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
+// GET /api/invoicing/projects/:projectId/release
+router.get("/projects/:projectId/release", async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT projectid, proceedtoinvoice, invpaymethodid, scheduletypeid,
+              numberofinvoices, firstdate, lastdate, updatedat, updatedby
+       FROM invoicingprojectrelease WHERE projectid = $1`,
+      [req.params.projectId]
+    );
+    res.json(rows[0] || null);
+  } catch (err) {
+    console.error("[GET /api/invoicing/projects/:projectId/release] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
+// PATCH /api/invoicing/projects/:projectId/release — upsert (Access's
+// ProceedToInvoice.frm save: insert if never released, else update).
+router.patch("/projects/:projectId/release", async (req, res) => {
+  const { projectId } = req.params;
+  const { proceedToInvoice, invPayMethodId, scheduleTypeId, numberOfInvoices, firstDate, lastDate, employeeId } = req.body || {};
+  try {
+    const existing = await pool.query(`SELECT id FROM invoicingprojectrelease WHERE projectid = $1`, [projectId]);
+    if (existing.rows.length) {
+      await pool.query(
+        `UPDATE invoicingprojectrelease SET
+           proceedtoinvoice = COALESCE($1, proceedtoinvoice),
+           invpaymethodid = $2, scheduletypeid = $3, numberofinvoices = $4,
+           firstdate = $5::date, lastdate = $6::date,
+           updatedat = now(), updatedby = $7
+         WHERE id = $8`,
+        [proceedToInvoice ?? null, invPayMethodId || null, scheduleTypeId || null, numberOfInvoices || null,
+         firstDate || null, lastDate || null, employeeId || null, existing.rows[0].id]
+      );
+    } else {
+      await pool.query(
+        `INSERT INTO invoicingprojectrelease
+           (projectid, proceedtoinvoice, invpaymethodid, scheduletypeid, numberofinvoices, firstdate, lastdate, updatedat, updatedby)
+         VALUES ($1, $2, $3, $4, $5, $6::date, $7::date, now(), $8)`,
+        [projectId, !!proceedToInvoice, invPayMethodId || null, scheduleTypeId || null, numberOfInvoices || null,
+         firstDate || null, lastDate || null, employeeId || null]
+      );
+    }
+    res.status(204).end();
+  } catch (err) {
+    console.error("[PATCH /api/invoicing/projects/:projectId/release] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
+// GET /api/invoicing/projects/:projectId/invoices
+router.get("/projects/:projectId/invoices", async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT i.id, i.invoicecode, i.invoicestatusid, ist.statusdesc AS "statusLabel",
+              i.invoiceyear, i.invoiceseq, i.iscorrective, i.sourceinvoiceid,
+              d.amount, d.invoicedate, d.invoiceduedate, d.invoicesentdate, d.invoicedipositdate,
+              d.numocclient, d.purchaseorder, d.descriptionservice, d.invoicecomments,
+              d.vatid, vt.vatdescription_short_en AS "vatLabel", d.vatamount,
+              d.busspartnertoinvoiceid, tc.taxcompanyname AS "invoicingPartnerLabel",
+              d.dipositaccountid
+       FROM invoices i
+       LEFT JOIN invoicesdetails d ON d.invoiceid = i.id
+       LEFT JOIN invoicesstatus ist ON ist.id = i.invoicestatusid::bigint
+       LEFT JOIN invoices_vattypes vt ON vt.id = d.vatid
+       LEFT JOIN taxcompanies tc ON tc.id = d.busspartnertoinvoiceid::bigint
+       WHERE i.projectid = $1::double precision
+       ORDER BY i.invoiceyear DESC NULLS LAST, i.invoiceseq DESC NULLS LAST, i.id DESC`,
+      [req.params.projectId]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error("[GET /api/invoicing/projects/:projectId/invoices] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
+// GET /api/invoicing/invoices/:id/pdf — streams the invoice as a PDF,
+// styled to match the real HITT invoice template. See lib/invoicePdf.js
+// for the letterhead-data caveat (HiTT only, confirmed from a real sample).
+router.get("/invoices/:id/pdf", async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT i.id, i.invoicecode,
+              d.amount, d.invoicedate, d.invoiceduedate, d.invoicesentdate, d.invoicedipositdate,
+              d.numocclient, d.purchaseorder, d.descriptionservice, d.invoicecomments,
+              vt.percentage AS "vatPercentage", d.vatamount,
+              tc.taxcompanyname AS "taxCompanyName", tc.vatnumber AS "taxCompanyVat",
+              tca.streetname AS "taxCompanyStreet", tca.zipcode AS "taxCompanyZip",
+              tca.city AS "taxCompanyCity", co.countrydesc AS "taxCompanyCountry",
+              p.projectnumber AS "projectCode", ent.entitydesc AS "entityLabel",
+              ba.bankname AS "bankName", ba.bankaddrline1 AS "bankAddressLine1",
+              ba.bankaddrline2 AS "bankAddressLine2", ba.iban, ba.bicswift AS "bicSwift"
+       FROM invoices i
+       LEFT JOIN invoicesdetails d ON d.invoiceid = i.id
+       LEFT JOIN projects p ON p.id = i.projectid::bigint
+       LEFT JOIN entity ent ON ent.id = p.entityid::bigint
+       LEFT JOIN invoices_vattypes vt ON vt.id = d.vatid
+       LEFT JOIN taxcompanies tc ON tc.id = d.busspartnertoinvoiceid::bigint
+       LEFT JOIN taxcompaniesaddresses tca ON tca.taxcompanyid = tc.id
+       LEFT JOIN countries co ON co.id = tca.countryid::bigint
+       LEFT JOIN bankaccts ba ON ba.acctid = d.dipositaccountid::bigint
+       WHERE i.id = $1`,
+      [req.params.id]
+    );
+    if (!rows.length) return res.status(404).json({ error: "not_found" });
+    const row = rows[0];
+    const zipCity = [row.taxCompanyZip, row.taxCompanyCity].filter(Boolean).join(" ");
+    streamInvoicePdf(res, {
+      ...row,
+      taxCompanyZipCity: row.taxCompanyCountry ? `${zipCity}, (${row.taxCompanyCountry})` : zipCity,
+    });
+  } catch (err) {
+    console.error("[GET /api/invoicing/invoices/:id/pdf] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
+async function computeVat(client, amount, vatId) {
+  const vt = await client.query(`SELECT percentage FROM invoices_vattypes WHERE id = $1`, [vatId || 4]);
+  const pct = Number(vt.rows[0]?.percentage ?? 0);
+  const vatAmount = amount ? Math.round(Number(amount) * (pct / 100) * 100) / 100 : 0;
+  return { pct, vatAmount };
+}
+
+async function computeStatus(client, invoiceDate, invoiceSentDate, invoiceDipositDate) {
+  const { rows } = await client.query(
+    `SELECT set_new_invoice_status($1::date, $2::date, $3::date) AS status`,
+    [invoiceDate || null, invoiceSentDate || null, invoiceDipositDate || null]
+  );
+  return rows[0].status;
+}
+
+// POST /api/invoicing/projects/:projectId/invoices — create (regular or
+// corrective). A corrective invoice auto-cancels its source invoice.
+router.post("/projects/:projectId/invoices", async (req, res) => {
+  const { projectId } = req.params;
+  const {
+    isCorrective, sourceInvoiceId, invoiceDate, invoiceDueDate, invoiceSentDate, invoiceDipositDate,
+    amount, vatId, numOcClient, purchaseOrder, descriptionService, invoiceComments,
+    taxCompanyId, dipositAccountId,
+  } = req.body || {};
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    const proj = await client.query(`SELECT busspartnerid, busspartnertoinvoiceid FROM projects WHERE id = $1`, [projectId]);
+    if (!proj.rows.length) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ error: "not_found", message: "project not found" });
+    }
+
+    const year = new Date(invoiceDate || Date.now()).getFullYear();
+    const seqRes = await client.query(
+      `SELECT COALESCE(MAX(invoiceseq), 0) + 1 AS next FROM invoices
+       WHERE invoiceyear = $1 AND COALESCE(iscorrective, false) = $2`,
+      [year, !!isCorrective]
+    );
+    const seq = Number(seqRes.rows[0].next);
+    const code = `${isCorrective ? "R" : ""}${year}-${String(seq).padStart(3, "0")}`;
+
+    const { vatAmount } = await computeVat(client, amount, vatId);
+    const status = await computeStatus(client, invoiceDate, invoiceSentDate, invoiceDipositDate);
+
+    const invRes = await client.query(
+      `INSERT INTO invoices (invoicecode, invoicestatusid, invoiceyear, invoiceseq, iscorrective, sourceinvoiceid, projectid)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING id`,
+      [code, status, year, seq, !!isCorrective, sourceInvoiceId || null, projectId]
+    );
+    const invoiceId = invRes.rows[0].id;
+
+    await client.query(
+      `INSERT INTO invoicesdetails
+         (invoiceid, amount, invoicedate, invoiceduedate, invoicesentdate, invoicedipositdate,
+          numocclient, purchaseorder, descriptionservice, invoicecomments, vatid, vatamount,
+          busspartnerid, busspartnertoinvoiceid, dipositaccountid)
+       VALUES ($1, $2, $3::date, $4::date, $5::date, $6::date, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
+      [
+        invoiceId, amount || null, invoiceDate || null, invoiceDueDate || null, invoiceSentDate || null, invoiceDipositDate || null,
+        numOcClient || null, purchaseOrder || null, descriptionService || null, invoiceComments || null,
+        vatId || 4, vatAmount, proj.rows[0].busspartnerid || null,
+        taxCompanyId || proj.rows[0].busspartnertoinvoiceid || null, dipositAccountId || null,
+      ]
+    );
+
+    if (isCorrective && sourceInvoiceId) {
+      await client.query(`UPDATE invoices SET invoicestatusid = 6 WHERE id = $1`, [sourceInvoiceId]);
+    }
+
+    await client.query("COMMIT");
+    res.status(201).json({ id: invoiceId, invoicecode: code, invoicestatusid: status });
+  } catch (err) {
+    await client.query("ROLLBACK");
+    console.error("[POST /api/invoicing/projects/:projectId/invoices] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  } finally {
+    client.release();
+  }
+});
+
+// PATCH /api/invoicing/invoices/:id — edit. Supports partial updates: any
+// field not present in the body keeps its current value. Status and VAT
+// amount are always recomputed server-side (from the merged, post-update
+// values) — never trusted from the client.
+router.patch("/invoices/:id", async (req, res) => {
+  const { id } = req.params;
+  const body = req.body || {};
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    const current = await client.query(`SELECT * FROM invoicesdetails WHERE invoiceid = $1`, [id]);
+    if (!current.rows.length) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ error: "not_found" });
+    }
+    const row = current.rows[0];
+
+    const merged = {
+      amount: body.amount !== undefined ? body.amount : row.amount,
+      invoiceDate: body.invoiceDate !== undefined ? body.invoiceDate : row.invoicedate,
+      invoiceDueDate: body.invoiceDueDate !== undefined ? body.invoiceDueDate : row.invoiceduedate,
+      invoiceSentDate: body.invoiceSentDate !== undefined ? body.invoiceSentDate : row.invoicesentdate,
+      invoiceDipositDate: body.invoiceDipositDate !== undefined ? body.invoiceDipositDate : row.invoicedipositdate,
+      numOcClient: body.numOcClient !== undefined ? body.numOcClient : row.numocclient,
+      purchaseOrder: body.purchaseOrder !== undefined ? body.purchaseOrder : row.purchaseorder,
+      descriptionService: body.descriptionService !== undefined ? body.descriptionService : row.descriptionservice,
+      invoiceComments: body.invoiceComments !== undefined ? body.invoiceComments : row.invoicecomments,
+      vatId: body.vatId !== undefined ? body.vatId : row.vatid,
+      taxCompanyId: body.taxCompanyId !== undefined ? body.taxCompanyId : row.busspartnertoinvoiceid,
+      dipositAccountId: body.dipositAccountId !== undefined ? body.dipositAccountId : row.dipositaccountid,
+    };
+
+    const { vatAmount } = await computeVat(client, merged.amount, merged.vatId);
+    const status = await computeStatus(client, merged.invoiceDate, merged.invoiceSentDate, merged.invoiceDipositDate);
+
+    await client.query(
+      `UPDATE invoicesdetails SET
+         amount = $1, invoicedate = $2::date, invoiceduedate = $3::date,
+         invoicesentdate = $4::date, invoicedipositdate = $5::date,
+         numocclient = $6, purchaseorder = $7, descriptionservice = $8, invoicecomments = $9,
+         vatid = $10, vatamount = $11, busspartnertoinvoiceid = $12, dipositaccountid = $13
+       WHERE invoiceid = $14`,
+      [
+        merged.amount || null, merged.invoiceDate || null, merged.invoiceDueDate || null,
+        merged.invoiceSentDate || null, merged.invoiceDipositDate || null,
+        merged.numOcClient || null, merged.purchaseOrder || null, merged.descriptionService || null, merged.invoiceComments || null,
+        merged.vatId || 4, vatAmount, merged.taxCompanyId || null, merged.dipositAccountId || null, id,
+      ]
+    );
+    await client.query(`UPDATE invoices SET invoicestatusid = $1 WHERE id = $2`, [status, id]);
+
+    await client.query("COMMIT");
+    res.json({ invoicestatusid: status, vatamount: vatAmount });
+  } catch (err) {
+    await client.query("ROLLBACK");
+    console.error("[PATCH /api/invoicing/invoices/:id] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  } finally {
+    client.release();
+  }
+});
+
+// DELETE /api/invoicing/invoices/:id
+router.delete("/invoices/:id", async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query(`DELETE FROM invoicesdetails WHERE invoiceid = $1`, [req.params.id]);
+    await client.query(`DELETE FROM invoices WHERE id = $1`, [req.params.id]);
+    await client.query("COMMIT");
+    res.status(204).end();
+  } catch (err) {
+    await client.query("ROLLBACK");
+    console.error("[DELETE /api/invoicing/invoices/:id] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  } finally {
+    client.release();
+  }
+});
+
+module.exports = router;

@@ -34,7 +34,7 @@ window.HITT_CONFIG = {
     projectsLive: true,        // Projects kanban tries the API, falls back to demo data
     businessPartnersLive: true,
     timeAllocationLive: true,
-    invoicingLive: false,
+    invoicingLive: true,
   },
 
   APP_VERSION: "0.1.0-prototype",

@@ -73,6 +73,18 @@ const HITT_API = (() => {
     withdrawTimeOffRequest: (id) => request(`/api/time-off/requests/${id}/withdraw`, { method: "PATCH" }),
     getTimeOffBalance: (empId, year) =>
       request(`/api/time-off/balance?empId=${encodeURIComponent(empId)}&year=${encodeURIComponent(year)}`),
+
+    getInvoicingLookups: () => request("/api/invoicing/lookups"),
+    getInvoicingProjects: () => request("/api/invoicing/projects"),
+    getProjectRelease: (projectId) => request(`/api/invoicing/projects/${projectId}/release`),
+    saveProjectRelease: (projectId, payload) =>
+      request(`/api/invoicing/projects/${projectId}/release`, { method: "PATCH", body: JSON.stringify(payload) }),
+    getProjectInvoices: (projectId) => request(`/api/invoicing/projects/${projectId}/invoices`),
+    createInvoice: (projectId, payload) =>
+      request(`/api/invoicing/projects/${projectId}/invoices`, { method: "POST", body: JSON.stringify(payload) }),
+    updateInvoice: (id, payload) =>
+      request(`/api/invoicing/invoices/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
+    deleteInvoice: (id) => request(`/api/invoicing/invoices/${id}`, { method: "DELETE" }),
     createProject: (payload) =>
       request("/api/projects", { method: "POST", body: JSON.stringify(payload) }),
     updateProjectStage: (id, stage) =>
