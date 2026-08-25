@@ -42,6 +42,21 @@ const HITT_API = (() => {
     addProjectNote: (id, payload) =>
       request(`/api/projects/${id}/notes`, { method: "POST", body: JSON.stringify(payload) }),
     getProjectQuotations: (id) => request(`/api/projects/${id}/quotations`),
+
+    getBusinessPartners: (q) => request(`/api/business-partners${q ? `?q=${encodeURIComponent(q)}` : ""}`),
+    getBusinessPartnerLookups: () => request("/api/business-partners/lookups"),
+    getBusinessPartner: (id) => request(`/api/business-partners/${id}`),
+    createBusinessPartner: (payload) =>
+      request("/api/business-partners", { method: "POST", body: JSON.stringify(payload) }),
+    updateBusinessPartner: (id, payload) =>
+      request(`/api/business-partners/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
+    getBusinessPartnerContacts: (id) => request(`/api/business-partners/${id}/contacts`),
+    addBusinessPartnerContact: (id, payload) =>
+      request(`/api/business-partners/${id}/contacts`, { method: "POST", body: JSON.stringify(payload) }),
+    getBusinessPartnerNotes: (id) => request(`/api/business-partners/${id}/notes`),
+    addBusinessPartnerNote: (id, payload) =>
+      request(`/api/business-partners/${id}/notes`, { method: "POST", body: JSON.stringify(payload) }),
+    getBusinessPartnerTaxCompanies: (id) => request(`/api/business-partners/${id}/tax-companies`),
     createProject: (payload) =>
       request("/api/projects", { method: "POST", body: JSON.stringify(payload) }),
     updateProjectStage: (id, stage) =>

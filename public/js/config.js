@@ -32,7 +32,7 @@ window.HITT_CONFIG = {
   FEATURES: {
     msalLoginEnabled: false,   // true once tenant/client IDs + validation are wired up
     projectsLive: true,        // Projects kanban tries the API, falls back to demo data
-    businessPartnersLive: false,
+    businessPartnersLive: true,
     timeAllocationLive: false,
     invoicingLive: false,
   },

@@ -5,25 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Business partners · HITT Ops</title>
 <link rel="stylesheet" href="../css/styles.css" />
-<style>
-  .empty-state {
-    max-width: 520px;
-    margin: 3rem auto 0;
-    text-align: center;
-    background: var(--bg-surface);
-    border: 1px dashed var(--border-subtle);
-    border-radius: var(--radius-lg);
-    padding: 2.5rem 2rem;
-  }
-  .empty-state__icon {
-    width: 56px; height: 56px;
-    border-radius: 50%;
-    background: var(--bg-surface-alt);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 1.6rem;
-    margin: 0 auto 1rem;
-  }
-</style>
+<link rel="stylesheet" href="../css/business-partners.css" />
 </head>
 <body>
   <header class="app-header">
@@ -33,6 +15,7 @@
       <a href="business-partners.html" class="active">Business partners</a>
     </nav>
     <div class="app-header__user">
+      <span id="dataSourcePill" class="data-pill" style="font-size:10px; font-weight:700; padding:2px 8px; border-radius:999px;">…</span>
       <div class="avatar" id="userAvatar">?</div>
       <span id="userName">Signed in</span>
       <button class="btn btn-secondary" id="btnSignOut" style="padding:0.35rem 0.75rem; font-size:0.8rem;">Sign out</button>
@@ -43,27 +26,174 @@
     <h1 class="page-title">Business partners</h1>
     <p class="page-subtitle">Search and manage clients, suppliers, contacts and tax entities.</p>
 
-    <div class="empty-state">
-      <div class="empty-state__icon" aria-hidden="true">🚧</div>
-      <h2 style="margin:0 0 0.5rem; font-size:1.1rem;">This module isn't built yet</h2>
-      <p style="color:var(--text-secondary); font-size:0.9rem; margin:0;">
-        Projects is the first module wired to real data. Business partners is next on the
-        progressive delivery roadmap — the same shared shell (header, sign-in,
-        colours) is already in place so it can be dropped in without reworking
-        the rest of the app.
-      </p>
+    <div class="bp-toolbar">
+      <input id="searchBox" type="text" placeholder="Search by name…" />
+      <span id="bpCount" class="bp-count"></span>
+      <button class="btn btn-primary" id="btnNewBp">+ New business partner</button>
+    </div>
+
+    <div class="bp-table-wrap">
+      <table class="bp-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Entity</th>
+            <th>Company type</th>
+            <th>Country</th>
+            <th>Website</th>
+          </tr>
+        </thead>
+        <tbody id="bpTableBody"></tbody>
+      </table>
+      <div id="bpEmpty" class="bp-empty hidden">No business partners found.</div>
     </div>
   </main>
 
+  <div id="toastHost" class="toast-host"></div>
+
+  <!-- ============================ DETAIL MODAL ============================ -->
+  <div id="modalOverlay" class="modal-overlay hidden">
+    <div class="modal-panel">
+      <div class="modal-head">
+        <input id="mName" type="text" placeholder="Business partner name" />
+        <button id="mSave" class="modal-head-btn modal-head-btn--save" title="Save">✓</button>
+        <button id="mClose" class="modal-head-btn modal-head-btn--close" title="Close">✕</button>
+      </div>
+      <div class="modal-tabs">
+        <button data-mtab="general" class="modal-tab" aria-selected="true">General</button>
+        <button data-mtab="invoicing" class="modal-tab" aria-selected="false">Invoicing info</button>
+      </div>
+      <div class="modal-body">
+        <div id="paneGeneral" class="modal-pane">
+          <div class="field-section">
+            <h3>General info</h3>
+            <div class="field-grid">
+              <div>
+                <label class="field-label">Entity</label>
+                <select id="mEntity" class="field-input"></select>
+              </div>
+              <div>
+                <label class="field-label">Type of company</label>
+                <select id="mCompanyType" class="field-input"></select>
+              </div>
+              <div>
+                <label class="field-label">Language</label>
+                <select id="mLanguage" class="field-input"></select>
+              </div>
+              <div>
+                <label class="field-label">Webpage</label>
+                <input id="mWebpage" type="text" class="field-input" placeholder="https://…" />
+              </div>
+            </div>
+          </div>
+
+          <div class="field-section">
+            <h3>Address</h3>
+            <div class="field-grid">
+              <div class="span-2">
+                <label class="field-label">Street name</label>
+                <input id="mStreetName" type="text" class="field-input" />
+              </div>
+              <div>
+                <label class="field-label">City</label>
+                <input id="mCity" type="text" class="field-input" />
+              </div>
+              <div>
+                <label class="field-label">State/Province</label>
+                <input id="mState" type="text" class="field-input" />
+              </div>
+              <div>
+                <label class="field-label">Country</label>
+                <select id="mCountry" class="field-input"></select>
+              </div>
+              <div>
+                <label class="field-label">Zip code</label>
+                <input id="mZipCode" type="text" class="field-input" />
+              </div>
+              <div>
+                <label class="field-label">Phone number #1</label>
+                <input id="mPhone1" type="text" class="field-input" />
+              </div>
+              <div>
+                <label class="field-label">Phone number #2</label>
+                <input id="mPhone2" type="text" class="field-input" />
+              </div>
+            </div>
+          </div>
+
+          <div class="field-section">
+            <h3>Contacts</h3>
+            <div id="mContactsList" class="sub-list"></div>
+            <div class="sub-add-row">
+              <input id="mNewContactName" type="text" placeholder="Contact name…" class="field-input" />
+              <input id="mNewContactPosition" type="text" placeholder="Position…" class="field-input" style="max-width:9rem;" />
+              <input id="mNewContactEmail" type="text" placeholder="Email…" class="field-input" style="max-width:12rem;" />
+              <button id="mAddContact" class="btn-icon-add">Add</button>
+            </div>
+          </div>
+
+          <div class="field-section">
+            <h3>Notes</h3>
+            <div id="mNotesList" class="sub-list"></div>
+            <div class="sub-add-row">
+              <input id="mNewNote" type="text" placeholder="Type here for a new note" class="field-input" />
+              <button id="mAddNote" class="btn-icon-add">Add note</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="paneInvoicing" class="modal-pane hidden">
+          <div class="field-section">
+            <h3>Tax companies</h3>
+            <table class="mini-table">
+              <thead>
+                <tr>
+                  <th>Tax company name</th>
+                  <th>VAT number</th>
+                  <th>Invoicing email</th>
+                  <th>Address</th>
+                </tr>
+              </thead>
+              <tbody id="mTaxCompanies"></tbody>
+            </table>
+            <div style="padding:0.6rem 0.75rem; font-size:0.72rem; color:var(--text-secondary);">Read-only — tax companies are entered through the finance workflow.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================ NEW BP MODAL ============================ -->
+  <div id="newBpOverlay" class="modal-overlay hidden">
+    <div class="modal-panel modal-panel--sm">
+      <div class="modal-head">
+        <input id="npName" type="text" placeholder="Business partner name" />
+        <button id="npClose" class="modal-head-btn modal-head-btn--close" title="Close">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="field-section">
+          <div class="field-grid">
+            <div>
+              <label class="field-label">Entity</label>
+              <select id="npEntity" class="field-input"></select>
+            </div>
+            <div>
+              <label class="field-label">Type of company</label>
+              <select id="npCompanyType" class="field-input"></select>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style="flex-shrink:0; border-top:1px solid var(--border-subtle); padding:0.75rem 1.1rem; display:flex; justify-content:flex-end; gap:0.5rem;">
+        <button id="npCancel" class="btn btn-secondary">Cancel</button>
+        <button id="npSave" class="btn btn-primary">Create</button>
+      </div>
+    </div>
+  </div>
+
   <script src="../js/config.js"></script>
   <script src="../js/auth.js"></script>
-  <script>
-    const session = HITT_AUTH.requireSession("../index.html");
-    if (session) {
-      document.getElementById("userName").textContent = session.displayName;
-      document.getElementById("userAvatar").textContent = HITT_AUTH.initials(session);
-    }
-    document.getElementById("btnSignOut").addEventListener("click", () => HITT_AUTH.signOut("../index.html"));
-  </script>
+  <script src="../js/api.js"></script>
+  <script src="../js/business-partners.js"></script>
 </body>
 </html>
