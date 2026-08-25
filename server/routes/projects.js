@@ -78,18 +78,52 @@ router.get("/statuses", async (req, res) => {
   }
 });
 
-// GET /api/projects/:id — single project detail (general info only for now;
-// deliverables/quotations/expenses/notes get their own routes later).
+// GET /api/projects/lookups — small reference lists for the project edit
+// modal (entity, biotech spectrum, project type). Mirrors /statuses.
+router.get("/lookups", async (req, res) => {
+  try {
+    const [entities, biotechSpectrums, projectTypes] = await Promise.all([
+      pool.query(`SELECT id, entitydesc AS label FROM entity ORDER BY entitydesc`),
+      pool.query(`SELECT id, spectrumdesc AS label FROM biotechspectrums ORDER BY spectrumdesc`),
+      pool.query(`SELECT id, projecttypedesc AS label FROM projecttypes ORDER BY projecttypedesc`),
+    ]);
+    res.json({
+      entities: entities.rows,
+      biotechSpectrums: biotechSpectrums.rows,
+      projectTypes: projectTypes.rows,
+    });
+  } catch (err) {
+    console.error("[GET /api/projects/lookups] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
+// GET /api/projects/:id — single project detail, including the fields
+// shown on the Access "EditProject" form's General tab (entity, biotech
+// spectrum, project type, contracting business partner, invoicing business
+// partner) resolved to human-readable labels via their lookup tables.
+// Deliverables/quotations/expenses/notes get their own routes later.
 router.get("/:id", async (req, res) => {
   try {
     const { rows } = await pool.query(
       `SELECT p.id, p.projectnumber AS code, p.projectname AS name,
               p.projectstatusid AS stage, COALESCE(pp.progress, 0) AS progress,
-              p.entrydate, p.entityid, p.biospectrumid, p.projecttypeid,
-              p.busspartnerid, p.busspartnertoinvoiceid, p.bprunningname,
-              p.notinvoiceable, p.lastupdated, p.lastupdatedby
+              p.entrydate, p.entityid, ent.entitydesc AS "entityLabel",
+              p.biospectrumid, bs.spectrumdesc AS "biospectrumLabel",
+              p.projecttypeid, pt.projecttypedesc AS "projectTypeLabel",
+              p.busspartnerid, bp.bpname AS "businessPartnerLabel",
+              p.busspartnertoinvoiceid, tc.taxcompanyname AS "invoicingPartnerLabel",
+              p.bprunningname, p.notinvoiceable,
+              p.lastupdated, p.lastupdatedby,
+              NULLIF(TRIM(CONCAT(upd.employeefirstname, ' ', upd.employeelastname)), '') AS "lastUpdatedByName"
        FROM projects p
        ${LATEST_PROGRESS_SUBQUERY}
+       LEFT JOIN entity ent ON ent.id = p.entityid::bigint
+       LEFT JOIN biotechspectrums bs ON bs.id = p.biospectrumid::bigint
+       LEFT JOIN projecttypes pt ON pt.id = p.projecttypeid::bigint
+       LEFT JOIN businesspartners bp ON bp.id = p.busspartnerid::bigint
+       LEFT JOIN taxcompanies tc ON tc.id = p.busspartnertoinvoiceid::bigint
+       LEFT JOIN employees upd ON upd.id = p.lastupdatedby::bigint
        WHERE p.id = $1`,
       [req.params.id]
     );
@@ -159,11 +193,18 @@ router.patch("/:id/stage", async (req, res) => {
   }
 });
 
-// PATCH /api/projects/:id — general edit from the project modal (status +
-// progress today; extend with more fields as the modal grows real tabs).
+// PATCH /api/projects/:id — general edit from the project modal (status,
+// progress, and the General-tab fields mirrored from the Access
+// EditProject form: entity, biotech spectrum, project type, BP running
+// name, not-invoiceable). Contracting/invoicing business partner are
+// read-only here — picking a different one belongs to the Business
+// Partners module's search UI, not this form.
 router.patch("/:id", async (req, res) => {
   const { id } = req.params;
-  const { stage, progress, employeeId } = req.body || {};
+  const {
+    stage, progress, employeeId,
+    entityId, biospectrumId, projectTypeId, bpRunningName, notInvoiceable,
+  } = req.body || {};
 
   const client = await pool.connect();
   try {
@@ -182,6 +223,23 @@ router.patch("/:id", async (req, res) => {
         [id, progress, employeeId || null]
       );
     }
+    if (entityId !== undefined || biospectrumId !== undefined || projectTypeId !== undefined
+        || bpRunningName !== undefined || notInvoiceable !== undefined) {
+      await client.query(
+        `UPDATE projects SET
+           entityid = COALESCE($1, entityid),
+           biospectrumid = COALESCE($2, biospectrumid),
+           projecttypeid = COALESCE($3, projecttypeid),
+           bprunningname = COALESCE($4, bprunningname),
+           notinvoiceable = COALESCE($5, notinvoiceable),
+           lastupdated = now(), lastupdatedby = $6
+         WHERE id = $7`,
+        [
+          entityId ?? null, biospectrumId ?? null, projectTypeId ?? null,
+          bpRunningName ?? null, notInvoiceable ?? null, employeeId || null, id,
+        ]
+      );
+    }
 
     await client.query("COMMIT");
     res.status(204).end();
@@ -191,6 +249,106 @@ router.patch("/:id", async (req, res) => {
     res.status(502).json({ error: "database_unreachable", message: err.message });
   } finally {
     client.release();
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Project modal sub-tabs: deliverables, notes, quotations. Mirrors the
+// Access "EditProject" form's subforms of the same name.
+// ---------------------------------------------------------------------------
+
+// GET /api/projects/:id/deliverables
+router.get("/:id/deliverables", async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, deliverablename, deliverydate, effectivedd
+       FROM projectdeliverables
+       WHERE projectid = $1
+       ORDER BY deliverydate NULLS LAST, id`,
+      [req.params.id]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error("[GET /api/projects/:id/deliverables] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
+// POST /api/projects/:id/deliverables — add a new deliverable row.
+router.post("/:id/deliverables", async (req, res) => {
+  const { deliverablename, deliverydate, effectivedd } = req.body || {};
+  if (!deliverablename) {
+    return res.status(400).json({ error: "validation_error", message: "deliverablename is required" });
+  }
+  try {
+    const { rows } = await pool.query(
+      `INSERT INTO projectdeliverables (projectid, deliverablename, deliverydate, effectivedd)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id, deliverablename, deliverydate, effectivedd`,
+      [req.params.id, deliverablename, deliverydate || null, effectivedd || null]
+    );
+    res.status(201).json(rows[0]);
+  } catch (err) {
+    console.error("[POST /api/projects/:id/deliverables] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
+// GET /api/projects/:id/notes — newest first, author resolved via employees.
+router.get("/:id/notes", async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT n.id, n.notes, n.commentsts, n.employeeid,
+              NULLIF(TRIM(CONCAT(e.employeefirstname, ' ', e.employeelastname)), '') AS "authorName"
+       FROM projectnotes n
+       LEFT JOIN employees e ON e.id = n.employeeid::bigint
+       WHERE n.projectid = $1
+       ORDER BY n.commentsts DESC NULLS LAST, n.id DESC`,
+      [req.params.id]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error("[GET /api/projects/:id/notes] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
+// POST /api/projects/:id/notes — add a note.
+router.post("/:id/notes", async (req, res) => {
+  const { notes, employeeId } = req.body || {};
+  if (!notes || !notes.trim()) {
+    return res.status(400).json({ error: "validation_error", message: "notes text is required" });
+  }
+  try {
+    const { rows } = await pool.query(
+      `INSERT INTO projectnotes (projectid, notes, employeeid, commentsts)
+       VALUES ($1, $2, $3, now())
+       RETURNING id, notes, commentsts, employeeid`,
+      [req.params.id, notes.trim(), employeeId || null]
+    );
+    res.status(201).json(rows[0]);
+  } catch (err) {
+    console.error("[POST /api/projects/:id/notes] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
+// GET /api/projects/:id/quotations — read-only; quotations are entered
+// through the finance workflow, not this modal.
+router.get("/:id/quotations", async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, amountquoted, expenses, discountnegotiation, finalquotation,
+              quotationdate, details
+       FROM projectquotations
+       WHERE projectid = $1
+       ORDER BY quotationdate DESC NULLS LAST, id DESC`,
+      [req.params.id]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error("[GET /api/projects/:id/quotations] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
   }
 });
 

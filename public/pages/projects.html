@@ -4,124 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Projects · HITT Ops</title>
-<script src="https://cdn.tailwindcss.com"></script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../css/styles.css" />
-<script>
-  // Tailwind theme mapped straight onto the HITT corporate colour sheet.
-  tailwind.config = {
-    theme: {
-      extend: {
-        fontFamily: {
-          sans: ['Calibri', 'Segoe UI', 'Inter', 'system-ui', 'sans-serif'],
-          mono: ['JetBrains Mono', 'monospace'],
-        },
-        colors: {
-          hitt: {
-            ink:      '#171717', // near-black wordmark / primary text
-            charcoal: '#211916', // deepest surface
-            teal:     '#5C757C', // brand accent
-            sage:     '#ABAF96', // secondary accent
-            cream:    '#DAD4B2', // light tint / canvas
-            olive:    '#B3B07D', // secondary surface
-            amber:    '#BC9A1C', // call to action / highlight
-            canvas:   '#F5F4EE',
-            mist:     '#EFEDE3',
-            green:    '#6E8F5A',
-            red:      '#B24A3A',
-          }
-        },
-        boxShadow: {
-          card: '0 1px 2px rgba(23,23,23,0.06), 0 1px 1px rgba(23,23,23,0.04)',
-          cardHover: '0 8px 20px rgba(23,23,23,0.14), 0 2px 6px rgba(23,23,23,0.08)',
-          lift: '0 18px 30px rgba(23,23,23,0.22)',
-        }
-      }
-    }
-  }
-</script>
-<style>
-  html, body { height: 100%; }
-  body { background: #F5F4EE; }
-
-  ::-webkit-scrollbar { height: 8px; width: 8px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: #D9D4C4; border-radius: 8px; }
-  ::-webkit-scrollbar-thumb:hover { background: #C2BBA5; }
-
-  .card {
-    transition: transform .16s ease, box-shadow .16s ease, opacity .16s ease, border-color .16s ease;
-    touch-action: none;
-  }
-  .card:active { cursor: grabbing; }
-  .card.dragging { opacity: 0.35; transform: scale(0.97); }
-  .card-ghost {
-    position: fixed; pointer-events: none; z-index: 60;
-    transform: rotate(-2deg) scale(1.03);
-    box-shadow: 0 18px 30px rgba(23,23,23,0.28);
-    opacity: 0.96;
-  }
-  .col-body.drag-over {
-    background: rgba(92,117,124,0.08);
-    outline: 2px dashed #5C757C;
-    outline-offset: -6px;
-  }
-  .col-body.drag-invalid {
-    background: rgba(178,74,58,0.08);
-    outline: 2px dashed #B24A3A;
-    outline-offset: -6px;
-  }
-  @keyframes pop-in {
-    0%   { transform: scale(0.9); opacity: 0; }
-    60%  { transform: scale(1.03); opacity: 1; }
-    100% { transform: scale(1); }
-  }
-  .pop-in { animation: pop-in .28s cubic-bezier(.34,1.56,.64,1); }
-  @keyframes count-pulse {
-    0% { transform: scale(1); } 35% { transform: scale(1.25); } 100% { transform: scale(1); }
-  }
-  .count-pulse { animation: count-pulse .32s ease; }
-  @keyframes rail-flash {
-    0% { filter: brightness(1); } 40% { filter: brightness(1.6); } 100% { filter: brightness(1); }
-  }
-  .rail-flash { animation: rail-flash .5s ease; }
-  .tab-btn[aria-selected="true"] {
-    background: #171717; color: white;
-    box-shadow: 0 6px 14px rgba(23,23,23,0.28);
-  }
-  .kbd-focus:focus-visible { outline: 2px solid #BC9A1C; outline-offset: 2px; }
-  .fade-mask {
-    -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 22px), transparent 100%);
-    mask-image: linear-gradient(to bottom, black calc(100% - 22px), transparent 100%);
-  }
-  .toast { animation: toast-in .22s ease, toast-out .22s ease 2.6s forwards; }
-  @keyframes toast-in { from { transform: translateY(10px); opacity: 0;} to { transform: translateY(0); opacity: 1;} }
-  @keyframes toast-out { to { transform: translateY(10px); opacity: 0;} }
-  @media (prefers-reduced-motion: reduce) {
-    .card, .pop-in, .count-pulse, .rail-flash, .toast { animation: none !important; transition: none !important; }
-  }
-  .modal-overlay { animation: overlay-in .18s ease; }
-  @keyframes overlay-in { from { opacity: 0; } to { opacity: 1; } }
-  .modal-panel { animation: panel-in .22s cubic-bezier(.2,.9,.3,1.1); }
-  @keyframes panel-in {
-    from { opacity: 0; transform: translateY(14px) scale(.98); }
-    to   { opacity: 1; transform: translateY(0) scale(1); }
-  }
-  .field-label { font-size: 11px; font-weight: 600; color: #5C757C; letter-spacing: .01em; }
-  .field-input {
-    width: 100%; font-size: 13px; padding: 6px 8px;
-    border: 1px solid #E4E0D4; border-radius: 6px; background: #fff; color: #171717;
-  }
-  .field-input:disabled, .field-input[readonly] { background: #F5F4EE; color: #5C757C; }
-  .field-input:focus { outline: 2px solid #BC9A1C; outline-offset: 1px; border-color: #5C757C; }
-  .modal-tab[aria-selected="true"] { color: #171717; border-bottom-color: #171717; }
-  .modal-tab { border-bottom: 2px solid transparent; }
-  .grid-row:nth-child(even) { background: #FAF9F4; }
-  .data-pill {
-    font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 999px;
-  }
-</style>
+<link rel="stylesheet" href="../css/projects-tailwind.css" />
+<link rel="stylesheet" href="../css/projects.css" />
 </head>
 <body class="h-full font-sans text-hitt-ink antialiased">
 
@@ -234,7 +119,38 @@
                 <label class="field-label">Progress (%)</label>
                 <input id="mProgress" type="number" min="0" max="100" class="field-input mt-1" />
               </div>
+              <div>
+                <label class="field-label">Entity</label>
+                <select id="mEntity" class="field-input mt-1"></select>
+              </div>
+              <div>
+                <label class="field-label">Project type</label>
+                <select id="mProjectType" class="field-input mt-1"></select>
+              </div>
+              <div class="col-span-2">
+                <label class="field-label">Biotech spectrum</label>
+                <select id="mBioSpectrum" class="field-input mt-1"></select>
+              </div>
             </div>
+          </section>
+
+          <section class="bg-white rounded-lg border border-slate-200 shadow-card overflow-hidden">
+            <div class="bg-hitt-teal px-3 py-1.5"><h3 class="text-white text-xs font-bold tracking-wide">BUSINESS PARTNER</h3></div>
+            <div class="p-3 grid grid-cols-2 gap-3">
+              <div>
+                <label class="field-label">Contracting Business Partner</label>
+                <div id="mBusinessPartner" class="field-input mt-1" style="background:#F5F4EE; color:#5C757C;">—</div>
+              </div>
+              <div>
+                <label class="field-label">Business Partner to invoice</label>
+                <div id="mInvoicingPartner" class="field-input mt-1" style="background:#F5F4EE; color:#5C757C;">—</div>
+              </div>
+              <div class="col-span-2">
+                <label class="field-label">Buss partner running name</label>
+                <input id="mBPRunningName" type="text" class="field-input mt-1" />
+              </div>
+            </div>
+            <div class="px-2.5 pb-2.5 text-[11px] text-slate-400">Picking a different business partner needs the Business Partners module's search — not wired yet.</div>
           </section>
 
           <section class="bg-white rounded-lg border border-slate-200 shadow-card overflow-hidden">
@@ -251,7 +167,11 @@
                 <tbody id="mDeliverables"></tbody>
               </table>
             </div>
-            <div class="px-2.5 py-2 text-[11px] text-slate-400">Deliverables endpoint not wired yet — placeholder only.</div>
+            <div class="px-2.5 py-2 border-t border-slate-100 flex items-center gap-1.5">
+              <input id="mNewDeliverableExpected" type="date" class="field-input" style="width:8.5rem;" title="Expected date" />
+              <input id="mNewDeliverableName" type="text" placeholder="New deliverable name…" class="field-input flex-1 italic text-hitt-teal" />
+              <button id="mAddDeliverable" class="shrink-0 bg-hitt-teal text-white text-[11px] font-semibold px-3 py-2 rounded-md hover:bg-hitt-ink transition">Add</button>
+            </div>
           </section>
         </div>
 
@@ -272,12 +192,30 @@
       <div id="paneBudget" class="hidden p-4 sm:p-5 flex flex-col gap-4">
         <section class="bg-white rounded-lg border border-slate-200 shadow-card overflow-hidden">
           <div class="bg-hitt-teal px-3 py-1.5"><h3 class="text-white text-xs font-bold tracking-wide">PROJECT QUOTATIONS</h3></div>
-          <div class="p-3 text-xs text-slate-400">Quotations endpoint not wired yet — connect ProjectQuotations table to populate this.</div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-xs">
+              <thead>
+                <tr class="bg-hitt-mist text-hitt-teal text-left">
+                  <th class="px-2.5 py-1.5 font-semibold w-28">Date</th>
+                  <th class="px-2.5 py-1.5 font-semibold text-right">Amount quoted</th>
+                  <th class="px-2.5 py-1.5 font-semibold text-right">Discount</th>
+                  <th class="px-2.5 py-1.5 font-semibold text-right">Expenses</th>
+                  <th class="px-2.5 py-1.5 font-semibold text-right">Final quotation</th>
+                </tr>
+              </thead>
+              <tbody id="mQuotations"></tbody>
+            </table>
+          </div>
+          <div class="px-2.5 py-2 text-[11px] text-slate-400">Read-only — quotations are entered through the finance workflow.</div>
         </section>
         <section class="bg-white rounded-lg border border-slate-200 shadow-card overflow-hidden">
           <div class="bg-hitt-teal px-3 py-1.5"><h3 class="text-white text-xs font-bold tracking-wide">EXPENSES RECORDS</h3></div>
           <div class="p-3 text-xs text-slate-400">Expenses endpoint not wired yet — connect ExpensesRecordsProject table to populate this.</div>
         </section>
+        <label class="flex items-center gap-2 text-sm font-medium text-hitt-ink">
+          <input id="mNotInvoiceable" type="checkbox" class="w-4 h-4" />
+          Check if the project is NOT invoiceable
+        </label>
       </div>
     </div>
   </div>

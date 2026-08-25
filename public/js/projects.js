@@ -71,6 +71,7 @@ const DEMO_SEED = [
 ];
 
 let PROJECTS = [];
+let LOOKUPS = { entities: [], biotechSpectrums: [], projectTypes: [] };
 let usingDemoData = false;
 let currentTab = 'alive';
 let searchTerm = '';
@@ -120,6 +121,11 @@ async function loadProjects() {
       applyRealStatuses(statuses);
     } catch (statusErr) {
       console.warn("Could not load real project statuses, using fallback stage list:", statusErr);
+    }
+    try {
+      LOOKUPS = await HITT_API.getProjectLookups();
+    } catch (lookupErr) {
+      console.warn("Could not load entity/biotech-spectrum/project-type lookups:", lookupErr);
     }
     const data = await HITT_API.getProjects();
     // Expected shape from GET /api/projects: [{ id, code, name, stage, progress }]
@@ -312,7 +318,13 @@ function updateTabCounts(){
 const modalOverlay = document.getElementById('modalOverlay');
 const modalPanel = document.getElementById('modalPanel');
 
-function openProjectModal(id){
+function lookupOptionsHtml(rows, selectedId, includeBlank){
+  const opts = (includeBlank ? [`<option value="">—</option>`] : [])
+    .concat((rows || []).map(r => `<option value="${r.id}" ${String(r.id)===String(selectedId)?'selected':''}>${escapeHtml(r.label)}</option>`));
+  return opts.join('');
+}
+
+async function openProjectModal(id){
   const p = PROJECTS.find(x => x.id === id);
   if (!p) return;
   activeProjectId = id;
@@ -328,8 +340,27 @@ function openProjectModal(id){
   statusSel.innerHTML = STAGES.map(s => `<option value="${s.id}" ${s.id===p.stage?'selected':''}>${s.label}</option>`).join('');
   document.getElementById('mProgress').value = p.progress ?? 0;
 
+  // Entity/biotech-spectrum/project-type + business partner fields come
+  // from the full detail record (GET /api/projects/:id), not the list
+  // endpoint — populate selects with the lookup options now, values once
+  // the detail fetch resolves below.
+  document.getElementById('mEntity').innerHTML = lookupOptionsHtml(LOOKUPS.entities, null, true);
+  document.getElementById('mProjectType').innerHTML = lookupOptionsHtml(LOOKUPS.projectTypes, null, true);
+  document.getElementById('mBioSpectrum').innerHTML = lookupOptionsHtml(LOOKUPS.biotechSpectrums, null, true);
+  document.getElementById('mBusinessPartner').textContent = '—';
+  document.getElementById('mInvoicingPartner').textContent = '—';
+  document.getElementById('mBPRunningName').value = '';
+  document.getElementById('mNotInvoiceable').checked = false;
+
   document.getElementById('mDeliverables').innerHTML =
-    `<tr><td colspan="3" class="px-2.5 py-4 text-center text-slate-400 text-xs">No deliverables endpoint wired yet</td></tr>`;
+    `<tr><td colspan="3" class="px-2.5 py-4 text-center text-slate-400 text-xs">${usingDemoData ? 'Not available in demo data' : 'Loading…'}</td></tr>`;
+  document.getElementById('mQuotations').innerHTML =
+    `<tr><td colspan="5" class="px-2.5 py-4 text-center text-slate-400 text-xs">${usingDemoData ? 'Not available in demo data' : 'Loading…'}</td></tr>`;
+  document.getElementById('mNotesList').innerHTML =
+    `<div class="text-xs text-slate-400 text-center py-6">${usingDemoData ? 'Not available in demo data' : 'Loading…'}</div>`;
+  document.getElementById('mNewDeliverableName').value = '';
+  document.getElementById('mNewDeliverableExpected').value = '';
+  document.getElementById('mNewNote').value = '';
 
   document.querySelectorAll('[data-mtab]').forEach(b => b.setAttribute('aria-selected', b.dataset.mtab === 'general' ? 'true' : 'false'));
   document.getElementById('paneGeneral').classList.remove('hidden');
@@ -341,6 +372,94 @@ function openProjectModal(id){
 
   modalOverlay.classList.remove('hidden');
   document.body.style.overflow = 'hidden';
+
+  if (!usingDemoData) {
+    try {
+      const detail = await HITT_API.getProject(id);
+      if (activeProjectId !== id) return; // modal was closed/reopened while this was in flight
+      document.getElementById('mEntity').innerHTML = lookupOptionsHtml(LOOKUPS.entities, detail.entityid, true);
+      document.getElementById('mProjectType').innerHTML = lookupOptionsHtml(LOOKUPS.projectTypes, detail.projecttypeid, true);
+      document.getElementById('mBioSpectrum').innerHTML = lookupOptionsHtml(LOOKUPS.biotechSpectrums, detail.biospectrumid, true);
+      document.getElementById('mBusinessPartner').textContent = detail.businessPartnerLabel || '—';
+      document.getElementById('mInvoicingPartner').textContent = detail.invoicingPartnerLabel || '—';
+      document.getElementById('mBPRunningName').value = detail.bprunningname || '';
+      document.getElementById('mNotInvoiceable').checked = !!detail.notinvoiceable;
+      document.getElementById('mLastUpdated').textContent = detail.lastupdated
+        ? new Date(detail.lastupdated).toLocaleString() : '—';
+      document.getElementById('mLastUpdatedBy').textContent = detail.lastUpdatedByName || detail.lastupdatedby || '—';
+    } catch (err) {
+      console.warn(`Could not load full detail for project ${id}:`, err);
+    }
+
+    try {
+      const [deliverables, notes, quotations] = await Promise.all([
+        HITT_API.getProjectDeliverables(id),
+        HITT_API.getProjectNotes(id),
+        HITT_API.getProjectQuotations(id),
+      ]);
+      if (activeProjectId !== id) return;
+      renderDeliverables(deliverables);
+      renderNotes(notes);
+      renderQuotations(quotations);
+    } catch (err) {
+      console.warn(`Could not load deliverables/notes/quotations for project ${id}:`, err);
+    }
+  }
+}
+
+function formatDateOnly(iso){
+  if (!iso) return '—';
+  return new Date(iso).toLocaleDateString();
+}
+
+function renderDeliverables(rows){
+  const tbody = document.getElementById('mDeliverables');
+  if (!rows || !rows.length) {
+    tbody.innerHTML = `<tr><td colspan="3" class="px-2.5 py-4 text-center text-slate-400 text-xs">No deliverables yet</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = rows.map(d => `
+    <tr class="grid-row border-t border-slate-100">
+      <td class="px-2.5 py-1.5 font-mono">${formatDateOnly(d.deliverydate)}</td>
+      <td class="px-2.5 py-1.5 font-mono">${formatDateOnly(d.effectivedd)}</td>
+      <td class="px-2.5 py-1.5">${escapeHtml(d.deliverablename || '(unnamed)')}</td>
+    </tr>
+  `).join('');
+}
+
+function renderQuotations(rows){
+  const tbody = document.getElementById('mQuotations');
+  if (!rows || !rows.length) {
+    tbody.innerHTML = `<tr><td colspan="5" class="px-2.5 py-4 text-center text-slate-400 text-xs">No quotations yet</td></tr>`;
+    return;
+  }
+  const money = (n) => n == null ? '—' : Number(n).toLocaleString(undefined, { style: 'currency', currency: 'EUR' });
+  tbody.innerHTML = rows.map(q => `
+    <tr class="grid-row border-t border-slate-100">
+      <td class="px-2.5 py-1.5 font-mono">${formatDateOnly(q.quotationdate)}</td>
+      <td class="px-2.5 py-1.5 text-right font-mono">${money(q.amountquoted)}</td>
+      <td class="px-2.5 py-1.5 text-right font-mono">${money(q.discountnegotiation)}</td>
+      <td class="px-2.5 py-1.5 text-right font-mono">${money(q.expenses)}</td>
+      <td class="px-2.5 py-1.5 text-right font-mono font-semibold">${money(q.finalquotation)}</td>
+    </tr>
+  `).join('');
+}
+
+function renderNotes(rows){
+  const list = document.getElementById('mNotesList');
+  if (!rows || !rows.length) {
+    list.innerHTML = `<div class="text-xs text-slate-400 text-center py-6">No notes yet</div>`;
+    return;
+  }
+  list.innerHTML = rows.map(n => `
+    <div class="border border-slate-100 rounded-md p-2 bg-hitt-canvas">
+      <div class="flex items-center justify-between gap-2 mb-1">
+        <span class="text-[11px] font-semibold text-hitt-teal">${escapeHtml(n.authorName || 'Unknown')}</span>
+        <span class="text-[10px] text-slate-400 font-mono">${formatDateOnly(n.commentsts)}</span>
+      </div>
+      <div class="text-xs text-hitt-ink whitespace-pre-wrap">${escapeHtml(n.notes)}</div>
+    </div>
+  `).join('');
 }
 
 function closeProjectModal(){
@@ -364,6 +483,18 @@ document.getElementById('mSave').addEventListener('click', async () => {
   const statusChanged = newStatus !== p.stage;
   p.stage = newStatus;
   p.progress = newProgress;
+
+  const entityVal = document.getElementById('mEntity').value;
+  const projectTypeVal = document.getElementById('mProjectType').value;
+  const bioSpectrumVal = document.getElementById('mBioSpectrum').value;
+  const extraFields = {
+    entityId: entityVal ? Number(entityVal) : null,
+    projectTypeId: projectTypeVal ? Number(projectTypeVal) : null,
+    biospectrumId: bioSpectrumVal ? Number(bioSpectrumVal) : null,
+    bpRunningName: document.getElementById('mBPRunningName').value || null,
+    notInvoiceable: document.getElementById('mNotInvoiceable').checked,
+  };
+
   document.getElementById('mChangedBadge').classList.add('hidden');
   renderBoard();
   updateTabCounts();
@@ -371,7 +502,7 @@ document.getElementById('mSave').addEventListener('click', async () => {
 
   if (!usingDemoData) {
     try {
-      await HITT_API.updateProject(p.id, { stage: newStatus, progress: newProgress });
+      await HITT_API.updateProject(p.id, { stage: newStatus, progress: newProgress, ...extraFields });
       toast(`<span class="font-mono text-xs opacity-80">${escapeHtml(p.code)}</span> saved${statusChanged ? ' · status updated' : ''}`, 'green');
     } catch (err) {
       console.error(err);
@@ -391,8 +522,56 @@ document.querySelectorAll('[data-mtab]').forEach(btn => {
   });
 });
 
-document.getElementById('mAddNote').addEventListener('click', () => {
-  toast('Notes endpoint is not wired up yet.', 'navy');
+document.getElementById('mAddNote').addEventListener('click', async () => {
+  const input = document.getElementById('mNewNote');
+  const text = input.value.trim();
+  if (!text || !activeProjectId) return;
+  if (usingDemoData) {
+    toast('Notes aren\'t available in demo data.', 'navy');
+    return;
+  }
+  try {
+    await HITT_API.addProjectNote(activeProjectId, { notes: text });
+    input.value = '';
+    const notes = await HITT_API.getProjectNotes(activeProjectId);
+    renderNotes(notes);
+    toast('Note added', 'green');
+  } catch (err) {
+    console.error(err);
+    toast('Could not save the note.', 'red');
+  }
+});
+
+document.getElementById('mNewNote').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') document.getElementById('mAddNote').click();
+});
+document.getElementById('mNewDeliverableName').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') document.getElementById('mAddDeliverable').click();
+});
+
+document.getElementById('mAddDeliverable').addEventListener('click', async () => {
+  const nameInput = document.getElementById('mNewDeliverableName');
+  const dateInput = document.getElementById('mNewDeliverableExpected');
+  const name = nameInput.value.trim();
+  if (!name || !activeProjectId) return;
+  if (usingDemoData) {
+    toast('Deliverables aren\'t available in demo data.', 'navy');
+    return;
+  }
+  try {
+    await HITT_API.addProjectDeliverable(activeProjectId, {
+      deliverablename: name,
+      deliverydate: dateInput.value || null,
+    });
+    nameInput.value = '';
+    dateInput.value = '';
+    const deliverables = await HITT_API.getProjectDeliverables(activeProjectId);
+    renderDeliverables(deliverables);
+    toast('Deliverable added', 'green');
+  } catch (err) {
+    console.error(err);
+    toast('Could not save the deliverable.', 'red');
+  }
 });
 
 /* ============================== NEW PROJECT MODAL ======================= */

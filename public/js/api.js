@@ -33,6 +33,15 @@ const HITT_API = (() => {
   return {
     getProjects: () => request("/api/projects"),
     getProjectStatuses: () => request("/api/projects/statuses"),
+    getProjectLookups: () => request("/api/projects/lookups"),
+    getProject: (id) => request(`/api/projects/${id}`),
+    getProjectDeliverables: (id) => request(`/api/projects/${id}/deliverables`),
+    addProjectDeliverable: (id, payload) =>
+      request(`/api/projects/${id}/deliverables`, { method: "POST", body: JSON.stringify(payload) }),
+    getProjectNotes: (id) => request(`/api/projects/${id}/notes`),
+    addProjectNote: (id, payload) =>
+      request(`/api/projects/${id}/notes`, { method: "POST", body: JSON.stringify(payload) }),
+    getProjectQuotations: (id) => request(`/api/projects/${id}/quotations`),
     createProject: (payload) =>
       request("/api/projects", { method: "POST", body: JSON.stringify(payload) }),
     updateProjectStage: (id, stage) =>
