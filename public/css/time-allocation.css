@@ -18,6 +18,51 @@
   box-shadow: var(--shadow-sm);
 }
 .ta-banner label { font-size: 0.78rem; font-weight: 600; color: var(--text-secondary); }
+
+/* ---------- Page-level tabs (Project time tracking / Time off) ---------- */
+.page-tabs {
+  display: flex; gap: 1.5rem;
+  border-bottom: 1px solid var(--border-subtle);
+  margin-bottom: 1.25rem;
+}
+.page-tab {
+  background: none; border: none; cursor: pointer;
+  padding: 0.6rem 0.1rem;
+  font-size: 0.92rem; font-weight: 700;
+  color: var(--text-secondary);
+  border-bottom: 2px solid transparent;
+}
+.page-tab[aria-selected="true"] { color: var(--text-primary); border-bottom-color: var(--accent); }
+.page-pane.hidden { display: none; }
+
+/* ---------- Time-off balance stat tiles ---------- */
+.to-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+.to-stat {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 0.9rem 1rem;
+  display: flex; flex-direction: column; gap: 0.15rem;
+  box-shadow: var(--shadow-sm);
+}
+.to-stat--highlight { border-color: var(--accent); background: rgba(188,154,28,0.06); }
+.to-stat__value { font-size: 1.5rem; font-weight: 800; color: var(--text-primary); }
+.to-stat--highlight .to-stat__value { color: var(--accent-hover); }
+.to-stat__label { font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.03em; }
+
+.to-status-pill {
+  font-size: 0.68rem; font-weight: 700; padding: 0.15rem 0.55rem;
+  border-radius: 999px; white-space: nowrap;
+}
+.to-status-submitted, .to-status-pending { background: rgba(188,154,28,0.16); color: #8A6E12; }
+.to-status-approved { background: rgba(110,143,90,0.15); color: #4C6B3A; }
+.to-status-rejected { background: rgba(178,74,58,0.12); color: var(--danger); }
+.to-status-withdrawn, .to-status-cancelled { background: var(--bg-surface-alt); color: var(--text-secondary); }
 .ta-banner select, .ta-banner input[type="week"] {
   padding: 0.45rem 0.6rem;
   border-radius: var(--radius-sm);

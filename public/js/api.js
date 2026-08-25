@@ -66,6 +66,13 @@ const HITT_API = (() => {
     saveTimeTracking: (payload) =>
       request("/api/time-tracking", { method: "POST", body: JSON.stringify(payload) }),
     deleteTimeTracking: (id) => request(`/api/time-tracking/${id}`, { method: "DELETE" }),
+
+    getTimeOffRequests: (empId) => request(`/api/time-off/requests?empId=${encodeURIComponent(empId)}`),
+    createTimeOffRequest: (payload) =>
+      request("/api/time-off/requests", { method: "POST", body: JSON.stringify(payload) }),
+    withdrawTimeOffRequest: (id) => request(`/api/time-off/requests/${id}/withdraw`, { method: "PATCH" }),
+    getTimeOffBalance: (empId, year) =>
+      request(`/api/time-off/balance?empId=${encodeURIComponent(empId)}&year=${encodeURIComponent(year)}`),
     createProject: (payload) =>
       request("/api/projects", { method: "POST", body: JSON.stringify(payload) }),
     updateProjectStage: (id, stage) =>

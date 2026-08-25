@@ -128,8 +128,27 @@ async function loadEmployees(){
 document.getElementById('employeeSelect').addEventListener('change', (e) => {
   currentEmployeeId = e.target.value;
   sessionStorage.setItem(EMPLOYEE_KEY, currentEmployeeId);
-  loadWeek();
+  refreshActiveTab();
 });
+
+/* ============================== PAGE TABS ================================= */
+let currentPageTab = 'tracking';
+
+document.querySelectorAll('[data-ptab]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('[data-ptab]').forEach(b => b.setAttribute('aria-selected', 'false'));
+    btn.setAttribute('aria-selected', 'true');
+    currentPageTab = btn.dataset.ptab;
+    document.getElementById('paneTracking').classList.toggle('hidden', currentPageTab !== 'tracking');
+    document.getElementById('paneTimeOff').classList.toggle('hidden', currentPageTab !== 'timeoff');
+    refreshActiveTab();
+  });
+});
+
+function refreshActiveTab(){
+  if (currentPageTab === 'tracking') loadWeek();
+  else loadTimeOff();
+}
 
 /* ============================== LOAD / RENDER WEEK ========================= */
 async function loadWeek(){
@@ -325,6 +344,176 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && !projectPickerOverlay.classList.contains('hidden')) closeProjectPicker();
 });
 document.getElementById('projectPickerSearch').addEventListener('input', (e) => renderProjectPickerResults(e.target.value));
+
+/* ============================== TIME OFF REQUESTS ==========================
+ * Self-service submit/view/withdraw only — mirrors the "Enter your time
+ * off requests" + balance-summary parts of Access's TimeOffRequests.frm.
+ * Approve/reject is deliberately NOT built: that workflow needs a
+ * manager-relationship concept this app doesn't have anywhere yet.
+ * ========================================================================== */
+let TIME_OFF_REQUESTS = [];
+
+const balanceYearSelect = document.getElementById('balanceYear');
+(function populateYearOptions(){
+  const current = new Date().getFullYear();
+  const years = [current + 1, current, current - 1, current - 2];
+  balanceYearSelect.innerHTML = years.map(y => `<option value="${y}" ${y === current ? 'selected' : ''}>${y}</option>`).join('');
+})();
+balanceYearSelect.addEventListener('change', () => loadBalance());
+
+function formatDateOnly(iso){
+  return iso ? new Date(iso).toLocaleDateString() : '—';
+}
+
+async function loadBalance(){
+  if (!currentEmployeeId || usingDemoData) {
+    ['statTotal', 'statApproved', 'statPending', 'statAvailable'].forEach(id => document.getElementById(id).textContent = '—');
+    return;
+  }
+  const hint = document.getElementById('balanceHint');
+  hint.classList.add('hidden');
+  try {
+    const balance = await HITT_API.getTimeOffBalance(currentEmployeeId, balanceYearSelect.value);
+    document.getElementById('statTotal').textContent = balance.totalDays ?? '—';
+    document.getElementById('statApproved').textContent = balance.approvedDays;
+    document.getElementById('statPending').textContent = balance.pendingDays;
+    document.getElementById('statAvailable').textContent = balance.availableDays ?? '—';
+    if (balance.totalDays === null) {
+      hint.textContent = `No annual quota configured for ${balanceYearSelect.value} yet — approved/pending days are still shown above.`;
+      hint.classList.remove('hidden');
+    }
+  } catch (err) {
+    console.warn('Could not load time-off balance:', err);
+  }
+}
+
+function statusPillClass(statusLabel){
+  const key = (statusLabel || '').toLowerCase().replace(/\s+/g, '-');
+  return `to-status-pill to-status-${key.includes('pending') ? 'pending' : key}`;
+}
+
+function canWithdraw(req){
+  return !['Rejected', 'Withdrawn', 'Cancelled'].includes(req.statusLabel);
+}
+
+function renderTimeOffTable(){
+  const tbody = document.getElementById('toTableBody');
+  const empty = document.getElementById('toEmpty');
+  if (!TIME_OFF_REQUESTS.length) {
+    tbody.innerHTML = '';
+    empty.classList.remove('hidden');
+    return;
+  }
+  empty.classList.add('hidden');
+  tbody.innerHTML = TIME_OFF_REQUESTS.map((r, i) => `
+    <tr data-i="${i}">
+      <td>${formatDateOnly(r.startdate)} – ${formatDateOnly(r.enddate)}</td>
+      <td style="text-align:right;">${r.daysrequested}</td>
+      <td><span class="${statusPillClass(r.statusLabel)}">${r.statusLabel || 'Unknown'}</span></td>
+      <td style="font-size:0.78rem; color:var(--text-secondary);">${formatDateOnly(r.submittedat)}</td>
+      <td>${canWithdraw(r) ? `<button class="ta-remove-btn" data-withdraw title="Withdraw this request">Withdraw</button>` : ''}</td>
+    </tr>
+  `).join('');
+
+  tbody.querySelectorAll('[data-withdraw]').forEach((btn, i) => {
+    btn.addEventListener('click', async () => {
+      const req = TIME_OFF_REQUESTS[i];
+      try {
+        await HITT_API.withdrawTimeOffRequest(req.id);
+        toast('Request withdrawn.', 'navy');
+        await loadTimeOff();
+      } catch (err) {
+        console.error(err);
+        toast('Could not withdraw that request.', 'red');
+      }
+    });
+  });
+}
+
+async function loadTimeOff(){
+  const tbody = document.getElementById('toTableBody');
+  const empty = document.getElementById('toEmpty');
+
+  if (!currentEmployeeId) {
+    TIME_OFF_REQUESTS = [];
+    tbody.innerHTML = '';
+    empty.textContent = 'Pick your name above to see your time-off requests.';
+    empty.classList.remove('hidden');
+    return;
+  }
+  if (usingDemoData) {
+    TIME_OFF_REQUESTS = [];
+    tbody.innerHTML = '';
+    empty.textContent = 'Not available in demo data.';
+    empty.classList.remove('hidden');
+    return;
+  }
+
+  tbody.innerHTML = `<tr><td colspan="5" class="sub-empty">Loading…</td></tr>`;
+  empty.classList.add('hidden');
+  try {
+    TIME_OFF_REQUESTS = await HITT_API.getTimeOffRequests(currentEmployeeId);
+  } catch (err) {
+    console.warn('Could not load time-off requests:', err);
+    TIME_OFF_REQUESTS = [];
+    toast('Could not load time-off requests.', 'red');
+  }
+  renderTimeOffTable();
+  await loadBalance();
+}
+
+/* ---------- New request modal ---------- */
+const timeOffOverlay = document.getElementById('timeOffOverlay');
+
+function openTimeOffModal(){
+  if (!currentEmployeeId) { toast('Pick your name first.', 'navy'); return; }
+  if (usingDemoData) { toast("Time-off requests aren't available in demo data.", 'navy'); return; }
+  document.getElementById('toStartDate').value = '';
+  document.getElementById('toEndDate').value = '';
+  document.getElementById('toDaysRequested').value = '';
+  timeOffOverlay.classList.remove('hidden');
+  setTimeout(() => document.getElementById('toStartDate').focus(), 50);
+}
+function closeTimeOffModal(){
+  timeOffOverlay.classList.add('hidden');
+}
+
+function suggestDaysRequested(){
+  const start = document.getElementById('toStartDate').value;
+  const end = document.getElementById('toEndDate').value;
+  if (!start || !end) return;
+  const days = Math.round((new Date(end) - new Date(start)) / 86400000) + 1;
+  if (days > 0) document.getElementById('toDaysRequested').value = days;
+}
+document.getElementById('toStartDate').addEventListener('change', suggestDaysRequested);
+document.getElementById('toEndDate').addEventListener('change', suggestDaysRequested);
+
+document.getElementById('btnNewTimeOff').addEventListener('click', openTimeOffModal);
+document.getElementById('timeOffClose').addEventListener('click', closeTimeOffModal);
+document.getElementById('timeOffCancel').addEventListener('click', closeTimeOffModal);
+timeOffOverlay.addEventListener('click', (e) => { if (e.target === timeOffOverlay) closeTimeOffModal(); });
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !timeOffOverlay.classList.contains('hidden')) closeTimeOffModal();
+});
+
+document.getElementById('timeOffSubmit').addEventListener('click', async () => {
+  const startDate = document.getElementById('toStartDate').value;
+  const endDate = document.getElementById('toEndDate').value;
+  const daysRequested = Number(document.getElementById('toDaysRequested').value);
+  if (!startDate || !endDate || !daysRequested) {
+    toast('Start date, end date and days requested are all required.', 'red');
+    return;
+  }
+  try {
+    await HITT_API.createTimeOffRequest({ empId: currentEmployeeId, startDate, endDate, daysRequested });
+    closeTimeOffModal();
+    toast('Request submitted.', 'green');
+    await loadTimeOff();
+  } catch (err) {
+    console.error(err);
+    toast('Could not submit the request.', 'red');
+  }
+});
 
 /* ============================== INIT ==================================== */
 (async () => {
