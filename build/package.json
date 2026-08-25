@@ -1,0 +1,12 @@
+{
+  "name": "hitt-ops-frontend-build",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Dev-only Tailwind CSS build for public/pages/projects.html. Produces a static compiled stylesheet — nothing here ships to employees or runs at runtime.",
+  "scripts": {
+    "build:css": "tailwindcss -c tailwind.config.js -i src.css -o ../public/css/projects-tailwind.css --minify"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.13"
+  }
+}

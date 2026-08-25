@@ -1,0 +1,85 @@
+/* ==========================================================================
+   HITT Ops — Projects (kanban) page-specific styles
+   Custom rules that sit alongside the compiled Tailwind utilities in
+   projects-tailwind.css (see /build for how that file is generated).
+   ========================================================================== */
+
+html, body { height: 100%; }
+body { background: #F5F4EE; }
+
+::-webkit-scrollbar { height: 8px; width: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #D9D4C4; border-radius: 8px; }
+::-webkit-scrollbar-thumb:hover { background: #C2BBA5; }
+
+.card {
+  transition: transform .16s ease, box-shadow .16s ease, opacity .16s ease, border-color .16s ease;
+  touch-action: none;
+}
+.card:active { cursor: grabbing; }
+.card.dragging { opacity: 0.35; transform: scale(0.97); }
+.card-ghost {
+  position: fixed; pointer-events: none; z-index: 60;
+  transform: rotate(-2deg) scale(1.03);
+  box-shadow: 0 18px 30px rgba(23,23,23,0.28);
+  opacity: 0.96;
+}
+.col-body.drag-over {
+  background: rgba(92,117,124,0.08);
+  outline: 2px dashed #5C757C;
+  outline-offset: -6px;
+}
+.col-body.drag-invalid {
+  background: rgba(178,74,58,0.08);
+  outline: 2px dashed #B24A3A;
+  outline-offset: -6px;
+}
+@keyframes pop-in {
+  0%   { transform: scale(0.9); opacity: 0; }
+  60%  { transform: scale(1.03); opacity: 1; }
+  100% { transform: scale(1); }
+}
+.pop-in { animation: pop-in .28s cubic-bezier(.34,1.56,.64,1); }
+@keyframes count-pulse {
+  0% { transform: scale(1); } 35% { transform: scale(1.25); } 100% { transform: scale(1); }
+}
+.count-pulse { animation: count-pulse .32s ease; }
+@keyframes rail-flash {
+  0% { filter: brightness(1); } 40% { filter: brightness(1.6); } 100% { filter: brightness(1); }
+}
+.rail-flash { animation: rail-flash .5s ease; }
+.tab-btn[aria-selected="true"] {
+  background: #171717; color: white;
+  box-shadow: 0 6px 14px rgba(23,23,23,0.28);
+}
+.kbd-focus:focus-visible { outline: 2px solid #BC9A1C; outline-offset: 2px; }
+.fade-mask {
+  -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 22px), transparent 100%);
+  mask-image: linear-gradient(to bottom, black calc(100% - 22px), transparent 100%);
+}
+.toast { animation: toast-in .22s ease, toast-out .22s ease 2.6s forwards; }
+@keyframes toast-in { from { transform: translateY(10px); opacity: 0;} to { transform: translateY(0); opacity: 1;} }
+@keyframes toast-out { to { transform: translateY(10px); opacity: 0;} }
+@media (prefers-reduced-motion: reduce) {
+  .card, .pop-in, .count-pulse, .rail-flash, .toast { animation: none !important; transition: none !important; }
+}
+.modal-overlay { animation: overlay-in .18s ease; }
+@keyframes overlay-in { from { opacity: 0; } to { opacity: 1; } }
+.modal-panel { animation: panel-in .22s cubic-bezier(.2,.9,.3,1.1); }
+@keyframes panel-in {
+  from { opacity: 0; transform: translateY(14px) scale(.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.field-label { font-size: 11px; font-weight: 600; color: #5C757C; letter-spacing: .01em; }
+.field-input {
+  width: 100%; font-size: 13px; padding: 6px 8px;
+  border: 1px solid #E4E0D4; border-radius: 6px; background: #fff; color: #171717;
+}
+.field-input:disabled, .field-input[readonly] { background: #F5F4EE; color: #5C757C; }
+.field-input:focus { outline: 2px solid #BC9A1C; outline-offset: 1px; border-color: #5C757C; }
+.modal-tab[aria-selected="true"] { color: #171717; border-bottom-color: #171717; }
+.modal-tab { border-bottom: 2px solid transparent; }
+.grid-row:nth-child(even) { background: #FAF9F4; }
+.data-pill {
+  font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 999px;
+}

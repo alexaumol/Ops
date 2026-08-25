@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "hitt-ops-static",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [".claude/nocache_server.py", "5500", "public"],
+      "port": 5500
+    }
+  ]
+}
