@@ -324,6 +324,16 @@ function lookupOptionsHtml(rows, selectedId, includeBlank){
   return opts.join('');
 }
 
+function setBPEditLink(businessPartnerId){
+  const link = document.getElementById('mBPEdit');
+  if (businessPartnerId) {
+    link.href = `business-partners.html?open=${encodeURIComponent(businessPartnerId)}`;
+    link.classList.remove('hidden');
+  } else {
+    link.classList.add('hidden');
+  }
+}
+
 async function openProjectModal(id){
   const p = PROJECTS.find(x => x.id === id);
   if (!p) return;
@@ -348,6 +358,7 @@ async function openProjectModal(id){
   document.getElementById('mProjectType').innerHTML = lookupOptionsHtml(LOOKUPS.projectTypes, null, true);
   document.getElementById('mBioSpectrum').innerHTML = lookupOptionsHtml(LOOKUPS.biotechSpectrums, null, true);
   document.getElementById('mBusinessPartner').textContent = '—';
+  setBPEditLink(null);
   document.getElementById('mInvoicingPartner').textContent = '—';
   document.getElementById('mBPRunningName').value = '';
   document.getElementById('mNotInvoiceable').checked = false;
@@ -381,6 +392,7 @@ async function openProjectModal(id){
       document.getElementById('mProjectType').innerHTML = lookupOptionsHtml(LOOKUPS.projectTypes, detail.projecttypeid, true);
       document.getElementById('mBioSpectrum').innerHTML = lookupOptionsHtml(LOOKUPS.biotechSpectrums, detail.biospectrumid, true);
       document.getElementById('mBusinessPartner').textContent = detail.businessPartnerLabel || '—';
+      setBPEditLink(detail.busspartnerid);
       document.getElementById('mInvoicingPartner').textContent = detail.invoicingPartnerLabel || '—';
       document.getElementById('mBPRunningName').value = detail.bprunningname || '';
       document.getElementById('mNotInvoiceable').checked = !!detail.notinvoiceable;
@@ -406,6 +418,104 @@ async function openProjectModal(id){
     }
   }
 }
+
+/* ============================== BP PICKER ================================
+ * Mirrors Access's SearchBusinessPartners.frm: search box (2+ chars),
+ * double-click a result to assign it as the open project's Contracting
+ * Business Partner. "+ Create & assign" covers the cmdAddNewBP "+" button
+ * next to it on EditProject.frm — quick-create then assign immediately.
+ * ========================================================================== */
+const bpPickerOverlay = document.getElementById('bpPickerOverlay');
+let bpSearchDebounce = null;
+
+function openBpPicker(){
+  if (!activeProjectId) return;
+  document.getElementById('bpPickerSearch').value = '';
+  document.getElementById('bpPickerNewName').value = '';
+  document.getElementById('bpPickerResults').innerHTML =
+    `<div class="text-xs text-slate-400 text-center py-6">Type at least two characters to start searching</div>`;
+  bpPickerOverlay.classList.remove('hidden');
+  setTimeout(() => document.getElementById('bpPickerSearch').focus(), 50);
+}
+
+function closeBpPicker(){
+  bpPickerOverlay.classList.add('hidden');
+}
+
+async function assignBusinessPartner(bpId, bpName){
+  if (!activeProjectId) return;
+  try {
+    await HITT_API.assignProjectBusinessPartner(activeProjectId, bpId);
+    document.getElementById('mBusinessPartner').textContent = bpName || '—';
+    setBPEditLink(bpId);
+    closeBpPicker();
+    toast(`<span class="font-mono text-xs opacity-80">${escapeHtml(bpName || '')}</span> assigned as the contracting business partner`, 'green');
+  } catch (err) {
+    console.error(err);
+    toast('Could not assign the business partner.', 'red');
+  }
+}
+
+function renderBpPickerResults(rows){
+  const host = document.getElementById('bpPickerResults');
+  if (!rows.length) {
+    host.innerHTML = `<div class="text-xs text-slate-400 text-center py-6">No matches</div>`;
+    return;
+  }
+  host.innerHTML = rows.map((bp, i) => `
+    <div data-i="${i}" class="px-2.5 py-2 rounded-md hover:bg-hitt-mist cursor-pointer select-none">
+      <div class="text-sm font-medium text-hitt-ink">${escapeHtml(bp.name)}</div>
+      <div class="text-[11px] text-slate-400">${escapeHtml([bp.entityLabel, bp.companyTypeLabel, bp.countryLabel].filter(Boolean).join(' · ') || '—')}</div>
+    </div>
+  `).join('');
+  host.querySelectorAll('[data-i]').forEach(el => {
+    el.addEventListener('dblclick', () => {
+      const bp = rows[Number(el.dataset.i)];
+      assignBusinessPartner(bp.id, bp.name);
+    });
+  });
+}
+
+document.getElementById('mBPSearch').addEventListener('click', openBpPicker);
+document.getElementById('bpPickerClose').addEventListener('click', closeBpPicker);
+bpPickerOverlay.addEventListener('click', (e) => { if (e.target === bpPickerOverlay) closeBpPicker(); });
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !bpPickerOverlay.classList.contains('hidden')) closeBpPicker();
+});
+
+document.getElementById('bpPickerSearch').addEventListener('input', (e) => {
+  const term = e.target.value.trim();
+  clearTimeout(bpSearchDebounce);
+  if (term.length < 2) {
+    document.getElementById('bpPickerResults').innerHTML =
+      `<div class="text-xs text-slate-400 text-center py-6">Type at least two characters to start searching</div>`;
+    return;
+  }
+  bpSearchDebounce = setTimeout(async () => {
+    document.getElementById('bpPickerResults').innerHTML =
+      `<div class="text-xs text-slate-400 text-center py-6">Searching…</div>`;
+    try {
+      const rows = await HITT_API.getBusinessPartners(term);
+      renderBpPickerResults(rows);
+    } catch (err) {
+      console.error(err);
+      document.getElementById('bpPickerResults').innerHTML =
+        `<div class="text-xs text-hitt-red text-center py-6">Search failed — is the API reachable?</div>`;
+    }
+  }, 300);
+});
+
+document.getElementById('bpPickerAddNew').addEventListener('click', async () => {
+  const name = document.getElementById('bpPickerNewName').value.trim();
+  if (!name) return;
+  try {
+    const created = await HITT_API.createBusinessPartner({ name });
+    await assignBusinessPartner(created.id, created.name || name);
+  } catch (err) {
+    console.error(err);
+    toast('Could not create the business partner.', 'red');
+  }
+});
 
 function formatDateOnly(iso){
   if (!iso) return '—';

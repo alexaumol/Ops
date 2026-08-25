@@ -193,12 +193,33 @@ router.patch("/:id/stage", async (req, res) => {
   }
 });
 
+// PATCH /api/projects/:id/business-partner — assign the Contracting
+// Business Partner, from the picker modal (mirrors Access's
+// SearchBusinessPartners.frm "double-click to assign" flow). Applies
+// immediately, same convention as /:id/stage.
+router.patch("/:id/business-partner", async (req, res) => {
+  const { id } = req.params;
+  const { businessPartnerId, employeeId } = req.body || {};
+  if (!businessPartnerId) {
+    return res.status(400).json({ error: "validation_error", message: "businessPartnerId is required" });
+  }
+  try {
+    await pool.query(
+      `UPDATE projects SET busspartnerid = $1, lastupdated = now(), lastupdatedby = $2 WHERE id = $3`,
+      [businessPartnerId, employeeId || null, id]
+    );
+    res.status(204).end();
+  } catch (err) {
+    console.error("[PATCH /api/projects/:id/business-partner] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
 // PATCH /api/projects/:id — general edit from the project modal (status,
 // progress, and the General-tab fields mirrored from the Access
 // EditProject form: entity, biotech spectrum, project type, BP running
-// name, not-invoiceable). Contracting/invoicing business partner are
-// read-only here — picking a different one belongs to the Business
-// Partners module's search UI, not this form.
+// name, not-invoiceable). Invoicing business partner (tax company) is
+// still read-only here — that needs the tax-companies workflow.
 router.patch("/:id", async (req, res) => {
   const { id } = req.params;
   const {

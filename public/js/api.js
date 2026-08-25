@@ -64,6 +64,11 @@ const HITT_API = (() => {
         method: "PATCH",
         body: JSON.stringify({ stage }),
       }),
+    assignProjectBusinessPartner: (id, businessPartnerId) =>
+      request(`/api/projects/${id}/business-partner`, {
+        method: "PATCH",
+        body: JSON.stringify({ businessPartnerId }),
+      }),
     updateProject: (id, payload) =>
       request(`/api/projects/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
     health: () => request("/api/health"),

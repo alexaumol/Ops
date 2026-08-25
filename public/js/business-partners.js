@@ -408,4 +408,12 @@ document.getElementById('npSave').addEventListener('click', async () => {
 });
 
 /* ============================== INIT ==================================== */
-loadPartners();
+loadPartners().then(() => {
+  // Deep link from the Projects modal's "Edit this business partner" button
+  // (business-partners.html?open=<id>).
+  const openId = new URLSearchParams(window.location.search).get('open');
+  if (openId) {
+    const target = PARTNERS.find(p => String(p.id) === openId);
+    if (target) openDetailModal(target.id);
+  }
+});

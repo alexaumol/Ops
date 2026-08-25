@@ -137,20 +137,28 @@
           <section class="bg-white rounded-lg border border-slate-200 shadow-card overflow-hidden">
             <div class="bg-hitt-teal px-3 py-1.5"><h3 class="text-white text-xs font-bold tracking-wide">BUSINESS PARTNER</h3></div>
             <div class="p-3 grid grid-cols-2 gap-3">
-              <div>
+              <div class="col-span-2">
                 <label class="field-label">Contracting Business Partner</label>
-                <div id="mBusinessPartner" class="field-input mt-1" style="background:#F5F4EE; color:#5C757C;">—</div>
+                <div class="flex items-center gap-1.5 mt-1">
+                  <div id="mBusinessPartner" class="field-input" style="background:#F5F4EE; color:#5C757C; flex:1;">—</div>
+                  <button id="mBPSearch" type="button" title="Search and assign a business partner" class="shrink-0 w-8 h-8 rounded-md border border-slate-200 bg-white hover:bg-hitt-mist text-hitt-teal flex items-center justify-center">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M17 10a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                  </button>
+                  <a id="mBPEdit" href="#" target="_blank" title="Edit this business partner" class="hidden shrink-0 w-8 h-8 rounded-md border border-slate-200 bg-white hover:bg-hitt-mist text-hitt-teal flex items-center justify-center">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11 4H6a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2v-5M18.5 2.5a2.12 2.12 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                  </a>
+                </div>
               </div>
               <div>
                 <label class="field-label">Business Partner to invoice</label>
                 <div id="mInvoicingPartner" class="field-input mt-1" style="background:#F5F4EE; color:#5C757C;">—</div>
               </div>
-              <div class="col-span-2">
+              <div>
                 <label class="field-label">Buss partner running name</label>
                 <input id="mBPRunningName" type="text" class="field-input mt-1" />
               </div>
             </div>
-            <div class="px-2.5 pb-2.5 text-[11px] text-slate-400">Picking a different business partner needs the Business Partners module's search — not wired yet.</div>
+            <div class="px-2.5 pb-2.5 text-[11px] text-slate-400">"Business Partner to invoice" isn't pickable yet — that needs the tax-companies workflow, not built here.</div>
           </section>
 
           <section class="bg-white rounded-lg border border-slate-200 shadow-card overflow-hidden">
@@ -218,6 +226,27 @@
         </label>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- ============================ BP PICKER MODAL ============================ -->
+<div id="bpPickerOverlay" class="modal-overlay hidden fixed inset-0 z-[60] bg-hitt-ink/40 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6">
+  <div class="modal-panel bg-white w-full max-w-md max-h-[80vh] rounded-xl shadow-lift flex flex-col overflow-hidden">
+    <div class="shrink-0 px-4 sm:px-5 py-3 flex items-center gap-3" style="background:#5C757C">
+      <h2 class="flex-1 text-white font-bold text-base">Search and assign a business partner</h2>
+      <button id="bpPickerClose" title="Close" class="w-8 h-8 rounded-md bg-hitt-red hover:brightness-110 flex items-center justify-center transition shrink-0">
+        <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="shrink-0 p-3 border-b border-slate-200">
+      <input id="bpPickerSearch" type="text" placeholder="Type at least two characters to start searching…" class="field-input" autocomplete="off" />
+      <div class="pt-2 flex items-center gap-1.5">
+        <input id="bpPickerNewName" type="text" placeholder="…or type a new business partner name" class="field-input flex-1 italic text-hitt-teal" />
+        <button id="bpPickerAddNew" class="shrink-0 bg-hitt-teal text-white text-[11px] font-semibold px-3 py-2 rounded-md hover:bg-hitt-ink transition">+ Create &amp; assign</button>
+      </div>
+    </div>
+    <div id="bpPickerResults" class="flex-1 overflow-y-auto p-2 space-y-1"></div>
+    <div class="shrink-0 px-3 py-2 text-[11px] text-slate-400 border-t border-slate-100">Double-click (or tap) a result to assign it to this project.</div>
   </div>
 </div>
 
