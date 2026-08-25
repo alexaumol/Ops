@@ -268,7 +268,7 @@ router.post("/:id/notes", async (req, res) => {
   }
 });
 
-// GET /api/business-partners/:id/tax-companies — read-only.
+// GET /api/business-partners/:id/tax-companies
 router.get("/:id/tax-companies", async (req, res) => {
   try {
     const { rows } = await pool.query(
@@ -286,6 +286,61 @@ router.get("/:id/tax-companies", async (req, res) => {
   } catch (err) {
     console.error("[GET /api/business-partners/:id/tax-companies] DB error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
+// POST /api/business-partners/:id/tax-companies — add an invoicing entity
+// for this business partner (mirrors TaxCompanies_BP.frm). If sameAddress
+// is true, copies the BP's own address instead of requiring a separate
+// one entered (matches the form's "Set main address as invoicing
+// address" checkbox).
+router.post("/:id/tax-companies", async (req, res) => {
+  const { taxcompanyname, vatnumber, emailinvoicing, sameAddress, address } = req.body || {};
+  if (!taxcompanyname || !taxcompanyname.trim()) {
+    return res.status(400).json({ error: "validation_error", message: "taxcompanyname is required" });
+  }
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    const { rows } = await client.query(
+      `INSERT INTO taxcompanies (businesspartnerid, taxcompanyname, vatnumber, emailinvoicing)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id, taxcompanyname, vatnumber, emailinvoicing`,
+      [req.params.id, taxcompanyname.trim(), vatnumber || null, emailinvoicing || null]
+    );
+    const taxCompany = rows[0];
+
+    let addr = address;
+    if (sameAddress) {
+      const bpAddr = await client.query(
+        `SELECT streetname, city, state, zipcode, phonenumber, phonenumber2, countryid
+         FROM addresses WHERE businesspartnerid = $1 LIMIT 1`,
+        [req.params.id]
+      );
+      addr = bpAddr.rows[0] || null;
+    }
+    if (addr) {
+      await client.query(
+        `INSERT INTO taxcompaniesaddresses
+           (taxcompanyid, streetname, city, state, zipcode, phonenumber, phonenumber2, countryid, sameaddress)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+        [
+          taxCompany.id, addr.streetname || null, addr.city || null, addr.state || null,
+          addr.zipcode || null, addr.phonenumber || null, addr.phonenumber2 || null,
+          addr.countryid || null, !!sameAddress,
+        ]
+      );
+    }
+
+    await client.query("COMMIT");
+    res.status(201).json(taxCompany);
+  } catch (err) {
+    await client.query("ROLLBACK");
+    console.error("[POST /api/business-partners/:id/tax-companies] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  } finally {
+    client.release();
   }
 });
 

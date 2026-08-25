@@ -358,6 +358,29 @@ document.getElementById('mNewContactName').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') document.getElementById('mAddContact').click();
 });
 
+document.getElementById('mAddTaxCompany').addEventListener('click', async () => {
+  const name = document.getElementById('mNewTcName').value.trim();
+  if (!name || !activeBpId) return;
+  if (usingDemoData) { toast("Tax companies aren't available in demo data.", 'navy'); return; }
+  try {
+    await HITT_API.addBusinessPartnerTaxCompany(activeBpId, {
+      taxcompanyname: name,
+      vatnumber: document.getElementById('mNewTcVat').value || null,
+      emailinvoicing: document.getElementById('mNewTcEmail').value || null,
+      sameAddress: document.getElementById('mNewTcSameAddress').checked,
+    });
+    document.getElementById('mNewTcName').value = '';
+    document.getElementById('mNewTcVat').value = '';
+    document.getElementById('mNewTcEmail').value = '';
+    document.getElementById('mNewTcSameAddress').checked = true;
+    renderTaxCompanies(await HITT_API.getBusinessPartnerTaxCompanies(activeBpId));
+    toast('Tax company added', 'green');
+  } catch (err) {
+    console.error(err);
+    toast('Could not save the tax company.', 'red');
+  }
+});
+
 /* ============================== NEW BP MODAL ============================= */
 const newBpOverlay = document.getElementById('newBpOverlay');
 

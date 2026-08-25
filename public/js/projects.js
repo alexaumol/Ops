@@ -76,6 +76,7 @@ let usingDemoData = false;
 let currentTab = 'alive';
 let searchTerm = '';
 let activeProjectId = null;
+let activeBusinessPartnerId = null;
 let idCounter = 1000;
 
 /* ============================== ICONS ================================= */
@@ -334,6 +335,102 @@ function setBPEditLink(businessPartnerId){
   }
 }
 
+// Populates "Business Partner to invoice" with the tax companies that
+// belong to the project's assigned Contracting Business Partner (Access's
+// cmbTaxCompanies combo, scoped the same way). Disabled until a BP is
+// assigned, since a project can only invoice one of ITS BP's entities.
+async function refreshInvoicingPartnerOptions(businessPartnerId, selectedTaxCompanyId){
+  activeBusinessPartnerId = businessPartnerId || null;
+  const select = document.getElementById('mInvoicingPartner');
+  const addBtn = document.getElementById('mInvoicingPartnerAdd');
+  const hint = document.getElementById('mInvoicingPartnerHint');
+
+  if (!businessPartnerId) {
+    select.innerHTML = '';
+    select.disabled = true;
+    addBtn.disabled = true;
+    hint.textContent = 'Assign a Contracting Business Partner first to pick who gets invoiced.';
+    return;
+  }
+
+  select.disabled = true;
+  addBtn.disabled = false;
+  select.innerHTML = `<option value="">Loading…</option>`;
+  try {
+    const taxCompanies = await HITT_API.getBusinessPartnerTaxCompanies(businessPartnerId);
+    select.innerHTML = lookupOptionsHtml(
+      taxCompanies.map(tc => ({ id: tc.id, label: tc.taxcompanyname })),
+      selectedTaxCompanyId, true
+    );
+    select.disabled = false;
+    hint.textContent = taxCompanies.length
+      ? ''
+      : 'No tax companies yet for this business partner — use "+" to add one.';
+  } catch (err) {
+    console.warn('Could not load tax companies for invoicing partner:', err);
+    select.innerHTML = `<option value="">—</option>`;
+    hint.textContent = 'Could not load tax companies.';
+  }
+}
+
+document.getElementById('mInvoicingPartner').addEventListener('change', async (e) => {
+  if (!activeProjectId) return;
+  const taxCompanyId = e.target.value;
+  if (!taxCompanyId) return;
+  try {
+    await HITT_API.assignProjectInvoicingPartner(activeProjectId, taxCompanyId);
+    toast('Invoicing partner updated', 'green');
+  } catch (err) {
+    console.error(err);
+    toast('Could not update the invoicing partner.', 'red');
+  }
+});
+
+/* ============================== TAX COMPANY MODAL ========================= */
+const taxCompanyOverlay = document.getElementById('taxCompanyOverlay');
+
+function openTaxCompanyModal(){
+  if (!activeBusinessPartnerId) return;
+  document.getElementById('tcName').value = '';
+  document.getElementById('tcVat').value = '';
+  document.getElementById('tcEmail').value = '';
+  document.getElementById('tcSameAddress').checked = true;
+  taxCompanyOverlay.classList.remove('hidden');
+  setTimeout(() => document.getElementById('tcName').focus(), 50);
+}
+function closeTaxCompanyModal(){
+  taxCompanyOverlay.classList.add('hidden');
+}
+
+document.getElementById('mInvoicingPartnerAdd').addEventListener('click', openTaxCompanyModal);
+document.getElementById('taxCompanyClose').addEventListener('click', closeTaxCompanyModal);
+document.getElementById('taxCompanyCancel').addEventListener('click', closeTaxCompanyModal);
+taxCompanyOverlay.addEventListener('click', (e) => { if (e.target === taxCompanyOverlay) closeTaxCompanyModal(); });
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !taxCompanyOverlay.classList.contains('hidden')) closeTaxCompanyModal();
+});
+
+document.getElementById('taxCompanySave').addEventListener('click', async () => {
+  const name = document.getElementById('tcName').value.trim();
+  if (!name || !activeBusinessPartnerId || !activeProjectId) return;
+  try {
+    const created = await HITT_API.addBusinessPartnerTaxCompany(activeBusinessPartnerId, {
+      taxcompanyname: name,
+      vatnumber: document.getElementById('tcVat').value || null,
+      emailinvoicing: document.getElementById('tcEmail').value || null,
+      sameAddress: document.getElementById('tcSameAddress').checked,
+    });
+    await refreshInvoicingPartnerOptions(activeBusinessPartnerId, created.id);
+    await HITT_API.assignProjectInvoicingPartner(activeProjectId, created.id);
+    document.getElementById('mInvoicingPartner').value = String(created.id);
+    closeTaxCompanyModal();
+    toast(`<span class="font-mono text-xs opacity-80">${escapeHtml(name)}</span> created and assigned`, 'green');
+  } catch (err) {
+    console.error(err);
+    toast('Could not create the tax company.', 'red');
+  }
+});
+
 async function openProjectModal(id){
   const p = PROJECTS.find(x => x.id === id);
   if (!p) return;
@@ -359,7 +456,11 @@ async function openProjectModal(id){
   document.getElementById('mBioSpectrum').innerHTML = lookupOptionsHtml(LOOKUPS.biotechSpectrums, null, true);
   document.getElementById('mBusinessPartner').textContent = '—';
   setBPEditLink(null);
-  document.getElementById('mInvoicingPartner').textContent = '—';
+  activeBusinessPartnerId = null;
+  document.getElementById('mInvoicingPartner').innerHTML = '';
+  document.getElementById('mInvoicingPartner').disabled = true;
+  document.getElementById('mInvoicingPartnerAdd').disabled = true;
+  document.getElementById('mInvoicingPartnerHint').textContent = 'Assign a Contracting Business Partner first to pick who gets invoiced.';
   document.getElementById('mBPRunningName').value = '';
   document.getElementById('mNotInvoiceable').checked = false;
 
@@ -393,7 +494,7 @@ async function openProjectModal(id){
       document.getElementById('mBioSpectrum').innerHTML = lookupOptionsHtml(LOOKUPS.biotechSpectrums, detail.biospectrumid, true);
       document.getElementById('mBusinessPartner').textContent = detail.businessPartnerLabel || '—';
       setBPEditLink(detail.busspartnerid);
-      document.getElementById('mInvoicingPartner').textContent = detail.invoicingPartnerLabel || '—';
+      await refreshInvoicingPartnerOptions(detail.busspartnerid, detail.busspartnertoinvoiceid);
       document.getElementById('mBPRunningName').value = detail.bprunningname || '';
       document.getElementById('mNotInvoiceable').checked = !!detail.notinvoiceable;
       document.getElementById('mLastUpdated').textContent = detail.lastupdated
@@ -448,6 +549,7 @@ async function assignBusinessPartner(bpId, bpName){
     await HITT_API.assignProjectBusinessPartner(activeProjectId, bpId);
     document.getElementById('mBusinessPartner').textContent = bpName || '—';
     setBPEditLink(bpId);
+    await refreshInvoicingPartnerOptions(bpId, null); // new BP -> old invoicing pick no longer applies
     closeBpPicker();
     toast(`<span class="font-mono text-xs opacity-80">${escapeHtml(bpName || '')}</span> assigned as the contracting business partner`, 'green');
   } catch (err) {

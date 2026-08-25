@@ -151,14 +151,17 @@
               </div>
               <div>
                 <label class="field-label">Business Partner to invoice</label>
-                <div id="mInvoicingPartner" class="field-input mt-1" style="background:#F5F4EE; color:#5C757C;">—</div>
+                <div class="flex items-center gap-1.5 mt-1">
+                  <select id="mInvoicingPartner" class="field-input" style="flex:1;" disabled></select>
+                  <button id="mInvoicingPartnerAdd" type="button" title="Add a new tax company for this business partner" disabled class="shrink-0 w-8 h-8 rounded-md border border-slate-200 bg-white hover:bg-hitt-mist text-hitt-teal flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed">+</button>
+                </div>
               </div>
               <div>
                 <label class="field-label">Buss partner running name</label>
                 <input id="mBPRunningName" type="text" class="field-input mt-1" />
               </div>
             </div>
-            <div class="px-2.5 pb-2.5 text-[11px] text-slate-400">"Business Partner to invoice" isn't pickable yet — that needs the tax-companies workflow, not built here.</div>
+            <div id="mInvoicingPartnerHint" class="px-2.5 pb-2.5 text-[11px] text-slate-400">Assign a Contracting Business Partner first to pick who gets invoiced.</div>
           </section>
 
           <section class="bg-white rounded-lg border border-slate-200 shadow-card overflow-hidden">
@@ -247,6 +250,42 @@
     </div>
     <div id="bpPickerResults" class="flex-1 overflow-y-auto p-2 space-y-1"></div>
     <div class="shrink-0 px-3 py-2 text-[11px] text-slate-400 border-t border-slate-100">Double-click (or tap) a result to assign it to this project.</div>
+  </div>
+</div>
+
+<!-- ============================ NEW TAX COMPANY MODAL ============================ -->
+<div id="taxCompanyOverlay" class="modal-overlay hidden fixed inset-0 z-[60] bg-hitt-ink/40 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6">
+  <div class="modal-panel bg-white w-full max-w-sm rounded-xl shadow-lift flex flex-col overflow-hidden">
+    <div class="shrink-0 px-4 sm:px-5 py-3 flex items-center gap-3" style="background:#5C757C">
+      <h2 class="flex-1 text-white font-bold text-base">Add a tax company</h2>
+      <button id="taxCompanyClose" title="Close" class="w-8 h-8 rounded-md bg-hitt-red hover:brightness-110 flex items-center justify-center transition shrink-0">
+        <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="p-4 space-y-3">
+      <div>
+        <label class="field-label">Tax company name <span class="text-hitt-red">*</span></label>
+        <input id="tcName" type="text" class="field-input mt-1" />
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="field-label">VAT number</label>
+          <input id="tcVat" type="text" class="field-input mt-1" />
+        </div>
+        <div>
+          <label class="field-label">Invoicing email</label>
+          <input id="tcEmail" type="text" class="field-input mt-1" />
+        </div>
+      </div>
+      <label class="flex items-center gap-2 text-sm text-hitt-ink">
+        <input id="tcSameAddress" type="checkbox" class="w-4 h-4" checked />
+        Same address as the business partner
+      </label>
+    </div>
+    <div class="shrink-0 border-t border-slate-200 px-4 py-3 flex items-center justify-end gap-2">
+      <button id="taxCompanyCancel" class="px-3 py-2 rounded-md text-sm font-semibold text-hitt-teal hover:bg-hitt-mist transition">Cancel</button>
+      <button id="taxCompanySave" class="px-4 py-2 rounded-md text-sm font-semibold text-white bg-hitt-teal hover:bg-hitt-ink transition">Create &amp; assign</button>
+    </div>
   </div>
 </div>
 

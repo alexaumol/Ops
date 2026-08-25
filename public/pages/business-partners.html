@@ -156,7 +156,15 @@
               </thead>
               <tbody id="mTaxCompanies"></tbody>
             </table>
-            <div style="padding:0.6rem 0.75rem; font-size:0.72rem; color:var(--text-secondary);">Read-only — tax companies are entered through the finance workflow.</div>
+            <div class="sub-add-row" style="flex-wrap:wrap;">
+              <input id="mNewTcName" type="text" placeholder="Tax company name…" class="field-input" style="min-width:10rem;" />
+              <input id="mNewTcVat" type="text" placeholder="VAT number…" class="field-input" style="max-width:9rem;" />
+              <input id="mNewTcEmail" type="text" placeholder="Invoicing email…" class="field-input" style="max-width:12rem;" />
+              <label style="display:flex; align-items:center; gap:0.3rem; font-size:0.78rem; white-space:nowrap;">
+                <input id="mNewTcSameAddress" type="checkbox" checked /> Same address as BP
+              </label>
+              <button id="mAddTaxCompany" class="btn-icon-add">Add</button>
+            </div>
           </div>
         </div>
       </div>

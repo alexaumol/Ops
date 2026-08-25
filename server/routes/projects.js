@@ -215,11 +215,32 @@ router.patch("/:id/business-partner", async (req, res) => {
   }
 });
 
+// PATCH /api/projects/:id/invoicing-partner — set which of the
+// contracting business partner's tax companies to invoice (Access's
+// cmbTaxCompanies combo, scoped to the assigned BP). Applies
+// immediately, same convention as /:id/business-partner.
+router.patch("/:id/invoicing-partner", async (req, res) => {
+  const { id } = req.params;
+  const { taxCompanyId, employeeId } = req.body || {};
+  if (!taxCompanyId) {
+    return res.status(400).json({ error: "validation_error", message: "taxCompanyId is required" });
+  }
+  try {
+    await pool.query(
+      `UPDATE projects SET busspartnertoinvoiceid = $1, lastupdated = now(), lastupdatedby = $2 WHERE id = $3`,
+      [taxCompanyId, employeeId || null, id]
+    );
+    res.status(204).end();
+  } catch (err) {
+    console.error("[PATCH /api/projects/:id/invoicing-partner] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
 // PATCH /api/projects/:id — general edit from the project modal (status,
 // progress, and the General-tab fields mirrored from the Access
 // EditProject form: entity, biotech spectrum, project type, BP running
-// name, not-invoiceable). Invoicing business partner (tax company) is
-// still read-only here — that needs the tax-companies workflow.
+// name, not-invoiceable).
 router.patch("/:id", async (req, res) => {
   const { id } = req.params;
   const {

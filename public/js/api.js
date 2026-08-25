@@ -57,6 +57,8 @@ const HITT_API = (() => {
     addBusinessPartnerNote: (id, payload) =>
       request(`/api/business-partners/${id}/notes`, { method: "POST", body: JSON.stringify(payload) }),
     getBusinessPartnerTaxCompanies: (id) => request(`/api/business-partners/${id}/tax-companies`),
+    addBusinessPartnerTaxCompany: (id, payload) =>
+      request(`/api/business-partners/${id}/tax-companies`, { method: "POST", body: JSON.stringify(payload) }),
 
     getEmployees: () => request("/api/employees"),
     getTimeTracking: (userId, weekStart) =>
@@ -75,6 +77,11 @@ const HITT_API = (() => {
       request(`/api/projects/${id}/business-partner`, {
         method: "PATCH",
         body: JSON.stringify({ businessPartnerId }),
+      }),
+    assignProjectInvoicingPartner: (id, taxCompanyId) =>
+      request(`/api/projects/${id}/invoicing-partner`, {
+        method: "PATCH",
+        body: JSON.stringify({ taxCompanyId }),
       }),
     updateProject: (id, payload) =>
       request(`/api/projects/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
