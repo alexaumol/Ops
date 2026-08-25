@@ -57,6 +57,13 @@ const HITT_API = (() => {
     addBusinessPartnerNote: (id, payload) =>
       request(`/api/business-partners/${id}/notes`, { method: "POST", body: JSON.stringify(payload) }),
     getBusinessPartnerTaxCompanies: (id) => request(`/api/business-partners/${id}/tax-companies`),
+
+    getEmployees: () => request("/api/employees"),
+    getTimeTracking: (userId, weekStart) =>
+      request(`/api/time-tracking?userId=${encodeURIComponent(userId)}&weekStart=${encodeURIComponent(weekStart)}`),
+    saveTimeTracking: (payload) =>
+      request("/api/time-tracking", { method: "POST", body: JSON.stringify(payload) }),
+    deleteTimeTracking: (id) => request(`/api/time-tracking/${id}`, { method: "DELETE" }),
     createProject: (payload) =>
       request("/api/projects", { method: "POST", body: JSON.stringify(payload) }),
     updateProjectStage: (id, stage) =>

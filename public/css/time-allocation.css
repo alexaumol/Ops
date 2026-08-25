@@ -1,0 +1,90 @@
+/* ==========================================================================
+   HITT Ops — Time allocation page-specific styles
+   Reuses the generic modal/toast/field-input classes from
+   business-partners.css (they're not actually BP-specific) plus a few
+   rules just for the weekly grid and employee/week pickers below.
+   ========================================================================== */
+
+.ta-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 0.85rem 1rem;
+  margin-bottom: 1.25rem;
+  box-shadow: var(--shadow-sm);
+}
+.ta-banner label { font-size: 0.78rem; font-weight: 600; color: var(--text-secondary); }
+.ta-banner select, .ta-banner input[type="week"] {
+  padding: 0.45rem 0.6rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-app);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+}
+.ta-week-nav { display: flex; align-items: center; gap: 0.35rem; }
+.ta-week-nav button {
+  width: 30px; height: 30px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-app);
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+.ta-week-nav button:hover { background: var(--bg-surface-alt); }
+.ta-spacer { flex: 1; }
+.ta-total {
+  font-size: 0.9rem; font-weight: 700;
+  padding: 0.4rem 0.75rem;
+  border-radius: 999px;
+  background: var(--bg-surface-alt);
+  color: var(--text-primary);
+}
+.ta-total.over { color: var(--danger); }
+
+.ta-table-wrap {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+.ta-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+.ta-table thead th {
+  text-align: left; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.03em;
+  color: var(--text-secondary); background: var(--bg-surface-alt);
+  padding: 0.6rem 0.9rem; border-bottom: 1px solid var(--border-subtle);
+}
+.ta-table tbody td { padding: 0.5rem 0.9rem; border-bottom: 1px solid var(--border-subtle); vertical-align: middle; }
+.ta-table tbody tr:last-child td { border-bottom: none; }
+.ta-table .ta-hours-input {
+  width: 5rem; text-align: right;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  font-family: inherit;
+}
+.ta-table select.ta-res-select {
+  padding: 0.3rem 0.4rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+}
+.ta-remove-btn {
+  background: none; border: none; cursor: pointer;
+  color: var(--text-secondary); font-size: 1rem; line-height: 1;
+  padding: 0.2rem 0.4rem; border-radius: var(--radius-sm);
+}
+.ta-remove-btn:hover { color: var(--danger); background: rgba(178,74,58,0.08); }
+.ta-status-pill {
+  font-size: 0.68rem; font-weight: 700; padding: 0.15rem 0.5rem;
+  border-radius: 999px; background: var(--bg-surface-alt); color: var(--text-secondary);
+  white-space: nowrap;
+}
+.ta-add-row { padding: 0.75rem 0.9rem; border-top: 1px solid var(--border-subtle); }
+.ta-saved-flash { color: var(--success); font-size: 0.72rem; margin-left: 0.4rem; }

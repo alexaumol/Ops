@@ -18,6 +18,8 @@ const helmet = require("helmet");
 
 const projectsRouter = require("./routes/projects");
 const businessPartnersRouter = require("./routes/businessPartners");
+const timeTrackingRouter = require("./routes/timeTracking");
+const employeesRouter = require("./routes/employees");
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -48,6 +50,8 @@ app.get("/api/health", (req, res) => {
 
 app.use("/api/projects", projectsRouter);
 app.use("/api/business-partners", businessPartnersRouter);
+app.use("/api/time-tracking", timeTrackingRouter);
+app.use("/api/employees", employeesRouter);
 
 // Fallback 404 for unknown API routes.
 app.use("/api", (req, res) => {

@@ -5,25 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Time allocation · HITT Ops</title>
 <link rel="stylesheet" href="../css/styles.css" />
-<style>
-  .empty-state {
-    max-width: 520px;
-    margin: 3rem auto 0;
-    text-align: center;
-    background: var(--bg-surface);
-    border: 1px dashed var(--border-subtle);
-    border-radius: var(--radius-lg);
-    padding: 2.5rem 2rem;
-  }
-  .empty-state__icon {
-    width: 56px; height: 56px;
-    border-radius: 50%;
-    background: var(--bg-surface-alt);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 1.6rem;
-    margin: 0 auto 1rem;
-  }
-</style>
+<link rel="stylesheet" href="../css/business-partners.css" />
+<link rel="stylesheet" href="../css/time-allocation.css" />
 </head>
 <body>
   <header class="app-header">
@@ -33,6 +16,7 @@
       <a href="time-allocation.html" class="active">Time allocation</a>
     </nav>
     <div class="app-header__user">
+      <span id="dataSourcePill" class="data-pill" style="font-size:10px; font-weight:700; padding:2px 8px; border-radius:999px;">…</span>
       <div class="avatar" id="userAvatar">?</div>
       <span id="userName">Signed in</span>
       <button class="btn btn-secondary" id="btnSignOut" style="padding:0.35rem 0.75rem; font-size:0.8rem;">Sign out</button>
@@ -41,29 +25,62 @@
 
   <main class="page-shell">
     <h1 class="page-title">Time allocation</h1>
-    <p class="page-subtitle">Time tracking, allocable/non-allocable hours, holidays and time-off requests.</p>
+    <p class="page-subtitle">Log your hours against projects, week by week.</p>
 
-    <div class="empty-state">
-      <div class="empty-state__icon" aria-hidden="true">🚧</div>
-      <h2 style="margin:0 0 0.5rem; font-size:1.1rem;">This module isn't built yet</h2>
-      <p style="color:var(--text-secondary); font-size:0.9rem; margin:0;">
-        Projects is the first module wired to real data. Time allocation is next on the
-        progressive delivery roadmap — the same shared shell (header, sign-in,
-        colours) is already in place so it can be dropped in without reworking
-        the rest of the app.
-      </p>
+    <div class="ta-banner">
+      <label for="employeeSelect">Logging time as</label>
+      <select id="employeeSelect"></select>
+
+      <div class="ta-spacer"></div>
+
+      <div class="ta-week-nav">
+        <button id="btnWeekBack" title="Previous week">‹</button>
+        <input id="weekPicker" type="week" />
+        <button id="btnWeekForward" title="Next week">›</button>
+      </div>
+      <span id="weekTotal" class="ta-total">0h logged</span>
+    </div>
+
+    <div class="ta-table-wrap">
+      <table class="ta-table">
+        <thead>
+          <tr>
+            <th>Project</th>
+            <th>Status</th>
+            <th>Resource type</th>
+            <th style="text-align:right;">Hours</th>
+            <th>Last update</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="taTableBody"></tbody>
+      </table>
+      <div id="taEmpty" class="bp-empty hidden">No projects logged for this week yet.</div>
+      <div class="ta-add-row">
+        <button class="btn btn-secondary" id="btnAddProject">+ Add project</button>
+      </div>
     </div>
   </main>
 
+  <div id="toastHost" class="toast-host"></div>
+
+  <!-- ============================ PROJECT PICKER MODAL ============================ -->
+  <div id="projectPickerOverlay" class="modal-overlay hidden">
+    <div class="modal-panel modal-panel--sm">
+      <div class="modal-head">
+        <h2 style="flex:1; font-size:1rem; font-weight:700; color:#fff; margin:0;">Add a project</h2>
+        <button id="projectPickerClose" class="modal-head-btn modal-head-btn--close" title="Close">✕</button>
+      </div>
+      <div style="padding: 0.75rem 1.1rem; border-bottom:1px solid var(--border-subtle);">
+        <input id="projectPickerSearch" type="text" placeholder="Search by project code or name…" class="field-input" autocomplete="off" />
+      </div>
+      <div id="projectPickerResults" class="modal-body" style="max-height:50vh;"></div>
+    </div>
+  </div>
+
   <script src="../js/config.js"></script>
   <script src="../js/auth.js"></script>
-  <script>
-    const session = HITT_AUTH.requireSession("../index.html");
-    if (session) {
-      document.getElementById("userName").textContent = session.displayName;
-      document.getElementById("userAvatar").textContent = HITT_AUTH.initials(session);
-    }
-    document.getElementById("btnSignOut").addEventListener("click", () => HITT_AUTH.signOut("../index.html"));
-  </script>
+  <script src="../js/api.js"></script>
+  <script src="../js/time-allocation.js"></script>
 </body>
 </html>
