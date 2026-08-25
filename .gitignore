@@ -1,0 +1,5 @@
+node_modules/
+
+# Internal-only notes (real infra details, real client/project names) —
+# never goes to the public repo. See README.md for the public-facing docs.
+INTERNAL.md
