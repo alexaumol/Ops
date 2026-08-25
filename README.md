@@ -39,8 +39,6 @@ calls the API over HTTPS, and the API is the only thing with a `.env` file.
 
 ## Running it
 
-**Backend (on the VPS or any machine that can reach `217.154.101.149:8432`):**
-
 ```bash
 cd server
 cp .env.example .env      # fill in PGPASSWORD and CORS_ALLOWED_ORIGINS
@@ -74,7 +72,7 @@ API_BASE_URL: "https://ops-api.fhitt.org", // -> your real API URL
 | Welcome menu | Built — Projects / Business partners / Time allocation / Invoicing tiles. |
 | Projects (kanban) | Built and wired to `GET/POST/PATCH /api/projects`. Falls back to on-screen demo data automatically if the API can't be reached, and says so in the header pill. |
 | Business partners / Time allocation / Invoicing | Placeholder "coming soon" pages using the same shared header/auth, ready to receive real content next. |
-| Backend `/api/projects` | Wired to the **real** schema (confirmed 2026-08-22 via `information_schema.columns`): `projects`, `projectstatus` (stage lookup, has an `ordinal` column), and `projectportfolioprogress` (a progress history table — the API takes the most recent row per project). See `server/routes/projects.js`. |
+| Backend `/api/projects` | Wired to the **real** schema: `projects`, `projectstatus` (stage lookup, has an `ordinal` column), and `projectportfolioprogress` (a progress history table — the API takes the most recent row per project). See `server/routes/projects.js`. |
 | Stage labels | Fetched live from `GET /api/projects/statuses` (reads the `projectstatus` table) and matched onto the Lead/Oferta/Guanyat/WIP/Delivered/Closed/Cancelled styling by name; falls back to the hardcoded 0–6 order if that call fails, so the board still renders. |
 | Microsoft 365 sign-in | Not implemented yet. `js/auth.js` and `js/config.js` have TODOs for wiring in MSAL.js once you provide the Entra tenant ID and register an app (client ID). |
 
