@@ -1,0 +1,209 @@
+/* ==========================================================================
+   HITT Ops — Design tokens & base styles
+   Colours extracted from "HITT corporate colours.jpg"
+   ========================================================================== */
+
+:root {
+  /* Corporate palette */
+  --hitt-ink:        #171717;   /* near-black, primary text / wordmark */
+  --hitt-charcoal:   #211916;   /* darkest swatch, deep backgrounds */
+  --hitt-teal:       #5C757C;   /* primary brand accent */
+  --hitt-sage:       #ABAF96;   /* secondary accent / muted UI */
+  --hitt-cream:      #DAD4B2;   /* light surface tint */
+  --hitt-olive:      #B3B07D;   /* secondary surface */
+  --hitt-amber:      #BC9A1C;   /* call-to-action / highlight */
+
+  /* Semantic tokens (light theme, default) */
+  --bg-app:          #F7F6F1;
+  --bg-surface:      #FFFFFF;
+  --bg-surface-alt:  var(--hitt-cream);
+  --bg-header:       var(--hitt-ink);
+  --text-primary:    var(--hitt-charcoal);
+  --text-secondary:  #5A5650;
+  --text-inverse:    #FFFFFF;
+  --border-subtle:   #E4E0D4;
+  --accent:          var(--hitt-amber);
+  --accent-hover:    #A5870F;
+  --accent-contrast: #1A1300;
+  --brand:           var(--hitt-teal);
+  --brand-hover:     #4A6167;
+  --success:         #6E8F5A;
+  --warning:         var(--hitt-amber);
+  --danger:          #B24A3A;
+  --focus-ring:      #7FA0A8;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --shadow-sm: 0 1px 2px rgba(23,23,23,0.06), 0 1px 1px rgba(23,23,23,0.04);
+  --shadow-md: 0 4px 12px rgba(23,23,23,0.08), 0 2px 4px rgba(23,23,23,0.06);
+  --shadow-lg: 0 12px 32px rgba(23,23,23,0.14);
+
+  --font-sans: "Calibri", "Segoe UI", "Inter", system-ui, -apple-system, sans-serif;
+  --header-height: 60px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg-app:          #15140F;
+    --bg-surface:      #201E19;
+    --bg-surface-alt:  #2A2820;
+    --bg-header:       var(--hitt-charcoal);
+    --text-primary:    #F1EFE6;
+    --text-secondary:  #B9B4A5;
+    --text-inverse:    #FFFFFF;
+    --border-subtle:   #38352C;
+    --accent:          var(--hitt-amber);
+    --accent-hover:    #D4AE24;
+    --accent-contrast: #1A1300;
+    --brand:           #7C99A0;
+    --brand-hover:     #93AEB4;
+    --shadow-sm: 0 1px 2px rgba(0,0,0,0.4);
+    --shadow-md: 0 4px 12px rgba(0,0,0,0.45);
+    --shadow-lg: 0 12px 32px rgba(0,0,0,0.55);
+  }
+}
+
+* { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+body {
+  font-family: var(--font-sans);
+  background: var(--bg-app);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+a { color: var(--brand); }
+img { max-width: 100%; display: block; }
+
+button, input, select, textarea { font-family: inherit; font-size: inherit; }
+
+:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px; height: 1px;
+  overflow: hidden;
+  clip: rect(0,0,0,0);
+  white-space: nowrap;
+}
+
+/* ---------- Buttons ---------- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.65rem 1.25rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: background-color .15s ease, border-color .15s ease, transform .05s ease;
+  text-decoration: none;
+}
+.btn:active { transform: translateY(1px); }
+.btn-primary {
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+.btn-primary:hover { background: var(--accent-hover); }
+.btn-secondary {
+  background: transparent;
+  border-color: var(--border-subtle);
+  color: var(--text-primary);
+}
+.btn-secondary:hover { border-color: var(--brand); color: var(--brand); }
+.btn-block { width: 100%; }
+.btn[disabled] { opacity: .55; cursor: not-allowed; }
+
+/* ---------- Top App Header (shared across pages) ---------- */
+.app-header {
+  height: var(--header-height);
+  background: var(--bg-header);
+  color: var(--text-inverse);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 1.25rem;
+  box-shadow: var(--shadow-sm);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+.app-header__brand {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  font-size: 1.1rem;
+  text-decoration: none;
+  color: var(--text-inverse);
+}
+.app-header__brand .dot { color: var(--accent); }
+.app-header__nav {
+  display: flex;
+  gap: 1.25rem;
+  align-items: center;
+}
+.app-header__nav a {
+  color: rgba(255,255,255,0.82);
+  text-decoration: none;
+  font-size: 0.92rem;
+  font-weight: 600;
+  padding: 0.4rem 0.2rem;
+  border-bottom: 2px solid transparent;
+}
+.app-header__nav a:hover,
+.app-header__nav a.active {
+  color: #fff;
+  border-bottom-color: var(--accent);
+}
+.app-header__user {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.88rem;
+}
+.avatar {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-contrast);
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700;
+  font-size: 0.8rem;
+}
+
+/* ---------- Layout helpers ---------- */
+.page-shell {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 1.5rem 1.25rem 3rem;
+}
+.page-title {
+  font-size: 1.5rem;
+  font-weight: 800;
+  margin: 0 0 0.25rem;
+}
+.page-subtitle {
+  color: var(--text-secondary);
+  margin: 0 0 1.5rem;
+  font-size: 0.95rem;
+}
+
+/* ---------- Responsive grid for cards ---------- */
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.25rem;
+}

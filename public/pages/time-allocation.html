@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Time allocation · HITT Ops</title>
+<link rel="stylesheet" href="../css/styles.css" />
+<style>
+  .empty-state {
+    max-width: 520px;
+    margin: 3rem auto 0;
+    text-align: center;
+    background: var(--bg-surface);
+    border: 1px dashed var(--border-subtle);
+    border-radius: var(--radius-lg);
+    padding: 2.5rem 2rem;
+  }
+  .empty-state__icon {
+    width: 56px; height: 56px;
+    border-radius: 50%;
+    background: var(--bg-surface-alt);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.6rem;
+    margin: 0 auto 1rem;
+  }
+</style>
+</head>
+<body>
+  <header class="app-header">
+    <a class="app-header__brand" href="../welcome.html">HITT<span class="dot">·</span>Ops</a>
+    <nav class="app-header__nav" aria-label="Primary">
+      <a href="../welcome.html">Home</a>
+      <a href="time-allocation.html" class="active">Time allocation</a>
+    </nav>
+    <div class="app-header__user">
+      <div class="avatar" id="userAvatar">?</div>
+      <span id="userName">Signed in</span>
+      <button class="btn btn-secondary" id="btnSignOut" style="padding:0.35rem 0.75rem; font-size:0.8rem;">Sign out</button>
+    </div>
+  </header>
+
+  <main class="page-shell">
+    <h1 class="page-title">Time allocation</h1>
+    <p class="page-subtitle">Time tracking, allocable/non-allocable hours, holidays and time-off requests.</p>
+
+    <div class="empty-state">
+      <div class="empty-state__icon" aria-hidden="true">🚧</div>
+      <h2 style="margin:0 0 0.5rem; font-size:1.1rem;">This module isn't built yet</h2>
+      <p style="color:var(--text-secondary); font-size:0.9rem; margin:0;">
+        Projects is the first module wired to real data. Time allocation is next on the
+        progressive delivery roadmap — the same shared shell (header, sign-in,
+        colours) is already in place so it can be dropped in without reworking
+        the rest of the app.
+      </p>
+    </div>
+  </main>
+
+  <script src="../js/config.js"></script>
+  <script src="../js/auth.js"></script>
+  <script>
+    const session = HITT_AUTH.requireSession("../index.html");
+    if (session) {
+      document.getElementById("userName").textContent = session.displayName;
+      document.getElementById("userAvatar").textContent = HITT_AUTH.initials(session);
+    }
+    document.getElementById("btnSignOut").addEventListener("click", () => HITT_AUTH.signOut("../index.html"));
+  </script>
+</body>
+</html>

@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Projects · HITT Ops</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/styles.css" />
+<script>
+  // Tailwind theme mapped straight onto the HITT corporate colour sheet.
+  tailwind.config = {
+    theme: {
+      extend: {
+        fontFamily: {
+          sans: ['Calibri', 'Segoe UI', 'Inter', 'system-ui', 'sans-serif'],
+          mono: ['JetBrains Mono', 'monospace'],
+        },
+        colors: {
+          hitt: {
+            ink:      '#171717', // near-black wordmark / primary text
+            charcoal: '#211916', // deepest surface
+            teal:     '#5C757C', // brand accent
+            sage:     '#ABAF96', // secondary accent
+            cream:    '#DAD4B2', // light tint / canvas
+            olive:    '#B3B07D', // secondary surface
+            amber:    '#BC9A1C', // call to action / highlight
+            canvas:   '#F5F4EE',
+            mist:     '#EFEDE3',
+            green:    '#6E8F5A',
+            red:      '#B24A3A',
+          }
+        },
+        boxShadow: {
+          card: '0 1px 2px rgba(23,23,23,0.06), 0 1px 1px rgba(23,23,23,0.04)',
+          cardHover: '0 8px 20px rgba(23,23,23,0.14), 0 2px 6px rgba(23,23,23,0.08)',
+          lift: '0 18px 30px rgba(23,23,23,0.22)',
+        }
+      }
+    }
+  }
+</script>
+<style>
+  html, body { height: 100%; }
+  body { background: #F5F4EE; }
+
+  ::-webkit-scrollbar { height: 8px; width: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #D9D4C4; border-radius: 8px; }
+  ::-webkit-scrollbar-thumb:hover { background: #C2BBA5; }
+
+  .card {
+    transition: transform .16s ease, box-shadow .16s ease, opacity .16s ease, border-color .16s ease;
+    touch-action: none;
+  }
+  .card:active { cursor: grabbing; }
+  .card.dragging { opacity: 0.35; transform: scale(0.97); }
+  .card-ghost {
+    position: fixed; pointer-events: none; z-index: 60;
+    transform: rotate(-2deg) scale(1.03);
+    box-shadow: 0 18px 30px rgba(23,23,23,0.28);
+    opacity: 0.96;
+  }
+  .col-body.drag-over {
+    background: rgba(92,117,124,0.08);
+    outline: 2px dashed #5C757C;
+    outline-offset: -6px;
+  }
+  .col-body.drag-invalid {
+    background: rgba(178,74,58,0.08);
+    outline: 2px dashed #B24A3A;
+    outline-offset: -6px;
+  }
+  @keyframes pop-in {
+    0%   { transform: scale(0.9); opacity: 0; }
+    60%  { transform: scale(1.03); opacity: 1; }
+    100% { transform: scale(1); }
+  }
+  .pop-in { animation: pop-in .28s cubic-bezier(.34,1.56,.64,1); }
+  @keyframes count-pulse {
+    0% { transform: scale(1); } 35% { transform: scale(1.25); } 100% { transform: scale(1); }
+  }
+  .count-pulse { animation: count-pulse .32s ease; }
+  @keyframes rail-flash {
+    0% { filter: brightness(1); } 40% { filter: brightness(1.6); } 100% { filter: brightness(1); }
+  }
+  .rail-flash { animation: rail-flash .5s ease; }
+  .tab-btn[aria-selected="true"] {
+    background: #171717; color: white;
+    box-shadow: 0 6px 14px rgba(23,23,23,0.28);
+  }
+  .kbd-focus:focus-visible { outline: 2px solid #BC9A1C; outline-offset: 2px; }
+  .fade-mask {
+    -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 22px), transparent 100%);
+    mask-image: linear-gradient(to bottom, black calc(100% - 22px), transparent 100%);
+  }
+  .toast { animation: toast-in .22s ease, toast-out .22s ease 2.6s forwards; }
+  @keyframes toast-in { from { transform: translateY(10px); opacity: 0;} to { transform: translateY(0); opacity: 1;} }
+  @keyframes toast-out { to { transform: translateY(10px); opacity: 0;} }
+  @media (prefers-reduced-motion: reduce) {
+    .card, .pop-in, .count-pulse, .rail-flash, .toast { animation: none !important; transition: none !important; }
+  }
+  .modal-overlay { animation: overlay-in .18s ease; }
+  @keyframes overlay-in { from { opacity: 0; } to { opacity: 1; } }
+  .modal-panel { animation: panel-in .22s cubic-bezier(.2,.9,.3,1.1); }
+  @keyframes panel-in {
+    from { opacity: 0; transform: translateY(14px) scale(.98); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  .field-label { font-size: 11px; font-weight: 600; color: #5C757C; letter-spacing: .01em; }
+  .field-input {
+    width: 100%; font-size: 13px; padding: 6px 8px;
+    border: 1px solid #E4E0D4; border-radius: 6px; background: #fff; color: #171717;
+  }
+  .field-input:disabled, .field-input[readonly] { background: #F5F4EE; color: #5C757C; }
+  .field-input:focus { outline: 2px solid #BC9A1C; outline-offset: 1px; border-color: #5C757C; }
+  .modal-tab[aria-selected="true"] { color: #171717; border-bottom-color: #171717; }
+  .modal-tab { border-bottom: 2px solid transparent; }
+  .grid-row:nth-child(even) { background: #FAF9F4; }
+  .data-pill {
+    font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 999px;
+  }
+</style>
+</head>
+<body class="h-full font-sans text-hitt-ink antialiased">
+
+<div class="h-full flex flex-col">
+
+  <!-- HITT Ops app header (shared chrome) -->
+  <header class="app-header">
+    <a class="app-header__brand" href="../welcome.html">HITT<span class="dot">·</span>Ops</a>
+    <nav class="app-header__nav" aria-label="Primary">
+      <a href="../welcome.html">Home</a>
+      <a href="projects.html" class="active">Projects</a>
+    </nav>
+    <div class="app-header__user">
+      <span id="dataSourcePill" class="data-pill">…</span>
+      <div class="avatar" id="userAvatar">?</div>
+      <span id="userName">Signed in</span>
+      <button class="btn btn-secondary" id="btnSignOut" style="padding:0.35rem 0.75rem; font-size:0.8rem;">Sign out</button>
+    </div>
+  </header>
+
+  <!-- Toolbar -->
+  <div class="border-b border-slate-200 bg-white/90 backdrop-blur px-4 sm:px-6 py-3 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6 shrink-0">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-lg bg-hitt-ink text-white flex items-center justify-center font-extrabold shrink-0">H</div>
+      <div class="leading-tight">
+        <h1 class="text-base sm:text-lg font-bold text-hitt-ink">Project portfolio</h1>
+        <p class="text-[11px] text-hitt-teel text-hitt-teal">Drag a card to move it through the pipeline</p>
+      </div>
+    </div>
+
+    <div class="flex-1 flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
+      <div class="relative flex-1 max-w-md">
+        <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-hitt-teal" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M17 10a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+        <input id="searchBox" type="text" placeholder="Type to start searching…"
+          class="kbd-focus w-full pl-9 pr-9 py-2 rounded-lg border border-slate-200 bg-hitt-canvas text-sm placeholder:text-slate-400 focus:bg-white focus:border-hitt-teal transition-colors" />
+        <button id="clearSearch" class="hidden absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-hitt-red">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <div role="tablist" class="inline-flex bg-hitt-canvas border border-slate-200 rounded-lg p-1 self-start">
+        <button data-tab="alive" role="tab" aria-selected="true" class="tab-btn kbd-focus px-3 py-1.5 rounded-md text-xs font-semibold text-hitt-teal transition-all whitespace-nowrap">
+          Alive <span id="countAlive" class="font-mono">(0)</span>
+        </button>
+        <button data-tab="closed" role="tab" aria-selected="false" class="tab-btn kbd-focus px-3 py-1.5 rounded-md text-xs font-semibold text-hitt-teal transition-all whitespace-nowrap">
+          Closed/Cancelled <span id="countClosed" class="font-mono">(0)</span>
+        </button>
+      </div>
+
+      <button id="btnRefresh" title="Refresh from database" class="kbd-focus self-start sm:self-center shrink-0 w-9 h-9 rounded-lg border border-slate-200 bg-white hover:bg-hitt-mist text-hitt-teal flex items-center justify-center shadow-card transition-all">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582M20 20v-5h-.581M5.635 8.36A9 9 0 0119.364 5.64M18.365 15.64A9 9 0 014.636 18.36"/></svg>
+      </button>
+      <button id="btnNewProject" title="Add new project" class="kbd-focus self-start sm:self-center shrink-0 w-9 h-9 rounded-lg bg-hitt-teal hover:bg-hitt-ink text-white flex items-center justify-center shadow-card hover:shadow-cardHover transition-all">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Board -->
+  <main class="flex-1 overflow-x-auto overflow-y-hidden px-3 sm:px-4 py-4">
+    <div id="board" class="h-full min-w-max grid grid-flow-col auto-cols-[264px] sm:auto-cols-[280px] gap-3"></div>
+  </main>
+</div>
+
+<div id="toastHost" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 items-end"></div>
+
+<!-- ============================ PROJECT MODAL ============================ -->
+<div id="modalOverlay" class="modal-overlay hidden fixed inset-0 z-50 bg-hitt-ink/40 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6">
+  <div id="modalPanel" class="modal-panel bg-white w-full max-w-5xl max-h-[92vh] rounded-xl shadow-lift flex flex-col overflow-hidden">
+
+    <div class="shrink-0 px-4 sm:px-5 py-3 flex items-center gap-3" style="background:#5C757C">
+      <span id="mYear" class="font-mono font-bold text-white/90 text-sm bg-white/10 rounded px-2 py-1">2026</span>
+      <span id="mCode" class="font-mono font-bold text-white text-sm bg-white/15 rounded px-2 py-1">00000</span>
+      <h2 id="mTitle" class="flex-1 min-w-0 truncate text-white font-bold text-base sm:text-lg">Project name</h2>
+      <div class="hidden md:flex items-center gap-3 text-white/85 text-xs ml-2 border-l border-white/20 pl-3">
+        <div>
+          <div class="text-[10px] uppercase tracking-wide text-white/50">Last updated</div>
+          <div id="mLastUpdated" class="font-medium">—</div>
+        </div>
+        <div>
+          <div class="text-[10px] uppercase tracking-wide text-white/50">By</div>
+          <div id="mLastUpdatedBy" class="font-medium">—</div>
+        </div>
+      </div>
+      <span id="mChangedBadge" class="hidden text-[11px] font-bold text-hitt-red bg-white rounded px-2 py-1 ml-1">Data has changed</span>
+      <button id="mSave" title="Save" class="w-8 h-8 rounded-md bg-hitt-green hover:brightness-110 flex items-center justify-center transition shrink-0">
+        <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+      </button>
+      <button id="mClose" title="Close" class="w-8 h-8 rounded-md bg-hitt-red hover:brightness-110 flex items-center justify-center transition shrink-0">
+        <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+
+    <div class="shrink-0 flex items-center gap-5 px-4 sm:px-5 border-b border-slate-200 bg-white">
+      <button data-mtab="general" class="modal-tab kbd-focus py-2.5 text-sm font-semibold text-hitt-teal" aria-selected="true">General</button>
+      <button data-mtab="budget" class="modal-tab kbd-focus py-2.5 text-sm font-semibold text-hitt-teal" aria-selected="false">Budget &amp; expenses</button>
+    </div>
+
+    <div class="flex-1 overflow-y-auto bg-hitt-canvas">
+      <div id="paneGeneral" class="grid grid-cols-1 lg:grid-cols-2 gap-4 p-4 sm:p-5">
+        <div class="flex flex-col gap-4">
+          <section class="bg-white rounded-lg border border-slate-200 shadow-card overflow-hidden">
+            <div class="bg-hitt-teal px-3 py-1.5"><h3 class="text-white text-xs font-bold tracking-wide">GENERAL PROJECT INFO</h3></div>
+            <div class="p-3 grid grid-cols-2 gap-3">
+              <div>
+                <label class="field-label">Status <span class="text-hitt-red">*</span></label>
+                <select id="mStatus" class="field-input mt-1"></select>
+              </div>
+              <div>
+                <label class="field-label">Progress (%)</label>
+                <input id="mProgress" type="number" min="0" max="100" class="field-input mt-1" />
+              </div>
+            </div>
+          </section>
+
+          <section class="bg-white rounded-lg border border-slate-200 shadow-card overflow-hidden">
+            <div class="bg-hitt-teal px-3 py-1.5"><h3 class="text-white text-xs font-bold tracking-wide">PROJECT DELIVERABLES</h3></div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-xs">
+                <thead>
+                  <tr class="bg-hitt-mist text-hitt-teal text-left">
+                    <th class="px-2.5 py-1.5 font-semibold w-32">Expected</th>
+                    <th class="px-2.5 py-1.5 font-semibold w-32">Effective</th>
+                    <th class="px-2.5 py-1.5 font-semibold">Deliverable name</th>
+                  </tr>
+                </thead>
+                <tbody id="mDeliverables"></tbody>
+              </table>
+            </div>
+            <div class="px-2.5 py-2 text-[11px] text-slate-400">Deliverables endpoint not wired yet — placeholder only.</div>
+          </section>
+        </div>
+
+        <div class="flex flex-col gap-4">
+          <section class="bg-white rounded-lg border border-slate-200 shadow-card overflow-hidden flex-1 flex flex-col min-h-[220px]">
+            <div class="px-3 py-2 border-b border-slate-100 flex items-center gap-2">
+              <input id="mNewNote" type="text" placeholder="Type here for a new note" class="field-input flex-1 italic text-hitt-teal" />
+              <button id="mAddNote" class="shrink-0 bg-hitt-teal text-white text-[11px] font-semibold px-3 py-2 rounded-md hover:bg-hitt-ink transition">Add note</button>
+            </div>
+            <div class="bg-hitt-teal px-3 py-1.5"><h3 class="text-white text-xs font-bold tracking-wide">NOTES</h3></div>
+            <div id="mNotesList" class="flex-1 overflow-y-auto p-3 space-y-2">
+              <div class="text-xs text-slate-400 text-center py-6">Notes endpoint not wired yet — this list is local to your browser only.</div>
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <div id="paneBudget" class="hidden p-4 sm:p-5 flex flex-col gap-4">
+        <section class="bg-white rounded-lg border border-slate-200 shadow-card overflow-hidden">
+          <div class="bg-hitt-teal px-3 py-1.5"><h3 class="text-white text-xs font-bold tracking-wide">PROJECT QUOTATIONS</h3></div>
+          <div class="p-3 text-xs text-slate-400">Quotations endpoint not wired yet — connect ProjectQuotations table to populate this.</div>
+        </section>
+        <section class="bg-white rounded-lg border border-slate-200 shadow-card overflow-hidden">
+          <div class="bg-hitt-teal px-3 py-1.5"><h3 class="text-white text-xs font-bold tracking-wide">EXPENSES RECORDS</h3></div>
+          <div class="p-3 text-xs text-slate-400">Expenses endpoint not wired yet — connect ExpensesRecordsProject table to populate this.</div>
+        </section>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================ NEW PROJECT MODAL ============================ -->
+<div id="newProjectOverlay" class="modal-overlay hidden fixed inset-0 z-50 bg-hitt-ink/40 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6">
+  <div class="modal-panel bg-white w-full max-w-lg max-h-[92vh] rounded-xl shadow-lift flex flex-col overflow-hidden">
+    <div class="shrink-0 bg-hitt-mist px-4 sm:px-5 py-3 flex items-start justify-between gap-3 border-b border-slate-200">
+      <div class="flex-1 min-w-0">
+        <input id="npName" type="text" value="Type here the name…"
+          class="w-full bg-transparent text-hitt-teal italic text-sm font-medium outline-none border-b border-dashed border-transparent focus:border-hitt-teal focus:text-hitt-ink focus:not-italic" />
+        <div class="mt-1 flex items-center gap-2">
+          <span class="font-mono font-bold text-hitt-ink text-sm" id="npYear">2026</span>
+          <span class="text-hitt-teal">–</span>
+          <span id="npNumber" class="font-mono font-bold text-hitt-ink text-sm">26084</span>
+          <span id="npSavedBadge" class="ml-auto text-[11px] font-bold text-hitt-green italic">Ready</span>
+        </div>
+      </div>
+      <button id="npClose" title="Close" class="w-8 h-8 shrink-0 rounded-md hover:bg-slate-200 flex items-center justify-center transition">
+        <svg class="w-4 h-4 text-hitt-teal" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+
+    <div class="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
+      <div>
+        <label class="field-label">Status <span class="text-hitt-red">*</span></label>
+        <select id="npStatus" class="field-input mt-1"></select>
+      </div>
+      <div>
+        <label class="field-label">Progress (%)</label>
+        <input id="npProgress" type="number" min="0" max="100" value="0" class="field-input mt-1" />
+      </div>
+    </div>
+
+    <div class="shrink-0 border-t border-slate-200 px-4 sm:px-5 py-3 flex items-center justify-center gap-3">
+      <button id="npSave" title="Save" class="w-10 h-10 rounded-lg bg-hitt-green hover:brightness-110 flex items-center justify-center transition shadow-card">
+        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+      </button>
+      <button id="npCancel" title="Cancel" class="w-10 h-10 rounded-lg bg-hitt-red hover:brightness-110 flex items-center justify-center transition shadow-card">
+        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<script src="../js/config.js"></script>
+<script src="../js/auth.js"></script>
+<script src="../js/api.js"></script>
+<script src="../js/projects.js"></script>
+</body>
+</html>

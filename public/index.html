@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sign in · HITT Ops</title>
+<link rel="stylesheet" href="css/styles.css" />
+<style>
+  body.login-body {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background:
+      radial-gradient(1200px 600px at 15% -10%, rgba(92,117,124,0.18), transparent 60%),
+      radial-gradient(900px 500px at 110% 110%, rgba(188,154,28,0.14), transparent 55%),
+      var(--bg-app);
+    padding: 1.5rem;
+  }
+  .login-card {
+    width: 100%;
+    max-width: 420px;
+    background: var(--bg-surface);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    padding: 2.25rem 2rem 1.75rem;
+    border: 1px solid var(--border-subtle);
+  }
+  .login-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    margin-bottom: 1.5rem;
+  }
+  .login-brand__mark {
+    width: 40px; height: 40px;
+    border-radius: var(--radius-sm);
+    background: var(--hitt-ink);
+    color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800;
+    font-size: 1.05rem;
+    flex: none;
+  }
+  .login-brand__text {
+    line-height: 1.15;
+  }
+  .login-brand__text strong {
+    display: block;
+    font-size: 1.05rem;
+    letter-spacing: 0.02em;
+  }
+  .login-brand__text span {
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+  }
+  .login-heading {
+    font-size: 1.35rem;
+    font-weight: 700;
+    margin: 0 0 0.35rem;
+  }
+  .login-sub {
+    color: var(--text-secondary);
+    font-size: 0.92rem;
+    margin: 0 0 1.5rem;
+  }
+  .ms-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    background: var(--bg-surface-alt);
+    border-radius: 999px;
+    padding: 0.3rem 0.7rem;
+    margin-bottom: 1.25rem;
+  }
+  .ms-badge svg { flex: none; }
+
+  .field {
+    margin-bottom: 1.1rem;
+  }
+  .field label {
+    display: block;
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-bottom: 0.4rem;
+  }
+  .field input {
+    width: 100%;
+    padding: 0.7rem 0.85rem;
+    border-radius: var(--radius-sm);
+    border: 1.5px solid var(--border-subtle);
+    background: var(--bg-app);
+    color: var(--text-primary);
+  }
+  .field input:focus {
+    border-color: var(--brand);
+  }
+  .field-hint {
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    margin-top: 0.35rem;
+  }
+  .login-step { display: none; }
+  .login-step.active { display: block; }
+  .login-user-chip {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    background: var(--bg-surface-alt);
+    border-radius: var(--radius-sm);
+    padding: 0.55rem 0.75rem;
+    margin-bottom: 1.25rem;
+    font-size: 0.9rem;
+  }
+  .login-user-chip button {
+    margin-left: auto;
+    background: none; border: none;
+    color: var(--brand);
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .login-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    margin-top: 0.5rem;
+  }
+  .prototype-note {
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border-subtle);
+    font-size: 0.76rem;
+    color: var(--text-secondary);
+    display: flex;
+    gap: 0.5rem;
+  }
+  .footer-note {
+    text-align: center;
+    margin-top: 1.25rem;
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+  }
+</style>
+</head>
+<body class="login-body">
+
+  <main class="login-card" role="main">
+    <div class="login-brand">
+      <div class="login-brand__mark" aria-hidden="true">H</div>
+      <div class="login-brand__text">
+        <strong>HITT Ops</strong>
+        <span>Health Innovation Technology Transfer</span>
+      </div>
+    </div>
+
+    <span class="ms-badge">
+      <svg width="14" height="14" viewBox="0 0 21 21" aria-hidden="true">
+        <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
+        <rect x="11" y="1" width="9" height="9" fill="#7fba00"/>
+        <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>
+        <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
+      </svg>
+      Sign in with your Microsoft 365 account
+    </span>
+
+    <!-- Step 1: identify -->
+    <section id="stepEmail" class="login-step active">
+      <h1 class="login-heading">Sign in</h1>
+      <p class="login-sub">Use your HITT email and Microsoft 365 password.</p>
+
+      <form id="formEmail" novalidate>
+        <div class="field">
+          <label for="username">Email address</label>
+          <input type="email" id="username" name="username" placeholder="name.surname@fhitt.org" autocomplete="username" required />
+          <p class="field-hint">This is the same account you use for Outlook and Teams.</p>
+        </div>
+        <div class="login-actions">
+          <button type="submit" class="btn btn-primary btn-block">Next</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- Step 2: password -->
+    <section id="stepPassword" class="login-step">
+      <div class="login-user-chip">
+        <span id="chipEmail">name.surname@fhitt.org</span>
+        <button type="button" id="btnChangeUser">Change</button>
+      </div>
+      <h1 class="login-heading">Enter password</h1>
+      <p class="login-sub">Prototype mode — password is not validated yet.</p>
+
+      <form id="formPassword" novalidate>
+        <div class="field">
+          <label for="password">Password</label>
+          <input type="password" id="password" name="password" autocomplete="current-password" placeholder="••••••••" />
+        </div>
+        <div class="login-actions">
+          <button type="submit" class="btn btn-primary btn-block">Sign in</button>
+          <button type="button" class="btn btn-secondary btn-block" id="btnBack">Back</button>
+        </div>
+      </form>
+    </section>
+
+    <p class="prototype-note">
+      ⚠️ <span>Prototype build: credentials are not verified against Microsoft Entra ID yet. Once the tenant ID and app registration are provided, this screen will use MSAL.js for real sign-in.</span>
+    </p>
+  </main>
+
+  <p class="footer-note">© <span id="year"></span> HITT · fhitt.org</p>
+
+  <script src="js/config.js"></script>
+  <script src="js/auth.js"></script>
+  <script>
+    document.getElementById("year").textContent = new Date().getFullYear();
+
+    const stepEmail = document.getElementById("stepEmail");
+    const stepPassword = document.getElementById("stepPassword");
+    const formEmail = document.getElementById("formEmail");
+    const formPassword = document.getElementById("formPassword");
+    const usernameInput = document.getElementById("username");
+    const chipEmail = document.getElementById("chipEmail");
+
+    formEmail.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const value = usernameInput.value.trim();
+      if (!value) return;
+      chipEmail.textContent = value;
+      stepEmail.classList.remove("active");
+      stepPassword.classList.add("active");
+      document.getElementById("password").focus();
+    });
+
+    document.getElementById("btnBack").addEventListener("click", () => {
+      stepPassword.classList.remove("active");
+      stepEmail.classList.add("active");
+      usernameInput.focus();
+    });
+
+    document.getElementById("btnChangeUser").addEventListener("click", () => {
+      stepPassword.classList.remove("active");
+      stepEmail.classList.add("active");
+      usernameInput.focus();
+      usernameInput.select();
+    });
+
+    formPassword.addEventListener("submit", (e) => {
+      e.preventDefault();
+      // Prototype: no credential validation. Real implementation will call
+      // MSAL loginRedirect/loginPopup here instead (see js/auth.js TODOs).
+      HITT_AUTH.fakeSignIn(usernameInput.value.trim());
+      window.location.href = "welcome.html";
+    });
+  </script>
+</body>
+</html>

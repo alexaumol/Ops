@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Welcome · HITT Ops</title>
+<link rel="stylesheet" href="css/styles.css" />
+<style>
+  .welcome-hero {
+    background: linear-gradient(135deg, var(--hitt-ink) 0%, var(--hitt-teal) 140%);
+    color: #fff;
+    border-radius: var(--radius-lg);
+    padding: 2rem 1.75rem;
+    margin-bottom: 2rem;
+    box-shadow: var(--shadow-md);
+  }
+  .welcome-hero h1 {
+    margin: 0 0 0.35rem;
+    font-size: 1.6rem;
+  }
+  .welcome-hero p {
+    margin: 0;
+    color: rgba(255,255,255,0.82);
+    font-size: 0.95rem;
+  }
+  .module-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    text-decoration: none;
+    color: var(--text-primary);
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+    position: relative;
+    overflow: hidden;
+  }
+  .module-card:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-md);
+    border-color: var(--brand);
+  }
+  .module-card__icon {
+    width: 46px; height: 46px;
+    border-radius: var(--radius-sm);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.35rem;
+    color: #fff;
+  }
+  .module-card__title {
+    font-size: 1.08rem;
+    font-weight: 700;
+    margin: 0;
+  }
+  .module-card__desc {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin: 0;
+    line-height: 1.4;
+  }
+  .module-card__status {
+    position: absolute;
+    top: 1rem; right: 1rem;
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 0.2rem 0.5rem;
+    border-radius: 999px;
+  }
+  .status-live { background: rgba(110,143,90,0.15); color: #4C6B3A; }
+  .status-soon { background: rgba(188,154,28,0.16); color: #8A6E12; }
+
+  .icon-projects   { background: var(--hitt-teal); }
+  .icon-partners   { background: var(--hitt-olive); }
+  .icon-time       { background: var(--hitt-amber); }
+  .icon-invoicing  { background: var(--hitt-charcoal); }
+</style>
+</head>
+<body>
+  <header class="app-header">
+    <a class="app-header__brand" href="welcome.html">HITT<span class="dot">·</span>Ops</a>
+    <nav class="app-header__nav" aria-label="Primary">
+      <a href="welcome.html" class="active">Home</a>
+    </nav>
+    <div class="app-header__user">
+      <div class="avatar" id="userAvatar">?</div>
+      <span id="userName">Signed in</span>
+      <button class="btn btn-secondary" id="btnSignOut" style="padding:0.35rem 0.75rem; font-size:0.8rem;">Sign out</button>
+    </div>
+  </header>
+
+  <main class="page-shell">
+    <section class="welcome-hero">
+      <h1 id="heroGreeting">Welcome back</h1>
+      <p>Pick a module below. Projects, Business partners, Time allocation and Invoicing all read live from the HITT test environment as each one comes online.</p>
+    </section>
+
+    <div class="card-grid">
+      <a class="module-card" href="pages/projects.html">
+        <span class="module-card__status status-live">Live data</span>
+        <div class="module-card__icon icon-projects" aria-hidden="true">📁</div>
+        <h2 class="module-card__title">Projects</h2>
+        <p class="module-card__desc">Portfolio kanban, project lifecycle stages, quotations and deliverables.</p>
+      </a>
+
+      <a class="module-card" href="pages/business-partners.html">
+        <span class="module-card__status status-soon">Coming soon</span>
+        <div class="module-card__icon icon-partners" aria-hidden="true">🤝</div>
+        <h2 class="module-card__title">Business partners</h2>
+        <p class="module-card__desc">Search and manage clients, suppliers, contacts and tax entities.</p>
+      </a>
+
+      <a class="module-card" href="pages/time-allocation.html">
+        <span class="module-card__status status-soon">Coming soon</span>
+        <div class="module-card__icon icon-time" aria-hidden="true">🕒</div>
+        <h2 class="module-card__title">Time allocation</h2>
+        <p class="module-card__desc">Time tracking, allocable/non-allocable hours, holidays and time-off requests.</p>
+      </a>
+
+      <a class="module-card" href="pages/invoicing.html">
+        <span class="module-card__status status-soon">Coming soon</span>
+        <div class="module-card__icon icon-invoicing" aria-hidden="true">🧾</div>
+        <h2 class="module-card__title">Invoicing</h2>
+        <p class="module-card__desc">Invoice creation, follow-up, previews and proceed-to-invoice workflow.</p>
+      </a>
+    </div>
+  </main>
+
+  <script src="js/config.js"></script>
+  <script src="js/auth.js"></script>
+  <script>
+    const session = HITT_AUTH.requireSession("index.html");
+    if (session) {
+      document.getElementById("userName").textContent = session.displayName;
+      document.getElementById("userAvatar").textContent = HITT_AUTH.initials(session);
+      document.getElementById("heroGreeting").textContent = `Welcome back, ${session.displayName.split(" ")[0]}`;
+    }
+    document.getElementById("btnSignOut").addEventListener("click", () => HITT_AUTH.signOut());
+  </script>
+</body>
+</html>
