@@ -50,6 +50,7 @@
  */
 const express = require("express");
 const { pool } = require("../config/db");
+const { requireModuleAccess } = require("../lib/permissions");
 const { streamInvoicePdf } = require("../lib/invoicePdf");
 
 const router = express.Router();
@@ -82,7 +83,7 @@ router.get("/lookups", async (req, res) => {
 // with its release settings (if any), latest quotation budget, and
 // invoiced-to-date total so the frontend can bucket by
 // not-released/not-started/partial/total.
-router.get("/projects", async (req, res) => {
+router.get("/projects", requireModuleAccess("invoicing"), async (req, res) => {
   try {
     const { rows } = await pool.query(`
       SELECT p.id, p.projectnumber AS code, p.projectname AS name,

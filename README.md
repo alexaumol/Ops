@@ -14,7 +14,10 @@ independently while the rest keeps working as static placeholder pages.
 - **Business partners** — searchable directory with contacts, notes, and
   tax companies per partner.
 - **Time allocation** — weekly project-hours logging and time-off requests
-  (submit/view/withdraw).
+  (submit/view/withdraw/approve/reject).
+- **Permissions & Settings** — admin-only page to manage who's an admin,
+  who can approve/reject time-off requests, and which modules each
+  employee can access.
 - **Invoicing** — proceed-to-invoice release settings per project, invoice
   create/edit with auto-derived status and VAT, and PDF generation matching
   the real HITT invoice template.
@@ -98,10 +101,11 @@ registered as a redirect URI on the Entra app registration (Authentication
 
 Early-stage prototype. Projects, Business partners, Time allocation, and
 Invoicing are all wired to a real PostgreSQL test database. Microsoft 365
-sign-in is real (Entra ID via MSAL.js). Not yet built: approve/reject
-workflows (need a manager-relationship concept the data model doesn't have
-yet), invoice-PDF emailing, and server-side validation of the MSAL ID token
-(the API currently trusts a plain header, not a verified bearer token).
+sign-in is real (Entra ID via MSAL.js). A permissions layer controls module
+access, admin rights, and time-off approve/reject rights (see Settings,
+admin-only). Not yet built: invoice-PDF emailing, and server-side
+validation of the MSAL ID token (the API currently trusts a plain header,
+not a verified bearer token).
 
 ## License
 

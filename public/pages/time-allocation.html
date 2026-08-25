@@ -100,6 +100,26 @@
         </table>
         <div id="toEmpty" class="bp-empty hidden">No time-off requests yet.</div>
       </div>
+
+      <div id="approvalsSection" class="hidden">
+        <h2 class="page-title" style="font-size:1.15rem; margin-top:2rem;">Pending approvals</h2>
+        <p class="page-subtitle" style="margin-bottom:1rem;">Requests awaiting a decision, across all employees.</p>
+        <div class="ta-table-wrap">
+          <table class="ta-table">
+            <thead>
+              <tr>
+                <th>Employee</th>
+                <th>Dates</th>
+                <th style="text-align:right;">Days</th>
+                <th>Submitted</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="approvalsTableBody"></tbody>
+          </table>
+          <div id="approvalsEmpty" class="bp-empty hidden">No requests waiting on you.</div>
+        </div>
+      </div>
     </div>
   </main>
 
@@ -154,6 +174,7 @@
   <script src="../js/config.js"></script>
   <script src="../js/auth.js"></script>
   <script src="../js/api.js"></script>
+  <script src="../js/permissions.js"></script>
   <script src="../js/time-allocation.js"></script>
 </body>
 </html>

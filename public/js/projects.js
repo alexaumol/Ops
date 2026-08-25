@@ -13,6 +13,7 @@
  */
 
 const session = HITT_AUTH.requireSession("../index.html");
+HITT_PERMS.guardModule("projects", "../welcome.html");
 
 // Default/fallback stage list — used until GET /api/projects/statuses
 // confirms the real projectstatus rows (id, label, ordinal) from the DB.

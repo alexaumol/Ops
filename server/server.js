@@ -22,6 +22,9 @@ const timeTrackingRouter = require("./routes/timeTracking");
 const timeOffRouter = require("./routes/timeOff");
 const invoicingRouter = require("./routes/invoicing");
 const employeesRouter = require("./routes/employees");
+const permissionsRouter = require("./routes/permissions");
+const settingsRouter = require("./routes/settings");
+const { attachHittUser } = require("./lib/permissions");
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -50,12 +53,18 @@ app.get("/api/health", (req, res) => {
   res.json({ status: "ok", time: new Date().toISOString() });
 });
 
+// Resolves X-HITT-User into req.hittUser = { raw, employeeId, isAdmin } for
+// every request that follows — see lib/permissions.js for the caveats.
+app.use(attachHittUser);
+
 app.use("/api/projects", projectsRouter);
 app.use("/api/business-partners", businessPartnersRouter);
 app.use("/api/time-tracking", timeTrackingRouter);
 app.use("/api/time-off", timeOffRouter);
 app.use("/api/invoicing", invoicingRouter);
 app.use("/api/employees", employeesRouter);
+app.use("/api/permissions", permissionsRouter);
+app.use("/api/settings", settingsRouter);
 
 // Fallback 404 for unknown API routes.
 app.use("/api", (req, res) => {

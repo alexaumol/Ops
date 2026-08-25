@@ -77,6 +77,14 @@
   .icon-partners   { background: var(--hitt-olive); }
   .icon-time       { background: var(--hitt-amber); }
   .icon-invoicing  { background: var(--hitt-charcoal); }
+  .icon-settings   { background: var(--hitt-ink); }
+
+  .module-card.is-restricted {
+    opacity: 0.5;
+    pointer-events: none;
+    filter: grayscale(0.4);
+  }
+  .status-restricted { background: rgba(160,40,40,0.12); color: #A02828; }
 </style>
 </head>
 <body>
@@ -98,39 +106,48 @@
       <p>Pick a module below. Projects, Business partners, Time allocation and Invoicing all read live from the HITT test environment as each one comes online.</p>
     </section>
 
-    <div class="card-grid">
-      <a class="module-card" href="pages/projects.html">
+    <div class="card-grid" id="moduleGrid">
+      <a class="module-card" href="pages/projects.html" data-module="projects">
         <span class="module-card__status status-live">Live data</span>
         <div class="module-card__icon icon-projects" aria-hidden="true">📁</div>
         <h2 class="module-card__title">Projects</h2>
         <p class="module-card__desc">Portfolio kanban, project lifecycle stages, quotations and deliverables.</p>
       </a>
 
-      <a class="module-card" href="pages/business-partners.html">
+      <a class="module-card" href="pages/business-partners.html" data-module="business-partners">
         <span class="module-card__status status-live">Live data</span>
         <div class="module-card__icon icon-partners" aria-hidden="true">🤝</div>
         <h2 class="module-card__title">Business partners</h2>
         <p class="module-card__desc">Search and manage clients, suppliers, contacts and tax entities.</p>
       </a>
 
-      <a class="module-card" href="pages/time-allocation.html">
+      <a class="module-card" href="pages/time-allocation.html" data-module="time-allocation">
         <span class="module-card__status status-live">Live data</span>
         <div class="module-card__icon icon-time" aria-hidden="true">🕒</div>
         <h2 class="module-card__title">Time allocation</h2>
         <p class="module-card__desc">Time tracking, allocable/non-allocable hours, holidays and time-off requests.</p>
       </a>
 
-      <a class="module-card" href="pages/invoicing.html">
+      <a class="module-card" href="pages/invoicing.html" data-module="invoicing">
         <span class="module-card__status status-live">Live data</span>
         <div class="module-card__icon icon-invoicing" aria-hidden="true">🧾</div>
         <h2 class="module-card__title">Invoicing</h2>
         <p class="module-card__desc">Invoice creation, follow-up, previews and proceed-to-invoice workflow.</p>
+      </a>
+
+      <a class="module-card" href="pages/settings.html" id="settingsTile" style="display:none;">
+        <span class="module-card__status status-live">Admin</span>
+        <div class="module-card__icon icon-settings" aria-hidden="true">⚙️</div>
+        <h2 class="module-card__title">Settings</h2>
+        <p class="module-card__desc">Manage admin/user roles, module access and time-off approvers.</p>
       </a>
     </div>
   </main>
 
   <script src="js/config.js"></script>
   <script src="js/auth.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/permissions.js"></script>
   <script>
     const session = HITT_AUTH.requireSession("index.html");
     if (session) {
@@ -139,6 +156,26 @@
       document.getElementById("heroGreeting").textContent = `Welcome back, ${session.displayName.split(" ")[0]}`;
     }
     document.getElementById("btnSignOut").addEventListener("click", () => HITT_AUTH.signOut());
+
+    HITT_PERMS.get().then((perms) => {
+      if (perms.isAdmin) {
+        document.getElementById("settingsTile").style.display = "";
+      }
+      if (!perms.isAdmin) {
+        perms.restrictedModules.forEach((moduleKey) => {
+          const tile = document.querySelector(`.module-card[data-module="${moduleKey}"]`);
+          if (!tile) return;
+          tile.classList.add("is-restricted");
+          const status = tile.querySelector(".module-card__status");
+          if (status) {
+            status.textContent = "Restricted";
+            status.className = "module-card__status status-restricted";
+          }
+        });
+      }
+    }).catch((err) => {
+      console.error("[welcome] permissions check failed, showing all tiles:", err.message);
+    });
   </script>
 </body>
 </html>

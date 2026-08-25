@@ -15,6 +15,7 @@
  */
 
 const session = HITT_AUTH.requireSession("../index.html");
+HITT_PERMS.guardModule("time-allocation", "../welcome.html");
 document.getElementById("userName").textContent = session.displayName;
 document.getElementById("userAvatar").textContent = HITT_AUTH.initials(session);
 document.getElementById("btnSignOut").addEventListener("click", () => HITT_AUTH.signOut("../index.html"));
@@ -434,6 +435,10 @@ async function loadTimeOff(){
   const tbody = document.getElementById('toTableBody');
   const empty = document.getElementById('toEmpty');
 
+  // Approving others' requests doesn't depend on who you're "logging time
+  // as" above, so it loads independently of the early returns below.
+  await loadApprovals();
+
   if (!currentEmployeeId) {
     TIME_OFF_REQUESTS = [];
     tbody.innerHTML = '';
@@ -460,6 +465,88 @@ async function loadTimeOff(){
   }
   renderTimeOffTable();
   await loadBalance();
+}
+
+/* ---------- Pending approvals (approver-only) ---------- */
+let isApprover = null; // null = not checked yet, avoids a render flash while HITT_PERMS resolves
+
+async function loadApprovals(){
+  const section = document.getElementById('approvalsSection');
+  if (usingDemoData) { section.classList.add('hidden'); return; }
+
+  if (isApprover === null) {
+    try {
+      const perms = await HITT_PERMS.get();
+      isApprover = !!perms.isTimeOffApprover;
+    } catch (err) {
+      console.warn('Could not resolve approver status:', err);
+      isApprover = false;
+    }
+  }
+  if (!isApprover) { section.classList.add('hidden'); return; }
+  section.classList.remove('hidden');
+
+  const tbody = document.getElementById('approvalsTableBody');
+  const empty = document.getElementById('approvalsEmpty');
+  tbody.innerHTML = `<tr><td colspan="5" class="sub-empty">Loading…</td></tr>`;
+  empty.classList.add('hidden');
+
+  let pending = [];
+  try {
+    pending = await HITT_API.getPendingTimeOffRequests();
+  } catch (err) {
+    console.warn('Could not load pending approvals:', err);
+    toast('Could not load pending approvals.', 'red');
+  }
+  renderApprovalsTable(pending);
+}
+
+function renderApprovalsTable(pending){
+  const tbody = document.getElementById('approvalsTableBody');
+  const empty = document.getElementById('approvalsEmpty');
+  if (!pending.length) {
+    tbody.innerHTML = '';
+    empty.classList.remove('hidden');
+    return;
+  }
+  empty.classList.add('hidden');
+  tbody.innerHTML = pending.map((r, i) => `
+    <tr data-i="${i}">
+      <td>${r.employeeName || `#${r.empid}`}</td>
+      <td>${formatDateOnly(r.startdate)} – ${formatDateOnly(r.enddate)}</td>
+      <td style="text-align:right;">${r.daysrequested}</td>
+      <td style="font-size:0.78rem; color:var(--text-secondary);">${formatDateOnly(r.submittedat)}</td>
+      <td style="display:flex; gap:0.4rem;">
+        <button class="btn btn-primary" style="padding:0.3rem 0.65rem; font-size:0.78rem;" data-approve>Approve</button>
+        <button class="btn btn-secondary" style="padding:0.3rem 0.65rem; font-size:0.78rem;" data-reject>Reject</button>
+      </td>
+    </tr>
+  `).join('');
+
+  tbody.querySelectorAll('[data-approve]').forEach((btn, i) => {
+    btn.addEventListener('click', async () => {
+      try {
+        await HITT_API.approveTimeOffRequest(pending[i].id);
+        toast(`Approved ${pending[i].employeeName}'s request.`, 'green');
+        await loadApprovals();
+      } catch (err) {
+        console.error(err);
+        toast('Could not approve that request.', 'red');
+      }
+    });
+  });
+  tbody.querySelectorAll('[data-reject]').forEach((btn, i) => {
+    btn.addEventListener('click', async () => {
+      try {
+        await HITT_API.rejectTimeOffRequest(pending[i].id);
+        toast(`Rejected ${pending[i].employeeName}'s request.`, 'navy');
+        await loadApprovals();
+      } catch (err) {
+        console.error(err);
+        toast('Could not reject that request.', 'red');
+      }
+    });
+  });
 }
 
 /* ---------- New request modal ---------- */

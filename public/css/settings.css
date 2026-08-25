@@ -1,0 +1,114 @@
+/* ==========================================================================
+   HITT Ops — Settings page-specific styles
+   Plain CSS (no Tailwind) — matches the rest of the app. See css/styles.css
+   for shared tokens/header.
+   ========================================================================== */
+
+.hidden { display: none !important; }
+
+.settings-table-wrap {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  overflow-x: auto;
+  box-shadow: var(--shadow-sm);
+  margin-bottom: 1.5rem;
+}
+.settings-table { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
+.settings-table thead th {
+  text-align: left;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-secondary);
+  background: var(--bg-surface-alt);
+  padding: 0.6rem 0.75rem;
+  border-bottom: 1px solid var(--border-subtle);
+  white-space: nowrap;
+}
+.settings-table tbody td {
+  padding: 0.55rem 0.75rem;
+  border-bottom: 1px solid var(--border-subtle);
+  vertical-align: middle;
+}
+.settings-table tbody tr:last-child td { border-bottom: none; }
+.settings-table tbody tr:hover { background: var(--bg-surface-alt); }
+
+.settings-emp-name { font-weight: 600; }
+.settings-emp-sub { font-size: 0.78rem; color: var(--text-secondary); }
+
+.settings-note {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin: 0 0 1.25rem;
+  max-width: 62ch;
+}
+
+/* ---------- toggle switch ---------- */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 38px;
+  height: 22px;
+  vertical-align: middle;
+}
+.switch input { opacity: 0; width: 0; height: 0; }
+.switch-track {
+  position: absolute; cursor: pointer; inset: 0;
+  background: var(--border-subtle);
+  border-radius: 999px;
+  transition: background-color .15s ease;
+}
+.switch-track::before {
+  content: "";
+  position: absolute;
+  height: 16px; width: 16px;
+  left: 3px; bottom: 3px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform .15s ease;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.25);
+}
+.switch input:checked + .switch-track { background: var(--brand); }
+.switch input:checked + .switch-track::before { transform: translateX(16px); }
+.switch input:disabled + .switch-track { opacity: 0.5; cursor: not-allowed; }
+
+.module-chip-row { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.module-chip {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  font-size: 0.74rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface-alt);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+.module-chip input { margin: 0; }
+.module-chip.is-off { color: var(--text-secondary); text-decoration: line-through; opacity: 0.75; }
+
+.settings-badge {
+  display: inline-block;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 0.18rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(110,143,90,0.15);
+  color: #4C6B3A;
+}
+
+.toast-host { position: fixed; bottom: 1rem; right: 1rem; z-index: 60; display: flex; flex-direction: column; gap: 0.5rem; align-items: flex-end; }
+.toast {
+  color: #fff;
+  padding: 0.6rem 1rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  box-shadow: var(--shadow-md);
+  max-width: 320px;
+}
+.toast-navy { background: var(--hitt-ink); }
+.toast-green { background: var(--success); }
+.toast-red { background: var(--danger); }

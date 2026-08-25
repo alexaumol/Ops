@@ -20,11 +20,12 @@
  */
 const express = require("express");
 const { pool } = require("../config/db");
+const { requireModuleAccess } = require("../lib/permissions");
 
 const router = express.Router();
 
 // GET /api/time-tracking?userId=X&weekStart=YYYY-MM-DD
-router.get("/", async (req, res) => {
+router.get("/", requireModuleAccess("time-allocation"), async (req, res) => {
   const { userId, weekStart } = req.query;
   if (!userId || !weekStart) {
     return res.status(400).json({ error: "validation_error", message: "userId and weekStart are required" });
@@ -49,7 +50,7 @@ router.get("/", async (req, res) => {
 });
 
 // POST /api/time-tracking — upsert one project's hours for a week.
-router.post("/", async (req, res) => {
+router.post("/", requireModuleAccess("time-allocation"), async (req, res) => {
   const { userId, projectId, week, weekStart, hours, poRes } = req.body || {};
   if (!userId || !projectId || !week || !weekStart || hours === undefined) {
     return res.status(400).json({ error: "validation_error", message: "userId, projectId, week, weekStart and hours are required" });

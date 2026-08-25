@@ -17,19 +17,44 @@
  *   employeeworkcalendar  per employee per year: holidaysamount +
  *                         corporateholidaysamount = that year's allowance
  *
- * Scope note: this covers self-service submit/view/withdraw only.
- * Approve/reject is NOT built — Access's workflow needs a "who can
- * approve whose requests" concept (a manager relationship) that doesn't
- * exist anywhere in this schema or app yet. See INTERNAL.md.
+ * Approve/reject: rather than Access's manager-relationship concept (which
+ * doesn't exist in this schema), approval rights come from the
+ * timeoffapprovers allow-list (lib/permissions.js) — any approver can act
+ * on anyone's request, mirroring how the global-admin override behaved in
+ * Auth.bas. See INTERNAL.md.
  * ---------------------------------------------------------------------------
  */
 const express = require("express");
 const { pool } = require("../config/db");
+const { requireModuleAccess, requireTimeOffApprover } = require("../lib/permissions");
 
 const router = express.Router();
 
+// GET /api/time-off/requests/pending — cross-employee queue for approvers.
+// Registered before the /:id routes so "pending" doesn't get swallowed as
+// an :id param.
+router.get("/requests/pending", requireTimeOffApprover(), async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT r.id, r.empid, TRIM(CONCAT(e.employeefirstname, ' ', e.employeelastname)) AS "employeeName",
+              r.startdate, r.enddate, r.daysrequested, r.submittedat,
+              s.statusid, ws.workflowstatusdesc AS "statusLabel"
+       FROM timeoffrequests r
+       LEFT JOIN timeoffrequeststatus s ON s.timeoffreqid = r.id
+       LEFT JOIN timeoffworkflowstatus ws ON ws.id = s.statusid
+       LEFT JOIN employees e ON e.id = r.empid
+       WHERE s.statusid IN (2, 3)
+       ORDER BY r.submittedat ASC`
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error("[GET /api/time-off/requests/pending] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
 // GET /api/time-off/requests?empId=X
-router.get("/requests", async (req, res) => {
+router.get("/requests", requireModuleAccess("time-allocation"), async (req, res) => {
   const { empId } = req.query;
   if (!empId) return res.status(400).json({ error: "validation_error", message: "empId is required" });
   try {
@@ -52,7 +77,7 @@ router.get("/requests", async (req, res) => {
 });
 
 // POST /api/time-off/requests — submit a new request (status: Submitted).
-router.post("/requests", async (req, res) => {
+router.post("/requests", requireModuleAccess("time-allocation"), async (req, res) => {
   const { empId, startDate, endDate, daysRequested } = req.body || {};
   if (!empId || !startDate || !endDate || !daysRequested) {
     return res.status(400).json({ error: "validation_error", message: "empId, startDate, endDate and daysRequested are required" });
@@ -104,6 +129,67 @@ router.patch("/requests/:id/withdraw", async (req, res) => {
   } catch (err) {
     await client.query("ROLLBACK");
     console.error("[PATCH /api/time-off/requests/:id/withdraw] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  } finally {
+    client.release();
+  }
+});
+
+// PATCH /api/time-off/requests/:id/approve
+router.patch("/requests/:id/approve", requireTimeOffApprover(), async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query(
+      `UPDATE timeoffrequests SET approvedby = $2, approvedat = now() WHERE id = $1`,
+      [req.params.id, req.hittUser.employeeId]
+    );
+
+    const existing = await client.query(
+      `SELECT id FROM timeoffrequeststatus WHERE timeoffreqid = $1 LIMIT 1`, [req.params.id]
+    );
+    if (existing.rows.length) {
+      await client.query(`UPDATE timeoffrequeststatus SET statusid = 4 WHERE id = $1`, [existing.rows[0].id]);
+    } else {
+      await client.query(`INSERT INTO timeoffrequeststatus (timeoffreqid, statusid) VALUES ($1, 4)`, [req.params.id]);
+    }
+
+    await client.query("COMMIT");
+    res.status(204).end();
+  } catch (err) {
+    await client.query("ROLLBACK");
+    console.error("[PATCH /api/time-off/requests/:id/approve] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  } finally {
+    client.release();
+  }
+});
+
+// PATCH /api/time-off/requests/:id/reject   { comment?: string }
+router.patch("/requests/:id/reject", requireTimeOffApprover(), async (req, res) => {
+  const { comment } = req.body || {};
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query(
+      `UPDATE timeoffrequests SET rejectedby = $2, rejectedat = now(), rejectcomment = $3 WHERE id = $1`,
+      [req.params.id, req.hittUser.employeeId, comment || null]
+    );
+
+    const existing = await client.query(
+      `SELECT id FROM timeoffrequeststatus WHERE timeoffreqid = $1 LIMIT 1`, [req.params.id]
+    );
+    if (existing.rows.length) {
+      await client.query(`UPDATE timeoffrequeststatus SET statusid = 5 WHERE id = $1`, [existing.rows[0].id]);
+    } else {
+      await client.query(`INSERT INTO timeoffrequeststatus (timeoffreqid, statusid) VALUES ($1, 5)`, [req.params.id]);
+    }
+
+    await client.query("COMMIT");
+    res.status(204).end();
+  } catch (err) {
+    await client.query("ROLLBACK");
+    console.error("[PATCH /api/time-off/requests/:id/reject] DB error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });
   } finally {
     client.release();

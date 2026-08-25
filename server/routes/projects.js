@@ -27,6 +27,7 @@
  */
 const express = require("express");
 const { pool } = require("../config/db");
+const { requireModuleAccess } = require("../lib/permissions");
 
 const router = express.Router();
 
@@ -41,7 +42,7 @@ const LATEST_PROGRESS_SUBQUERY = `
 `;
 
 // GET /api/projects — full portfolio list for the kanban board.
-router.get("/", async (req, res) => {
+router.get("/", requireModuleAccess("projects"), async (req, res) => {
   try {
     const { rows } = await pool.query(`
       SELECT p.id,
@@ -136,7 +137,7 @@ router.get("/:id", async (req, res) => {
 });
 
 // POST /api/projects — create a project (+ optional initial progress row).
-router.post("/", async (req, res) => {
+router.post("/", requireModuleAccess("projects"), async (req, res) => {
   const { code, name, stage, progress, entityId, employeeId } = req.body || {};
   if (!name || stage === undefined) {
     return res.status(400).json({ error: "validation_error", message: "name and stage are required" });

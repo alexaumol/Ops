@@ -73,6 +73,21 @@ const HITT_API = (() => {
     withdrawTimeOffRequest: (id) => request(`/api/time-off/requests/${id}/withdraw`, { method: "PATCH" }),
     getTimeOffBalance: (empId, year) =>
       request(`/api/time-off/balance?empId=${encodeURIComponent(empId)}&year=${encodeURIComponent(year)}`),
+    getPendingTimeOffRequests: () => request("/api/time-off/requests/pending"),
+    approveTimeOffRequest: (id) => request(`/api/time-off/requests/${id}/approve`, { method: "PATCH" }),
+    rejectTimeOffRequest: (id, comment) =>
+      request(`/api/time-off/requests/${id}/reject`, { method: "PATCH", body: JSON.stringify({ comment }) }),
+
+    getMyPermissions: () => request("/api/permissions/me"),
+    getModuleKeys: () => request("/api/permissions/module-keys"),
+
+    getSettingsEmployees: () => request("/api/settings/employees"),
+    setEmployeeAdmin: (id, isAdmin) =>
+      request(`/api/settings/employees/${id}/role`, { method: "PATCH", body: JSON.stringify({ isAdmin }) }),
+    setEmployeeTimeOffApprover: (id, isTimeOffApprover) =>
+      request(`/api/settings/employees/${id}/timeoff-approver`, { method: "PATCH", body: JSON.stringify({ isTimeOffApprover }) }),
+    setEmployeeModuleAccess: (id, moduleKey, hasAccess) =>
+      request(`/api/settings/employees/${id}/module-access`, { method: "PATCH", body: JSON.stringify({ moduleKey, hasAccess }) }),
 
     getInvoicingLookups: () => request("/api/invoicing/lookups"),
     getInvoicingProjects: () => request("/api/invoicing/projects"),

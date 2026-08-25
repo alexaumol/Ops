@@ -28,6 +28,7 @@
  */
 const express = require("express");
 const { pool } = require("../config/db");
+const { requireModuleAccess } = require("../lib/permissions");
 
 const router = express.Router();
 
@@ -53,7 +54,7 @@ router.get("/lookups", async (req, res) => {
 });
 
 // GET /api/business-partners?q=search — list for the search/browse table.
-router.get("/", async (req, res) => {
+router.get("/", requireModuleAccess("business-partners"), async (req, res) => {
   const q = (req.query.q || "").trim();
   try {
     const { rows } = await pool.query(
@@ -106,7 +107,7 @@ router.get("/:id", async (req, res) => {
 });
 
 // POST /api/business-partners — create (+ optional initial address).
-router.post("/", async (req, res) => {
+router.post("/", requireModuleAccess("business-partners"), async (req, res) => {
   const { name, entityId, companyTypeId, languageId, webpage, address } = req.body || {};
   if (!name || !name.trim()) {
     return res.status(400).json({ error: "validation_error", message: "name is required" });
