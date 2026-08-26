@@ -1,8 +1,8 @@
 /**
  * /api/settings — admin-only management of the permissions layer
- * (server/lib/permissions.js). Backs the (planned) Settings page: who's an
- * admin, who's a time-off approver, and which modules each employee is
- * restricted from. Every route here requires requireAdmin.
+ * (server/lib/permissions.js). Backs the Settings page: who's an admin,
+ * who's a time-off approver, which modules each employee is restricted
+ * from, and who's deactivated. Every route here requires requireAdmin.
  * ---------------------------------------------------------------------------
  */
 const express = require("express");
@@ -19,7 +19,7 @@ router.use(requireAdmin);
 router.get("/employees", async (req, res) => {
   try {
     const { rows } = await pool.query(
-      `SELECT e.id, e.username, e.emailid,
+      `SELECT e.id, e.username, e.emailid, e.deactivated AS "isDeactivated",
               TRIM(CONCAT(e.employeefirstname, ' ', e.employeelastname)) AS name,
               (a.employeeid IS NOT NULL) AS "isAdmin",
               (t.employeeid IS NOT NULL) AS "isTimeOffApprover",
@@ -31,10 +31,9 @@ router.get("/employees", async (req, res) => {
        LEFT JOIN admins a ON a.employeeid = e.id
        LEFT JOIN timeoffapprovers t ON t.employeeid = e.id
        LEFT JOIN modulerestrictions mr ON mr.employeeid = e.id
-       WHERE e.deactivated = false
-       GROUP BY e.id, e.username, e.emailid, e.employeefirstname, e.employeelastname,
+       GROUP BY e.id, e.username, e.emailid, e.deactivated, e.employeefirstname, e.employeelastname,
                 a.employeeid, t.employeeid
-       ORDER BY e.employeefirstname, e.employeelastname`
+       ORDER BY e.deactivated, e.employeefirstname, e.employeelastname`
     );
     res.json(rows);
   } catch (err) {
@@ -90,6 +89,28 @@ router.patch("/employees/:id/timeoff-approver", async (req, res) => {
     res.json({ employeeId, isTimeOffApprover });
   } catch (err) {
     console.error("[PATCH /employees/:id/timeoff-approver] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
+// PATCH /api/settings/employees/:id/status   { isDeactivated: boolean }
+// Mirrors Access's chkDeactivateUser: deactivating someone doesn't delete
+// their data/activity, it just blocks every module/admin/approver gate in
+// lib/permissions.js until reactivated.
+router.patch("/employees/:id/status", async (req, res) => {
+  const employeeId = Number(req.params.id);
+  const { isDeactivated } = req.body;
+  if (!Number.isInteger(employeeId) || typeof isDeactivated !== "boolean") {
+    return res.status(400).json({ error: "bad_request", message: "isDeactivated (boolean) is required." });
+  }
+  if (isDeactivated && employeeId === Number(req.hittUser.employeeId)) {
+    return res.status(400).json({ error: "bad_request", message: "You can't deactivate your own account." });
+  }
+  try {
+    await pool.query(`UPDATE employees SET deactivated = $2 WHERE id = $1`, [employeeId, isDeactivated]);
+    res.json({ employeeId, isDeactivated });
+  } catch (err) {
+    console.error("[PATCH /employees/:id/status] DB error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });
   }
 });

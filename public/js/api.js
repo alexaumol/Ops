@@ -88,6 +88,8 @@ const HITT_API = (() => {
       request(`/api/settings/employees/${id}/timeoff-approver`, { method: "PATCH", body: JSON.stringify({ isTimeOffApprover }) }),
     setEmployeeModuleAccess: (id, moduleKey, hasAccess) =>
       request(`/api/settings/employees/${id}/module-access`, { method: "PATCH", body: JSON.stringify({ moduleKey, hasAccess }) }),
+    setEmployeeStatus: (id, isDeactivated) =>
+      request(`/api/settings/employees/${id}/status`, { method: "PATCH", body: JSON.stringify({ isDeactivated }) }),
 
     getInvoicingLookups: () => request("/api/invoicing/lookups"),
     getInvoicingProjects: () => request("/api/invoicing/projects"),

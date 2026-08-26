@@ -16,8 +16,8 @@ independently while the rest keeps working as static placeholder pages.
 - **Time allocation** — weekly project-hours logging and time-off requests
   (submit/view/withdraw/approve/reject).
 - **Permissions & Settings** — admin-only page to manage who's an admin,
-  who can approve/reject time-off requests, and which modules each
-  employee can access.
+  who can approve/reject time-off requests, which modules each employee
+  can access, and who's active vs. deactivated.
 - **Invoicing** — proceed-to-invoice release settings per project, invoice
   create/edit with auto-derived status and VAT, and PDF generation matching
   the real HITT invoice template.

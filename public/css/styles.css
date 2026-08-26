@@ -184,6 +184,18 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; }
   font-size: 0.8rem;
 }
 
+/* .btn-secondary defaults to --text-primary, which is near-black — right
+   for light surfaces, invisible against the dark header background (only
+   the hover color showed). Override just within the header. */
+.app-header .btn-secondary {
+  color: var(--text-inverse);
+  border-color: rgba(255,255,255,0.35);
+}
+.app-header .btn-secondary:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 /* ---------- Layout helpers ---------- */
 .page-shell {
   max-width: 1280px;

@@ -33,11 +33,19 @@
     </div>
 
     <div id="settingsContent" class="hidden">
+      <div class="settings-toolbar">
+        <label class="settings-toggle-deactivated">
+          <input type="checkbox" id="showDeactivated" />
+          Show deactivated users
+          <span id="deactivatedCount" class="settings-emp-sub"></span>
+        </label>
+      </div>
       <div class="settings-table-wrap">
         <table class="settings-table">
           <thead>
             <tr>
               <th>Employee</th>
+              <th>Status</th>
               <th>Role</th>
               <th>Time-off approver</th>
               <th>Module access</th>

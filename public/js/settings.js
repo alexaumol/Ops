@@ -3,10 +3,15 @@
  * ---------------------------------------------------------------------------
  * Thin CRUD UI over /api/settings — see server/routes/settings.js and
  * server/lib/permissions.js for the actual rules (admins allow-list,
- * modulerestrictions block-list, timeoffapprovers allow-list). This page
- * has no precedent in the Access app ("General settings.frm" only hinted
- * at the idea) — it exists purely to make the new permissions layer usable
- * without hand-editing the database.
+ * modulerestrictions block-list, timeoffapprovers allow-list,
+ * employees.deactivated). This page has no precedent in the Access app
+ * ("General settings.frm" only hinted at the idea; user activation lived
+ * in the separate Employees.frm) — it exists purely to make the new
+ * permissions layer usable without hand-editing the database.
+ *
+ * Deactivating someone disables their other toggles here (moot while
+ * deactivated, not cleared) and dims the row — mirrors Access's
+ * chkDeactivateUser: data/activity is kept, just blocked from every gate.
  *
  * Every mutation here is enforced server-side by requireAdmin regardless
  * of what this page shows — if GET /api/settings/employees 403s (caller
@@ -44,31 +49,39 @@ function toast(msg, tone = "navy") {
 }
 
 function renderRow(emp) {
+  const deactivated = !!emp.isDeactivated;
   const moduleChips = Object.keys(MODULE_LABELS).map((key) => {
     const hasAccess = emp.isAdmin || !emp.restrictedModules.includes(key);
     return `
       <label class="module-chip ${hasAccess ? "" : "is-off"}" data-module="${key}">
-        <input type="checkbox" ${hasAccess ? "checked" : ""} ${emp.isAdmin ? "disabled" : ""} class="moduleAccessToggle" data-emp="${emp.id}" data-module="${key}" />
+        <input type="checkbox" ${hasAccess ? "checked" : ""} ${(emp.isAdmin || deactivated) ? "disabled" : ""} class="moduleAccessToggle" data-emp="${emp.id}" data-module="${key}" />
         ${escapeHtml(MODULE_LABELS[key])}
       </label>`;
   }).join("");
 
   return `
-    <tr>
+    <tr class="${deactivated ? "is-deactivated-row" : ""}">
       <td>
         <div class="settings-emp-name">${escapeHtml(emp.name || emp.username)}</div>
         <div class="settings-emp-sub">${escapeHtml(emp.emailid || emp.username)}</div>
       </td>
       <td>
+        <label class="switch" title="Deactivate this user">
+          <input type="checkbox" class="statusToggle" data-emp="${emp.id}" ${deactivated ? "checked" : ""} />
+          <span class="switch-track"></span>
+        </label>
+        <span class="settings-emp-sub">${deactivated ? "Deactivated" : "Active"}</span>
+      </td>
+      <td>
         <label class="switch" title="Admin">
-          <input type="checkbox" class="adminToggle" data-emp="${emp.id}" ${emp.isAdmin ? "checked" : ""} />
+          <input type="checkbox" class="adminToggle" data-emp="${emp.id}" ${emp.isAdmin ? "checked" : ""} ${deactivated ? "disabled" : ""} />
           <span class="switch-track"></span>
         </label>
         <span class="settings-emp-sub">${emp.isAdmin ? "Admin" : "User"}</span>
       </td>
       <td>
         <label class="switch" title="Time-off approver">
-          <input type="checkbox" class="approverToggle" data-emp="${emp.id}" ${emp.isTimeOffApprover ? "checked" : ""} ${emp.isAdmin ? "disabled" : ""} />
+          <input type="checkbox" class="approverToggle" data-emp="${emp.id}" ${emp.isTimeOffApprover ? "checked" : ""} ${(emp.isAdmin || deactivated) ? "disabled" : ""} />
           <span class="switch-track"></span>
         </label>
         ${emp.isAdmin ? '<span class="settings-badge" title="Admins are always approvers">Auto</span>' : ""}
@@ -78,8 +91,15 @@ function renderRow(emp) {
 }
 
 function render() {
-  document.getElementById("empTableBody").innerHTML = EMPLOYEES.map(renderRow).join("");
+  const showDeactivated = document.getElementById("showDeactivated").checked;
+  const visible = showDeactivated ? EMPLOYEES : EMPLOYEES.filter((e) => !e.isDeactivated);
+  document.getElementById("empTableBody").innerHTML = visible.map(renderRow).join("");
+
+  const deactivatedCount = EMPLOYEES.filter((e) => e.isDeactivated).length;
+  document.getElementById("deactivatedCount").textContent = deactivatedCount ? `(${deactivatedCount})` : "";
 }
+
+document.getElementById("showDeactivated").addEventListener("change", render);
 
 async function loadEmployees() {
   try {
@@ -101,7 +121,17 @@ document.getElementById("empTableBody").addEventListener("change", async (e) => 
   if (!emp) return;
 
   try {
-    if (e.target.classList.contains("adminToggle")) {
+    if (e.target.classList.contains("statusToggle")) {
+      const isDeactivated = e.target.checked;
+      if (isDeactivated && !confirm(`Deactivate ${emp.name}? They won't be able to use HITT Ops until reactivated. Their data and activity are kept.`)) {
+        e.target.checked = false;
+        return;
+      }
+      await HITT_API.setEmployeeStatus(empId, isDeactivated);
+      emp.isDeactivated = isDeactivated;
+      toast(`${emp.name}: ${isDeactivated ? "deactivated" : "reactivated"}.`, isDeactivated ? "navy" : "green");
+      render();
+    } else if (e.target.classList.contains("adminToggle")) {
       const isAdmin = e.target.checked;
       await HITT_API.setEmployeeAdmin(empId, isAdmin);
       emp.isAdmin = isAdmin;

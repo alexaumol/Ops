@@ -167,6 +167,13 @@
       Sign in with your Microsoft 365 account
     </span>
 
+    <!-- Shown when redirected back here with ?deactivated=1 — see
+         js/permissions.js redirectIfDeactivated(), called right after
+         sign-in resolves credentials, before ever routing to welcome.html. -->
+    <p id="deactivatedNotice" class="field-hint hidden" style="color:var(--danger); margin:-0.5rem 0 1.25rem;">
+      Your HITT Ops account has been deactivated. Contact an admin if you think this is a mistake.
+    </p>
+
     <!-- Real sign-in: Entra ID via MSAL.js. Shown when FEATURES.msalLoginEnabled. -->
     <section id="stepMsal" class="login-step">
       <h1 class="login-heading">Sign in</h1>
@@ -234,8 +241,15 @@
   <script src="js/config.js"></script>
   <script src="vendor/msal-browser.min.js"></script>
   <script src="js/auth.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/permissions.js"></script>
   <script>
     document.getElementById("year").textContent = new Date().getFullYear();
+
+    if (new URLSearchParams(window.location.search).get("deactivated") === "1") {
+      document.getElementById("deactivatedNotice").classList.remove("hidden");
+      history.replaceState(null, "", window.location.pathname);
+    }
 
     const msalEnabled = !!window.HITT_CONFIG?.FEATURES?.msalLoginEnabled;
     document.getElementById("stepMsal").classList.toggle("active", msalEnabled);
@@ -251,6 +265,12 @@
         btnMsal.textContent = "Signing in…";
         try {
           await HITT_AUTH.signInWithMicrosoft();
+          // Checked right here, right after credentials resolve — a
+          // deactivated employee's session is cleared and they're kept on
+          // this page (see redirectIfDeactivated), never routed to
+          // welcome.html at all.
+          const blocked = await HITT_PERMS.redirectIfDeactivated("index.html");
+          if (blocked) return;
           window.location.href = "welcome.html";
         } catch (err) {
           console.error("MSAL sign-in failed:", err);
@@ -295,10 +315,12 @@
       usernameInput.select();
     });
 
-    formPassword.addEventListener("submit", (e) => {
+    formPassword.addEventListener("submit", async (e) => {
       e.preventDefault();
       // Stub path only — used when FEATURES.msalLoginEnabled is false.
       HITT_AUTH.fakeSignIn(usernameInput.value.trim());
+      const blocked = await HITT_PERMS.redirectIfDeactivated("index.html");
+      if (blocked) return;
       window.location.href = "welcome.html";
     });
   </script>
