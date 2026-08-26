@@ -93,6 +93,7 @@ function iconCancelled(){ return `<svg viewBox="0 0 24 24" class="w-4 h-4" fill=
 document.getElementById("userName").textContent = session.displayName;
 document.getElementById("userAvatar").textContent = HITT_AUTH.initials(session);
 document.getElementById("btnSignOut").addEventListener("click", () => HITT_AUTH.signOut("../index.html"));
+HITT_PERMS.applyRealName();
 
 function setDataSourcePill() {
   const pill = document.getElementById("dataSourcePill");

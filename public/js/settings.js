@@ -23,6 +23,7 @@ const session = HITT_AUTH.requireSession("../index.html");
 document.getElementById("userName").textContent = session.displayName;
 document.getElementById("userAvatar").textContent = HITT_AUTH.initials(session);
 document.getElementById("btnSignOut").addEventListener("click", () => HITT_AUTH.signOut("../index.html"));
+HITT_PERMS.applyRealName();
 
 const MODULE_LABELS = {
   "projects": "Projects",

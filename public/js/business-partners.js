@@ -14,6 +14,7 @@ HITT_PERMS.guardModule("business-partners", "../welcome.html");
 document.getElementById("userName").textContent = session.displayName;
 document.getElementById("userAvatar").textContent = HITT_AUTH.initials(session);
 document.getElementById("btnSignOut").addEventListener("click", () => HITT_AUTH.signOut("../index.html"));
+HITT_PERMS.applyRealName();
 
 const DEMO_SEED = [
   { id: 1, name: "Demo Pharma Inc", entityLabel: "HiTT", companyTypeLabel: "Pharmaceutical", countryLabel: "United States", webpage: "https://example.com" },

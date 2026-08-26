@@ -13,6 +13,7 @@ HITT_PERMS.guardModule("invoicing", "../welcome.html");
 document.getElementById("userName").textContent = session.displayName;
 document.getElementById("userAvatar").textContent = HITT_AUTH.initials(session);
 document.getElementById("btnSignOut").addEventListener("click", () => HITT_AUTH.signOut("../index.html"));
+HITT_PERMS.applyRealName();
 
 const DEMO_SEED = [
   { id: 1, code: '26018', name: 'Demo Project', entityLabel: 'HiTT', budget: 5000, proceedtoinvoice: true, invoiceCount: 1, invoicedTotal: 2000 },

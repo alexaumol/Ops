@@ -67,5 +67,29 @@ const HITT_PERMS = (() => {
     }
   }
 
-  return { get, guardModule, redirectIfDeactivated };
+  // Upgrades the header's #userName/#userAvatar from the username-derived
+  // guess set at page load (see auth.js deriveDisplayName — accurate for
+  // real MSAL sign-in, but there's nothing to derive a first name from for
+  // a stub-mode short username like "abellmunt") to the real name from the
+  // employees row this identity resolved to. Call this on every page right
+  // after setting the header from `session`. Silently leaves the guessed
+  // name in place on error/no-match — never worse than what was already
+  // shown.
+  async function applyRealName() {
+    try {
+      const perms = await get();
+      if (perms.name) {
+        const nameEl = document.getElementById("userName");
+        if (nameEl) nameEl.textContent = perms.name;
+        const avatarEl = document.getElementById("userAvatar");
+        if (avatarEl) avatarEl.textContent = HITT_AUTH.initials({ displayName: perms.name });
+      }
+      return perms;
+    } catch (err) {
+      console.error("[HITT_PERMS.applyRealName] permissions check failed, keeping username-derived name:", err.message);
+      return null;
+    }
+  }
+
+  return { get, guardModule, redirectIfDeactivated, applyRealName };
 })();

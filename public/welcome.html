@@ -163,18 +163,13 @@
     // checking right after sign-in, before it ever navigates here.
     HITT_PERMS.redirectIfDeactivated("index.html").then((blocked) => {
       if (blocked) return;
-      HITT_PERMS.get().then((perms) => {
-        // Upgrades the username-derived guess (see auth.js
-        // deriveDisplayName) to the real name from the employees row, once
-        // known — e.g. "Alba" instead of "Abellmunt" for a stub-mode
-        // "abellmunt" login, where there's nothing in the username itself
-        // to derive a real first name from.
+      HITT_PERMS.applyRealName().then((perms) => {
+        if (!perms) return;
+        // Same upgrade as applyRealName() does for the header, applied to
+        // the hero greeting too (it isn't part of that shared helper since
+        // no other page has one).
         if (perms.firstName) {
           document.getElementById("heroGreeting").textContent = `Welcome back, ${perms.firstName}`;
-        }
-        if (perms.name) {
-          document.getElementById("userName").textContent = perms.name;
-          document.getElementById("userAvatar").textContent = HITT_AUTH.initials({ displayName: perms.name });
         }
         if (perms.isAdmin) {
           document.getElementById("settingsTile").style.display = "";
