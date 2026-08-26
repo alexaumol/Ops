@@ -104,10 +104,10 @@ const HITT_API = (() => {
     deleteInvoice: (id) => request(`/api/invoicing/invoices/${id}`, { method: "DELETE" }),
     createProject: (payload) =>
       request("/api/projects", { method: "POST", body: JSON.stringify(payload) }),
-    updateProjectStage: (id, stage) =>
+    updateProjectStage: (id, stage, employeeId) =>
       request(`/api/projects/${id}/stage`, {
         method: "PATCH",
-        body: JSON.stringify({ stage }),
+        body: JSON.stringify({ stage, employeeId }),
       }),
     assignProjectBusinessPartner: (id, businessPartnerId) =>
       request(`/api/projects/${id}/business-partner`, {
@@ -138,6 +138,28 @@ const HITT_API = (() => {
     },
     getResourceLeaves: (startDate, endDate) =>
       request(`/api/reports/resource-leaves?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`),
+
+    getProjectsByStatusEntity: (year) =>
+      request(`/api/reports/projects-by-status-entity${year ? `?year=${encodeURIComponent(year)}` : ""}`),
+    getProjectYears: () => request("/api/reports/project-years"),
+    getProjectsOpenedByMonth: (year) =>
+      request(`/api/reports/projects-opened-by-month${year ? `?year=${encodeURIComponent(year)}` : ""}`),
+    getProjectsByMonthDetail: (year, month, type) => {
+      const params = new URLSearchParams({ month, type });
+      if (year) params.set("year", year);
+      return request(`/api/reports/projects-by-month-detail?${params.toString()}`);
+    },
+    getProjectTimeline: (filters = {}) => {
+      const params = new URLSearchParams();
+      if (filters.projectId) params.set("projectId", filters.projectId);
+      if (filters.search) params.set("search", filters.search);
+      if (filters.startDate) params.set("startDate", filters.startDate);
+      if (filters.endDate) params.set("endDate", filters.endDate);
+      if (filters.page) params.set("page", filters.page);
+      if (filters.limit) params.set("limit", filters.limit);
+      const qs = params.toString();
+      return request(`/api/reports/project-timeline${qs ? `?${qs}` : ""}`);
+    },
 
     health: () => request("/api/health"),
   };

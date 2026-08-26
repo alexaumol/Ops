@@ -29,6 +29,7 @@
     <div class="page-tabs">
       <button data-rtab="hours" class="page-tab" aria-selected="true">Hours per project</button>
       <button data-rtab="leaves" class="page-tab" aria-selected="false">Resource leaves</button>
+      <button data-rtab="stats" class="page-tab" aria-selected="false">Project stats</button>
     </div>
 
     <!-- ============================ HOURS PER PROJECT ============================ -->
@@ -86,6 +87,75 @@
 
       <div id="leavesCalendar" class="rpt-calendar"></div>
     </div>
+
+    <!-- ============================ PROJECT STATS ============================ -->
+    <div id="paneStats" class="page-pane hidden">
+      <div class="rpt-charts-grid">
+        <div class="rpt-chart-card">
+          <div class="rpt-chart-head">
+            <h2>Projects by status</h2>
+            <label class="rpt-field" style="margin-right:0.5rem;">
+              <span>Year</span>
+              <select id="statusYearSelect">
+                <option value="">All years</option>
+              </select>
+            </label>
+            <button class="btn btn-secondary" id="btnStatusExport">Export CSV</button>
+          </div>
+          <div id="statusChart"></div>
+        </div>
+
+        <div class="rpt-chart-card">
+          <div class="rpt-chart-head">
+            <h2>Projects opened &amp; closed by month</h2>
+            <label class="rpt-field" style="margin-right:0.5rem;">
+              <span>Year</span>
+              <select id="openedYearSelect"></select>
+            </label>
+            <button class="btn btn-secondary" id="btnOpenedExport">Export CSV</button>
+          </div>
+          <div id="openedChart"></div>
+        </div>
+      </div>
+
+      <div class="rpt-chart-card">
+        <div class="rpt-chart-head">
+          <h2>Project timeline</h2>
+          <input type="text" id="timelineFilter" placeholder="Filter by project code or name…" class="rpt-timeline-filter" />
+          <button class="btn btn-secondary" id="btnTimelineExport">Export CSV</button>
+        </div>
+        <p class="rpt-hint">Only shows status changes made since this log was added — earlier history wasn't tracked.</p>
+        <div class="rpt-table-wrap">
+          <table class="rpt-table">
+            <thead>
+              <tr>
+                <th>Project</th>
+                <th>Change</th>
+                <th>When</th>
+                <th>Changed by</th>
+              </tr>
+            </thead>
+            <tbody id="timelineTableBody"></tbody>
+          </table>
+          <div id="timelineEmpty" class="bp-empty hidden">No status changes logged yet.</div>
+        </div>
+        <div class="rpt-pagination">
+          <span id="timelinePageInfo" class="rpt-page-info"></span>
+          <div class="rpt-spacer"></div>
+          <label class="rpt-field" style="margin-right:0.25rem;">
+            <span>Per page</span>
+            <select id="timelinePageSizeSelect">
+              <option value="10" selected>10</option>
+              <option value="25">25</option>
+              <option value="50">50</option>
+              <option value="1000">All</option>
+            </select>
+          </label>
+          <button class="btn btn-secondary" id="btnTimelinePrev">&larr; Prev</button>
+          <button class="btn btn-secondary" id="btnTimelineNext">Next &rarr;</button>
+        </div>
+      </div>
+    </div>
   </main>
 
   <!-- ============================ PROJECT HOURS DRILL-DOWN ============================ -->
@@ -109,6 +179,29 @@
           <tbody id="drillTableBody"></tbody>
         </table>
         <div id="drillEmpty" class="bp-empty hidden">No hours logged by anyone for this project in this range.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================ MONTH DETAIL (line chart drill-down) ============================ -->
+  <div id="monthDetailOverlay" class="modal-overlay hidden">
+    <div class="modal-panel modal-panel--sm">
+      <div class="modal-head">
+        <h2 id="monthDetailTitle" style="flex:1; font-size:1rem; font-weight:700; color:#fff; margin:0;">Projects</h2>
+        <button id="monthDetailClose" class="modal-head-btn modal-head-btn--close" title="Close">✕</button>
+      </div>
+      <div class="modal-body">
+        <table class="rpt-table">
+          <thead>
+            <tr>
+              <th>Project</th>
+              <th>Entry date</th>
+              <th>Entity</th>
+            </tr>
+          </thead>
+          <tbody id="monthDetailTableBody"></tbody>
+        </table>
+        <div id="monthDetailEmpty" class="bp-empty hidden">No projects for this point.</div>
       </div>
     </div>
   </div>

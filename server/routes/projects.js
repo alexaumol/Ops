@@ -21,6 +21,16 @@
  *                             snapshot, not one row per project — we take
  *                             the most recent row per project)
  *
+ *   projectstatushistory      id, projectid, oldstatusid, newstatusid,
+ *                             changedat, changedby (new table, no Access
+ *                             precedent — added for the Reports "Project
+ *                             timeline"). Written by logStatusChangeAndUpdate()
+ *                             below and inline in PATCH /:id, only when
+ *                             the status actually changes. Project
+ *                             creation (POST /) does NOT write an initial
+ *                             row — there's no "old status" for a create,
+ *                             and it isn't a change.
+ *
  * Nothing here queries the "_dump" tables — those are Access-side caches
  * refreshed FROM these live tables, not the other way round.
  * ---------------------------------------------------------------------------
@@ -40,6 +50,37 @@ const LATEST_PROGRESS_SUBQUERY = `
     LIMIT 1
   ) pp ON true
 `;
+
+// Shared by both places a project's status can change (drag-and-drop
+// /:id/stage and the edit modal's /:id). Reads the current status first so
+// a projectstatushistory row only gets written when it actually changed —
+// backs the Reports "Project timeline" (see routes/reports.js). Runs
+// inside the caller's existing try/catch, so DB errors just propagate.
+async function logStatusChangeAndUpdate(projectId, newStatus, employeeId) {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const { rows } = await client.query(`SELECT projectstatusid FROM projects WHERE id = $1 FOR UPDATE`, [projectId]);
+    const oldStatus = rows[0]?.projectstatusid ?? null;
+    await client.query(
+      `UPDATE projects SET projectstatusid = $1, lastupdated = now(), lastupdatedby = $2 WHERE id = $3`,
+      [newStatus, employeeId || null, projectId]
+    );
+    if (oldStatus !== null && String(oldStatus) !== String(newStatus)) {
+      await client.query(
+        `INSERT INTO projectstatushistory (projectid, oldstatusid, newstatusid, changedat, changedby)
+         VALUES ($1, $2, $3, now(), $4)`,
+        [projectId, oldStatus, newStatus, employeeId || null]
+      );
+    }
+    await client.query("COMMIT");
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+}
 
 // GET /api/projects — full portfolio list for the kanban board.
 router.get("/", requireModuleAccess("projects"), async (req, res) => {
@@ -183,10 +224,7 @@ router.patch("/:id/stage", async (req, res) => {
     return res.status(400).json({ error: "validation_error", message: "stage is required" });
   }
   try {
-    await pool.query(
-      `UPDATE projects SET projectstatusid = $1, lastupdated = now(), lastupdatedby = $2 WHERE id = $3`,
-      [stage, employeeId || null, id]
-    );
+    await logStatusChangeAndUpdate(id, stage, employeeId);
     res.status(204).end();
   } catch (err) {
     console.error("[PATCH /api/projects/:id/stage] DB error:", err.message);
@@ -254,10 +292,22 @@ router.patch("/:id", async (req, res) => {
     await client.query("BEGIN");
 
     if (stage !== undefined) {
+      // Same history-logging as /:id/stage — see logStatusChangeAndUpdate's
+      // comment above for why the old value is read first, inline here
+      // since this endpoint already owns its own transaction.
+      const { rows: cur } = await client.query(`SELECT projectstatusid FROM projects WHERE id = $1 FOR UPDATE`, [id]);
+      const oldStatus = cur[0]?.projectstatusid ?? null;
       await client.query(
         `UPDATE projects SET projectstatusid = $1, lastupdated = now(), lastupdatedby = $2 WHERE id = $3`,
         [stage, employeeId || null, id]
       );
+      if (oldStatus !== null && String(oldStatus) !== String(stage)) {
+        await client.query(
+          `INSERT INTO projectstatushistory (projectid, oldstatusid, newstatusid, changedat, changedby)
+           VALUES ($1, $2, $3, now(), $4)`,
+          [id, oldStatus, stage, employeeId || null]
+        );
+      }
     }
     if (progress !== undefined) {
       await client.query(

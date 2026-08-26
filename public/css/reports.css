@@ -74,6 +74,8 @@
 }
 .rpt-table tbody tr:last-child td { border-bottom: none; }
 .rpt-table tbody tr:hover { background: var(--bg-surface-alt); }
+.rpt-table a { color: var(--brand); text-decoration: none; font-weight: 600; }
+.rpt-table a:hover { text-decoration: underline; }
 .rpt-proj-code { font-size: 0.78rem; color: var(--text-secondary); }
 
 .rpt-month-label { font-size: 1rem; font-weight: 700; min-width: 11ch; text-align: center; }
@@ -147,3 +149,96 @@
   font-style: italic;
 }
 .rpt-cal-more { font-size: 0.65rem; color: var(--text-secondary); }
+
+/* ---------- Project stats: chart cards ---------- */
+.rpt-charts-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+  align-items: start;
+}
+@media (max-width: 860px) {
+  .rpt-charts-grid { grid-template-columns: 1fr; }
+}
+.rpt-chart-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: 1.1rem 1.25rem 1.4rem;
+  margin-bottom: 1.5rem;
+}
+.rpt-charts-grid .rpt-chart-card { margin-bottom: 0; }
+.rpt-chart-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+.rpt-chart-head h2 {
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0;
+  flex: 1;
+}
+.rpt-chart-head .btn { height: 34px; padding: 0 0.85rem; font-size: 0.82rem; }
+.rpt-chart-head select {
+  height: 34px;
+  padding: 0 0.5rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  box-sizing: border-box;
+}
+.rpt-timeline-filter {
+  height: 34px;
+  padding: 0 0.6rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  min-width: 220px;
+  box-sizing: border-box;
+}
+
+.rpt-chart-svg { width: 100%; height: auto; display: block; }
+.rpt-chart-axis { stroke: var(--border-subtle); stroke-width: 1; }
+.rpt-chart-gridline { stroke: var(--border-subtle); stroke-width: 1; stroke-dasharray: 3 3; }
+.rpt-chart-label { font-size: 10px; fill: var(--text-secondary); font-family: var(--font-sans); }
+.rpt-chart-value { font-size: 9px; fill: var(--text-secondary); font-family: var(--font-sans); }
+.rpt-chart-line { fill: none; stroke: var(--brand); stroke-width: 2.5; }
+.rpt-chart-line--closed { stroke: var(--hitt-amber); }
+.rpt-chart-line--total { stroke: var(--text-primary); stroke-width: 2; }
+.rpt-chart-dot { fill: var(--brand); stroke: var(--bg-surface); stroke-width: 1.5; }
+.rpt-chart-dot--closed { fill: var(--hitt-amber); }
+.rpt-chart-dot--total { fill: var(--text-primary); }
+.rpt-chart-dot--clickable { cursor: pointer; }
+.rpt-chart-dot--clickable:hover { stroke: var(--text-primary); stroke-width: 2; }
+.rpt-chart-empty { padding: 2.5rem 1rem; text-align: center; color: var(--text-secondary); font-size: 0.9rem; }
+
+.rpt-change-arrow { color: var(--text-secondary); margin: 0 0.35rem; }
+
+.rpt-pagination {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.75rem;
+  margin-top: 0.85rem;
+}
+.rpt-pagination .btn { height: 34px; padding: 0 0.85rem; font-size: 0.82rem; }
+.rpt-pagination .rpt-page-info { padding-bottom: 0.4rem; }
+.rpt-page-info { font-size: 0.82rem; color: var(--text-secondary); }
+.rpt-pagination select {
+  height: 34px;
+  padding: 0 0.5rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  box-sizing: border-box;
+}

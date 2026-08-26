@@ -21,8 +21,10 @@ independently while the rest keeps working as static placeholder pages.
 - **Invoicing** — proceed-to-invoice release settings per project, invoice
   create/edit with auto-derived status and VAT, and PDF generation matching
   the real HITT invoice template.
-- **Reports** — hours logged per project, and a calendar view of company
-  holidays and employee leaves.
+- **Reports** — hours logged per project (with a per-employee drill-down),
+  a calendar view of company holidays and employee leaves, portfolio
+  charts (projects by status/entity, projects opened by month), a project
+  status-change timeline, and CSV export on every report.
 - Corporate design system with light/dark support and a small set of
   reusable UI primitives (buttons, app header, cards).
 

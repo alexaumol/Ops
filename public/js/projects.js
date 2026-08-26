@@ -15,6 +15,13 @@
 const session = HITT_AUTH.requireSession("../index.html");
 HITT_PERMS.guardModule("projects", "../welcome.html");
 
+// Resolved once and reused for stage-change calls so
+// projectstatushistory.changedby (and lastupdatedby) actually records who
+// made the change, instead of always landing NULL — neither
+// updateProjectStage nor updateProject passed an employeeId before this.
+let currentEmployeeId = null;
+HITT_PERMS.get().then((perms) => { currentEmployeeId = perms.employeeId; }).catch(() => {});
+
 // Default/fallback stage list — used until GET /api/projects/statuses
 // confirms the real projectstatus rows (id, label, ordinal) from the DB.
 // The visual styling (color/icon/alive-vs-closed) is matched onto whatever
@@ -297,7 +304,7 @@ async function moveProject(id, targetStageId){
 
   if (!usingDemoData) {
     try {
-      await HITT_API.updateProjectStage(id, targetStageId);
+      await HITT_API.updateProjectStage(id, targetStageId, currentEmployeeId);
     } catch (err) {
       console.error("Failed to persist stage change:", err);
       p.stage = previousStage; // rollback
@@ -716,7 +723,7 @@ document.getElementById('mSave').addEventListener('click', async () => {
 
   if (!usingDemoData) {
     try {
-      await HITT_API.updateProject(p.id, { stage: newStatus, progress: newProgress, ...extraFields });
+      await HITT_API.updateProject(p.id, { stage: newStatus, progress: newProgress, employeeId: currentEmployeeId, ...extraFields });
       toast(`<span class="font-mono text-xs opacity-80">${escapeHtml(p.code)}</span> saved${statusChanged ? ' · status updated' : ''}`, 'green');
     } catch (err) {
       console.error(err);
@@ -903,4 +910,12 @@ document.getElementById('btnRefresh').addEventListener('click', () => {
 });
 
 /* ============================== INIT ==================================== */
-loadProjects();
+loadProjects().then(() => {
+  // Deep link from Reports (project timeline rows, month-detail drill-down)
+  // — ?projectId=X opens that project's modal directly. PROJECTS[].id
+  // comes straight off the API response (a stringified bigint), so this
+  // deliberately doesn't Number()-convert id — the strict equality in
+  // openProjectModal's PROJECTS.find(x => x.id === id) needs the same type.
+  const projectId = new URLSearchParams(window.location.search).get('projectId');
+  if (projectId) openProjectModal(projectId);
+});
