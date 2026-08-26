@@ -21,6 +21,8 @@ independently while the rest keeps working as static placeholder pages.
 - **Invoicing** — proceed-to-invoice release settings per project, invoice
   create/edit with auto-derived status and VAT, and PDF generation matching
   the real HITT invoice template.
+- **Reports** — hours logged per project, and a calendar view of company
+  holidays and employee leaves.
 - Corporate design system with light/dark support and a small set of
   reusable UI primitives (buttons, app header, cards).
 
@@ -99,9 +101,10 @@ registered as a redirect URI on the Entra app registration (Authentication
 
 ## Status
 
-Early-stage prototype. Projects, Business partners, Time allocation, and
-Invoicing are all wired to a real PostgreSQL test database. Microsoft 365
-sign-in is real (Entra ID via MSAL.js). A permissions layer controls module
+Early-stage prototype. Projects, Business partners, Time allocation,
+Invoicing, and Reports are all wired to a real PostgreSQL test database.
+Microsoft 365 sign-in is real (Entra ID via MSAL.js). A permissions layer
+controls module
 access, admin rights, and time-off approve/reject rights (see Settings,
 admin-only). Not yet built: invoice-PDF emailing, and server-side
 validation of the MSAL ID token (the API currently trusts a plain header,

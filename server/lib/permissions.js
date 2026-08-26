@@ -34,13 +34,14 @@
  * deferred server-side MSAL ID-token validation (see js/auth.js).
  *
  * MODULE_KEYS: 'projects' | 'business-partners' | 'time-allocation' |
- * 'invoicing'. 'time-allocation' covers both routes/timeTracking.js and
- * routes/timeOff.js — they're one module in the frontend menu.
+ * 'invoicing' | 'reports'. 'time-allocation' covers both
+ * routes/timeTracking.js and routes/timeOff.js — they're one module in the
+ * frontend menu.
  * ---------------------------------------------------------------------------
  */
 const { pool } = require("../config/db");
 
-const MODULE_KEYS = ["projects", "business-partners", "time-allocation", "invoicing"];
+const MODULE_KEYS = ["projects", "business-partners", "time-allocation", "invoicing", "reports"];
 
 // Resolves the X-HITT-User header (a stub-mode short username OR a real
 // MSAL UPN/email — this app supports both auth modes) to an employees row.

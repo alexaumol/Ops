@@ -121,6 +121,24 @@ const HITT_API = (() => {
       }),
     updateProject: (id, payload) =>
       request(`/api/projects/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
+
+    getHoursPerProject: (startDate, endDate) => {
+      const params = new URLSearchParams();
+      if (startDate) params.set("startDate", startDate);
+      if (endDate) params.set("endDate", endDate);
+      const qs = params.toString();
+      return request(`/api/reports/hours-per-project${qs ? `?${qs}` : ""}`);
+    },
+    getHoursPerProjectDetail: (projectId, startDate, endDate) => {
+      const params = new URLSearchParams();
+      if (startDate) params.set("startDate", startDate);
+      if (endDate) params.set("endDate", endDate);
+      const qs = params.toString();
+      return request(`/api/reports/hours-per-project/${projectId}${qs ? `?${qs}` : ""}`);
+    },
+    getResourceLeaves: (startDate, endDate) =>
+      request(`/api/reports/resource-leaves?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`),
+
     health: () => request("/api/health"),
   };
 })();

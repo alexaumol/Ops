@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Reports · HITT Ops</title>
+<link rel="stylesheet" href="../css/styles.css" />
+<link rel="stylesheet" href="../css/business-partners.css" />
+<link rel="stylesheet" href="../css/reports.css" />
+</head>
+<body>
+  <header class="app-header">
+    <a class="app-header__brand" href="../welcome.html">HITT<span class="dot">·</span>Ops</a>
+    <nav class="app-header__nav" aria-label="Primary">
+      <a href="../welcome.html">Home</a>
+      <a href="reports.html" class="active">Reports</a>
+    </nav>
+    <div class="app-header__user">
+      <div class="avatar" id="userAvatar">?</div>
+      <span id="userName">Signed in</span>
+      <button class="btn btn-secondary" id="btnSignOut" style="padding:0.35rem 0.75rem; font-size:0.8rem;">Sign out</button>
+    </div>
+  </header>
+
+  <main class="page-shell">
+    <h1 class="page-title">Reports</h1>
+    <p class="page-subtitle">Portfolio-wide views built from live project and time-off data.</p>
+
+    <div class="page-tabs">
+      <button data-rtab="hours" class="page-tab" aria-selected="true">Hours per project</button>
+      <button data-rtab="leaves" class="page-tab" aria-selected="false">Resource leaves</button>
+    </div>
+
+    <!-- ============================ HOURS PER PROJECT ============================ -->
+    <div id="paneHours" class="page-pane">
+      <div class="rpt-toolbar">
+        <label class="rpt-field">
+          <span>From</span>
+          <input type="date" id="hoursStartDate" />
+        </label>
+        <label class="rpt-field">
+          <span>To</span>
+          <input type="date" id="hoursEndDate" />
+        </label>
+        <button class="btn btn-secondary" id="btnHoursThisYear">This year</button>
+        <button class="btn btn-secondary" id="btnHoursAllTime">All time</button>
+        <button class="btn btn-secondary" id="btnHoursExport">Export CSV</button>
+        <div class="rpt-spacer"></div>
+        <span id="hoursTotal" class="rpt-total"></span>
+      </div>
+      <p class="rpt-hint">Click a project row for a per-employee breakdown.</p>
+
+      <div class="rpt-table-wrap">
+        <table class="rpt-table">
+          <thead>
+            <tr>
+              <th>Project</th>
+              <th>Status</th>
+              <th style="text-align:right;">Total hours</th>
+              <th style="text-align:right;">PO hours</th>
+              <th style="text-align:right;">RES hours</th>
+              <th style="text-align:right;">Employees</th>
+            </tr>
+          </thead>
+          <tbody id="hoursTableBody"></tbody>
+        </table>
+        <div id="hoursEmpty" class="bp-empty hidden">No hours logged in this range.</div>
+      </div>
+    </div>
+
+    <!-- ============================ RESOURCE LEAVES ============================ -->
+    <div id="paneLeaves" class="page-pane hidden">
+      <div class="rpt-toolbar">
+        <button class="btn btn-secondary" id="btnPrevMonth" title="Previous month">&larr;</button>
+        <span id="leavesMonthLabel" class="rpt-month-label"></span>
+        <button class="btn btn-secondary" id="btnNextMonth" title="Next month">&rarr;</button>
+        <button class="btn btn-secondary" id="btnThisMonth">Today</button>
+        <button class="btn btn-secondary" id="btnLeavesExport">Export CSV</button>
+        <div class="rpt-spacer"></div>
+        <div class="rpt-legend">
+          <span class="rpt-legend-item"><span class="rpt-swatch rpt-swatch-holiday"></span>Holiday</span>
+          <span class="rpt-legend-item"><span class="rpt-swatch rpt-swatch-approved"></span>Approved leave</span>
+          <span class="rpt-legend-item"><span class="rpt-swatch rpt-swatch-pending"></span>Pending leave</span>
+        </div>
+      </div>
+
+      <div id="leavesCalendar" class="rpt-calendar"></div>
+    </div>
+  </main>
+
+  <!-- ============================ PROJECT HOURS DRILL-DOWN ============================ -->
+  <div id="drillOverlay" class="modal-overlay hidden">
+    <div class="modal-panel modal-panel--sm">
+      <div class="modal-head">
+        <h2 id="drillTitle" style="flex:1; font-size:1rem; font-weight:700; color:#fff; margin:0;">Project</h2>
+        <button id="drillExport" class="modal-head-btn" title="Export CSV" style="background: var(--hitt-charcoal);">⬇</button>
+        <button id="drillClose" class="modal-head-btn modal-head-btn--close" title="Close">✕</button>
+      </div>
+      <div class="modal-body">
+        <table class="rpt-table">
+          <thead>
+            <tr>
+              <th>Employee</th>
+              <th style="text-align:right;">Total</th>
+              <th style="text-align:right;">PO</th>
+              <th style="text-align:right;">RES</th>
+            </tr>
+          </thead>
+          <tbody id="drillTableBody"></tbody>
+        </table>
+        <div id="drillEmpty" class="bp-empty hidden">No hours logged by anyone for this project in this range.</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toastHost" class="toast-host"></div>
+
+  <script src="../js/config.js"></script>
+  <script src="../js/auth.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/permissions.js"></script>
+  <script src="../js/reports.js"></script>
+</body>
+</html>

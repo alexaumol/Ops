@@ -24,6 +24,7 @@ const invoicingRouter = require("./routes/invoicing");
 const employeesRouter = require("./routes/employees");
 const permissionsRouter = require("./routes/permissions");
 const settingsRouter = require("./routes/settings");
+const reportsRouter = require("./routes/reports");
 const { attachHittUser } = require("./lib/permissions");
 
 const app = express();
@@ -65,6 +66,7 @@ app.use("/api/invoicing", invoicingRouter);
 app.use("/api/employees", employeesRouter);
 app.use("/api/permissions", permissionsRouter);
 app.use("/api/settings", settingsRouter);
+app.use("/api/reports", reportsRouter);
 
 // Fallback 404 for unknown API routes.
 app.use("/api", (req, res) => {

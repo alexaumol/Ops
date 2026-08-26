@@ -1,0 +1,149 @@
+/* ==========================================================================
+   HITT Ops — Reports page-specific styles
+   Plain CSS (no Tailwind) — matches the rest of the app. See css/styles.css
+   for shared tokens/header, css/business-partners.css for .bp-empty/.toast.
+   ========================================================================== */
+
+.page-tabs {
+  display: flex; gap: 1.5rem;
+  border-bottom: 1px solid var(--border-subtle);
+  margin-bottom: 1.25rem;
+}
+.page-tab {
+  background: none; border: none; cursor: pointer;
+  padding: 0.6rem 0.1rem;
+  font-size: 0.92rem; font-weight: 700;
+  color: var(--text-secondary);
+  border-bottom: 2px solid transparent;
+}
+.page-tab[aria-selected="true"] { color: var(--text-primary); border-bottom-color: var(--accent); }
+.page-pane.hidden { display: none; }
+
+.rpt-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+.rpt-toolbar .btn { height: 38px; padding: 0 1rem; }
+.rpt-spacer { flex: 1; }
+.rpt-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+.rpt-field input[type="date"] {
+  height: 38px;
+  padding: 0 0.6rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  box-sizing: border-box;
+}
+.rpt-total { font-size: 0.9rem; font-weight: 700; color: var(--text-primary); }
+.rpt-hint { font-size: 0.78rem; color: var(--text-secondary); margin: -0.75rem 0 1rem; }
+
+.rpt-table-wrap {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+.rpt-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+.rpt-table thead th {
+  text-align: left;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-secondary);
+  background: var(--bg-surface-alt);
+  padding: 0.6rem 0.9rem;
+  border-bottom: 1px solid var(--border-subtle);
+  white-space: nowrap;
+}
+.rpt-table tbody td {
+  padding: 0.55rem 0.9rem;
+  border-bottom: 1px solid var(--border-subtle);
+  vertical-align: middle;
+}
+.rpt-table tbody tr:last-child td { border-bottom: none; }
+.rpt-table tbody tr:hover { background: var(--bg-surface-alt); }
+.rpt-proj-code { font-size: 0.78rem; color: var(--text-secondary); }
+
+.rpt-month-label { font-size: 1rem; font-weight: 700; min-width: 11ch; text-align: center; }
+
+.rpt-legend { display: flex; gap: 1rem; font-size: 0.8rem; color: var(--text-secondary); }
+.rpt-legend-item { display: inline-flex; align-items: center; gap: 0.35rem; }
+.rpt-swatch { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+.rpt-swatch-holiday { background: var(--hitt-amber); }
+.rpt-swatch-approved { background: var(--brand); }
+.rpt-swatch-pending { background: var(--bg-surface); border: 1.5px dashed var(--text-secondary); }
+
+/* ---------- Calendar grid ---------- */
+.rpt-calendar {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+.rpt-cal-weekdays, .rpt-cal-week {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+}
+.rpt-cal-weekdays div {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-secondary);
+  background: var(--bg-surface-alt);
+  padding: 0.5rem 0.6rem;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.rpt-cal-day {
+  min-height: 92px;
+  padding: 0.4rem;
+  border-right: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  overflow: hidden;
+}
+.rpt-cal-week > .rpt-cal-day:last-child { border-right: none; }
+.rpt-cal-day.is-outside { background: var(--bg-surface-alt); opacity: 0.55; }
+.rpt-cal-day.is-today { background: rgba(188,154,28,0.1); }
+.rpt-cal-daynum { font-size: 0.78rem; font-weight: 700; color: var(--text-secondary); }
+.rpt-cal-holiday {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #fff;
+  background: var(--hitt-amber);
+  padding: 0.1rem 0.35rem;
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rpt-cal-leave {
+  font-size: 0.68rem;
+  padding: 0.1rem 0.35rem;
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rpt-cal-leave.is-approved { background: var(--brand); color: #fff; }
+.rpt-cal-leave.is-pending {
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  border: 1.5px dashed var(--text-secondary);
+  font-style: italic;
+}
+.rpt-cal-more { font-size: 0.65rem; color: var(--text-secondary); }
