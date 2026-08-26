@@ -29,7 +29,11 @@
  *                                        logStatusChangeAndUpdate()) —
  *                                        paginated, with a project
  *                                        code/name search filter.
+ *   GET /stale-projects                 Open (non-Closed/Cancelled)
+ *                                        projects with the oldest (or no)
+ *                                        logged status change — paginated.
  *
+
  * IMPORTANT schema note: corporateworkcalendar/employeeworkcalendar (named
  * by Alex as the source for resource-leaves) hold only ANNUAL TOTALS
  * (workyear, labourhoursperyear, holidaysamount, corporateholidaysamount) —
@@ -156,13 +160,25 @@ router.get("/resource-leaves", requireModuleAccess("reports"), async (req, res) 
 // `year` is optional — omitted means all-time (the original behavior),
 // filtered by entrydate to match project-years/opened-by-month's notion
 // of "year" when given.
+//
+// Returns both `count` (project count) and `budget` (sum of each
+// project's most recent projectquotations.finalquotation, via a LATERAL
+// join) per row — the frontend's Total/Budgeted dropdown picks which
+// field to plot, no separate request needed. Checked the real data before
+// assuming "most recent": 255 projects each have exactly one quotation
+// row; the only project*quotations grouping with a high count (176) turned
+// out to be quotation rows with projectid IS NULL (orphaned, not one
+// project with many revisions) — they simply don't match any project in
+// this join, same as they wouldn't match anything meaningful anywhere
+// else. `finalquotation` is NULL on ~40% of quotation rows, treated as 0.
 router.get("/projects-by-status-entity", requireModuleAccess("reports"), async (req, res) => {
   const year = req.query.year ? Number(req.query.year) : null;
   try {
     const { rows } = await pool.query(
       `SELECT ps.id AS "statusId", ps.projectstatusdesc AS "statusLabel", ps.ordinal,
               ent.id AS "entityId", ent.label AS "entityLabel",
-              COUNT(p.id) AS count
+              COUNT(p.id) AS count,
+              COALESCE(SUM(latestq.finalquotation), 0) AS budget
        FROM projectstatus ps
        CROSS JOIN (
          SELECT id, entitydesc AS label FROM entity
@@ -173,6 +189,13 @@ router.get("/projects-by-status-entity", requireModuleAccess("reports"), async (
          ON p.projectstatusid::bigint = ps.id
          AND (p.entityid::bigint = ent.id OR (p.entityid IS NULL AND ent.id IS NULL))
          AND ($1::int IS NULL OR EXTRACT(YEAR FROM p.entrydate) = $1)
+       LEFT JOIN LATERAL (
+         SELECT finalquotation
+         FROM projectquotations q
+         WHERE q.projectid = p.id
+         ORDER BY q.quotationdate DESC NULLS LAST, q.id DESC
+         LIMIT 1
+       ) latestq ON true
        GROUP BY ps.id, ps.projectstatusdesc, ps.ordinal, ent.id, ent.label
        ORDER BY ps.ordinal NULLS LAST, ps.id, ent.label`,
       [year]
@@ -333,6 +356,47 @@ router.get("/project-timeline", requireModuleAccess("reports"), async (req, res)
     });
   } catch (err) {
     console.error("[GET /api/reports/project-timeline] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
+// GET /api/reports/stale-projects?page=&limit=
+// Open projects (excludes Closed/Cancelled — nothing more is going to
+// happen to those) ordered by how long they've sat without a logged
+// status change: NULLS FIRST (never logged a change at all — the
+// projectstatushistory table only started recording going forward, so
+// most real projects will legitimately show "—" here for a while yet),
+// then by entrydate ASC as a tiebreak among those — among projects with
+// no tracked movement, the ones opened longest ago are the more
+// plausible candidates for genuinely stale. Same { rows, total, page,
+// limit } pagination shape as /project-timeline.
+router.get("/stale-projects", requireModuleAccess("reports"), async (req, res) => {
+  const limit = Math.min(Number(req.query.limit) || 5, 200);
+  const page = Math.max(Number(req.query.page) || 1, 1);
+  const offset = (page - 1) * limit;
+  try {
+    const { rows } = await pool.query(
+      `SELECT p.id, p.projectnumber AS code, p.projectname AS name, p.entrydate AS "entryDate",
+              lsc.changedat AS "lastStatusChangeAt",
+              COUNT(*) OVER() AS "totalCount"
+       FROM projects p
+       LEFT JOIN LATERAL (
+         SELECT MAX(changedat) AS changedat FROM projectstatushistory h WHERE h.projectid = p.id
+       ) lsc ON true
+       WHERE p.projectstatusid::bigint NOT IN (
+         SELECT id FROM projectstatus WHERE projectstatusdesc IN ('Closed', 'Cancelled')
+       )
+       ORDER BY lsc.changedat ASC NULLS FIRST, p.entrydate ASC
+       LIMIT $1 OFFSET $2`,
+      [limit, offset]
+    );
+    const total = rows.length ? Number(rows[0].totalCount) : 0;
+    res.json({
+      rows: rows.map(({ totalCount, ...r }) => r),
+      total, page, limit,
+    });
+  } catch (err) {
+    console.error("[GET /api/reports/stale-projects] DB error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });
   }
 });

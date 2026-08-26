@@ -90,21 +90,30 @@
 
     <!-- ============================ PROJECT STATS ============================ -->
     <div id="paneStats" class="page-pane hidden">
-      <div class="rpt-charts-grid">
-        <div class="rpt-chart-card">
-          <div class="rpt-chart-head">
-            <h2>Projects by status</h2>
-            <label class="rpt-field" style="margin-right:0.5rem;">
-              <span>Year</span>
-              <select id="statusYearSelect">
-                <option value="">All years</option>
-              </select>
-            </label>
-            <button class="btn btn-secondary" id="btnStatusExport">Export CSV</button>
-          </div>
-          <div id="statusChart"></div>
+      <!-- Row 1: full width -->
+      <div class="rpt-chart-card">
+        <div class="rpt-chart-head">
+          <h2>Projects by status</h2>
+          <label class="rpt-field" style="margin-right:0.5rem;">
+            <span>Show</span>
+            <select id="statusMetricSelect">
+              <option value="count" selected>Total</option>
+              <option value="budget">Budgeted</option>
+            </select>
+          </label>
+          <label class="rpt-field" style="margin-right:0.5rem;">
+            <span>Year</span>
+            <select id="statusYearSelect">
+              <option value="">All years</option>
+            </select>
+          </label>
+          <button class="btn btn-secondary" id="btnStatusExport">Export CSV</button>
         </div>
+        <div id="statusChart"></div>
+      </div>
 
+      <!-- Row 2: line chart + stale projects, same card height -->
+      <div class="rpt-charts-grid rpt-charts-grid--row2">
         <div class="rpt-chart-card">
           <div class="rpt-chart-head">
             <h2>Projects opened &amp; closed by month</h2>
@@ -116,8 +125,36 @@
           </div>
           <div id="openedChart"></div>
         </div>
+
+        <div class="rpt-chart-card">
+          <div class="rpt-chart-head">
+            <h2>Stale projects</h2>
+            <button class="btn btn-secondary" id="btnStaleExport">Export CSV</button>
+          </div>
+          <p class="rpt-hint">Open projects (excludes Closed/Cancelled) with the oldest — or no — logged status change. Most will show "—" until more changes are made under the new tracking.</p>
+          <div class="rpt-table-wrap">
+            <table class="rpt-table">
+              <thead>
+                <tr>
+                  <th>Project</th>
+                  <th>Entry date</th>
+                  <th>Last status change</th>
+                </tr>
+              </thead>
+              <tbody id="staleTableBody"></tbody>
+            </table>
+            <div id="staleEmpty" class="bp-empty hidden">No open projects.</div>
+          </div>
+          <div class="rpt-pagination">
+            <span id="stalePageInfo" class="rpt-page-info"></span>
+            <div class="rpt-spacer"></div>
+            <button class="btn btn-secondary" id="btnStalePrev">&larr; Prev</button>
+            <button class="btn btn-secondary" id="btnStaleNext">Next &rarr;</button>
+          </div>
+        </div>
       </div>
 
+      <!-- Row 3: full width -->
       <div class="rpt-chart-card">
         <div class="rpt-chart-head">
           <h2>Project timeline</h2>

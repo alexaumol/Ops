@@ -354,18 +354,48 @@ const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "S
 // Rounds a max value up to a "nice" chart ceiling divisible by 5, so the
 // gridline labels (0/25/50/75/100%) come out as clean integers instead of
 // e.g. 13.75. Floors at 5 so an all-zero dataset still draws a usable axis.
+// Used for project-count scales (small integers) — see niceCeilMagnitude
+// below for the currency scale, which needs a different step size.
 function niceCeil(max) {
   return Math.max(5, Math.ceil(max / 5) * 5);
+}
+
+// Same idea as niceCeil but for values that can span orders of magnitude
+// (budget euros, hundreds to hundreds of thousands) — a flat ÷5 step would
+// produce ugly ceilings like 47330. Picks the next 1/2/5×10^n above max,
+// the standard "nice numbers" chart-axis approach.
+function niceCeilMagnitude(max) {
+  if (max <= 0) return 100;
+  const magnitude = Math.pow(10, Math.floor(Math.log10(max)));
+  const residual = max / magnitude;
+  const niceResidual = residual <= 1 ? 1 : residual <= 2 ? 2 : residual <= 5 ? 5 : 10;
+  return niceResidual * magnitude;
+}
+
+// Full precision, for tooltips/CSV — matches the EUR formatting already
+// established in invoicing.js's formatMoney.
+function formatMoney(n) {
+  return Number(n).toLocaleString(undefined, { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
+}
+// Compact, for axis/bar labels where full "€225,000.00" would crowd a
+// narrow chart — "€225k", "€1.2M".
+function formatCompactCurrency(n) {
+  const abs = Math.abs(n);
+  if (abs >= 1_000_000) return `€${(n / 1_000_000).toFixed(1)}M`;
+  if (abs >= 1_000) return `€${Math.round(n / 1000)}k`;
+  return `€${Math.round(n)}`;
 }
 
 let lastStatusEntityRows = [];
 let lastOpenedRows = [];
 let lastTimelineRows = [];
+let lastStaleRows = [];
 
 const statusYearSelect = document.getElementById("statusYearSelect");
+const statusMetricSelect = document.getElementById("statusMetricSelect");
 
 async function loadStats() {
-  await Promise.all([loadYearsThenCharts(), loadTimeline()]);
+  await Promise.all([loadYearsThenCharts(), loadTimeline(), loadStaleProjects()]);
 }
 
 // Populates both year dropdowns (status chart + opened/closed chart) from
@@ -412,36 +442,48 @@ async function loadStatusChart() {
 }
 
 statusYearSelect.addEventListener("change", loadStatusChart);
+// Both metrics come back in the same response (see routes/reports.js) —
+// switching the dropdown just re-renders already-loaded data, no re-fetch.
+statusMetricSelect.addEventListener("change", () => renderStatusChart(lastStatusEntityRows));
 
 function renderStatusChart(rows) {
   const el = document.getElementById("statusChart");
   if (!rows.length) { el.innerHTML = `<div class="rpt-chart-empty">No data.</div>`; return; }
 
+  // "Total" = project count; "Budgeted" = sum of each project's latest
+  // projectquotations.finalquotation (see routes/reports.js — both come
+  // back in every row, this just picks which field to plot).
+  const isBudget = statusMetricSelect.value === "budget";
+  const metricField = isBudget ? "budget" : "count";
+  const fmtAxis = isBudget ? formatCompactCurrency : (v) => v;
+  const fmtFull = isBudget ? formatMoney : (v) => v;
+
   const statuses = [];
   const byStatus = new Map();
   rows.forEach((r) => {
     if (!byStatus.has(r.statusId)) {
-      byStatus.set(r.statusId, { label: r.statusLabel, entities: new Map(), total: 0 });
+      byStatus.set(r.statusId, { label: r.statusLabel, entities: new Map(), counts: new Map(), total: 0 });
       statuses.push(r.statusId);
     }
     const group = byStatus.get(r.statusId);
-    group.entities.set(r.entityLabel, Number(r.count));
-    group.total += Number(r.count);
+    group.entities.set(r.entityLabel, Number(r[metricField]));
+    group.counts.set(r.entityLabel, Number(r.count)); // kept for tooltip context even in Budgeted mode
+    group.total += Number(r[metricField]);
   });
   const entitiesPresent = ENTITY_ORDER.filter((e) => rows.some((r) => r.entityLabel === e));
   const entities = entitiesPresent.length ? entitiesPresent : ENTITY_ORDER;
 
-  // Bars use one real scale (individual entity counts). The total line
-  // is NOT plotted against a value axis at all — it just floats a fixed
-  // distance above whichever bar is tallest in each group, so it (and its
-  // value labels) never collides with a bar's own value label regardless
-  // of how big the total is relative to the bars. MT is generous
-  // specifically to leave room for this floating line + its labels above
-  // the tallest possible bar.
-  const maxBar = Math.max(0, ...rows.map((r) => Number(r.count)));
-  const yMaxBars = niceCeil(maxBar);
+  // Bars use one real scale (whichever metric is selected). The total
+  // line is NOT plotted against a value axis at all — it just floats a
+  // fixed distance above whichever bar is tallest in each group, so it
+  // (and its value labels) never collides with a bar's own value label
+  // regardless of how big the total is relative to the bars. MT is
+  // generous specifically to leave room for this floating line + its
+  // labels above the tallest possible bar.
+  const maxBar = Math.max(0, ...rows.map((r) => Number(r[metricField])));
+  const yMaxBars = isBudget ? niceCeilMagnitude(maxBar) : niceCeil(maxBar);
 
-  const W = 480, H = 320, ML = 32, MR = 8, MT = 34, MB = 58;
+  const W = 480, H = 320, ML = isBudget ? 44 : 32, MR = 8, MT = 34, MB = 58;
   const plotW = W - ML - MR, plotH = H - MT - MB;
   const groupW = plotW / statuses.length;
   const barGap = groupW * 0.1;
@@ -455,7 +497,7 @@ function renderStatusChart(rows) {
     const val = Math.round((yMaxBars * i) / 4);
     const y = MT + yScaleBars(val);
     svg += `<line class="rpt-chart-gridline" x1="${ML}" y1="${y}" x2="${W - MR}" y2="${y}" />`;
-    svg += `<text class="rpt-chart-label" x="${ML - 6}" y="${y + 3}" text-anchor="end">${val}</text>`;
+    svg += `<text class="rpt-chart-label" x="${ML - 6}" y="${y + 3}" text-anchor="end">${fmtAxis(val)}</text>`;
   }
   svg += `<line class="rpt-chart-axis" x1="${ML}" y1="${MT}" x2="${ML}" y2="${MT + plotH}" />`;
   svg += `<line class="rpt-chart-axis" x1="${ML}" y1="${MT + plotH}" x2="${W - MR}" y2="${MT + plotH}" />`;
@@ -465,16 +507,19 @@ function renderStatusChart(rows) {
     const gx = ML + si * groupW + barGap;
     let tallestBarTopY = MT + plotH; // tracks the highest (smallest y) bar top in this group
     entities.forEach((entityLabel, ei) => {
-      const count = group.entities.get(entityLabel) || 0;
-      const barH = (count / yMaxBars) * plotH;
+      const value = group.entities.get(entityLabel) || 0;
+      const barH = (value / yMaxBars) * plotH;
       const x = gx + ei * barW;
       const y = MT + plotH - barH;
       tallestBarTopY = Math.min(tallestBarTopY, y);
+      const tooltip = isBudget
+        ? `${escapeHtml(group.label)} · ${escapeHtml(entityLabel)}: ${fmtFull(value)} (${group.counts.get(entityLabel) || 0} projects)`
+        : `${escapeHtml(group.label)} · ${escapeHtml(entityLabel)}: ${value}`;
       svg += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${(barW * 0.82).toFixed(1)}" height="${barH.toFixed(1)}" fill="${ENTITY_COLORS[entityLabel] || "#999"}" rx="2">
-        <title>${escapeHtml(group.label)} · ${escapeHtml(entityLabel)}: ${count}</title>
+        <title>${tooltip}</title>
       </rect>`;
-      if (count > 0) {
-        svg += `<text class="rpt-chart-value" x="${(x + barW * 0.41).toFixed(1)}" y="${(y - 4).toFixed(1)}" text-anchor="middle">${count}</text>`;
+      if (value > 0) {
+        svg += `<text class="rpt-chart-value" x="${(x + barW * 0.41).toFixed(1)}" y="${(y - 4).toFixed(1)}" text-anchor="middle">${fmtAxis(value)}</text>`;
       }
     });
     group.floatY = tallestBarTopY - FLOAT_GAP;
@@ -491,8 +536,8 @@ function renderStatusChart(rows) {
   });
   svg += `<polyline class="rpt-chart-line rpt-chart-line--total" points="${totalPoints.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ")}" />`;
   totalPoints.forEach((p, si) => {
-    svg += `<circle class="rpt-chart-dot rpt-chart-dot--total" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3.5"><title>${escapeHtml(byStatus.get(statuses[si]).label)} total: ${p.total}</title></circle>`;
-    svg += `<text class="rpt-chart-value" style="font-weight:700;" x="${p.x.toFixed(1)}" y="${(p.y - 8).toFixed(1)}" text-anchor="middle">${p.total}</text>`;
+    svg += `<circle class="rpt-chart-dot rpt-chart-dot--total" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3.5"><title>${escapeHtml(byStatus.get(statuses[si]).label)} total: ${fmtFull(p.total)}</title></circle>`;
+    svg += `<text class="rpt-chart-value" style="font-weight:700;" x="${p.x.toFixed(1)}" y="${(p.y - 8).toFixed(1)}" text-anchor="middle">${fmtAxis(p.total)}</text>`;
   });
 
   const legend = entities.map((e) => `
@@ -502,7 +547,7 @@ function renderStatusChart(rows) {
   `;
 
   el.innerHTML = `
-    <svg class="rpt-chart-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Projects by status and entity">${svg}</svg>
+    <svg class="rpt-chart-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Projects by status and entity, ${isBudget ? "budgeted amount" : "count"}">${svg}</svg>
     <div class="rpt-legend" style="margin-top:0.5rem;">${legend}</div>
   `;
 }
@@ -511,8 +556,8 @@ document.getElementById("btnStatusExport").addEventListener("click", () => {
   if (!lastStatusEntityRows.length) { toast("Nothing to export.", "navy"); return; }
   downloadCsv(
     "projects-by-status-entity.csv",
-    ["Status", "Entity", "Count"],
-    lastStatusEntityRows.map((r) => [r.statusLabel, r.entityLabel, r.count])
+    ["Status", "Entity", "Count", "Budget (EUR)"],
+    lastStatusEntityRows.map((r) => [r.statusLabel, r.entityLabel, r.count, r.budget])
   );
 });
 
@@ -769,6 +814,97 @@ document.getElementById("btnTimelineExport").addEventListener("click", async () 
   } catch (err) {
     console.error("[reports] failed to export project-timeline:", err.message);
     toast("Could not export the project timeline.", "red");
+  }
+});
+
+/* ---------- Stale projects (server-paginated, small fixed page size to
+   match the line chart's card height — see rpt-charts-grid--row2 CSS) ---- */
+const STALE_PAGE_SIZE = 5;
+let stalePage = 1;
+let staleTotal = 0;
+
+async function loadStaleProjects() {
+  const tbody = document.getElementById("staleTableBody");
+  const empty = document.getElementById("staleEmpty");
+  tbody.innerHTML = `<tr><td colspan="3" class="sub-empty">Loading…</td></tr>`;
+  empty.classList.add("hidden");
+  try {
+    const { rows, total } = await HITT_API.getStaleProjects(stalePage, STALE_PAGE_SIZE);
+    lastStaleRows = rows;
+    staleTotal = total;
+    renderStaleProjects();
+  } catch (err) {
+    console.error("[reports] failed to load stale-projects:", err.message);
+    lastStaleRows = [];
+    staleTotal = 0;
+    tbody.innerHTML = "";
+    empty.textContent = "Could not load stale projects.";
+    empty.classList.remove("hidden");
+    toast("Could not load stale projects.", "red");
+  }
+  updateStalePagination();
+}
+
+function renderStaleProjects() {
+  const tbody = document.getElementById("staleTableBody");
+  const empty = document.getElementById("staleEmpty");
+  if (!lastStaleRows.length) {
+    tbody.innerHTML = "";
+    empty.classList.remove("hidden");
+    return;
+  }
+  empty.classList.add("hidden");
+  tbody.innerHTML = lastStaleRows.map((r) => `
+    <tr>
+      <td>
+        <a href="projects.html?projectId=${encodeURIComponent(r.id)}">${escapeHtml(r.name)}</a>
+        <div class="rpt-proj-code">${escapeHtml(r.code)}</div>
+      </td>
+      <td style="font-size:0.82rem; color:var(--text-secondary);">${r.entryDate ? new Date(r.entryDate).toLocaleDateString() : "—"}</td>
+      <td style="font-size:0.82rem; color:var(--text-secondary);">${r.lastStatusChangeAt ? new Date(r.lastStatusChangeAt).toLocaleDateString() : "—"}</td>
+    </tr>
+  `).join("");
+}
+
+function staleTotalPages() {
+  return Math.max(1, Math.ceil(staleTotal / STALE_PAGE_SIZE));
+}
+
+function updateStalePagination() {
+  const totalPages = staleTotalPages();
+  document.getElementById("stalePageInfo").textContent = staleTotal
+    ? `Page ${stalePage} of ${totalPages} · ${staleTotal} open`
+    : "";
+  document.getElementById("btnStalePrev").disabled = stalePage <= 1;
+  document.getElementById("btnStaleNext").disabled = stalePage >= totalPages;
+}
+
+document.getElementById("btnStalePrev").addEventListener("click", () => {
+  if (stalePage > 1) { stalePage--; loadStaleProjects(); }
+});
+document.getElementById("btnStaleNext").addEventListener("click", () => {
+  if (stalePage < staleTotalPages()) { stalePage++; loadStaleProjects(); }
+});
+
+// Exports the full stale list (capped at the backend's 200), not just the
+// current 5-row page — same "export = the whole filtered dataset"
+// reasoning as the project timeline.
+document.getElementById("btnStaleExport").addEventListener("click", async () => {
+  try {
+    const { rows } = await HITT_API.getStaleProjects(1, 200);
+    if (!rows.length) { toast("Nothing to export.", "navy"); return; }
+    downloadCsv(
+      "stale-projects.csv",
+      ["Project code", "Project name", "Entry date", "Last status change"],
+      rows.map((r) => [
+        r.code, r.name,
+        r.entryDate ? new Date(r.entryDate).toLocaleDateString() : "",
+        r.lastStatusChangeAt ? new Date(r.lastStatusChangeAt).toLocaleDateString() : "",
+      ])
+    );
+  } catch (err) {
+    console.error("[reports] failed to export stale-projects:", err.message);
+    toast("Could not export stale projects.", "red");
   }
 });
 

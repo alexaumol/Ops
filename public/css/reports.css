@@ -161,6 +161,14 @@
 @media (max-width: 860px) {
   .rpt-charts-grid { grid-template-columns: 1fr; }
 }
+/* Row 2 (line chart + stale projects): both cards stretch to the same
+   height (the taller one, normally the chart, sets it) instead of each
+   sizing to its own content — the stale-projects card's table area then
+   grows to fill the leftover space, with pagination pinned to the
+   bottom. */
+.rpt-charts-grid--row2 { align-items: stretch; }
+.rpt-charts-grid--row2 > .rpt-chart-card { display: flex; flex-direction: column; }
+.rpt-charts-grid--row2 > .rpt-chart-card > .rpt-table-wrap { flex: 1; overflow-y: auto; }
 .rpt-chart-card {
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);

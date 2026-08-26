@@ -161,6 +161,14 @@ const HITT_API = (() => {
       return request(`/api/reports/project-timeline${qs ? `?${qs}` : ""}`);
     },
 
+    getStaleProjects: (page, limit) => {
+      const params = new URLSearchParams();
+      if (page) params.set("page", page);
+      if (limit) params.set("limit", limit);
+      const qs = params.toString();
+      return request(`/api/reports/stale-projects${qs ? `?${qs}` : ""}`);
+    },
+
     health: () => request("/api/health"),
   };
 })();
