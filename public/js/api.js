@@ -58,6 +58,13 @@ const HITT_API = (() => {
     addProjectQuotation: (id, payload) =>
       request(`/api/projects/${id}/quotations`, { method: "POST", body: JSON.stringify(payload) }),
     getProjectHistory: (id) => request(`/api/projects/${id}/history`),
+    getProjectResources: (id) => request(`/api/projects/${id}/resources`),
+    addProjectResource: (id, payload) =>
+      request(`/api/projects/${id}/resources`, { method: "POST", body: JSON.stringify(payload) }),
+    updateProjectResource: (id, resourceRowId, payload) =>
+      request(`/api/projects/${id}/resources/${resourceRowId}`, { method: "PATCH", body: JSON.stringify(payload) }),
+    deleteProjectResource: (id, resourceRowId, employeeId) =>
+      request(`/api/projects/${id}/resources/${resourceRowId}`, { method: "DELETE", body: JSON.stringify({ employeeId }) }),
 
     getBusinessPartners: (q) => request(`/api/business-partners${q ? `?q=${encodeURIComponent(q)}` : ""}`),
     getBusinessPartnerLookups: () => request("/api/business-partners/lookups"),

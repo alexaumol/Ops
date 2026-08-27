@@ -84,6 +84,7 @@ const DEMO_SEED = [
 
 let PROJECTS = [];
 let LOOKUPS = { entities: [], biotechSpectrums: [], projectTypes: [] };
+let EMPLOYEES = []; // not-deactivated employees — GET /api/employees already filters. Owner + Resources pickers.
 let usingDemoData = false;
 let currentTab = 'alive';
 let searchTerm = '';
@@ -172,6 +173,11 @@ async function loadProjects() {
     } catch (lookupErr) {
       console.warn("Could not load entity/biotech-spectrum/project-type lookups:", lookupErr);
     }
+    try {
+      EMPLOYEES = await HITT_API.getEmployees(); // already excludes deactivated
+    } catch (empErr) {
+      console.warn("Could not load employees (owner/resource pickers):", empErr);
+    }
     const data = await HITT_API.getProjects();
     // Expected shape from GET /api/projects: [{ id, code, name, stage, progress }]
     PROJECTS = data.map(p => ({
@@ -183,7 +189,10 @@ async function loadProjects() {
       notInvoiceable: !!p.notInvoiceable,
       hasBusinessPartner: !!p.hasBusinessPartner,
       hasBudget: !!p.hasBudget,
+      ownerId: p.ownerId ?? null,
+      ownerName: p.ownerName ?? null,
     }));
+    populateOwnerFilterOptions();
     usingDemoData = false;
   } catch (err) {
     console.warn("Falling back to demo data — could not reach API:", err);
@@ -292,7 +301,10 @@ function renderCard(p, stage){
             <span class="font-mono text-[10px] font-bold text-hitt-teal tracking-tight">${escapeHtml(p.code)}</span>
             ${cardBadgesHtml(p)}
           </div>
-          <span class="text-[10px] font-mono text-slate-400 shrink-0">${p.progress ?? 0}%</span>
+          <div class="flex flex-col items-center gap-0.5 shrink-0">
+            <span class="text-[10px] font-mono text-slate-400">${p.progress ?? 0}%</span>
+            ${p.ownerName ? `<span class="w-5 h-5 rounded-full flex items-center justify-center text-white font-bold" style="background:${ownerColor(p.ownerId)}; font-size:8px; line-height:1;" title="${escapeHtml(p.ownerName)}">${ownerInitials(p.ownerName)}</span>` : ''}
+          </div>
         </div>
         <p class="text-[13px] leading-snug font-medium text-hitt-ink mt-0.5 truncate" title="${escapeHtml(p.name)}">${escapeHtml(p.name)}</p>
       </div>
@@ -393,6 +405,46 @@ function lookupOptionsHtml(rows, selectedId, includeBlank){
   const opts = (includeBlank ? [`<option value="">—</option>`] : [])
     .concat((rows || []).map(r => `<option value="${r.id}" ${String(r.id)===String(selectedId)?'selected':''}>${escapeHtml(r.label)}</option>`));
   return opts.join('');
+}
+
+// EMPLOYEES rows are { id, username, emailid, name } (GET /api/employees,
+// already excludes deactivated) — reused for both the Owner picker and
+// the Resources tab's employee picker.
+function employeeOptionsHtml(selectedId, includeBlank){
+  const opts = (includeBlank ? [`<option value="">—</option>`] : [])
+    .concat(EMPLOYEES.map(e => `<option value="${e.id}" ${String(e.id)===String(selectedId)?'selected':''}>${escapeHtml(e.name)}</option>`));
+  return opts.join('');
+}
+
+function populateOwnerFilterOptions(){
+  const sel = document.getElementById('filterOwner');
+  const current = sel.value;
+  const owners = new Map();
+  PROJECTS.forEach(p => { if (p.ownerId) owners.set(String(p.ownerId), p.ownerName || `#${p.ownerId}`); });
+  const sorted = [...owners.entries()].sort((a, b) => a[1].localeCompare(b[1]));
+  sel.innerHTML = `<option value="">Any owner</option>` +
+    sorted.map(([id, name]) => `<option value="${id}">${escapeHtml(name)}</option>`).join('');
+  if ([...owners.keys()].includes(current)) sel.value = current;
+}
+
+// Initials for the kanban card badge — "Oriol Solà" -> "OS". Matches
+// HITT_AUTH.initials()'s approach (first letter of up to the first two
+// words) so this app has one consistent initials convention.
+function ownerInitials(name){
+  if (!name) return '?';
+  const parts = name.trim().split(/\s+/);
+  return parts.slice(0, 2).map(p => p[0]?.toUpperCase() ?? '').join('');
+}
+
+// Deterministic colour per owner (same id always gets the same colour),
+// picked from a small fixed palette so it stays legible with white text
+// rather than a fully random hue.
+const OWNER_COLORS = ['#5C757C', '#BC9A1C', '#6E8F5A', '#B24A3A', '#7C5C9C', '#3D7A8C', '#9C6E3D', '#4A6B8A'];
+function ownerColor(id){
+  if (!id) return '#8A8676';
+  let hash = 0;
+  for (const ch of String(id)) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+  return OWNER_COLORS[hash % OWNER_COLORS.length];
 }
 
 function setBPEditLink(businessPartnerId){
@@ -524,6 +576,9 @@ async function openProjectModal(id){
   document.getElementById('mEntity').innerHTML = lookupOptionsHtml(LOOKUPS.entities, null, true);
   document.getElementById('mProjectType').innerHTML = lookupOptionsHtml(LOOKUPS.projectTypes, null, true);
   document.getElementById('mBioSpectrum').innerHTML = lookupOptionsHtml(LOOKUPS.biotechSpectrums, null, true);
+  document.getElementById('mOwner').innerHTML = employeeOptionsHtml(p.ownerId, true);
+  document.getElementById('mNewResourceEmployee').innerHTML = employeeOptionsHtml(null, true);
+  document.getElementById('mNewResourceAmount').value = 50;
   document.getElementById('mBusinessPartner').textContent = '—';
   setBPEditLink(null);
   activeBusinessPartnerId = null;
@@ -542,6 +597,8 @@ async function openProjectModal(id){
     `<div class="text-xs text-slate-400 text-center py-6">${usingDemoData ? 'Not available in demo data' : 'Loading…'}</div>`;
   document.getElementById('historyList').innerHTML =
     `<div class="text-xs text-slate-400 text-center py-6">${usingDemoData ? 'Not available in demo data' : 'Loading…'}</div>`;
+  document.getElementById('mResources').innerHTML =
+    `<tr><td colspan="3" class="px-2.5 py-4 text-center text-slate-400 text-xs">${usingDemoData ? 'Not available in demo data' : 'Loading…'}</td></tr>`;
   cancelEditDeliverable(); // clears the deliverable form + edit state from any previous project
   ['mNewQuotationDate', 'mNewQuotationAmount', 'mNewQuotationDiscount', 'mNewQuotationExpenses', 'mNewQuotationFinal']
     .forEach(id2 => document.getElementById(id2).value = '');
@@ -568,6 +625,7 @@ async function openProjectModal(id){
       document.getElementById('mEntity').innerHTML = lookupOptionsHtml(LOOKUPS.entities, detail.entityid, true);
       document.getElementById('mProjectType').innerHTML = lookupOptionsHtml(LOOKUPS.projectTypes, detail.projecttypeid, true);
       document.getElementById('mBioSpectrum').innerHTML = lookupOptionsHtml(LOOKUPS.biotechSpectrums, detail.biospectrumid, true);
+      document.getElementById('mOwner').innerHTML = employeeOptionsHtml(detail.ownerId, true);
       document.getElementById('mBusinessPartner').textContent = detail.businessPartnerLabel || '—';
       setBPEditLink(detail.busspartnerid);
       await refreshInvoicingPartnerOptions(detail.busspartnerid, detail.busspartnertoinvoiceid);
@@ -601,6 +659,15 @@ async function openProjectModal(id){
     } catch (err) {
       console.warn(`Could not load history for project ${id}:`, err);
       document.getElementById('historyList').innerHTML = `<div class="text-xs text-slate-400 text-center py-6">Could not load history</div>`;
+    }
+
+    try {
+      const resources = await HITT_API.getProjectResources(id);
+      if (activeProjectId !== id) return;
+      renderResources(resources);
+    } catch (err) {
+      console.warn(`Could not load resources for project ${id}:`, err);
+      document.getElementById('mResources').innerHTML = `<tr><td colspan="3" class="px-2.5 py-4 text-center text-slate-400 text-xs">Could not load resources</td></tr>`;
     }
   }
 }
@@ -808,6 +875,88 @@ function renderQuotations(rows){
   `).join('');
 }
 
+function renderResources(rows){
+  const tbody = document.getElementById('mResources');
+  if (!rows || !rows.length) {
+    tbody.innerHTML = `<tr><td colspan="3" class="px-2.5 py-4 text-center text-slate-400 text-xs">No resources assigned yet</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = rows.map(r => `
+    <tr class="grid-row border-t border-slate-100">
+      <td class="px-2.5 py-1.5">${escapeHtml(r.employeeName || '—')}</td>
+      <td class="px-2.5 py-1.5 text-right">
+        <input type="number" min="0" max="100" value="${r.amount ?? 50}" data-resource-amount="${r.id}"
+          class="field-input" style="width:5rem; text-align:right; display:inline-block; padding-top:0.3rem; padding-bottom:0.3rem;" />
+      </td>
+      <td class="px-2.5 py-1.5 text-right">
+        <button data-delete-resource="${r.id}" title="Remove this resource" class="w-6 h-6 rounded hover:bg-hitt-mist text-hitt-red inline-flex items-center justify-center">✕</button>
+      </td>
+    </tr>
+  `).join('');
+  tbody.querySelectorAll('[data-resource-amount]').forEach(input => {
+    let original = input.value;
+    input.addEventListener('focus', () => { original = input.value; });
+    input.addEventListener('change', async () => {
+      const rowId = input.dataset.resourceAmount;
+      const amount = input.value;
+      if (amount === original) return;
+      try {
+        await HITT_API.updateProjectResource(activeProjectId, rowId, { amount, employeeId: currentEmployeeId });
+        original = amount;
+        renderHistory(await HITT_API.getProjectHistory(activeProjectId));
+        toast('Workload updated', 'green');
+      } catch (err) {
+        console.error(err);
+        input.value = original;
+        toast('Could not update the workload.', 'red');
+      }
+    });
+  });
+  tbody.querySelectorAll('[data-delete-resource]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const rowId = btn.dataset.deleteResource;
+      if (!confirm('Remove this resource from the project?')) return;
+      try {
+        await HITT_API.deleteProjectResource(activeProjectId, rowId, currentEmployeeId);
+        renderResources(await HITT_API.getProjectResources(activeProjectId));
+        renderHistory(await HITT_API.getProjectHistory(activeProjectId));
+        toast('Resource removed', 'navy');
+      } catch (err) {
+        console.error(err);
+        toast('Could not remove the resource.', 'red');
+      }
+    });
+  });
+}
+
+document.getElementById('mAddResource').addEventListener('click', async () => {
+  if (!activeProjectId) return;
+  if (usingDemoData) {
+    toast('Resources aren\'t available in demo data.', 'navy');
+    return;
+  }
+  const employeeSel = document.getElementById('mNewResourceEmployee');
+  const amountInput = document.getElementById('mNewResourceAmount');
+  const resourceId = employeeSel.value;
+  if (!resourceId) {
+    toast('Pick an employee first.', 'red');
+    return;
+  }
+  try {
+    await HITT_API.addProjectResource(activeProjectId, {
+      resourceId, amount: amountInput.value || 50, employeeId: currentEmployeeId,
+    });
+    employeeSel.value = '';
+    amountInput.value = 50;
+    renderResources(await HITT_API.getProjectResources(activeProjectId));
+    renderHistory(await HITT_API.getProjectHistory(activeProjectId));
+    toast('Resource added', 'green');
+  } catch (err) {
+    console.error(err);
+    toast('Could not add the resource.', 'red');
+  }
+});
+
 let NOTES = [];
 let notesSearchTerm = '';
 
@@ -919,6 +1068,7 @@ document.getElementById('mSave').addEventListener('click', async () => {
 
   const projectTypeVal = document.getElementById('mProjectType').value;
   const bioSpectrumVal = document.getElementById('mBioSpectrum').value;
+  const ownerVal = document.getElementById('mOwner').value;
   const extraFields = {
     name: newName,
     entityId: entityVal ? Number(entityVal) : null,
@@ -926,11 +1076,15 @@ document.getElementById('mSave').addEventListener('click', async () => {
     biospectrumId: bioSpectrumVal ? Number(bioSpectrumVal) : null,
     bpRunningName: document.getElementById('mBPRunningName').value || null,
     notInvoiceable: document.getElementById('mNotInvoiceable').checked,
+    ownerId: ownerVal ? Number(ownerVal) : null,
   };
+  p.ownerId = extraFields.ownerId;
+  p.ownerName = ownerVal ? (EMPLOYEES.find(e => String(e.id) === ownerVal)?.name ?? null) : null;
 
   document.getElementById('mChangedBadge').classList.add('hidden');
   renderBoard();
   updateTabCounts();
+  populateOwnerFilterOptions();
   closeProjectModal();
 
   if (!usingDemoData) {
@@ -952,6 +1106,7 @@ document.querySelectorAll('[data-mtab]').forEach(btn => {
     btn.setAttribute('aria-selected', 'true');
     document.getElementById('paneGeneral').classList.toggle('hidden', btn.dataset.mtab !== 'general');
     document.getElementById('paneBudget').classList.toggle('hidden', btn.dataset.mtab !== 'budget');
+    document.getElementById('paneResources').classList.toggle('hidden', btn.dataset.mtab !== 'resources');
   });
 });
 
@@ -1078,6 +1233,7 @@ function openNewProjectModal(){
   document.getElementById('npEntity').innerHTML = lookupOptionsHtml(LOOKUPS.entities, null, true);
   document.getElementById('npProjectType').innerHTML = lookupOptionsHtml(LOOKUPS.projectTypes, null, true);
   document.getElementById('npBioSpectrum').innerHTML = lookupOptionsHtml(LOOKUPS.biotechSpectrums, null, true);
+  document.getElementById('npOwner').innerHTML = employeeOptionsHtml(null, true);
   npBusinessPartnerId = null;
   document.getElementById('npBusinessPartner').textContent = '—';
 
@@ -1109,6 +1265,7 @@ document.getElementById('npSave').addEventListener('click', async () => {
   const entityVal = document.getElementById('npEntity').value;
   const projectTypeVal = document.getElementById('npProjectType').value;
   const bioSpectrumVal = document.getElementById('npBioSpectrum').value;
+  const ownerVal = document.getElementById('npOwner').value;
 
   if (!name || name === NP_PLACEHOLDER) {
     toast(`Missing required data: <b>Project name</b>`, 'red');
@@ -1137,6 +1294,7 @@ document.getElementById('npSave').addEventListener('click', async () => {
       entityId: entityVal ? Number(entityVal) : null,
       projectTypeId: projectTypeVal ? Number(projectTypeVal) : null,
       biospectrumId: bioSpectrumVal ? Number(bioSpectrumVal) : null,
+      ownerId: ownerVal ? Number(ownerVal) : null,
     });
     if (npBusinessPartnerId) {
       try {
@@ -1152,9 +1310,12 @@ document.getElementById('npSave').addEventListener('click', async () => {
       name: created.name ?? name,
       stage: Number(created.stage ?? status),
       progress: Number(created.progress ?? progress),
+      ownerId: ownerVal ? Number(ownerVal) : null,
+      ownerName: ownerVal ? (EMPLOYEES.find(e => String(e.id) === ownerVal)?.name ?? null) : null,
     });
     renderBoard();
     updateTabCounts();
+    populateOwnerFilterOptions();
     toast(`<span class="font-mono text-xs opacity-80">${code}</span> project <b>created</b>`, 'green');
     if (created.oneDriveFolder?.created === false) {
       toast('Project created, but the OneDrive folder could not be created — create it by hand.', 'red');

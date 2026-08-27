@@ -87,7 +87,11 @@ async function logStatusChangeAndUpdate(projectId, newStatus, employeeId) {
 // three booleans purely for the card badges (not invoiceable, missing
 // budget, missing business partner) — "budget" mirrors the Reports
 // "Projects by status" chart's definition: the latest projectquotations
-// row's finalquotation, per project.
+// row's finalquotation, per project. ownerId/ownerName power the kanban
+// card's initials badge and the Filters panel's owner select — projectowners
+// technically allows multiple rows per project, but this app treats it as
+// a single owner (see PATCH /:id), so LIMIT 1 by id DESC picks the most
+// recently assigned if more than one ever exists.
 router.get("/", requireModuleAccess("projects"), async (req, res) => {
   try {
     const { rows } = await pool.query(`
@@ -100,7 +104,8 @@ router.get("/", requireModuleAccess("projects"), async (req, res) => {
              p.lastupdatedby,
              COALESCE(p.notinvoiceable, false) AS "notInvoiceable",
              (p.busspartnerid IS NOT NULL) AS "hasBusinessPartner",
-             (latestq.finalquotation IS NOT NULL) AS "hasBudget"
+             (latestq.finalquotation IS NOT NULL) AS "hasBudget",
+             owner."ownerId", owner."ownerName"
       FROM projects p
       ${LATEST_PROGRESS_SUBQUERY}
       LEFT JOIN LATERAL (
@@ -110,6 +115,14 @@ router.get("/", requireModuleAccess("projects"), async (req, res) => {
         ORDER BY q.quotationdate DESC NULLS LAST, q.id DESC
         LIMIT 1
       ) latestq ON true
+      LEFT JOIN LATERAL (
+        SELECT e.id AS "ownerId", TRIM(CONCAT(e.employeefirstname, ' ', e.employeelastname)) AS "ownerName"
+        FROM projectowners po
+        JOIN employees e ON e.id = po.projectownerid::bigint
+        WHERE po.projectid = p.id
+        ORDER BY po.id DESC
+        LIMIT 1
+      ) owner ON true
       ORDER BY p.projectnumber DESC
     `);
     res.json(rows);
@@ -172,7 +185,8 @@ router.get("/:id", async (req, res) => {
               p.busspartnertoinvoiceid, tc.taxcompanyname AS "invoicingPartnerLabel",
               p.bprunningname, p.notinvoiceable,
               p.lastupdated, p.lastupdatedby,
-              NULLIF(TRIM(CONCAT(upd.employeefirstname, ' ', upd.employeelastname)), '') AS "lastUpdatedByName"
+              NULLIF(TRIM(CONCAT(upd.employeefirstname, ' ', upd.employeelastname)), '') AS "lastUpdatedByName",
+              owner."ownerId", owner."ownerName"
        FROM projects p
        ${LATEST_PROGRESS_SUBQUERY}
        LEFT JOIN entity ent ON ent.id = p.entityid::bigint
@@ -181,6 +195,14 @@ router.get("/:id", async (req, res) => {
        LEFT JOIN businesspartners bp ON bp.id = p.busspartnerid::bigint
        LEFT JOIN taxcompanies tc ON tc.id = p.busspartnertoinvoiceid::bigint
        LEFT JOIN employees upd ON upd.id = p.lastupdatedby::bigint
+       LEFT JOIN LATERAL (
+         SELECT e.id AS "ownerId", TRIM(CONCAT(e.employeefirstname, ' ', e.employeelastname)) AS "ownerName"
+         FROM projectowners po
+         JOIN employees e ON e.id = po.projectownerid::bigint
+         WHERE po.projectid = p.id
+         ORDER BY po.id DESC
+         LIMIT 1
+       ) owner ON true
        WHERE p.id = $1`,
       [req.params.id]
     );
@@ -194,7 +216,7 @@ router.get("/:id", async (req, res) => {
 
 // POST /api/projects — create a project (+ optional initial progress row).
 router.post("/", requireModuleAccess("projects"), async (req, res) => {
-  const { code, name, stage, progress, entityId, biospectrumId, projectTypeId, employeeId } = req.body || {};
+  const { code, name, stage, progress, entityId, biospectrumId, projectTypeId, ownerId, employeeId } = req.body || {};
   if (!name || stage === undefined) {
     return res.status(400).json({ error: "validation_error", message: "name and stage are required" });
   }
@@ -219,6 +241,13 @@ router.post("/", requireModuleAccess("projects"), async (req, res) => {
         `INSERT INTO projectportfolioprogress (projectid, progress, updatedby, updatedat, datadate)
          VALUES ($1, $2, $3, now(), now())`,
         [project.id, progress, employeeId || null]
+      );
+    }
+
+    if (ownerId) {
+      await client.query(
+        `INSERT INTO projectowners (projectid, projectownerid) VALUES ($1, $2)`,
+        [project.id, ownerId]
       );
     }
 
@@ -370,7 +399,7 @@ router.patch("/:id", async (req, res) => {
   const { id } = req.params;
   const {
     stage, progress, employeeId,
-    name, entityId, biospectrumId, projectTypeId, bpRunningName, notInvoiceable,
+    name, entityId, biospectrumId, projectTypeId, bpRunningName, notInvoiceable, ownerId,
   } = req.body || {};
 
   const client = await pool.connect();
@@ -484,6 +513,42 @@ router.patch("/:id", async (req, res) => {
       }
     }
 
+    // Owner — a separate table (projectowners), not a projects column, so
+    // it's handled as its own read-then-write rather than folded into the
+    // COALESCE UPDATE above. Treated as a single owner even though the
+    // table technically allows multiple rows per project (see GET /,
+    // GET /:id) — this always fully replaces whatever's there.
+    if (ownerId !== undefined) {
+      const { rows: curOwnerRows } = await client.query(
+        `SELECT po.projectownerid, TRIM(CONCAT(e.employeefirstname, ' ', e.employeelastname)) AS "ownerName"
+         FROM projectowners po
+         LEFT JOIN employees e ON e.id = po.projectownerid::bigint
+         WHERE po.projectid = $1
+         ORDER BY po.id DESC LIMIT 1`,
+        [id]
+      );
+      const curOwner = curOwnerRows[0] || {};
+      if (String(ownerId || "") !== String(curOwner.projectownerid || "")) {
+        await client.query(`DELETE FROM projectowners WHERE projectid = $1`, [id]);
+        let newOwnerName = null;
+        if (ownerId) {
+          await client.query(`INSERT INTO projectowners (projectid, projectownerid) VALUES ($1, $2)`, [id, ownerId]);
+          const r = await client.query(
+            `SELECT TRIM(CONCAT(employeefirstname, ' ', employeelastname)) AS name FROM employees WHERE id = $1`,
+            [ownerId]
+          );
+          newOwnerName = r.rows[0]?.name ?? null;
+        }
+        if (curOwner.projectownerid && ownerId) {
+          changes.push(`Owner changed from ${curOwner.ownerName || "—"} to ${newOwnerName || "—"}`);
+        } else if (ownerId) {
+          changes.push(`Owner assigned: ${newOwnerName || "—"}`);
+        } else if (curOwner.projectownerid) {
+          changes.push(`Owner removed (was ${curOwner.ownerName || "—"})`);
+        }
+      }
+    }
+
     for (const summary of changes) {
       await client.query(
         `INSERT INTO projectchangelog (projectid, changedat, changedby, summary) VALUES ($1, now(), $2, $3)`,
@@ -543,6 +608,119 @@ router.get("/:id/history", async (req, res) => {
     res.json(rows);
   } catch (err) {
     console.error("[GET /api/projects/:id/history] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Resources tab — projectresources (id, projectid, resourceid, amount).
+// "amount" is workload % (default 50, matches the "not deactivated
+// employees only" + "% of work load" ask). Every write is logged to
+// projectchangelog same as everything else on this modal.
+// ---------------------------------------------------------------------------
+
+// GET /api/projects/:id/resources
+router.get("/:id/resources", async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT r.id, r.resourceid AS "employeeId", r.amount,
+              TRIM(CONCAT(e.employeefirstname, ' ', e.employeelastname)) AS "employeeName"
+       FROM projectresources r
+       JOIN employees e ON e.id = r.resourceid::bigint
+       WHERE r.projectid = $1
+       ORDER BY e.employeefirstname, e.employeelastname`,
+      [req.params.id]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error("[GET /api/projects/:id/resources] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
+// POST /api/projects/:id/resources — assign an employee (defaults to 50%
+// workload if not specified).
+router.post("/:id/resources", async (req, res) => {
+  const { resourceId, amount, employeeId } = req.body || {};
+  if (!resourceId) {
+    return res.status(400).json({ error: "validation_error", message: "resourceId is required" });
+  }
+  try {
+    const workload = amount ?? 50;
+    const { rows } = await pool.query(
+      `INSERT INTO projectresources (projectid, resourceid, amount)
+       VALUES ($1, $2, $3)
+       RETURNING id, resourceid AS "employeeId", amount`,
+      [req.params.id, resourceId, workload]
+    );
+    const { rows: empRows } = await pool.query(
+      `SELECT TRIM(CONCAT(employeefirstname, ' ', employeelastname)) AS name FROM employees WHERE id = $1`,
+      [resourceId]
+    );
+    const empName = empRows[0]?.name ?? "—";
+    await pool.query(
+      `INSERT INTO projectchangelog (projectid, changedat, changedby, summary) VALUES ($1, now(), $2, $3)`,
+      [req.params.id, employeeId || null, `Resource added: ${empName} (${workload}%)`]
+    );
+    res.status(201).json({ ...rows[0], employeeName: empName });
+  } catch (err) {
+    console.error("[POST /api/projects/:id/resources] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
+// PATCH /api/projects/:id/resources/:resourceRowId — change workload %.
+router.patch("/:id/resources/:resourceRowId", async (req, res) => {
+  const { amount, employeeId } = req.body || {};
+  if (amount == null) {
+    return res.status(400).json({ error: "validation_error", message: "amount is required" });
+  }
+  try {
+    const { rows } = await pool.query(
+      `UPDATE projectresources SET amount = $1
+       WHERE id = $2 AND projectid = $3
+       RETURNING id, resourceid AS "employeeId", amount`,
+      [amount, req.params.resourceRowId, req.params.id]
+    );
+    if (!rows.length) return res.status(404).json({ error: "not_found" });
+    const { rows: empRows } = await pool.query(
+      `SELECT TRIM(CONCAT(employeefirstname, ' ', employeelastname)) AS name FROM employees WHERE id = $1`,
+      [rows[0].employeeId]
+    );
+    const empName = empRows[0]?.name ?? "—";
+    await pool.query(
+      `INSERT INTO projectchangelog (projectid, changedat, changedby, summary) VALUES ($1, now(), $2, $3)`,
+      [req.params.id, employeeId || null, `Resource workload changed: ${empName} → ${amount}%`]
+    );
+    res.json({ ...rows[0], employeeName: empName });
+  } catch (err) {
+    console.error("[PATCH /api/projects/:id/resources/:resourceRowId] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
+// DELETE /api/projects/:id/resources/:resourceRowId
+router.delete("/:id/resources/:resourceRowId", async (req, res) => {
+  const { employeeId } = req.body || {};
+  try {
+    const { rows } = await pool.query(
+      `DELETE FROM projectresources WHERE id = $1 AND projectid = $2
+       RETURNING resourceid AS "employeeId"`,
+      [req.params.resourceRowId, req.params.id]
+    );
+    if (!rows.length) return res.status(404).json({ error: "not_found" });
+    const { rows: empRows } = await pool.query(
+      `SELECT TRIM(CONCAT(employeefirstname, ' ', employeelastname)) AS name FROM employees WHERE id = $1`,
+      [rows[0].employeeId]
+    );
+    const empName = empRows[0]?.name ?? "—";
+    await pool.query(
+      `INSERT INTO projectchangelog (projectid, changedat, changedby, summary) VALUES ($1, now(), $2, $3)`,
+      [req.params.id, employeeId || null, `Resource removed: ${empName}`]
+    );
+    res.status(204).end();
+  } catch (err) {
+    console.error("[DELETE /api/projects/:id/resources/:resourceRowId] DB error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });
   }
 });
