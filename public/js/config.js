@@ -26,15 +26,19 @@ window.HITT_CONFIG = {
   // redirect URI on this app registration in the Entra portal (App
   // registrations > this app > Authentication > SPA platform), exactly
   // matching whatever origin actually serves these files — e.g.
-  // http://localhost:5500/index.html for local dev, plus the real
-  // production URL once that's decided. It points at index.html (not
-  // welcome.html) because that's the page with the MSAL library loaded —
-  // the popup posts its result back there, then our own code navigates to
-  // welcome.html, same as the old stub flow.
+  // http://localhost:5500/auth-redirect.html for local dev, plus the real
+  // production URL. It points at auth-redirect.html — a deliberately empty
+  // page (see that file) — rather than index.html: MSAL's loginPopup()
+  // completes entirely from the opener side by polling the popup's URL and
+  // closing it once it sees the auth code, so the popup itself doesn't need
+  // to run any app code. Pointing it at index.html used to make the popup
+  // boot the whole app (and its "Sign in" button) again before the opener
+  // could close it — looked broken, and let people click "Sign in" a
+  // second time from inside the popup (MSAL's block_nested_popups error).
   MSAL: {
     tenantId: "6ab80f28-9ca1-4f48-9be7-7d98f3e1f076",
     clientId: "841556ac-d3af-47ee-a399-403de65c139c",
-    redirectUri: window.location.origin + "/index.html",
+    redirectUri: window.location.origin + "/auth-redirect.html",
     authority: null, // computed at runtime from tenantId (see auth.js)
   },
 
