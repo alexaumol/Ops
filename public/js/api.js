@@ -38,6 +38,10 @@ const HITT_API = (() => {
     getProjectDeliverables: (id) => request(`/api/projects/${id}/deliverables`),
     addProjectDeliverable: (id, payload) =>
       request(`/api/projects/${id}/deliverables`, { method: "POST", body: JSON.stringify(payload) }),
+    updateProjectDeliverable: (id, deliverableId, payload) =>
+      request(`/api/projects/${id}/deliverables/${deliverableId}`, { method: "PATCH", body: JSON.stringify(payload) }),
+    deleteProjectDeliverable: (id, deliverableId) =>
+      request(`/api/projects/${id}/deliverables/${deliverableId}`, { method: "DELETE" }),
     getProjectNotes: (id) => request(`/api/projects/${id}/notes`),
     addProjectNote: (id, payload) =>
       request(`/api/projects/${id}/notes`, { method: "POST", body: JSON.stringify(payload) }),

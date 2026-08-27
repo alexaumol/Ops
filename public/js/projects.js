@@ -482,7 +482,7 @@ async function openProjectModal(id){
   document.getElementById('mNotInvoiceable').checked = false;
 
   document.getElementById('mDeliverables').innerHTML =
-    `<tr><td colspan="3" class="px-2.5 py-4 text-center text-slate-400 text-xs">${usingDemoData ? 'Not available in demo data' : 'Loading…'}</td></tr>`;
+    `<tr><td colspan="4" class="px-2.5 py-4 text-center text-slate-400 text-xs">${usingDemoData ? 'Not available in demo data' : 'Loading…'}</td></tr>`;
   document.getElementById('mQuotations').innerHTML =
     `<tr><td colspan="5" class="px-2.5 py-4 text-center text-slate-400 text-xs">${usingDemoData ? 'Not available in demo data' : 'Loading…'}</td></tr>`;
   document.getElementById('mNotesList').innerHTML =
@@ -641,10 +641,46 @@ function formatDateOnly(iso){
   return new Date(iso).toLocaleDateString();
 }
 
+let DELIVERABLES = [];
+let editingDeliverableId = null;
+
+function startEditDeliverable(id){
+  const d = DELIVERABLES.find(x => x.id === id);
+  if (!d) return;
+  editingDeliverableId = id;
+  document.getElementById('mNewDeliverableExpected').value = d.deliverydate ? d.deliverydate.slice(0, 10) : '';
+  document.getElementById('mNewDeliverableName').value = d.deliverablename || '';
+  document.getElementById('mAddDeliverable').textContent = 'Save';
+  document.getElementById('mNewDeliverableName').focus();
+}
+
+function cancelEditDeliverable(){
+  editingDeliverableId = null;
+  document.getElementById('mNewDeliverableExpected').value = '';
+  document.getElementById('mNewDeliverableName').value = '';
+  document.getElementById('mAddDeliverable').textContent = 'Add';
+}
+
+async function deleteDeliverable(id){
+  const d = DELIVERABLES.find(x => x.id === id);
+  if (!d || !confirm(`Delete deliverable "${d.deliverablename || '(unnamed)'}"? This cannot be undone.`)) return;
+  try {
+    await HITT_API.deleteProjectDeliverable(activeProjectId, id);
+    if (editingDeliverableId === id) cancelEditDeliverable();
+    const deliverables = await HITT_API.getProjectDeliverables(activeProjectId);
+    renderDeliverables(deliverables);
+    toast('Deliverable deleted', 'navy');
+  } catch (err) {
+    console.error(err);
+    toast('Could not delete the deliverable.', 'red');
+  }
+}
+
 function renderDeliverables(rows){
+  DELIVERABLES = rows || [];
   const tbody = document.getElementById('mDeliverables');
   if (!rows || !rows.length) {
-    tbody.innerHTML = `<tr><td colspan="3" class="px-2.5 py-4 text-center text-slate-400 text-xs">No deliverables yet</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="4" class="px-2.5 py-4 text-center text-slate-400 text-xs">No deliverables yet</td></tr>`;
     return;
   }
   tbody.innerHTML = rows.map(d => `
@@ -652,8 +688,18 @@ function renderDeliverables(rows){
       <td class="px-2.5 py-1.5 font-mono">${formatDateOnly(d.deliverydate)}</td>
       <td class="px-2.5 py-1.5 font-mono">${formatDateOnly(d.effectivedd)}</td>
       <td class="px-2.5 py-1.5">${escapeHtml(d.deliverablename || '(unnamed)')}</td>
+      <td class="px-2.5 py-1.5 text-right whitespace-nowrap">
+        <button data-edit-deliverable="${d.id}" title="Edit this deliverable" class="w-6 h-6 rounded hover:bg-hitt-mist text-hitt-teal inline-flex items-center justify-center">✎</button>
+        <button data-delete-deliverable="${d.id}" title="Delete this deliverable" class="w-6 h-6 rounded hover:bg-hitt-mist text-hitt-red inline-flex items-center justify-center">✕</button>
+      </td>
     </tr>
   `).join('');
+  tbody.querySelectorAll('[data-edit-deliverable]').forEach(btn => {
+    btn.addEventListener('click', () => startEditDeliverable(btn.dataset.editDeliverable));
+  });
+  tbody.querySelectorAll('[data-delete-deliverable]').forEach(btn => {
+    btn.addEventListener('click', () => deleteDeliverable(btn.dataset.deleteDeliverable));
+  });
 }
 
 function renderQuotations(rows){
@@ -695,6 +741,7 @@ function closeProjectModal(){
   modalOverlay.classList.add('hidden');
   document.body.style.overflow = '';
   activeProjectId = null;
+  cancelEditDeliverable();
 }
 
 document.getElementById('mClose').addEventListener('click', closeProjectModal);
@@ -760,7 +807,7 @@ document.getElementById('mAddNote').addEventListener('click', async () => {
     return;
   }
   try {
-    await HITT_API.addProjectNote(activeProjectId, { notes: text });
+    await HITT_API.addProjectNote(activeProjectId, { notes: text, employeeId: currentEmployeeId });
     input.value = '';
     const notes = await HITT_API.getProjectNotes(activeProjectId);
     renderNotes(notes);
@@ -776,6 +823,7 @@ document.getElementById('mNewNote').addEventListener('keydown', (e) => {
 });
 document.getElementById('mNewDeliverableName').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') document.getElementById('mAddDeliverable').click();
+  if (e.key === 'Escape' && editingDeliverableId) cancelEditDeliverable();
 });
 
 document.getElementById('mAddDeliverable').addEventListener('click', async () => {
@@ -787,19 +835,26 @@ document.getElementById('mAddDeliverable').addEventListener('click', async () =>
     toast('Deliverables aren\'t available in demo data.', 'navy');
     return;
   }
+  const editingId = editingDeliverableId;
   try {
-    await HITT_API.addProjectDeliverable(activeProjectId, {
-      deliverablename: name,
-      deliverydate: dateInput.value || null,
-    });
-    nameInput.value = '';
-    dateInput.value = '';
+    if (editingId) {
+      await HITT_API.updateProjectDeliverable(activeProjectId, editingId, {
+        deliverablename: name,
+        deliverydate: dateInput.value || null,
+      });
+    } else {
+      await HITT_API.addProjectDeliverable(activeProjectId, {
+        deliverablename: name,
+        deliverydate: dateInput.value || null,
+      });
+    }
+    cancelEditDeliverable(); // also clears the inputs
     const deliverables = await HITT_API.getProjectDeliverables(activeProjectId);
     renderDeliverables(deliverables);
-    toast('Deliverable added', 'green');
+    toast(editingId ? 'Deliverable updated' : 'Deliverable added', 'green');
   } catch (err) {
     console.error(err);
-    toast('Could not save the deliverable.', 'red');
+    toast(`Could not ${editingId ? 'update' : 'save'} the deliverable.`, 'red');
   }
 });
 

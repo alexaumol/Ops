@@ -387,6 +387,47 @@ router.post("/:id/deliverables", async (req, res) => {
   }
 });
 
+// PATCH /api/projects/:id/deliverables/:deliverableId — edit name/dates.
+router.patch("/:id/deliverables/:deliverableId", async (req, res) => {
+  const { deliverablename, deliverydate, effectivedd } = req.body || {};
+  if (!deliverablename) {
+    return res.status(400).json({ error: "validation_error", message: "deliverablename is required" });
+  }
+  try {
+    const { rows } = await pool.query(
+      `UPDATE projectdeliverables
+       SET deliverablename = $1, deliverydate = $2, effectivedd = $3
+       WHERE id = $4 AND projectid = $5
+       RETURNING id, deliverablename, deliverydate, effectivedd`,
+      [deliverablename, deliverydate || null, effectivedd || null, req.params.deliverableId, req.params.id]
+    );
+    if (!rows.length) {
+      return res.status(404).json({ error: "not_found", message: "Deliverable not found on this project" });
+    }
+    res.json(rows[0]);
+  } catch (err) {
+    console.error("[PATCH /api/projects/:id/deliverables/:deliverableId] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
+// DELETE /api/projects/:id/deliverables/:deliverableId
+router.delete("/:id/deliverables/:deliverableId", async (req, res) => {
+  try {
+    const { rowCount } = await pool.query(
+      `DELETE FROM projectdeliverables WHERE id = $1 AND projectid = $2`,
+      [req.params.deliverableId, req.params.id]
+    );
+    if (!rowCount) {
+      return res.status(404).json({ error: "not_found", message: "Deliverable not found on this project" });
+    }
+    res.status(204).end();
+  } catch (err) {
+    console.error("[DELETE /api/projects/:id/deliverables/:deliverableId] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
 // GET /api/projects/:id/notes — newest first, author resolved via employees.
 router.get("/:id/notes", async (req, res) => {
   try {
