@@ -101,6 +101,36 @@ function iconDelivered(){ return `<svg viewBox="0 0 24 24" class="w-4 h-4" fill=
 function iconClosed(){ return `<svg viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="10" width="16" height="10" rx="1.5"/><path stroke-linecap="round" stroke-linejoin="round" d="M8 10V7a4 4 0 118 0v3"/></svg>`; }
 function iconCancelled(){ return `<svg viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path stroke-linecap="round" d="M8.5 8.5l7 7M15.5 8.5l-7 7"/></svg>`; }
 
+// Kanban card badges — not invoiceable (a definite state, solid+slash),
+// missing budget / missing business partner (an absence, dashed outline —
+// same "dashed = not set yet" visual language for both).
+function iconNotInvoiceable(){
+  return `<svg viewBox="0 0 24 24" class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.8">
+    <circle cx="12" cy="12" r="9"/>
+    <text x="12" y="15.5" text-anchor="middle" font-size="10" font-weight="700" fill="currentColor" stroke="none">€</text>
+    <path stroke-linecap="round" d="M5.5 18.5l13-13"/>
+  </svg>`;
+}
+function iconMissingBudget(){
+  return `<svg viewBox="0 0 24 24" class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.8">
+    <circle cx="12" cy="12" r="9" stroke-dasharray="3 2.3"/>
+    <text x="12" y="15.5" text-anchor="middle" font-size="10" font-weight="700" fill="currentColor" stroke="none">€</text>
+  </svg>`;
+}
+function iconMissingBP(){
+  return `<svg viewBox="0 0 24 24" class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.8">
+    <rect x="4" y="8" width="16" height="12" rx="1.5" stroke-dasharray="3 2.3"/>
+    <path d="M9 8V6a3 3 0 016 0v2"/>
+  </svg>`;
+}
+function cardBadgesHtml(p){
+  const badges = [];
+  if (p.notInvoiceable) badges.push(`<span class="text-hitt-red" title="Not invoiceable">${iconNotInvoiceable()}</span>`);
+  if (!p.hasBudget) badges.push(`<span class="text-hitt-amber" title="Missing budget">${iconMissingBudget()}</span>`);
+  if (!p.hasBusinessPartner) badges.push(`<span class="text-hitt-amber" title="Missing business partner">${iconMissingBP()}</span>`);
+  return badges.length ? `<div class="flex items-center gap-1 shrink-0">${badges.join('')}</div>` : '';
+}
+
 /* ============================== HEADER ================================= */
 document.getElementById("userName").textContent = session.displayName;
 document.getElementById("userAvatar").textContent = HITT_AUTH.initials(session);
@@ -150,6 +180,9 @@ async function loadProjects() {
       name: p.name ?? p.projectName ?? "(unnamed project)",
       stage: Number(p.stage ?? p.prjStatusId ?? 0),
       progress: Number(p.progress ?? 0),
+      notInvoiceable: !!p.notInvoiceable,
+      hasBusinessPartner: !!p.hasBusinessPartner,
+      hasBudget: !!p.hasBudget,
     }));
     usingDemoData = false;
   } catch (err) {
@@ -239,8 +272,11 @@ function renderCard(p, stage){
       <div class="w-1 shrink-0" style="background:${stage.color}" data-rail></div>
       <div class="flex-1 min-w-0 px-2.5 py-2">
         <div class="flex items-start justify-between gap-1.5">
-          <span class="font-mono text-[10px] font-bold text-hitt-teal tracking-tight">${escapeHtml(p.code)}</span>
-          <span class="text-[10px] font-mono text-slate-400">${p.progress ?? 0}%</span>
+          <div class="flex items-center gap-1 min-w-0">
+            <span class="font-mono text-[10px] font-bold text-hitt-teal tracking-tight">${escapeHtml(p.code)}</span>
+            ${cardBadgesHtml(p)}
+          </div>
+          <span class="text-[10px] font-mono text-slate-400 shrink-0">${p.progress ?? 0}%</span>
         </div>
         <p class="text-[13px] leading-snug font-medium text-hitt-ink mt-0.5 truncate" title="${escapeHtml(p.name)}">${escapeHtml(p.name)}</p>
       </div>
@@ -488,6 +524,8 @@ async function openProjectModal(id){
     `<tr><td colspan="5" class="px-2.5 py-4 text-center text-slate-400 text-xs">${usingDemoData ? 'Not available in demo data' : 'Loading…'}</td></tr>`;
   document.getElementById('mNotesList').innerHTML =
     `<div class="text-xs text-slate-400 text-center py-6">${usingDemoData ? 'Not available in demo data' : 'Loading…'}</div>`;
+  document.getElementById('historyList').innerHTML =
+    `<div class="text-xs text-slate-400 text-center py-6">${usingDemoData ? 'Not available in demo data' : 'Loading…'}</div>`;
   cancelEditDeliverable(); // clears the deliverable form + edit state from any previous project
   document.getElementById('mNewNote').value = '';
 
@@ -533,6 +571,15 @@ async function openProjectModal(id){
       renderQuotations(quotations);
     } catch (err) {
       console.warn(`Could not load deliverables/notes/quotations for project ${id}:`, err);
+    }
+
+    try {
+      const history = await HITT_API.getProjectHistory(id);
+      if (activeProjectId !== id) return;
+      renderHistory(history);
+    } catch (err) {
+      console.warn(`Could not load history for project ${id}:`, err);
+      document.getElementById('historyList').innerHTML = `<div class="text-xs text-slate-400 text-center py-6">Could not load history</div>`;
     }
   }
 }
@@ -757,6 +804,38 @@ function renderNotes(rows){
   `).join('');
 }
 
+// projectstatushistory only ever logs an actual status CHANGE (see
+// logStatusChangeAndUpdate in routes/projects.js) — oldStatusId being null
+// is a defensive fallback, not something the current data model produces.
+function renderHistory(rows){
+  const list = document.getElementById('historyList');
+  if (!rows || !rows.length) {
+    list.innerHTML = `<div class="text-xs text-slate-400 text-center py-6">No history yet</div>`;
+    return;
+  }
+  list.innerHTML = rows.map(h => `
+    <div class="border border-slate-100 rounded-md p-2 bg-hitt-canvas">
+      <div class="text-xs text-hitt-ink">
+        ${h.oldStatusId == null
+          ? `Created${h.newStatusLabel ? ` as <b>${escapeHtml(h.newStatusLabel)}</b>` : ''}`
+          : `<b>${escapeHtml(h.oldStatusLabel || '—')}</b> → <b>${escapeHtml(h.newStatusLabel || '—')}</b>`}
+      </div>
+      <div class="flex items-center justify-between gap-2 mt-1">
+        <span class="text-[10px] font-semibold text-hitt-teal">${escapeHtml(h.changedByName || 'Unknown')}</span>
+        <span class="text-[10px] text-slate-400 font-mono">${formatDateTime(h.changedAt)}</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+const historyPanel = document.getElementById('historyPanel');
+const historyCollapseBtn = document.getElementById('historyCollapse');
+historyCollapseBtn.addEventListener('click', () => {
+  const collapsed = historyPanel.classList.toggle('history-collapsed');
+  historyCollapseBtn.textContent = collapsed ? '«' : '»';
+  historyCollapseBtn.title = collapsed ? 'Expand history' : 'Collapse history';
+});
+
 function closeProjectModal(){
   modalOverlay.classList.add('hidden');
   document.body.style.overflow = '';
@@ -779,6 +858,11 @@ document.getElementById('mSave').addEventListener('click', async () => {
     toast(`Missing required data: <b>Project name</b>`, 'red');
     return;
   }
+  const entityVal = document.getElementById('mEntity').value;
+  if (!entityVal) {
+    toast(`Missing required data: <b>Entity</b>`, 'red');
+    return;
+  }
   const newStatus = Number(document.getElementById('mStatus').value);
   const newProgress = Number(document.getElementById('mProgress').value) || 0;
   const statusChanged = newStatus !== p.stage;
@@ -786,7 +870,6 @@ document.getElementById('mSave').addEventListener('click', async () => {
   p.stage = newStatus;
   p.progress = newProgress;
 
-  const entityVal = document.getElementById('mEntity').value;
   const projectTypeVal = document.getElementById('mProjectType').value;
   const bioSpectrumVal = document.getElementById('mBioSpectrum').value;
   const extraFields = {
@@ -947,6 +1030,10 @@ document.getElementById('npSave').addEventListener('click', async () => {
 
   if (!name || name === NP_PLACEHOLDER) {
     toast(`Missing required data: <b>Project name</b>`, 'red');
+    return;
+  }
+  if (!entityVal) {
+    toast(`Missing required data: <b>Entity</b>`, 'red');
     return;
   }
 

@@ -37,7 +37,6 @@
         <thead>
           <tr>
             <th>Name</th>
-            <th>Entity</th>
             <th>Company type</th>
             <th>Country</th>
             <th>Website</th>
@@ -69,15 +68,11 @@
             <h3>General info</h3>
             <div class="field-grid">
               <div>
-                <label class="field-label">Entity</label>
-                <select id="mEntity" class="field-input"></select>
-              </div>
-              <div>
                 <label class="field-label">Type of company</label>
                 <select id="mCompanyType" class="field-input"></select>
               </div>
               <div>
-                <label class="field-label">Language</label>
+                <label class="field-label">Language <span style="color: var(--danger);">*</span></label>
                 <select id="mLanguage" class="field-input"></select>
               </div>
               <div>
@@ -171,23 +166,67 @@
     </div>
   </div>
 
-  <!-- ============================ NEW BP MODAL ============================ -->
+  <!-- ============================ NEW BP MODAL ============================
+       Mirrors the Edit form's General tab (VBA_Export/BusinessPartner-New_
+       Edit.frm — the same Access form serves both New and Edit) — minus
+       Entity (dropped from BP forms entirely, see the Edit form above) and
+       minus Contacts/Notes/Invoicing, which need a bpid to attach to and so
+       only make sense once the partner already exists. ============================ -->
   <div id="newBpOverlay" class="modal-overlay hidden">
-    <div class="modal-panel modal-panel--sm">
+    <div class="modal-panel">
       <div class="modal-head">
         <input id="npName" type="text" placeholder="Business partner name" />
         <button id="npClose" class="modal-head-btn modal-head-btn--close" title="Close">✕</button>
       </div>
       <div class="modal-body">
         <div class="field-section">
+          <h3>General info</h3>
           <div class="field-grid">
-            <div>
-              <label class="field-label">Entity</label>
-              <select id="npEntity" class="field-input"></select>
-            </div>
             <div>
               <label class="field-label">Type of company</label>
               <select id="npCompanyType" class="field-input"></select>
+            </div>
+            <div>
+              <label class="field-label">Language <span style="color: var(--danger);">*</span></label>
+              <select id="npLanguage" class="field-input"></select>
+            </div>
+            <div>
+              <label class="field-label">Webpage</label>
+              <input id="npWebpage" type="text" class="field-input" placeholder="https://…" />
+            </div>
+          </div>
+        </div>
+
+        <div class="field-section">
+          <h3>Address</h3>
+          <div class="field-grid">
+            <div class="span-2">
+              <label class="field-label">Street name</label>
+              <input id="npStreetName" type="text" class="field-input" />
+            </div>
+            <div>
+              <label class="field-label">City</label>
+              <input id="npCity" type="text" class="field-input" />
+            </div>
+            <div>
+              <label class="field-label">State/Province</label>
+              <input id="npState" type="text" class="field-input" />
+            </div>
+            <div>
+              <label class="field-label">Country</label>
+              <select id="npCountry" class="field-input"></select>
+            </div>
+            <div>
+              <label class="field-label">Zip code</label>
+              <input id="npZipCode" type="text" class="field-input" />
+            </div>
+            <div>
+              <label class="field-label">Phone number #1</label>
+              <input id="npPhone1" type="text" class="field-input" />
+            </div>
+            <div>
+              <label class="field-label">Phone number #2</label>
+              <input id="npPhone2" type="text" class="field-input" />
             </div>
           </div>
         </div>

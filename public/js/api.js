@@ -46,6 +46,7 @@ const HITT_API = (() => {
     addProjectNote: (id, payload) =>
       request(`/api/projects/${id}/notes`, { method: "POST", body: JSON.stringify(payload) }),
     getProjectQuotations: (id) => request(`/api/projects/${id}/quotations`),
+    getProjectHistory: (id) => request(`/api/projects/${id}/history`),
 
     getBusinessPartners: (q) => request(`/api/business-partners${q ? `?q=${encodeURIComponent(q)}` : ""}`),
     getBusinessPartnerLookups: () => request("/api/business-partners/lookups"),

@@ -144,6 +144,15 @@
     font-size: 0.78rem;
     color: var(--text-secondary);
   }
+  .footer-note a {
+    color: var(--text-secondary);
+    text-decoration: underline;
+    text-decoration-color: transparent;
+    transition: text-decoration-color 0.15s;
+  }
+  .footer-note a:hover {
+    text-decoration-color: currentColor;
+  }
 </style>
 </head>
 <body class="login-body">
@@ -236,7 +245,7 @@
     </p>
   </main>
 
-  <p class="footer-note">© <span id="year"></span> HITT · fhitt.org</p>
+  <p class="footer-note">© <span id="year"></span> HITT · <a href="https://fhitt.org" target="_blank" rel="noopener">fhitt.org</a></p>
 
   <script src="js/config.js"></script>
   <script src="vendor/msal-browser.min.js"></script>

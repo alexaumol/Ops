@@ -104,9 +104,12 @@
     <div class="shrink-0 flex items-center gap-5 px-4 sm:px-5 border-b border-slate-200 bg-white">
       <button data-mtab="general" class="modal-tab kbd-focus py-2.5 text-sm font-semibold text-hitt-teal" aria-selected="true">General</button>
       <button data-mtab="budget" class="modal-tab kbd-focus py-2.5 text-sm font-semibold text-hitt-teal" aria-selected="false">Budget &amp; expenses</button>
+      <div class="flex-1"></div>
+      <button id="historyCollapse" title="Collapse history" class="w-7 h-7 rounded hover:bg-hitt-mist text-hitt-teal flex items-center justify-center text-sm">»</button>
     </div>
 
-    <div class="flex-1 overflow-y-auto bg-hitt-canvas">
+    <div class="flex-1 flex overflow-hidden">
+    <div class="flex-1 min-w-0 overflow-y-auto bg-hitt-canvas">
       <div id="paneGeneral" class="grid grid-cols-1 lg:grid-cols-2 gap-4 p-4 sm:p-5">
         <div class="flex flex-col gap-4">
           <section class="bg-white rounded-lg border border-slate-200 shadow-card overflow-hidden">
@@ -121,7 +124,7 @@
                 <input id="mProgress" type="number" min="0" max="100" class="field-input mt-1" />
               </div>
               <div>
-                <label class="field-label">Entity</label>
+                <label class="field-label">Entity <span class="text-hitt-red">*</span></label>
                 <select id="mEntity" class="field-input mt-1"></select>
               </div>
               <div>
@@ -232,6 +235,15 @@
         </label>
       </div>
     </div>
+
+    <!-- Collapsible via #historyCollapse — see projects.css .history-collapsed -->
+    <div id="historyPanel" class="shrink-0 border-l border-slate-200 bg-white flex flex-col overflow-hidden" style="width:260px;">
+      <div class="shrink-0 px-3 py-2 border-b border-slate-100">
+        <h3 id="historyTitle" class="text-xs font-bold text-hitt-teal tracking-wide">HISTORY</h3>
+      </div>
+      <div id="historyList" class="flex-1 overflow-y-auto p-2 space-y-2"></div>
+    </div>
+    </div>
   </div>
 </div>
 
@@ -322,7 +334,7 @@
           <input id="npProgress" type="number" min="0" max="100" value="0" class="field-input mt-1" />
         </div>
         <div>
-          <label class="field-label">Entity</label>
+          <label class="field-label">Entity <span class="text-hitt-red">*</span></label>
           <select id="npEntity" class="field-input mt-1"></select>
         </div>
         <div>

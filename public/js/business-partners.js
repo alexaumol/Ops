@@ -17,8 +17,8 @@ document.getElementById("btnSignOut").addEventListener("click", () => HITT_AUTH.
 HITT_PERMS.applyRealName();
 
 const DEMO_SEED = [
-  { id: 1, name: "Demo Pharma Inc", entityLabel: "HiTT", companyTypeLabel: "Pharmaceutical", countryLabel: "United States", webpage: "https://example.com" },
-  { id: 2, name: "Demo Biotech Spain", entityLabel: "HiTT", companyTypeLabel: "Start Up", countryLabel: "Spain", webpage: "" },
+  { id: 1, name: "Demo Pharma Inc", companyTypeLabel: "Pharmaceutical", countryLabel: "United States", webpage: "https://example.com" },
+  { id: 2, name: "Demo Biotech Spain", companyTypeLabel: "Start Up", countryLabel: "Spain", webpage: "" },
 ];
 
 let PARTNERS = [];
@@ -102,7 +102,6 @@ function renderTable(){
   tbody.innerHTML = rows.map(p => `
     <tr data-id="${p.id}">
       <td>${escapeHtml(p.name)}</td>
-      <td>${escapeHtml(p.entityLabel || '—')}</td>
       <td>${escapeHtml(p.companyTypeLabel || '—')}</td>
       <td>${escapeHtml(p.countryLabel || '—')}</td>
       <td>${p.webpage ? `<a href="${escapeHtml(p.webpage)}" target="_blank" rel="noopener">${escapeHtml(p.webpage.replace(/^https?:\/\//, ''))}</a>` : '—'}</td>
@@ -192,7 +191,6 @@ async function openDetailModal(id){
   activeBpId = id;
 
   document.getElementById('mName').value = p.name || '';
-  document.getElementById('mEntity').innerHTML = lookupOptionsHtml(LOOKUPS.entities, null, true);
   document.getElementById('mCompanyType').innerHTML = lookupOptionsHtml(LOOKUPS.companyTypes, null, true);
   document.getElementById('mLanguage').innerHTML = lookupOptionsHtml(LOOKUPS.languages, null, true);
   document.getElementById('mCountry').innerHTML = lookupOptionsHtml(LOOKUPS.countries, null, true);
@@ -221,7 +219,6 @@ async function openDetailModal(id){
     const detail = await HITT_API.getBusinessPartner(id);
     if (activeBpId !== id) return;
     document.getElementById('mName').value = detail.name || '';
-    document.getElementById('mEntity').innerHTML = lookupOptionsHtml(LOOKUPS.entities, detail.entityid, true);
     document.getElementById('mCompanyType').innerHTML = lookupOptionsHtml(LOOKUPS.companyTypes, detail.companytypeid, true);
     document.getElementById('mLanguage').innerHTML = lookupOptionsHtml(LOOKUPS.languages, detail.languageid, true);
     document.getElementById('mCountry').innerHTML = lookupOptionsHtml(LOOKUPS.countries, detail.countryid, true);
@@ -277,12 +274,13 @@ document.getElementById('mSave').addEventListener('click', async () => {
   if (!activeBpId) return;
   const name = document.getElementById('mName').value.trim();
   if (!name) { toast('Name is required', 'red'); return; }
+  const languageId = document.getElementById('mLanguage').value;
+  if (!languageId) { toast('Language is required', 'red'); return; }
 
   const payload = {
     name,
-    entityId: document.getElementById('mEntity').value ? Number(document.getElementById('mEntity').value) : null,
     companyTypeId: document.getElementById('mCompanyType').value ? Number(document.getElementById('mCompanyType').value) : null,
-    languageId: document.getElementById('mLanguage').value ? Number(document.getElementById('mLanguage').value) : null,
+    languageId: Number(languageId),
     webpage: document.getElementById('mWebpage').value || null,
     address: {
       streetname: document.getElementById('mStreetName').value || null,
@@ -388,8 +386,11 @@ const newBpOverlay = document.getElementById('newBpOverlay');
 
 function openNewBpModal(){
   document.getElementById('npName').value = '';
-  document.getElementById('npEntity').innerHTML = lookupOptionsHtml(LOOKUPS.entities, null, true);
   document.getElementById('npCompanyType').innerHTML = lookupOptionsHtml(LOOKUPS.companyTypes, null, true);
+  document.getElementById('npLanguage').innerHTML = lookupOptionsHtml(LOOKUPS.languages, null, true);
+  document.getElementById('npCountry').innerHTML = lookupOptionsHtml(LOOKUPS.countries, null, true);
+  document.getElementById('npWebpage').value = '';
+  ['npStreetName', 'npCity', 'npState', 'npZipCode', 'npPhone1', 'npPhone2'].forEach(id => document.getElementById(id).value = '');
   newBpOverlay.classList.remove('hidden');
   document.body.style.overflow = 'hidden';
   setTimeout(() => document.getElementById('npName').focus(), 50);
@@ -408,12 +409,28 @@ newBpOverlay.addEventListener('click', (e) => { if (e.target === newBpOverlay) c
 document.getElementById('npSave').addEventListener('click', async () => {
   const name = document.getElementById('npName').value.trim();
   if (!name) { toast('Name is required', 'red'); return; }
-  const entityId = document.getElementById('npEntity').value ? Number(document.getElementById('npEntity').value) : null;
+  const languageId = document.getElementById('npLanguage').value;
+  if (!languageId) { toast('Language is required', 'red'); return; }
   const companyTypeId = document.getElementById('npCompanyType').value ? Number(document.getElementById('npCompanyType').value) : null;
+  const payload = {
+    name,
+    companyTypeId,
+    languageId: Number(languageId),
+    webpage: document.getElementById('npWebpage').value || null,
+    address: {
+      streetname: document.getElementById('npStreetName').value || null,
+      city: document.getElementById('npCity').value || null,
+      state: document.getElementById('npState').value || null,
+      zipcode: document.getElementById('npZipCode').value || null,
+      phonenumber: document.getElementById('npPhone1').value || null,
+      phonenumber2: document.getElementById('npPhone2').value || null,
+      countryid: document.getElementById('npCountry').value ? Number(document.getElementById('npCountry').value) : null,
+    },
+  };
 
   if (usingDemoData) {
     const id = Math.max(0, ...PARTNERS.map(p => p.id)) + 1;
-    PARTNERS.push({ id, name, entityLabel: '—', companyTypeLabel: '—', countryLabel: '—', webpage: '' });
+    PARTNERS.push({ id, name, companyTypeLabel: '—', countryLabel: '—', webpage: payload.webpage || '' });
     renderTable();
     closeNewBpModal();
     toast('Created locally (demo data)', 'green');
@@ -421,7 +438,7 @@ document.getElementById('npSave').addEventListener('click', async () => {
   }
 
   try {
-    const created = await HITT_API.createBusinessPartner({ name, entityId, companyTypeId });
+    const created = await HITT_API.createBusinessPartner(payload);
     await loadPartners();
     closeNewBpModal();
     toast('Business partner created', 'green');

@@ -63,6 +63,12 @@ body { background: #F5F4EE; }
 @media (prefers-reduced-motion: reduce) {
   .card, .pop-in, .count-pulse, .rail-flash, .toast { animation: none !important; transition: none !important; }
 }
+/* Project modal's History side panel — toggled by #historyCollapse, which
+   lives in the tabs bar above it (not inside the panel itself), so the
+   toggle stays reachable when the panel is fully collapsed to width 0. */
+#historyPanel { transition: width .16s ease; }
+#historyPanel.history-collapsed { width: 0 !important; border-left: none; }
+
 .modal-overlay { animation: overlay-in .18s ease; }
 @keyframes overlay-in { from { opacity: 0; } to { opacity: 1; } }
 .modal-panel { animation: panel-in .22s cubic-bezier(.2,.9,.3,1.1); }

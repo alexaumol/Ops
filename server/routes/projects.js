@@ -83,7 +83,11 @@ async function logStatusChangeAndUpdate(projectId, newStatus, employeeId) {
   }
 }
 
-// GET /api/projects — full portfolio list for the kanban board.
+// GET /api/projects — full portfolio list for the kanban board. Includes
+// three booleans purely for the card badges (not invoiceable, missing
+// budget, missing business partner) — "budget" mirrors the Reports
+// "Projects by status" chart's definition: the latest projectquotations
+// row's finalquotation, per project.
 router.get("/", requireModuleAccess("projects"), async (req, res) => {
   try {
     const { rows } = await pool.query(`
@@ -93,9 +97,19 @@ router.get("/", requireModuleAccess("projects"), async (req, res) => {
              p.projectstatusid AS stage,
              COALESCE(pp.progress, 0) AS progress,
              p.lastupdated,
-             p.lastupdatedby
+             p.lastupdatedby,
+             COALESCE(p.notinvoiceable, false) AS "notInvoiceable",
+             (p.busspartnerid IS NOT NULL) AS "hasBusinessPartner",
+             (latestq.finalquotation IS NOT NULL) AS "hasBudget"
       FROM projects p
       ${LATEST_PROGRESS_SUBQUERY}
+      LEFT JOIN LATERAL (
+        SELECT finalquotation
+        FROM projectquotations q
+        WHERE q.projectid = p.id
+        ORDER BY q.quotationdate DESC NULLS LAST, q.id DESC
+        LIMIT 1
+      ) latestq ON true
       ORDER BY p.projectnumber DESC
     `);
     res.json(rows);
@@ -369,6 +383,34 @@ router.patch("/:id", async (req, res) => {
     res.status(502).json({ error: "database_unreachable", message: err.message });
   } finally {
     client.release();
+  }
+});
+
+// GET /api/projects/:id/history — every logged status change for this one
+// project, newest first. Powers the project modal's collapsible History
+// side panel. Deliberately a separate route from GET
+// /api/reports/project-timeline (same underlying data, but that one
+// requires the Reports module) — seeing the history of a project you can
+// already view and edit shouldn't also require Reports access.
+router.get("/:id/history", async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT h.id, h.oldstatusid AS "oldStatusId", os.projectstatusdesc AS "oldStatusLabel",
+              h.newstatusid AS "newStatusId", ns.projectstatusdesc AS "newStatusLabel",
+              h.changedat AS "changedAt", h.changedby AS "changedBy",
+              NULLIF(TRIM(CONCAT(e.employeefirstname, ' ', e.employeelastname)), '') AS "changedByName"
+       FROM projectstatushistory h
+       LEFT JOIN projectstatus os ON os.id = h.oldstatusid
+       LEFT JOIN projectstatus ns ON ns.id = h.newstatusid
+       LEFT JOIN employees e ON e.id = h.changedby
+       WHERE h.projectid = $1
+       ORDER BY h.changedat DESC`,
+      [req.params.id]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error("[GET /api/projects/:id/history] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
   }
 });
 
