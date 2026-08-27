@@ -23,8 +23,8 @@ let currentEmployeeId = null;
 HITT_PERMS.get().then((perms) => { currentEmployeeId = perms.employeeId; }).catch(() => {});
 
 const DEMO_SEED = [
-  { id: 1, name: "Demo Pharma Inc", companyTypeLabel: "Pharmaceutical", countryLabel: "United States", webpage: "https://example.com" },
-  { id: 2, name: "Demo Biotech Spain", companyTypeLabel: "Start Up", countryLabel: "Spain", webpage: "" },
+  { id: 1, name: "Demo Pharma Inc", companyTypeLabel: "Pharmaceutical", countryLabel: "United States", webpage: "https://example.com", projectsAlive: 2, projectsDead: 1, projectsTotal: 3 },
+  { id: 2, name: "Demo Biotech Spain", companyTypeLabel: "Start Up", countryLabel: "Spain", webpage: "", projectsAlive: 0, projectsDead: 0, projectsTotal: 0 },
 ];
 
 let PARTNERS = [];
@@ -32,6 +32,8 @@ let LOOKUPS = { entities: [], companyTypes: [], countries: [], languages: [] };
 let usingDemoData = false;
 let searchTerm = "";
 let activeBpId = null;
+let sortColumn = "name";
+let sortDirection = "asc"; // 'asc' | 'desc'
 
 function escapeHtml(s){
   const d = document.createElement('div');
@@ -76,7 +78,17 @@ async function loadPartners(){
     } catch (err) {
       console.warn("Could not load business partner lookups:", err);
     }
-    PARTNERS = await HITT_API.getBusinessPartners();
+    const data = await HITT_API.getBusinessPartners();
+    // projectsAlive/Dead/Total come back as strings — Postgres COUNT()
+    // is bigint, and node-pg serializes bigints as strings to avoid
+    // precision loss. Coerce to Number so the "Number of projects" column
+    // sorts numerically (10 > 9), not lexicographically ("10" < "9").
+    PARTNERS = data.map(p => ({
+      ...p,
+      projectsAlive: Number(p.projectsAlive ?? 0),
+      projectsDead: Number(p.projectsDead ?? 0),
+      projectsTotal: Number(p.projectsTotal ?? 0),
+    }));
     usingDemoData = false;
   } catch (err) {
     console.warn("Falling back to demo data — could not reach API:", err);
@@ -96,8 +108,22 @@ function matchesSearch(p){
 function renderTable(){
   const tbody = document.getElementById('bpTableBody');
   const empty = document.getElementById('bpEmpty');
-  const rows = PARTNERS.filter(matchesSearch).sort((a, b) => String(a.name).localeCompare(String(b.name)));
+  const dir = sortDirection === 'asc' ? 1 : -1;
+  const rows = PARTNERS.filter(matchesSearch).sort((a, b) => {
+    const av = a[sortColumn], bv = b[sortColumn];
+    if (typeof av === 'number' || typeof bv === 'number') {
+      return ((av ?? 0) - (bv ?? 0)) * dir;
+    }
+    return String(av ?? '').localeCompare(String(bv ?? '')) * dir;
+  });
   document.getElementById('bpCount').textContent = `${rows.length} of ${PARTNERS.length}`;
+
+  document.querySelectorAll('.bp-table th[data-sort]').forEach(th => {
+    const active = th.dataset.sort === sortColumn;
+    th.classList.toggle('sorted', active);
+    const arrow = th.querySelector('.sort-arrow');
+    if (arrow) arrow.textContent = active ? (sortDirection === 'asc' ? '▲' : '▼') : '▲';
+  });
 
   if (!rows.length) {
     tbody.innerHTML = '';
@@ -111,6 +137,7 @@ function renderTable(){
       <td>${escapeHtml(p.companyTypeLabel || '—')}</td>
       <td>${escapeHtml(p.countryLabel || '—')}</td>
       <td>${p.webpage ? `<a href="${escapeHtml(p.webpage)}" target="_blank" rel="noopener">${escapeHtml(p.webpage.replace(/^https?:\/\//, ''))}</a>` : '—'}</td>
+      <td style="font-family:monospace;" title="Alive / Dead (Total)">${p.projectsAlive ?? 0} / ${p.projectsDead ?? 0} (${p.projectsTotal ?? 0})</td>
     </tr>
   `).join('');
 
@@ -122,6 +149,19 @@ function renderTable(){
 document.getElementById('searchBox').addEventListener('input', (e) => {
   searchTerm = e.target.value.trim();
   renderTable();
+});
+
+document.querySelectorAll('.bp-table th[data-sort]').forEach(th => {
+  th.addEventListener('click', () => {
+    const col = th.dataset.sort;
+    if (sortColumn === col) {
+      sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+    } else {
+      sortColumn = col;
+      sortDirection = 'asc';
+    }
+    renderTable();
+  });
 });
 
 /* ============================== LOOKUPS HELPERS ========================== */
@@ -169,7 +209,7 @@ function renderNotes(rows){
     <div class="sub-item">
       <div class="sub-item-row">
         <span class="sub-item-title">${escapeHtml(n.authorName || 'Unknown')}</span>
-        <span class="sub-item-meta">${formatDateOnly(n.commentsts)}</span>
+        <span class="sub-item-meta">${formatDateTime(n.commentsts)}</span>
       </div>
       <div style="font-size:0.82rem; white-space:pre-wrap;">${escapeHtml(n.notes)}</div>
     </div>
@@ -229,6 +269,7 @@ async function openDetailModal(id){
   document.getElementById('mNewContactName').value = '';
   document.getElementById('mNewContactPosition').value = '';
   document.getElementById('mNewContactEmail').value = '';
+  document.getElementById('mNewContactPhone').value = '';
   document.getElementById('mNewNote').value = '';
   document.getElementById('mLastUpdated').textContent = '—';
   document.getElementById('mLastUpdatedBy').textContent = '—';
@@ -396,10 +437,12 @@ document.getElementById('mAddContact').addEventListener('click', async () => {
       contactname: name,
       position: document.getElementById('mNewContactPosition').value || null,
       emailaddress: document.getElementById('mNewContactEmail').value || null,
+      phonenumber: document.getElementById('mNewContactPhone').value || null,
     });
     document.getElementById('mNewContactName').value = '';
     document.getElementById('mNewContactPosition').value = '';
     document.getElementById('mNewContactEmail').value = '';
+    document.getElementById('mNewContactPhone').value = '';
     renderContacts(await HITT_API.getBusinessPartnerContacts(activeBpId));
     toast('Contact added', 'green');
   } catch (err) {
@@ -413,7 +456,7 @@ document.getElementById('mAddNote').addEventListener('click', async () => {
   if (!text || !activeBpId) return;
   if (usingDemoData) { toast("Notes aren't available in demo data.", 'navy'); return; }
   try {
-    await HITT_API.addBusinessPartnerNote(activeBpId, { notes: text });
+    await HITT_API.addBusinessPartnerNote(activeBpId, { notes: text, employeeId: currentEmployeeId });
     document.getElementById('mNewNote').value = '';
     renderNotes(await HITT_API.getBusinessPartnerNotes(activeBpId));
     toast('Note added', 'green');

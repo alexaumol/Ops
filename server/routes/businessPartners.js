@@ -54,18 +54,33 @@ router.get("/lookups", async (req, res) => {
 });
 
 // GET /api/business-partners?q=search — list for the search/browse table.
+// projectsAlive/projectsDead/projectsTotal power the "Number of projects"
+// column (N/M(T) — alive/dead(total)) — "dead" mirrors the Reports/
+// stale-projects convention: projectstatus IN ('Closed','Cancelled').
 router.get("/", requireModuleAccess("business-partners"), async (req, res) => {
   const q = (req.query.q || "").trim();
   try {
     const { rows } = await pool.query(
       `SELECT bp.id, bp.bpname AS name, bp.webpage,
               ent.entitydesc AS "entityLabel", ct.companytypedesc AS "companyTypeLabel",
-              c.countrydesc AS "countryLabel"
+              c.countrydesc AS "countryLabel",
+              COALESCE(proj.alive, 0) AS "projectsAlive",
+              COALESCE(proj.dead, 0) AS "projectsDead",
+              COALESCE(proj.total, 0) AS "projectsTotal"
        FROM businesspartners bp
        LEFT JOIN entity ent ON ent.id = bp.entityid::bigint
        LEFT JOIN companytypes ct ON ct.id = bp.companytypeid
        LEFT JOIN addresses a ON a.businesspartnerid = bp.id
        LEFT JOIN countries c ON c.id = a.countryid::bigint
+       LEFT JOIN LATERAL (
+         SELECT
+           COUNT(*) FILTER (WHERE ps.projectstatusdesc NOT IN ('Closed', 'Cancelled')) AS alive,
+           COUNT(*) FILTER (WHERE ps.projectstatusdesc IN ('Closed', 'Cancelled')) AS dead,
+           COUNT(*) AS total
+         FROM projects p
+         LEFT JOIN projectstatus ps ON ps.id = p.projectstatusid::bigint
+         WHERE p.busspartnerid::bigint = bp.id
+       ) proj ON true
        WHERE $1 = '' OR bp.bpname ILIKE '%' || $1 || '%'
        ORDER BY bp.bpname
        LIMIT 500`,

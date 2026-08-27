@@ -36,10 +36,11 @@
       <table class="bp-table">
         <thead>
           <tr>
-            <th>Name</th>
-            <th>Company type</th>
-            <th>Country</th>
-            <th>Website</th>
+            <th data-sort="name">Name<span class="sort-arrow"></span></th>
+            <th data-sort="companyTypeLabel">Company type<span class="sort-arrow"></span></th>
+            <th data-sort="countryLabel">Country<span class="sort-arrow"></span></th>
+            <th data-sort="webpage">Website<span class="sort-arrow"></span></th>
+            <th data-sort="projectsTotal" title="Alive / Dead (Total)">Number of projects<span class="sort-arrow"></span></th>
           </tr>
         </thead>
         <tbody id="bpTableBody"></tbody>
@@ -134,10 +135,11 @@
           <div class="field-section">
             <h3>Contacts</h3>
             <div id="mContactsList" class="sub-list"></div>
-            <div class="sub-add-row">
+            <div class="sub-add-row" style="flex-wrap:wrap;">
               <input id="mNewContactName" type="text" placeholder="Contact name…" class="field-input" />
               <input id="mNewContactPosition" type="text" placeholder="Position…" class="field-input" style="max-width:9rem;" />
               <input id="mNewContactEmail" type="text" placeholder="Email…" class="field-input" style="max-width:12rem;" />
+              <input id="mNewContactPhone" type="text" placeholder="Phone…" class="field-input" style="max-width:9rem;" />
               <button id="mAddContact" class="btn-icon-add">Add</button>
             </div>
           </div>
