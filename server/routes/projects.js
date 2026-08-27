@@ -278,15 +278,40 @@ router.patch("/:id/business-partner", async (req, res) => {
   if (!businessPartnerId) {
     return res.status(400).json({ error: "validation_error", message: "businessPartnerId is required" });
   }
+  const client = await pool.connect();
   try {
-    await pool.query(
+    await client.query("BEGIN");
+    const { rows } = await client.query(
+      `SELECT p.busspartnerid, bp.bpname AS "businessPartnerLabel"
+       FROM projects p LEFT JOIN businesspartners bp ON bp.id = p.busspartnerid::bigint
+       WHERE p.id = $1 FOR UPDATE OF p`,
+      [id]
+    );
+    const cur = rows[0] || {};
+    const { rows: newBpRows } = await client.query(`SELECT bpname AS label FROM businesspartners WHERE id = $1`, [businessPartnerId]);
+    const newLabel = newBpRows[0]?.label ?? null;
+
+    await client.query(
       `UPDATE projects SET busspartnerid = $1, lastupdated = now(), lastupdatedby = $2 WHERE id = $3`,
       [businessPartnerId, employeeId || null, id]
     );
+    if (String(businessPartnerId) !== String(cur.busspartnerid)) {
+      const summary = cur.busspartnerid
+        ? `Business partner changed from ${cur.businessPartnerLabel || "—"} to ${newLabel || "—"}`
+        : `Business partner assigned: ${newLabel || "—"}`;
+      await client.query(
+        `INSERT INTO projectchangelog (projectid, changedat, changedby, summary) VALUES ($1, now(), $2, $3)`,
+        [id, employeeId || null, summary]
+      );
+    }
+    await client.query("COMMIT");
     res.status(204).end();
   } catch (err) {
+    await client.query("ROLLBACK");
     console.error("[PATCH /api/projects/:id/business-partner] DB error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });
+  } finally {
+    client.release();
   }
 });
 
@@ -300,15 +325,40 @@ router.patch("/:id/invoicing-partner", async (req, res) => {
   if (!taxCompanyId) {
     return res.status(400).json({ error: "validation_error", message: "taxCompanyId is required" });
   }
+  const client = await pool.connect();
   try {
-    await pool.query(
+    await client.query("BEGIN");
+    const { rows } = await client.query(
+      `SELECT p.busspartnertoinvoiceid, tc.taxcompanyname AS "taxCompanyLabel"
+       FROM projects p LEFT JOIN taxcompanies tc ON tc.id = p.busspartnertoinvoiceid::bigint
+       WHERE p.id = $1 FOR UPDATE OF p`,
+      [id]
+    );
+    const cur = rows[0] || {};
+    const { rows: newTcRows } = await client.query(`SELECT taxcompanyname AS label FROM taxcompanies WHERE id = $1`, [taxCompanyId]);
+    const newLabel = newTcRows[0]?.label ?? null;
+
+    await client.query(
       `UPDATE projects SET busspartnertoinvoiceid = $1, lastupdated = now(), lastupdatedby = $2 WHERE id = $3`,
       [taxCompanyId, employeeId || null, id]
     );
+    if (String(taxCompanyId) !== String(cur.busspartnertoinvoiceid)) {
+      const summary = cur.busspartnertoinvoiceid
+        ? `Invoicing partner changed from ${cur.taxCompanyLabel || "—"} to ${newLabel || "—"}`
+        : `Invoicing partner assigned: ${newLabel || "—"}`;
+      await client.query(
+        `INSERT INTO projectchangelog (projectid, changedat, changedby, summary) VALUES ($1, now(), $2, $3)`,
+        [id, employeeId || null, summary]
+      );
+    }
+    await client.query("COMMIT");
     res.status(204).end();
   } catch (err) {
+    await client.query("ROLLBACK");
     console.error("[PATCH /api/projects/:id/invoicing-partner] DB error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });
+  } finally {
+    client.release();
   }
 });
 
@@ -327,12 +377,35 @@ router.patch("/:id", async (req, res) => {
   try {
     await client.query("BEGIN");
 
+    // Read the current row (+ resolved labels, + latest progress) once,
+    // locked, before any updates — both for the existing stage-history
+    // logging AND to build human-readable projectchangelog summaries for
+    // everything else this endpoint can change. See GET /:id/history,
+    // which merges projectstatushistory (stage only) with this new table.
+    const { rows: curRows } = await client.query(
+      `SELECT p.projectstatusid, p.projectname, p.entityid, ent.entitydesc AS "entityLabel",
+              p.biospectrumid, bs.spectrumdesc AS "biospectrumLabel",
+              p.projecttypeid, pt.projecttypedesc AS "projectTypeLabel",
+              p.bprunningname, p.notinvoiceable,
+              pp.progress AS "currentProgress"
+       FROM projects p
+       LEFT JOIN entity ent ON ent.id = p.entityid::bigint
+       LEFT JOIN biotechspectrums bs ON bs.id = p.biospectrumid::bigint
+       LEFT JOIN projecttypes pt ON pt.id = p.projecttypeid::bigint
+       LEFT JOIN LATERAL (
+         SELECT progress FROM projectportfolioprogress
+         WHERE projectid = p.id ORDER BY datadate DESC NULLS LAST, id DESC LIMIT 1
+       ) pp ON true
+       WHERE p.id = $1
+       FOR UPDATE OF p`,
+      [id]
+    );
+    const cur = curRows[0] || {};
+    const changes = []; // human-readable summaries -> projectchangelog
+
     if (stage !== undefined) {
-      // Same history-logging as /:id/stage — see logStatusChangeAndUpdate's
-      // comment above for why the old value is read first, inline here
-      // since this endpoint already owns its own transaction.
-      const { rows: cur } = await client.query(`SELECT projectstatusid FROM projects WHERE id = $1 FOR UPDATE`, [id]);
-      const oldStatus = cur[0]?.projectstatusid ?? null;
+      // Same history-logging as /:id/stage.
+      const oldStatus = cur.projectstatusid ?? null;
       await client.query(
         `UPDATE projects SET projectstatusid = $1, lastupdated = now(), lastupdatedby = $2 WHERE id = $3`,
         [stage, employeeId || null, id]
@@ -351,11 +424,34 @@ router.patch("/:id", async (req, res) => {
          VALUES ($1, $2, $3, now(), now())`,
         [id, progress, employeeId || null]
       );
+      const prevProgress = cur.currentProgress != null ? Number(cur.currentProgress) : null;
+      if (prevProgress !== Number(progress)) {
+        changes.push(`Progress changed from ${prevProgress ?? 0}% to ${progress}%`);
+      }
     }
     if (name !== undefined && !name.trim()) {
       await client.query("ROLLBACK");
+      client.release();
       return res.status(400).json({ error: "validation_error", message: "name cannot be empty" });
     }
+
+    // Resolve NEW labels only for whichever of entity/biospectrum/type
+    // actually changed, so an unrelated save (e.g. just progress) doesn't
+    // do pointless extra lookups.
+    let newEntityLabel = null, newBiospectrumLabel = null, newProjectTypeLabel = null;
+    if (entityId != null && String(entityId) !== String(cur.entityid)) {
+      const r = await client.query(`SELECT entitydesc AS label FROM entity WHERE id = $1`, [entityId]);
+      newEntityLabel = r.rows[0]?.label ?? null;
+    }
+    if (biospectrumId != null && String(biospectrumId) !== String(cur.biospectrumid)) {
+      const r = await client.query(`SELECT spectrumdesc AS label FROM biotechspectrums WHERE id = $1`, [biospectrumId]);
+      newBiospectrumLabel = r.rows[0]?.label ?? null;
+    }
+    if (projectTypeId != null && String(projectTypeId) !== String(cur.projecttypeid)) {
+      const r = await client.query(`SELECT projecttypedesc AS label FROM projecttypes WHERE id = $1`, [projectTypeId]);
+      newProjectTypeLabel = r.rows[0]?.label ?? null;
+    }
+
     if (name !== undefined || entityId !== undefined || biospectrumId !== undefined || projectTypeId !== undefined
         || bpRunningName !== undefined || notInvoiceable !== undefined) {
       await client.query(
@@ -373,6 +469,26 @@ router.patch("/:id", async (req, res) => {
           bpRunningName ?? null, notInvoiceable ?? null, employeeId || null, id,
         ]
       );
+
+      if (name !== undefined && name.trim() !== cur.projectname) {
+        changes.push(`Name changed from "${cur.projectname || ""}" to "${name.trim()}"`);
+      }
+      if (newEntityLabel !== null) changes.push(`Entity changed from ${cur.entityLabel || "—"} to ${newEntityLabel}`);
+      if (newBiospectrumLabel !== null) changes.push(`Biotech spectrum changed from ${cur.biospectrumLabel || "—"} to ${newBiospectrumLabel}`);
+      if (newProjectTypeLabel !== null) changes.push(`Project type changed from ${cur.projectTypeLabel || "—"} to ${newProjectTypeLabel}`);
+      if (bpRunningName !== undefined && (bpRunningName || null) !== (cur.bprunningname || null)) {
+        changes.push(`BP running name changed from "${cur.bprunningname || ""}" to "${bpRunningName || ""}"`);
+      }
+      if (notInvoiceable !== undefined && !!notInvoiceable !== !!cur.notinvoiceable) {
+        changes.push(notInvoiceable ? "Marked as not invoiceable" : "Marked as invoiceable");
+      }
+    }
+
+    for (const summary of changes) {
+      await client.query(
+        `INSERT INTO projectchangelog (projectid, changedat, changedby, summary) VALUES ($1, now(), $2, $3)`,
+        [id, employeeId || null, summary]
+      );
     }
 
     await client.query("COMMIT");
@@ -386,25 +502,42 @@ router.patch("/:id", async (req, res) => {
   }
 });
 
-// GET /api/projects/:id/history — every logged status change for this one
-// project, newest first. Powers the project modal's collapsible History
-// side panel. Deliberately a separate route from GET
-// /api/reports/project-timeline (same underlying data, but that one
-// requires the Reports module) — seeing the history of a project you can
-// already view and edit shouldn't also require Reports access.
+// GET /api/projects/:id/history — every logged change for this one
+// project, newest first: status transitions (projectstatushistory, as
+// before) UNIONed with everything else (projectchangelog — name, entity,
+// biotech spectrum, project type, BP running name, not-invoiceable,
+// progress, business/invoicing partner assignment; see the PATCH handlers
+// above). Powers the project modal's collapsible History side panel.
+// Deliberately a separate route from GET /api/reports/project-timeline
+// (which only covers status changes and requires the Reports module) —
+// seeing a project's history you can already view and edit shouldn't also
+// require Reports access.
 router.get("/:id/history", async (req, res) => {
   try {
     const { rows } = await pool.query(
-      `SELECT h.id, h.oldstatusid AS "oldStatusId", os.projectstatusdesc AS "oldStatusLabel",
+      `SELECT 'status' AS type, h.id, h.oldstatusid AS "oldStatusId", os.projectstatusdesc AS "oldStatusLabel",
               h.newstatusid AS "newStatusId", ns.projectstatusdesc AS "newStatusLabel",
+              NULL::text AS summary,
               h.changedat AS "changedAt", h.changedby AS "changedBy",
-              NULLIF(TRIM(CONCAT(e.employeefirstname, ' ', e.employeelastname)), '') AS "changedByName"
+              NULLIF(TRIM(CONCAT(e1.employeefirstname, ' ', e1.employeelastname)), '') AS "changedByName"
        FROM projectstatushistory h
        LEFT JOIN projectstatus os ON os.id = h.oldstatusid
        LEFT JOIN projectstatus ns ON ns.id = h.newstatusid
-       LEFT JOIN employees e ON e.id = h.changedby
+       LEFT JOIN employees e1 ON e1.id = h.changedby
        WHERE h.projectid = $1
-       ORDER BY h.changedat DESC`,
+
+       UNION ALL
+
+       SELECT 'change' AS type, c.id, NULL::bigint AS "oldStatusId", NULL::text AS "oldStatusLabel",
+              NULL::bigint AS "newStatusId", NULL::text AS "newStatusLabel",
+              c.summary,
+              c.changedat AS "changedAt", c.changedby AS "changedBy",
+              NULLIF(TRIM(CONCAT(e2.employeefirstname, ' ', e2.employeelastname)), '') AS "changedByName"
+       FROM projectchangelog c
+       LEFT JOIN employees e2 ON e2.id = c.changedby
+       WHERE c.projectid = $1
+
+       ORDER BY "changedAt" DESC`,
       [req.params.id]
     );
     res.json(rows);

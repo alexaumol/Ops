@@ -16,6 +16,12 @@ document.getElementById("userAvatar").textContent = HITT_AUTH.initials(session);
 document.getElementById("btnSignOut").addEventListener("click", () => HITT_AUTH.signOut("../index.html"));
 HITT_PERMS.applyRealName();
 
+// Resolved once and reused for create/update calls so
+// businesspartners.lastupdatedby actually records who made the change,
+// instead of always landing NULL — mirrors projects.js's currentEmployeeId.
+let currentEmployeeId = null;
+HITT_PERMS.get().then((perms) => { currentEmployeeId = perms.employeeId; }).catch(() => {});
+
 const DEMO_SEED = [
   { id: 1, name: "Demo Pharma Inc", companyTypeLabel: "Pharmaceutical", countryLabel: "United States", webpage: "https://example.com" },
   { id: 2, name: "Demo Biotech Spain", companyTypeLabel: "Start Up", countryLabel: "Spain", webpage: "" },
@@ -296,6 +302,7 @@ document.getElementById('mSave').addEventListener('click', async () => {
 
   const payload = {
     name,
+    employeeId: currentEmployeeId,
     companyTypeId: document.getElementById('mCompanyType').value ? Number(document.getElementById('mCompanyType').value) : null,
     languageId: Number(languageId),
     webpage: document.getElementById('mWebpage').value || null,
@@ -431,6 +438,7 @@ document.getElementById('npSave').addEventListener('click', async () => {
   const companyTypeId = document.getElementById('npCompanyType').value ? Number(document.getElementById('npCompanyType').value) : null;
   const payload = {
     name,
+    employeeId: currentEmployeeId,
     companyTypeId,
     languageId: Number(languageId),
     webpage: document.getElementById('npWebpage').value || null,

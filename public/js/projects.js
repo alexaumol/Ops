@@ -804,9 +804,11 @@ function renderNotes(rows){
   `).join('');
 }
 
-// projectstatushistory only ever logs an actual status CHANGE (see
-// logStatusChangeAndUpdate in routes/projects.js) — oldStatusId being null
-// is a defensive fallback, not something the current data model produces.
+// GET /api/projects/:id/history returns two row shapes, merged: type
+// 'status' (from projectstatushistory — oldStatusId == null is a
+// defensive fallback, not something the current data model produces) and
+// type 'change' (from projectchangelog — every other field edit, already
+// a human-readable summary built server-side in the PATCH handlers).
 function renderHistory(rows){
   const list = document.getElementById('historyList');
   if (!rows || !rows.length) {
@@ -816,9 +818,11 @@ function renderHistory(rows){
   list.innerHTML = rows.map(h => `
     <div class="border border-slate-100 rounded-md p-2 bg-hitt-canvas">
       <div class="text-xs text-hitt-ink">
-        ${h.oldStatusId == null
-          ? `Created${h.newStatusLabel ? ` as <b>${escapeHtml(h.newStatusLabel)}</b>` : ''}`
-          : `<b>${escapeHtml(h.oldStatusLabel || '—')}</b> → <b>${escapeHtml(h.newStatusLabel || '—')}</b>`}
+        ${h.type === 'status'
+          ? (h.oldStatusId == null
+              ? `Created${h.newStatusLabel ? ` as <b>${escapeHtml(h.newStatusLabel)}</b>` : ''}`
+              : `<b>${escapeHtml(h.oldStatusLabel || '—')}</b> → <b>${escapeHtml(h.newStatusLabel || '—')}</b>`)
+          : escapeHtml(h.summary || '')}
       </div>
       <div class="flex items-center justify-between gap-2 mt-1">
         <span class="text-[10px] font-semibold text-hitt-teal">${escapeHtml(h.changedByName || 'Unknown')}</span>

@@ -86,6 +86,8 @@ router.get("/:id", async (req, res) => {
               bp.entityid, ent.entitydesc AS "entityLabel",
               bp.companytypeid, ct.companytypedesc AS "companyTypeLabel",
               bp.languageid, lang.languagedesc AS "languageLabel",
+              bp.lastupdated, bp.lastupdatedby,
+              NULLIF(TRIM(CONCAT(emp.employeefirstname, ' ', emp.employeelastname)), '') AS "lastUpdatedByName",
               a.id AS "addressId", a.streetname, a.city, a.state, a.zipcode,
               a.phonenumber, a.phonenumber2, a.countryid,
               country.countrydesc AS "countryLabel"
@@ -93,6 +95,7 @@ router.get("/:id", async (req, res) => {
        LEFT JOIN entity ent ON ent.id = bp.entityid::bigint
        LEFT JOIN companytypes ct ON ct.id = bp.companytypeid
        LEFT JOIN languages lang ON lang.id = bp.languageid
+       LEFT JOIN employees emp ON emp.id = bp.lastupdatedby
        LEFT JOIN addresses a ON a.businesspartnerid = bp.id
        LEFT JOIN countries country ON country.id = a.countryid::bigint
        WHERE bp.id = $1`,
@@ -108,7 +111,7 @@ router.get("/:id", async (req, res) => {
 
 // POST /api/business-partners — create (+ optional initial address).
 router.post("/", requireModuleAccess("business-partners"), async (req, res) => {
-  const { name, entityId, companyTypeId, languageId, webpage, address } = req.body || {};
+  const { name, entityId, companyTypeId, languageId, webpage, address, employeeId } = req.body || {};
   if (!name || !name.trim()) {
     return res.status(400).json({ error: "validation_error", message: "name is required" });
   }
@@ -116,10 +119,10 @@ router.post("/", requireModuleAccess("business-partners"), async (req, res) => {
   try {
     await client.query("BEGIN");
     const { rows } = await client.query(
-      `INSERT INTO businesspartners (bpname, entityid, companytypeid, languageid, webpage)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO businesspartners (bpname, entityid, companytypeid, languageid, webpage, lastupdated, lastupdatedby)
+       VALUES ($1, $2, $3, $4, $5, now(), $6)
        RETURNING id, bpname AS name`,
-      [name.trim(), entityId || null, companyTypeId || null, languageId || null, webpage || null]
+      [name.trim(), entityId || null, companyTypeId || null, languageId || null, webpage || null, employeeId || null]
     );
     const bp = rows[0];
     if (address && (address.streetname || address.city || address.countryid)) {
@@ -144,7 +147,7 @@ router.post("/", requireModuleAccess("business-partners"), async (req, res) => {
 // PATCH /api/business-partners/:id — update core fields + upsert address.
 router.patch("/:id", async (req, res) => {
   const { id } = req.params;
-  const { name, entityId, companyTypeId, languageId, webpage, address } = req.body || {};
+  const { name, entityId, companyTypeId, languageId, webpage, address, employeeId } = req.body || {};
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
@@ -155,9 +158,10 @@ router.patch("/:id", async (req, res) => {
          entityid = COALESCE($2, entityid),
          companytypeid = COALESCE($3, companytypeid),
          languageid = COALESCE($4, languageid),
-         webpage = COALESCE($5, webpage)
-       WHERE id = $6`,
-      [name || null, entityId ?? null, companyTypeId ?? null, languageId ?? null, webpage ?? null, id]
+         webpage = COALESCE($5, webpage),
+         lastupdated = now(), lastupdatedby = $6
+       WHERE id = $7`,
+      [name || null, entityId ?? null, companyTypeId ?? null, languageId ?? null, webpage ?? null, employeeId || null, id]
     );
 
     if (address) {
