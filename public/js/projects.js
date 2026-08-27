@@ -62,7 +62,11 @@ function applyRealStatuses(dbStatuses) {
       color: '#8A8676',
       icon: iconLead(),
     };
-    return { id: row.id, label: row.label, ...style };
+    // Number(), not the raw row.id: the API serializes it as a string, but
+    // PROJECTS[].stage below is coerced to a number, and renderBoard()
+    // matches the two with strict equality — a string/number mismatch here
+    // made every column filter to empty even with real data loaded.
+    return { id: Number(row.id), label: row.label, ...style };
   });
   STAGE_BY_ID = Object.fromEntries(STAGES.map(s => [s.id, s]));
 }
@@ -280,7 +284,11 @@ function attachDropZone(body){
   body.addEventListener('drop', (e) => {
     e.preventDefault();
     body.classList.remove('drag-over');
-    const id = Number(e.dataTransfer.getData('text/plain'));
+    // Not Number(): PROJECTS[].id is deliberately kept as the raw
+    // stringified-bigint the API returns (see the INIT deep-link comment
+    // below), and moveProject()'s PROJECTS.find(x => x.id === id) needs
+    // the same type — Number() here made every drop silently no-op.
+    const id = e.dataTransfer.getData('text/plain');
     const targetStage = Number(body.dataset.stage);
     if (id) moveProject(id, targetStage);
   });
