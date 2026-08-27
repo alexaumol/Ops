@@ -38,6 +38,7 @@
 const express = require("express");
 const { pool } = require("../config/db");
 const { requireModuleAccess } = require("../lib/permissions");
+const { graphConfigured, createProjectFolder } = require("../lib/graph");
 
 const router = express.Router();
 
@@ -184,6 +185,7 @@ router.post("/", requireModuleAccess("projects"), async (req, res) => {
     return res.status(400).json({ error: "validation_error", message: "name and stage are required" });
   }
 
+  let project;
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
@@ -196,7 +198,7 @@ router.post("/", requireModuleAccess("projects"), async (req, res) => {
        RETURNING id, projectnumber AS code, projectname AS name, projectstatusid AS stage`,
       [code || null, name, stage, entityId || null, biospectrumId || null, projectTypeId || null, employeeId || null]
     );
-    const project = rows[0];
+    project = rows[0];
 
     if (progress !== undefined) {
       await client.query(
@@ -207,14 +209,33 @@ router.post("/", requireModuleAccess("projects"), async (req, res) => {
     }
 
     await client.query("COMMIT");
-    res.status(201).json({ ...project, progress: progress || 0 });
   } catch (err) {
     await client.query("ROLLBACK");
     console.error("[POST /api/projects] DB error:", err.message);
-    res.status(502).json({ error: "database_unreachable", message: err.message });
-  } finally {
     client.release();
+    return res.status(502).json({ error: "database_unreachable", message: err.message });
   }
+  client.release();
+
+  // Best-effort OneDrive folder creation (see lib/graph.js) — never lets a
+  // Graph hiccup roll back or fail project creation, which has already
+  // committed by this point. Needs entityId (folder naming: "code_entity
+  // name") and the GRAPH_* env vars to actually be set; skipped silently
+  // otherwise. The frontend surfaces oneDriveFolder in its toast so a
+  // failure here isn't silent to the person creating the project.
+  let oneDriveFolder = null;
+  if (entityId && graphConfigured()) {
+    const folderName = `${project.code}_${String(entityId).padStart(3, "0")} ${project.name}`;
+    try {
+      const created = await createProjectFolder(folderName);
+      oneDriveFolder = { created: true, name: created.name, webUrl: created.webUrl };
+    } catch (err) {
+      console.error("[POST /api/projects] OneDrive folder creation failed:", err.message);
+      oneDriveFolder = { created: false, error: err.message };
+    }
+  }
+
+  res.status(201).json({ ...project, progress: progress || 0, oneDriveFolder });
 });
 
 // PATCH /api/projects/:id/stage — drag-and-drop move between kanban columns.

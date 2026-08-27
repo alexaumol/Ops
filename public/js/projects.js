@@ -987,6 +987,11 @@ document.getElementById('npSave').addEventListener('click', async () => {
     renderBoard();
     updateTabCounts();
     toast(`<span class="font-mono text-xs opacity-80">${code}</span> project <b>created</b>`, 'green');
+    if (created.oneDriveFolder?.created === false) {
+      toast('Project created, but the OneDrive folder could not be created — create it by hand.', 'red');
+    } else if (created.oneDriveFolder === null && entityVal === '') {
+      toast('No entity selected — OneDrive folder not created (folder naming needs it). Set the entity, then create the folder by hand.', 'navy');
+    }
     closeNewProjectModal();
   } catch (err) {
     console.error(err);
