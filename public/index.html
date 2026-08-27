@@ -252,34 +252,53 @@
     }
 
     const msalEnabled = !!window.HITT_CONFIG?.FEATURES?.msalLoginEnabled;
-    document.getElementById("stepMsal").classList.toggle("active", msalEnabled);
     document.getElementById("stepEmail").classList.toggle("active", !msalEnabled);
     document.getElementById("prototypeNote").classList.toggle("hidden", msalEnabled);
 
     if (msalEnabled) {
+      const stepMsal = document.getElementById("stepMsal");
       const btnMsal = document.getElementById("btnMsalSignIn");
       const msalError = document.getElementById("msalError");
+
+      // On a normal visit this resolves to null almost immediately and we
+      // just show the sign-in button below. On the page load that IS
+      // Microsoft redirecting back after signInWithMicrosoft()'s
+      // loginRedirect() call, this completes sign-in and sends the user
+      // straight on to welcome.html — the login card is never shown at all
+      // for that load, avoiding a flash of "click Sign in" right as we're
+      // already signing them in.
+      (async () => {
+        try {
+          const session = await HITT_AUTH.completeMsalRedirect();
+          if (session) {
+            // Checked right here, right after credentials resolve — a
+            // deactivated employee's session is cleared and they're kept
+            // on this page (see redirectIfDeactivated), never routed to
+            // welcome.html at all.
+            const blocked = await HITT_PERMS.redirectIfDeactivated("index.html");
+            if (blocked) return;
+            window.location.href = "welcome.html";
+            return;
+          }
+        } catch (err) {
+          console.error("MSAL sign-in failed:", err);
+          msalError.textContent = `Could not sign in: ${err?.message || err}`;
+          msalError.classList.remove("hidden");
+        }
+        stepMsal.classList.add("active");
+      })();
+
       btnMsal.addEventListener("click", async () => {
         msalError.classList.add("hidden");
         btnMsal.disabled = true;
         btnMsal.textContent = "Signing in…";
         try {
-          await HITT_AUTH.signInWithMicrosoft();
-          // Checked right here, right after credentials resolve — a
-          // deactivated employee's session is cleared and they're kept on
-          // this page (see redirectIfDeactivated), never routed to
-          // welcome.html at all.
-          const blocked = await HITT_PERMS.redirectIfDeactivated("index.html");
-          if (blocked) return;
-          window.location.href = "welcome.html";
+          await HITT_AUTH.signInWithMicrosoft(); // navigates away on success — nothing below runs
         } catch (err) {
           console.error("MSAL sign-in failed:", err);
-          msalError.textContent = err?.errorCode === "user_cancelled" || err?.errorCode === "popup_window_error"
-            ? "Sign-in was cancelled or the popup was blocked — check your browser's popup blocker and try again."
-            : `Could not sign in: ${err?.message || err}`;
+          msalError.textContent = `Could not sign in: ${err?.message || err}`;
           msalError.classList.remove("hidden");
           btnMsal.disabled = false;
-          btnMsal.innerHTML = btnMsal.innerHTML.replace("Signing in…", "Sign in with Microsoft");
           btnMsal.textContent = "Sign in with Microsoft";
         }
       });

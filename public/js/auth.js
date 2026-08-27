@@ -10,8 +10,8 @@
  *
  * IMPORTANT — file:// deployment stops working once real MSAL is live.
  * Microsoft Entra only accepts http/https redirect URIs for SPA app
- * registrations, so loginPopup() cannot complete when this is opened as a
- * local file. Serve public/ over http(s) (a shared-folder web server, the
+ * registrations, so loginRedirect() cannot complete when this is opened as
+ * a local file. Serve public/ over http(s) (a shared-folder web server, the
  * VPS, or the local dev preview) for sign-in to work. fakeSignIn() is kept
  * below and still used automatically when FEATURES.msalLoginEnabled is
  * false, so file:// / offline testing still has a path — see index.html.
@@ -57,12 +57,39 @@ const HITT_AUTH = (() => {
     return msalInstance;
   }
 
-  // Real sign-in: opens Microsoft's own hosted login popup. Throws on
-  // cancel/failure — callers should catch and show the error, not assume
-  // this always resolves.
+  // Real sign-in: navigates this whole tab to Microsoft's hosted login,
+  // which redirects back to redirectUri (index.html) with an auth code —
+  // see completeMsalRedirect() below for the other half of this flow.
+  // Nothing after the loginRedirect() call runs; the page navigates away.
+  //
+  // This used to be loginPopup() (a popup window instead of a full-page
+  // redirect), but login.microsoftonline.com sends its own
+  // Cross-Origin-Opener-Policy header, which some browsers/profiles use to
+  // sever window.opener between the popup and this tab the moment the
+  // popup first navigates there — permanently, even once the popup
+  // navigates back to our own origin. When that happens the popup just
+  // sits on the final redirect page forever with a valid, unused auth code
+  // in its URL: nothing is listening for it, because msal-browser's popup
+  // flow completes by having the OPENER poll the popup's window.opener-
+  // dependent state, and that link is already gone. Confirmed by checking
+  // window.opener directly in a stuck popup's console — it was null.
+  // loginRedirect() sidesteps the whole popup/opener relationship.
   async function signInWithMicrosoft() {
     const instance = await ensureMsal();
-    const result = await instance.loginPopup({ scopes: ["openid", "profile", "email"] });
+    await instance.loginRedirect({ scopes: ["openid", "profile", "email"] });
+  }
+
+  // Call once, early, on every page load that has the MSAL library loaded
+  // (currently just index.html, right before deciding whether to show the
+  // sign-in button). On an ordinary visit this resolves to null almost
+  // immediately. On the page load that IS Microsoft redirecting back after
+  // loginRedirect() above, this completes sign-in — same session shape
+  // signInWithMicrosoft() used to hand back directly from loginPopup().
+  // Throws on failure — callers should catch and show the error.
+  async function completeMsalRedirect() {
+    const instance = await ensureMsal();
+    const result = await instance.handleRedirectPromise();
+    if (!result) return null;
     const account = result.account;
     const session = {
       username: account.username, // the signed-in UPN, typically their email
@@ -126,5 +153,5 @@ const HITT_AUTH = (() => {
     return parts.slice(0, 2).map((p) => p[0]?.toUpperCase() ?? "").join("");
   }
 
-  return { signInWithMicrosoft, fakeSignIn, getSession, requireSession, signOut, initials };
+  return { signInWithMicrosoft, completeMsalRedirect, fakeSignIn, getSession, requireSession, signOut, initials };
 })();

@@ -26,19 +26,23 @@ window.HITT_CONFIG = {
   // redirect URI on this app registration in the Entra portal (App
   // registrations > this app > Authentication > SPA platform), exactly
   // matching whatever origin actually serves these files — e.g.
-  // http://localhost:5500/auth-redirect.html for local dev, plus the real
-  // production URL. It points at auth-redirect.html — a deliberately empty
-  // page (see that file) — rather than index.html: MSAL's loginPopup()
-  // completes entirely from the opener side by polling the popup's URL and
-  // closing it once it sees the auth code, so the popup itself doesn't need
-  // to run any app code. Pointing it at index.html used to make the popup
-  // boot the whole app (and its "Sign in" button) again before the opener
-  // could close it — looked broken, and let people click "Sign in" a
-  // second time from inside the popup (MSAL's block_nested_popups error).
+  // http://localhost:5500/index.html for local dev, plus the real
+  // production URL. It points at index.html because that's the page with
+  // the MSAL library loaded and the "Sign in" button — loginRedirect()
+  // (see js/auth.js) sends the whole tab here with an auth code, and
+  // index.html's own script calls completeMsalRedirect() on load to finish
+  // signing in and move on to welcome.html.
+  //
+  // This used to be a popup flow (loginPopup(), redirecting to a separate
+  // blank auth-redirect.html) but login.microsoftonline.com's own
+  // Cross-Origin-Opener-Policy header was severing window.opener between
+  // the popup and this tab in some browsers, leaving the popup stuck with
+  // an unused auth code and no way to complete. Full-page redirect avoids
+  // that whole cross-window relationship.
   MSAL: {
     tenantId: "6ab80f28-9ca1-4f48-9be7-7d98f3e1f076",
     clientId: "841556ac-d3af-47ee-a399-403de65c139c",
-    redirectUri: window.location.origin + "/auth-redirect.html",
+    redirectUri: window.location.origin + "/index.html",
     authority: null, // computed at runtime from tenantId (see auth.js)
   },
 
