@@ -40,7 +40,7 @@
             <th data-sort="companyTypeLabel">Company type<span class="sort-arrow"></span></th>
             <th data-sort="countryLabel">Country<span class="sort-arrow"></span></th>
             <th data-sort="webpage">Website<span class="sort-arrow"></span></th>
-            <th data-sort="projectsTotal" title="Alive / Dead (Total)">Number of projects<span class="sort-arrow"></span></th>
+            <th data-sort="projectsTotal" title="Alive / Dead (Total)">Projects<span class="sort-arrow"></span></th>
           </tr>
         </thead>
         <tbody id="bpTableBody"></tbody>
@@ -91,7 +91,7 @@
                 <label class="field-label">Language <span style="color: var(--danger);">*</span></label>
                 <select id="mLanguage" class="field-input"></select>
               </div>
-              <div>
+              <div class="span-2">
                 <label class="field-label">Webpage</label>
                 <input id="mWebpage" type="text" class="field-input" placeholder="https://…" />
               </div>
@@ -148,6 +148,9 @@
           <div>
           <div class="field-section">
             <h3>Notes</h3>
+            <div style="padding:0.5rem 0.75rem; border-bottom:1px solid var(--border-subtle);">
+              <input id="mNotesSearch" type="text" placeholder="Search notes…" class="field-input" style="width:100%;" />
+            </div>
             <div id="mNotesList" class="sub-list"></div>
             <div class="sub-add-row">
               <input id="mNewNote" type="text" placeholder="Type here for a new note" class="field-input" />
@@ -216,7 +219,7 @@
               <label class="field-label">Language <span style="color: var(--danger);">*</span></label>
               <select id="npLanguage" class="field-input"></select>
             </div>
-            <div>
+            <div class="span-2">
               <label class="field-label">Webpage</label>
               <input id="npWebpage" type="text" class="field-input" placeholder="https://…" />
             </div>
@@ -260,6 +263,28 @@
       <div style="flex-shrink:0; border-top:1px solid var(--border-subtle); padding:0.75rem 1.1rem; display:flex; justify-content:flex-end; gap:0.5rem;">
         <button id="npCancel" class="btn btn-secondary">Cancel</button>
         <button id="npSave" class="btn btn-primary">Create</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================ BP PROJECTS DRILL-DOWN ============================ -->
+  <div id="bpProjectsOverlay" class="modal-overlay hidden">
+    <div class="modal-panel modal-panel--sm">
+      <div class="modal-head">
+        <h2 id="bpProjectsTitle" style="flex:1; font-size:1rem; font-weight:700; color:#fff; margin:0;">Projects</h2>
+        <button id="bpProjectsClose" class="modal-head-btn modal-head-btn--close" title="Close">✕</button>
+      </div>
+      <div class="modal-body">
+        <table class="mini-table">
+          <thead>
+            <tr>
+              <th>Project</th>
+              <th>Name</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="bpProjectsList"></tbody>
+        </table>
       </div>
     </div>
   </div>

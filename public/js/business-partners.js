@@ -137,12 +137,21 @@ function renderTable(){
       <td>${escapeHtml(p.companyTypeLabel || '—')}</td>
       <td>${escapeHtml(p.countryLabel || '—')}</td>
       <td>${p.webpage ? `<a href="${escapeHtml(p.webpage)}" target="_blank" rel="noopener">${escapeHtml(p.webpage.replace(/^https?:\/\//, ''))}</a>` : '—'}</td>
-      <td style="font-family:monospace;" title="Alive / Dead (Total)">${p.projectsAlive ?? 0} / ${p.projectsDead ?? 0} (${p.projectsTotal ?? 0})</td>
+      <td>
+        <span title="Alive / Dead (Total)">${p.projectsAlive ?? 0} / ${p.projectsDead ?? 0} (${p.projectsTotal ?? 0})</span>
+        ${p.projectsTotal ? `<button data-bp-projects="${p.id}" class="btn-icon-add" style="margin-left:0.4rem; padding:0.1rem 0.5rem; font-size:0.72rem;" title="View projects">⋯</button>` : ''}
+      </td>
     </tr>
   `).join('');
 
   tbody.querySelectorAll('tr').forEach((tr, i) => {
     tr.addEventListener('click', () => openDetailModal(rows[i].id));
+  });
+  tbody.querySelectorAll('[data-bp-projects]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation(); // don't also trigger the row's own openDetailModal
+      openBpProjectsModal(btn.dataset.bpProjects);
+    });
   });
 }
 
@@ -199,13 +208,26 @@ function renderContacts(rows){
   `).join('');
 }
 
+let NOTES = [];
+let notesSearchTerm = '';
+
+function matchesNotesSearch(n){
+  if (!notesSearchTerm) return true;
+  const term = notesSearchTerm.toLowerCase();
+  return (n.notes || '').toLowerCase().includes(term) || (n.authorName || '').toLowerCase().includes(term);
+}
+
+// Called both with fresh rows (a real fetch — replaces the stored set)
+// and with no argument at all (the search box's own input handler).
 function renderNotes(rows){
+  if (rows) NOTES = rows;
   const list = document.getElementById('mNotesList');
-  if (!rows || !rows.length) {
-    list.innerHTML = `<div class="sub-empty">No notes yet</div>`;
+  const filtered = NOTES.filter(matchesNotesSearch);
+  if (!filtered.length) {
+    list.innerHTML = `<div class="sub-empty">${NOTES.length ? 'No notes match your search' : 'No notes yet'}</div>`;
     return;
   }
-  list.innerHTML = rows.map(n => `
+  list.innerHTML = filtered.map(n => `
     <div class="sub-item">
       <div class="sub-item-row">
         <span class="sub-item-title">${escapeHtml(n.authorName || 'Unknown')}</span>
@@ -271,6 +293,9 @@ async function openDetailModal(id){
   document.getElementById('mNewContactEmail').value = '';
   document.getElementById('mNewContactPhone').value = '';
   document.getElementById('mNewNote').value = '';
+  document.getElementById('mNotesSearch').value = '';
+  notesSearchTerm = '';
+  NOTES = [];
   document.getElementById('mLastUpdated').textContent = '—';
   document.getElementById('mLastUpdatedBy').textContent = '—';
   document.getElementById('mChangedBadge').classList.add('hidden');
@@ -472,6 +497,10 @@ document.getElementById('mNewNote').addEventListener('keydown', (e) => {
 document.getElementById('mNewContactName').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') document.getElementById('mAddContact').click();
 });
+document.getElementById('mNotesSearch').addEventListener('input', (e) => {
+  notesSearchTerm = e.target.value.trim();
+  renderNotes();
+});
 
 document.getElementById('mAddTaxCompany').addEventListener('click', async () => {
   const name = document.getElementById('mNewTcName').value.trim();
@@ -563,6 +592,45 @@ document.getElementById('npSave').addEventListener('click', async () => {
     console.error(err);
     toast('Could not create the business partner.', 'red');
   }
+});
+
+/* ============================== BP PROJECTS DRILL-DOWN =================== */
+const bpProjectsOverlay = document.getElementById('bpProjectsOverlay');
+
+async function openBpProjectsModal(bpId){
+  const bp = PARTNERS.find(p => p.id === bpId);
+  document.getElementById('bpProjectsTitle').textContent = bp ? `Projects — ${bp.name}` : 'Projects';
+  document.getElementById('bpProjectsList').innerHTML = `<tr><td colspan="3" class="sub-empty">Loading…</td></tr>`;
+  bpProjectsOverlay.classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+  try {
+    const rows = await HITT_API.getBusinessPartnerProjects(bpId);
+    if (!rows.length) {
+      document.getElementById('bpProjectsList').innerHTML = `<tr><td colspan="3" class="sub-empty">No projects</td></tr>`;
+      return;
+    }
+    document.getElementById('bpProjectsList').innerHTML = rows.map(p => `
+      <tr>
+        <td><a href="projects.html?projectId=${encodeURIComponent(p.id)}">${escapeHtml(p.code || '—')}</a></td>
+        <td><a href="projects.html?projectId=${encodeURIComponent(p.id)}">${escapeHtml(p.name || '—')}</a></td>
+        <td>${escapeHtml(p.statusLabel || '—')}</td>
+      </tr>
+    `).join('');
+  } catch (err) {
+    console.error(err);
+    document.getElementById('bpProjectsList').innerHTML = `<tr><td colspan="3" class="sub-empty">Could not load projects</td></tr>`;
+  }
+}
+
+function closeBpProjectsModal(){
+  bpProjectsOverlay.classList.add('hidden');
+  document.body.style.overflow = '';
+}
+
+document.getElementById('bpProjectsClose').addEventListener('click', closeBpProjectsModal);
+bpProjectsOverlay.addEventListener('click', (e) => { if (e.target === bpProjectsOverlay) closeBpProjectsModal(); });
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !bpProjectsOverlay.classList.contains('hidden')) closeBpProjectsModal();
 });
 
 /* ============================== INIT ==================================== */

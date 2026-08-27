@@ -87,7 +87,7 @@
    alongside the tabs bar's #historyCollapse toggle. */
 .modal-columns { flex: 1; display: flex; overflow: hidden; }
 .modal-columns .modal-body { min-width: 0; }
-#paneGeneral.modal-pane { display: grid; grid-template-columns: 1fr 1fr; gap: 0.9rem; align-items: start; }
+#paneGeneral.modal-pane { display: grid; grid-template-columns: 1.5fr 1fr; gap: 0.9rem; align-items: start; }
 #historyPanel {
   flex-shrink: 0; width: 260px; overflow: hidden;
   border-left: 1px solid var(--border-subtle);

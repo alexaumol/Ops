@@ -528,6 +528,9 @@ async function openProjectModal(id){
     `<div class="text-xs text-slate-400 text-center py-6">${usingDemoData ? 'Not available in demo data' : 'Loading…'}</div>`;
   cancelEditDeliverable(); // clears the deliverable form + edit state from any previous project
   document.getElementById('mNewNote').value = '';
+  document.getElementById('mNotesSearch').value = '';
+  notesSearchTerm = '';
+  NOTES = [];
 
   document.querySelectorAll('[data-mtab]').forEach(b => b.setAttribute('aria-selected', b.dataset.mtab === 'general' ? 'true' : 'false'));
   document.getElementById('paneGeneral').classList.remove('hidden');
@@ -787,13 +790,27 @@ function renderQuotations(rows){
   `).join('');
 }
 
+let NOTES = [];
+let notesSearchTerm = '';
+
+function matchesNotesSearch(n){
+  if (!notesSearchTerm) return true;
+  const term = notesSearchTerm.toLowerCase();
+  return (n.notes || '').toLowerCase().includes(term) || (n.authorName || '').toLowerCase().includes(term);
+}
+
+// Called both with fresh rows (a real fetch — replaces the stored set)
+// and with no argument at all (the search box's own input handler —
+// just re-filters/re-renders whatever's already loaded).
 function renderNotes(rows){
+  if (rows) NOTES = rows;
   const list = document.getElementById('mNotesList');
-  if (!rows || !rows.length) {
-    list.innerHTML = `<div class="text-xs text-slate-400 text-center py-6">No notes yet</div>`;
+  const filtered = NOTES.filter(matchesNotesSearch);
+  if (!filtered.length) {
+    list.innerHTML = `<div class="text-xs text-slate-400 text-center py-6">${NOTES.length ? 'No notes match your search' : 'No notes yet'}</div>`;
     return;
   }
-  list.innerHTML = rows.map(n => `
+  list.innerHTML = filtered.map(n => `
     <div class="border border-slate-100 rounded-md p-2 bg-hitt-canvas">
       <div class="flex items-center justify-between gap-2 mb-1">
         <span class="text-[11px] font-semibold text-hitt-teal">${escapeHtml(n.authorName || 'Unknown')}</span>
@@ -942,6 +959,10 @@ document.getElementById('mAddNote').addEventListener('click', async () => {
 
 document.getElementById('mNewNote').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') document.getElementById('mAddNote').click();
+});
+document.getElementById('mNotesSearch').addEventListener('input', (e) => {
+  notesSearchTerm = e.target.value.trim();
+  renderNotes();
 });
 document.getElementById('mNewDeliverableName').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') document.getElementById('mAddDeliverable').click();

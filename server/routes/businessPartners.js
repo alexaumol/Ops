@@ -290,6 +290,27 @@ router.get("/:id/history", async (req, res) => {
   }
 });
 
+// GET /api/business-partners/:id/projects — every project with this BP as
+// its contracting business partner. Powers the "Projects" column's
+// drill-down button on the main list.
+router.get("/:id/projects", async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT p.id, p.projectnumber AS code, p.projectname AS name,
+              ps.projectstatusdesc AS "statusLabel"
+       FROM projects p
+       LEFT JOIN projectstatus ps ON ps.id = p.projectstatusid::bigint
+       WHERE p.busspartnerid::bigint = $1
+       ORDER BY p.projectnumber DESC`,
+      [req.params.id]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error("[GET /api/business-partners/:id/projects] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
 // ---------------------------------------------------------------------------
 // Contacts / Notes / Tax companies subforms.
 // ---------------------------------------------------------------------------
