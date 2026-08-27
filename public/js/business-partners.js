@@ -135,6 +135,10 @@ function formatDateOnly(iso){
   return iso ? new Date(iso).toLocaleDateString() : '—';
 }
 
+function formatDateTime(iso){
+  return iso ? new Date(iso).toLocaleString() : '—';
+}
+
 /* ============================== DETAIL MODAL ============================= */
 const modalOverlay = document.getElementById('modalOverlay');
 
@@ -191,6 +195,26 @@ function renderTaxCompanies(rows){
   }).join('');
 }
 
+// businesspartnerchangelog rows — same shape/design as the Projects
+// modal's History panel (see renderHistory in projects.js), minus the
+// status-history half since business partners have no status field.
+function renderHistory(rows){
+  const list = document.getElementById('historyList');
+  if (!rows || !rows.length) {
+    list.innerHTML = `<div class="sub-empty">No history yet</div>`;
+    return;
+  }
+  list.innerHTML = rows.map(h => `
+    <div class="history-entry">
+      <div class="summary">${escapeHtml(h.summary || '')}</div>
+      <div class="meta">
+        <span class="who">${escapeHtml(h.changedByName || 'Unknown')}</span>
+        <span class="when">${formatDateTime(h.changedAt)}</span>
+      </div>
+    </div>
+  `).join('');
+}
+
 async function openDetailModal(id){
   const p = PARTNERS.find(x => x.id === id);
   if (!p) return;
@@ -214,6 +238,7 @@ async function openDetailModal(id){
   document.getElementById('mContactsList').innerHTML = `<div class="sub-empty">${loadingMsg}</div>`;
   document.getElementById('mNotesList').innerHTML = `<div class="sub-empty">${loadingMsg}</div>`;
   document.getElementById('mTaxCompanies').innerHTML = `<tr><td colspan="4" class="sub-empty">${loadingMsg}</td></tr>`;
+  document.getElementById('historyList').innerHTML = `<div class="sub-empty">${loadingMsg}</div>`;
 
   document.querySelectorAll('[data-mtab]').forEach(b => b.setAttribute('aria-selected', b.dataset.mtab === 'general' ? 'true' : 'false'));
   document.getElementById('paneGeneral').classList.remove('hidden');
@@ -268,6 +293,15 @@ async function openDetailModal(id){
   } catch (err) {
     console.warn(`Could not load contacts/notes/tax companies for business partner ${id}:`, err);
   }
+
+  try {
+    const history = await HITT_API.getBusinessPartnerHistory(id);
+    if (activeBpId !== id) return;
+    renderHistory(history);
+  } catch (err) {
+    console.warn(`Could not load history for business partner ${id}:`, err);
+    document.getElementById('historyList').innerHTML = `<div class="sub-empty">Could not load history</div>`;
+  }
 }
 
 function closeDetailModal(){
@@ -275,6 +309,20 @@ function closeDetailModal(){
   document.body.style.overflow = '';
   activeBpId = null;
 }
+
+const historyPanel = document.getElementById('historyPanel');
+const historyCollapseBtn = document.getElementById('historyCollapse');
+let historyCollapsed = false;
+// Direct inline-style toggle, not a CSS class — see projects.js's
+// identical fix for why (a class + !important toggled fine but failed to
+// visually collapse for a real user).
+historyCollapseBtn.addEventListener('click', () => {
+  historyCollapsed = !historyCollapsed;
+  historyPanel.style.width = historyCollapsed ? '0px' : '260px';
+  historyPanel.style.borderLeft = historyCollapsed ? 'none' : '';
+  historyCollapseBtn.textContent = historyCollapsed ? '«' : '»';
+  historyCollapseBtn.title = historyCollapsed ? 'Expand history' : 'Collapse history';
+});
 
 document.getElementById('mClose').addEventListener('click', closeDetailModal);
 modalOverlay.addEventListener('click', (e) => { if (e.target === modalOverlay) closeDetailModal(); });

@@ -52,7 +52,7 @@
 
   <!-- ============================ DETAIL MODAL ============================ -->
   <div id="modalOverlay" class="modal-overlay hidden">
-    <div class="modal-panel">
+    <div class="modal-panel modal-panel--lg">
       <div class="modal-head">
         <input id="mName" type="text" placeholder="Business partner name" />
         <div style="display:flex; gap:0.75rem; font-size:0.72rem; color:rgba(255,255,255,0.85); flex-shrink:0; white-space:nowrap;">
@@ -72,9 +72,13 @@
       <div class="modal-tabs">
         <button data-mtab="general" class="modal-tab" aria-selected="true">General</button>
         <button data-mtab="invoicing" class="modal-tab" aria-selected="false">Invoicing info</button>
+        <div style="flex:1;"></div>
+        <button id="historyCollapse" title="Collapse history" style="width:1.75rem; height:1.75rem; border:none; background:none; cursor:pointer; border-radius:var(--radius-sm); color:var(--hitt-teal); font-size:0.85rem;">»</button>
       </div>
+      <div class="modal-columns">
       <div class="modal-body">
         <div id="paneGeneral" class="modal-pane">
+          <div>
           <div class="field-section">
             <h3>General info</h3>
             <div class="field-grid">
@@ -137,7 +141,9 @@
               <button id="mAddContact" class="btn-icon-add">Add</button>
             </div>
           </div>
+          </div>
 
+          <div>
           <div class="field-section">
             <h3>Notes</h3>
             <div id="mNotesList" class="sub-list"></div>
@@ -145,6 +151,7 @@
               <input id="mNewNote" type="text" placeholder="Type here for a new note" class="field-input" />
               <button id="mAddNote" class="btn-icon-add">Add note</button>
             </div>
+          </div>
           </div>
         </div>
 
@@ -173,6 +180,12 @@
             </div>
           </div>
         </div>
+      </div>
+
+      <div id="historyPanel">
+        <div class="history-head"><h3>History</h3></div>
+        <div id="historyList"></div>
+      </div>
       </div>
     </div>
   </div>

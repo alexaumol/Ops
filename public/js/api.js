@@ -59,6 +59,7 @@ const HITT_API = (() => {
     addBusinessPartnerContact: (id, payload) =>
       request(`/api/business-partners/${id}/contacts`, { method: "POST", body: JSON.stringify(payload) }),
     getBusinessPartnerNotes: (id) => request(`/api/business-partners/${id}/notes`),
+    getBusinessPartnerHistory: (id) => request(`/api/business-partners/${id}/history`),
     addBusinessPartnerNote: (id, payload) =>
       request(`/api/business-partners/${id}/notes`, { method: "POST", body: JSON.stringify(payload) }),
     getBusinessPartnerTaxCompanies: (id) => request(`/api/business-partners/${id}/tax-companies`),

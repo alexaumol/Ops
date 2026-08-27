@@ -145,12 +145,41 @@ router.post("/", requireModuleAccess("business-partners"), async (req, res) => {
 });
 
 // PATCH /api/business-partners/:id — update core fields + upsert address.
+// Logs a human-readable summary per changed field to businesspartnerchangelog
+// (address fields are collapsed into one "Address updated" entry rather than
+// one line per street/city/zip/etc.) — see GET /:id/history, same pattern as
+// projects.js's PATCH /:id.
 router.patch("/:id", async (req, res) => {
   const { id } = req.params;
   const { name, entityId, companyTypeId, languageId, webpage, address, employeeId } = req.body || {};
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
+
+    const { rows: curRows } = await client.query(
+      `SELECT bp.bpname, bp.companytypeid, ct.companytypedesc AS "companyTypeLabel",
+              bp.languageid, lang.languagedesc AS "languageLabel", bp.webpage,
+              a.streetname, a.city, a.state, a.zipcode, a.phonenumber, a.phonenumber2, a.countryid
+       FROM businesspartners bp
+       LEFT JOIN companytypes ct ON ct.id = bp.companytypeid
+       LEFT JOIN languages lang ON lang.id = bp.languageid
+       LEFT JOIN addresses a ON a.businesspartnerid = bp.id
+       WHERE bp.id = $1
+       FOR UPDATE OF bp`,
+      [id]
+    );
+    const cur = curRows[0] || {};
+    const changes = [];
+
+    let newCompanyTypeLabel = null, newLanguageLabel = null;
+    if (companyTypeId != null && String(companyTypeId) !== String(cur.companytypeid)) {
+      const r = await client.query(`SELECT companytypedesc AS label FROM companytypes WHERE id = $1`, [companyTypeId]);
+      newCompanyTypeLabel = r.rows[0]?.label ?? null;
+    }
+    if (languageId != null && String(languageId) !== String(cur.languageid)) {
+      const r = await client.query(`SELECT languagedesc AS label FROM languages WHERE id = $1`, [languageId]);
+      newLanguageLabel = r.rows[0]?.label ?? null;
+    }
 
     await client.query(
       `UPDATE businesspartners SET
@@ -164,7 +193,26 @@ router.patch("/:id", async (req, res) => {
       [name || null, entityId ?? null, companyTypeId ?? null, languageId ?? null, webpage ?? null, employeeId || null, id]
     );
 
+    if (name !== undefined && name !== cur.bpname) {
+      changes.push(`Name changed from "${cur.bpname || ""}" to "${name}"`);
+    }
+    if (newCompanyTypeLabel !== null) changes.push(`Type of company changed from ${cur.companyTypeLabel || "—"} to ${newCompanyTypeLabel}`);
+    if (newLanguageLabel !== null) changes.push(`Language changed from ${cur.languageLabel || "—"} to ${newLanguageLabel}`);
+    if (webpage !== undefined && (webpage || null) !== (cur.webpage || null)) {
+      changes.push(`Webpage changed from "${cur.webpage || ""}" to "${webpage || ""}"`);
+    }
+
     if (address) {
+      const addressChanged =
+        (address.streetname || null) !== (cur.streetname || null) ||
+        (address.city || null) !== (cur.city || null) ||
+        (address.state || null) !== (cur.state || null) ||
+        (address.zipcode || null) !== (cur.zipcode || null) ||
+        (address.phonenumber || null) !== (cur.phonenumber || null) ||
+        (address.phonenumber2 || null) !== (cur.phonenumber2 || null) ||
+        String(address.countryid ?? null) !== String(cur.countryid ?? null);
+      if (addressChanged) changes.push("Address updated");
+
       const existing = await client.query(
         `SELECT id FROM addresses WHERE businesspartnerid = $1 LIMIT 1`, [id]
       );
@@ -188,6 +236,13 @@ router.patch("/:id", async (req, res) => {
       }
     }
 
+    for (const summary of changes) {
+      await client.query(
+        `INSERT INTO businesspartnerchangelog (businesspartnerid, changedat, changedby, summary) VALUES ($1, now(), $2, $3)`,
+        [id, employeeId || null, summary]
+      );
+    }
+
     await client.query("COMMIT");
     res.status(204).end();
   } catch (err) {
@@ -196,6 +251,27 @@ router.patch("/:id", async (req, res) => {
     res.status(502).json({ error: "database_unreachable", message: err.message });
   } finally {
     client.release();
+  }
+});
+
+// GET /api/business-partners/:id/history — every logged field change,
+// newest first. Powers the edit modal's collapsible History side panel —
+// same design/pattern as GET /api/projects/:id/history.
+router.get("/:id/history", async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT c.id, c.summary, c.changedat AS "changedAt", c.changedby AS "changedBy",
+              NULLIF(TRIM(CONCAT(e.employeefirstname, ' ', e.employeelastname)), '') AS "changedByName"
+       FROM businesspartnerchangelog c
+       LEFT JOIN employees e ON e.id = c.changedby
+       WHERE c.businesspartnerid = $1
+       ORDER BY c.changedat DESC`,
+      [req.params.id]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error("[GET /api/business-partners/:id/history] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
   }
 });
 

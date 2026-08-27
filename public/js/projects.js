@@ -834,10 +834,18 @@ function renderHistory(rows){
 
 const historyPanel = document.getElementById('historyPanel');
 const historyCollapseBtn = document.getElementById('historyCollapse');
+let historyCollapsed = false;
+// Direct inline-style toggle rather than a CSS class + !important — the
+// class approach toggled correctly (button icon flipped) but visually
+// failed to collapse for at least one real user despite testing clean in
+// isolation, so this sidesteps whatever cascade/caching quirk was in the
+// way instead of chasing it further.
 historyCollapseBtn.addEventListener('click', () => {
-  const collapsed = historyPanel.classList.toggle('history-collapsed');
-  historyCollapseBtn.textContent = collapsed ? '«' : '»';
-  historyCollapseBtn.title = collapsed ? 'Expand history' : 'Collapse history';
+  historyCollapsed = !historyCollapsed;
+  historyPanel.style.width = historyCollapsed ? '0px' : '260px';
+  historyPanel.style.borderLeft = historyCollapsed ? 'none' : '';
+  historyCollapseBtn.textContent = historyCollapsed ? '«' : '»';
+  historyCollapseBtn.title = historyCollapsed ? 'Expand history' : 'Collapse history';
 });
 
 function closeProjectModal(){
