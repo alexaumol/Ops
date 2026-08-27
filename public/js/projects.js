@@ -1360,6 +1360,17 @@ clearBtn.addEventListener('click', () => {
 const filterPanel = document.getElementById('filterPanel');
 const btnFilters = document.getElementById('btnFilters');
 
+// Reparent to <body> once, up front — the panel started life nested
+// inside the toolbar, which has backdrop-blur (backdrop-filter). Per the
+// CSS spec, backdrop-filter (like transform/filter/perspective) on an
+// ancestor creates a new containing block for position:fixed descendants,
+// silently turning "fixed" into "fixed relative to that ancestor" instead
+// of the viewport — which is exactly what made the earlier viewport-
+// clamped positioning still land the panel in the wrong place/stacking
+// order. Moving it out from under that ancestor entirely (a standard
+// "portal" pattern) sidesteps the problem instead of fighting it.
+document.body.appendChild(filterPanel);
+
 // position:fixed, computed here rather than via CSS right:0 — this
 // panel's trigger button sits at different horizontal positions depending
 // on viewport width (the toolbar's own responsive wrapping), and a fixed
