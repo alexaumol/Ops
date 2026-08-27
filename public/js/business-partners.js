@@ -200,6 +200,9 @@ async function openDetailModal(id){
   document.getElementById('mNewContactPosition').value = '';
   document.getElementById('mNewContactEmail').value = '';
   document.getElementById('mNewNote').value = '';
+  document.getElementById('mLastUpdated').textContent = '—';
+  document.getElementById('mLastUpdatedBy').textContent = '—';
+  document.getElementById('mChangedBadge').classList.add('hidden');
 
   const loadingMsg = usingDemoData ? 'Not available in demo data' : 'Loading…';
   document.getElementById('mContactsList').innerHTML = `<div class="sub-empty">${loadingMsg}</div>`;
@@ -209,6 +212,13 @@ async function openDetailModal(id){
   document.querySelectorAll('[data-mtab]').forEach(b => b.setAttribute('aria-selected', b.dataset.mtab === 'general' ? 'true' : 'false'));
   document.getElementById('paneGeneral').classList.remove('hidden');
   document.getElementById('paneInvoicing').classList.add('hidden');
+
+  // "Data has changed" badge — same pattern as the Projects modal: attach a
+  // once-only input listener to every field, right before showing the
+  // modal, so programmatic value-setting above doesn't itself trigger it.
+  document.querySelectorAll('#modalOverlay input, #modalOverlay select').forEach(el => {
+    el.addEventListener('input', () => document.getElementById('mChangedBadge').classList.remove('hidden'), { once: true });
+  });
 
   modalOverlay.classList.remove('hidden');
   document.body.style.overflow = 'hidden';
@@ -229,6 +239,12 @@ async function openDetailModal(id){
     document.getElementById('mZipCode').value = detail.zipcode || '';
     document.getElementById('mPhone1').value = detail.phonenumber || '';
     document.getElementById('mPhone2').value = detail.phonenumber2 || '';
+    // lastupdated/lastUpdatedByName aren't in the schema yet (businesspartners
+    // has no lastupdated/lastupdatedby columns, unlike projects) — this is
+    // ready for whenever that migration lands; shows '—' until then.
+    document.getElementById('mLastUpdated').textContent = detail.lastupdated
+      ? new Date(detail.lastupdated).toLocaleString() : '—';
+    document.getElementById('mLastUpdatedBy').textContent = detail.lastUpdatedByName || '—';
   } catch (err) {
     console.warn(`Could not load full detail for business partner ${id}:`, err);
   }
@@ -276,6 +292,7 @@ document.getElementById('mSave').addEventListener('click', async () => {
   if (!name) { toast('Name is required', 'red'); return; }
   const languageId = document.getElementById('mLanguage').value;
   if (!languageId) { toast('Language is required', 'red'); return; }
+  document.getElementById('mChangedBadge').classList.add('hidden');
 
   const payload = {
     name,
