@@ -14,9 +14,16 @@
  * ---------------------------------------------------------------------------
  */
 window.HITT_CONFIG = {
-  // Base URL of the Node/Express API (see /server). Point this at the
-  // test VPS while prototyping; switch to the production API URL later.
-  API_BASE_URL: "https://ops-api.fhitt.org", // TODO: replace with real test VPS URL
+  // Base URL of the Node/Express API (see /server). Same-origin as the
+  // frontend — nginx on ops.fhitt.org proxies /api/ to the Node app on
+  // 127.0.0.1:4000 (see /etc/nginx/sites-enabled/hitt-ops on the VPS), so
+  // no CORS is needed. This was originally a separate ops-api.fhitt.org
+  // subdomain, but that vhost was never actually wired up to proxy to
+  // Node (DNS resolved, but nginx had no matching server block, so every
+  // API call 404'd and the frontend silently fell back to demo data) — if
+  // that subdomain gets a proper reverse proxy + cert later, switch this
+  // back and add its origin to server/.env's CORS_ALLOWED_ORIGINS.
+  API_BASE_URL: "https://ops.fhitt.org",
 
   // Microsoft Entra ID (Azure AD) app registration — used for M365 sign-in.
   // These are public identifiers, safe to ship in static files (a client ID
