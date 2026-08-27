@@ -24,7 +24,16 @@ const HITT_API = (() => {
     });
     if (!res.ok) {
       const text = await res.text().catch(() => "");
-      throw new Error(`API ${res.status}: ${text || res.statusText}`);
+      // Every route here responds with { error, message } on failure —
+      // surface just the human-readable message when present (e.g. "You
+      // can't remove your own admin role.") instead of the whole raw JSON
+      // body, which every caller's toast would otherwise show verbatim.
+      let message = text || res.statusText;
+      try {
+        const parsed = JSON.parse(text);
+        if (parsed?.message) message = parsed.message;
+      } catch {}
+      throw new Error(message);
     }
     if (res.status === 204) return null;
     return res.json();

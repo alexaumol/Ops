@@ -45,12 +45,28 @@ router.get("/employees", async (req, res) => {
 // GET /api/settings/module-keys
 router.get("/module-keys", (req, res) => res.json(MODULE_KEYS));
 
+// Count of admins who are also active (not deactivated) — the number that
+// actually matters for "at least one admin must be active", since a
+// deactivated employee's admin row existing doesn't let anyone use it.
+async function countActiveAdmins(excludeEmployeeId = null) {
+  const { rows } = await pool.query(
+    `SELECT COUNT(*) FROM admins a
+     JOIN employees e ON e.id = a.employeeid
+     WHERE e.deactivated = false AND ($1::int IS NULL OR a.employeeid != $1)`,
+    [excludeEmployeeId]
+  );
+  return Number(rows[0].count);
+}
+
 // PATCH /api/settings/employees/:id/role   { isAdmin: boolean }
 router.patch("/employees/:id/role", async (req, res) => {
   const employeeId = Number(req.params.id);
   const { isAdmin } = req.body;
   if (!Number.isInteger(employeeId) || typeof isAdmin !== "boolean") {
     return res.status(400).json({ error: "bad_request", message: "isAdmin (boolean) is required." });
+  }
+  if (!isAdmin && employeeId === Number(req.hittUser.employeeId)) {
+    return res.status(400).json({ error: "bad_request", message: "You can't remove your own admin role." });
   }
   try {
     if (isAdmin) {
@@ -60,6 +76,9 @@ router.patch("/employees/:id/role", async (req, res) => {
         [employeeId, req.hittUser.employeeId]
       );
     } else {
+      if ((await countActiveAdmins(employeeId)) < 1) {
+        return res.status(400).json({ error: "bad_request", message: "At least one admin must stay active." });
+      }
       await pool.query(`DELETE FROM admins WHERE employeeid = $1`, [employeeId]);
     }
     res.json({ employeeId, isAdmin });
@@ -107,6 +126,15 @@ router.patch("/employees/:id/status", async (req, res) => {
     return res.status(400).json({ error: "bad_request", message: "You can't deactivate your own account." });
   }
   try {
+    // Deactivating an admin has the same effect on "at least one admin
+    // must be active" as removing their admin role outright — check the
+    // same way, only when this employee is actually an admin.
+    if (isDeactivated) {
+      const { rows } = await pool.query(`SELECT 1 FROM admins WHERE employeeid = $1`, [employeeId]);
+      if (rows.length && (await countActiveAdmins(employeeId)) < 1) {
+        return res.status(400).json({ error: "bad_request", message: "At least one admin must stay active — deactivate another admin first, or remove this one's admin role after promoting someone else." });
+      }
+    }
     await pool.query(`UPDATE employees SET deactivated = $2 WHERE id = $1`, [employeeId, isDeactivated]);
     res.json({ employeeId, isDeactivated });
   } catch (err) {

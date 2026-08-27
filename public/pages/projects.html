@@ -56,12 +56,17 @@
         </button>
       </div>
 
-      <div class="relative self-start sm:self-center">
+      <div class="self-start sm:self-center">
         <button id="btnFilters" title="Filters" class="kbd-focus shrink-0 h-9 px-3 rounded-lg border border-slate-200 bg-white hover:bg-hitt-mist text-hitt-teal flex items-center gap-1.5 shadow-card transition-all text-xs font-semibold">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 5h18M6 12h12M10 19h4"/></svg>
           Filters<span id="filterCount" class="hidden ml-0.5 bg-hitt-teal text-white rounded-full px-1.5 text-[10px] font-bold"></span>
         </button>
-        <div id="filterPanel" class="hidden absolute right-0 top-11 z-40 bg-white border border-slate-200 rounded-lg shadow-lift p-3 w-64 space-y-2.5">
+        <!-- position:fixed, placed dynamically by JS (see #btnFilters click
+             handler in projects.js) rather than CSS right:0 anchored to
+             this narrow wrapper — that overflowed off the left edge of the
+             viewport whenever the button wasn't near the page's right
+             edge (confirmed: any window narrower than full-desktop-wide). -->
+        <div id="filterPanel" class="hidden fixed z-40 bg-white border border-slate-200 rounded-lg shadow-lift p-3 w-64 space-y-2.5">
           <div>
             <label class="field-label block mb-1">Project owner</label>
             <select id="filterOwner" class="field-input"><option value="">Any owner</option></select>

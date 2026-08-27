@@ -1197,12 +1197,35 @@ clearBtn.addEventListener('click', () => {
 
 /* ---------- Filters panel ---------- */
 const filterPanel = document.getElementById('filterPanel');
-document.getElementById('btnFilters').addEventListener('click', (e) => {
+const btnFilters = document.getElementById('btnFilters');
+
+// position:fixed, computed here rather than via CSS right:0 — this
+// panel's trigger button sits at different horizontal positions depending
+// on viewport width (the toolbar's own responsive wrapping), and a fixed
+// CSS anchor point overflowed off the left edge of the viewport once the
+// button wasn't near the page's right edge. Clamping against the actual
+// viewport width here is correct at any width, not just the one it was
+// eyeballed at.
+function positionFilterPanel(){
+  const rect = btnFilters.getBoundingClientRect();
+  const panelWidth = filterPanel.offsetWidth || 256;
+  let left = rect.right - panelWidth;
+  left = Math.max(8, Math.min(left, window.innerWidth - panelWidth - 8));
+  filterPanel.style.left = `${left}px`;
+  filterPanel.style.top = `${rect.bottom + 6}px`;
+}
+
+btnFilters.addEventListener('click', (e) => {
   e.stopPropagation();
+  const opening = filterPanel.classList.contains('hidden');
+  if (opening) positionFilterPanel();
   filterPanel.classList.toggle('hidden');
 });
 filterPanel.addEventListener('click', (e) => e.stopPropagation());
 document.addEventListener('click', () => filterPanel.classList.add('hidden'));
+window.addEventListener('resize', () => {
+  if (!filterPanel.classList.contains('hidden')) positionFilterPanel();
+});
 
 function updateFilterCount(){
   const active = [
