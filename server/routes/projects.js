@@ -179,7 +179,7 @@ router.get("/:id", async (req, res) => {
 
 // POST /api/projects — create a project (+ optional initial progress row).
 router.post("/", requireModuleAccess("projects"), async (req, res) => {
-  const { code, name, stage, progress, entityId, employeeId } = req.body || {};
+  const { code, name, stage, progress, entityId, biospectrumId, projectTypeId, employeeId } = req.body || {};
   if (!name || stage === undefined) {
     return res.status(400).json({ error: "validation_error", message: "name and stage are required" });
   }
@@ -190,10 +190,11 @@ router.post("/", requireModuleAccess("projects"), async (req, res) => {
 
     const { rows } = await client.query(
       `INSERT INTO projects (projectnumber, projectname, projectstatusid, entityid,
+                              biospectrumid, projecttypeid,
                               projectyear, entrydate, lastupdated, lastupdatedby)
-       VALUES ($1, $2, $3, $4, EXTRACT(YEAR FROM now()), now(), now(), $5)
+       VALUES ($1, $2, $3, $4, $5, $6, EXTRACT(YEAR FROM now()), now(), now(), $7)
        RETURNING id, projectnumber AS code, projectname AS name, projectstatusid AS stage`,
-      [code || null, name, stage, entityId || null, employeeId || null]
+      [code || null, name, stage, entityId || null, biospectrumId || null, projectTypeId || null, employeeId || null]
     );
     const project = rows[0];
 
@@ -284,7 +285,7 @@ router.patch("/:id", async (req, res) => {
   const { id } = req.params;
   const {
     stage, progress, employeeId,
-    entityId, biospectrumId, projectTypeId, bpRunningName, notInvoiceable,
+    name, entityId, biospectrumId, projectTypeId, bpRunningName, notInvoiceable,
   } = req.body || {};
 
   const client = await pool.connect();
@@ -316,19 +317,24 @@ router.patch("/:id", async (req, res) => {
         [id, progress, employeeId || null]
       );
     }
-    if (entityId !== undefined || biospectrumId !== undefined || projectTypeId !== undefined
+    if (name !== undefined && !name.trim()) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({ error: "validation_error", message: "name cannot be empty" });
+    }
+    if (name !== undefined || entityId !== undefined || biospectrumId !== undefined || projectTypeId !== undefined
         || bpRunningName !== undefined || notInvoiceable !== undefined) {
       await client.query(
         `UPDATE projects SET
-           entityid = COALESCE($1, entityid),
-           biospectrumid = COALESCE($2, biospectrumid),
-           projecttypeid = COALESCE($3, projecttypeid),
-           bprunningname = COALESCE($4, bprunningname),
-           notinvoiceable = COALESCE($5, notinvoiceable),
-           lastupdated = now(), lastupdatedby = $6
-         WHERE id = $7`,
+           projectname = COALESCE($1, projectname),
+           entityid = COALESCE($2, entityid),
+           biospectrumid = COALESCE($3, biospectrumid),
+           projecttypeid = COALESCE($4, projecttypeid),
+           bprunningname = COALESCE($5, bprunningname),
+           notinvoiceable = COALESCE($6, notinvoiceable),
+           lastupdated = now(), lastupdatedby = $7
+         WHERE id = $8`,
         [
-          entityId ?? null, biospectrumId ?? null, projectTypeId ?? null,
+          name?.trim() || null, entityId ?? null, biospectrumId ?? null, projectTypeId ?? null,
           bpRunningName ?? null, notInvoiceable ?? null, employeeId || null, id,
         ]
       );

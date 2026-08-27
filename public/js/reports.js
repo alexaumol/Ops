@@ -483,7 +483,16 @@ function renderStatusChart(rows) {
   const maxBar = Math.max(0, ...rows.map((r) => Number(r[metricField])));
   const yMaxBars = isBudget ? niceCeilMagnitude(maxBar) : niceCeil(maxBar);
 
-  const W = 480, H = 320, ML = isBudget ? 44 : 32, MR = 8, MT = 34, MB = 58;
+  // W is 1200 (not the usual ~480) specifically to shrink the RENDERED
+  // height: this SVG is width:100%/height:auto (see reports.css), so its
+  // on-screen height is container-width * H/W. Widening W keeps H and
+  // every absolute layout constant below (MT/MB, label font sizes, the
+  // -40deg rotation) unchanged and correctly proportioned, while the
+  // wider coordinate system alone makes the rendered aspect ratio — and
+  // therefore the on-screen height — 40% of what it was (a 60% cut) at
+  // the same on-screen width. This card is full-width, unlike the other
+  // charts on this page, which is why only this one was oversized.
+  const W = 1200, H = 320, ML = isBudget ? 44 : 32, MR = 8, MT = 34, MB = 58;
   const plotW = W - ML - MR, plotH = H - MT - MB;
   const groupW = plotW / statuses.length;
   const barGap = groupW * 0.1;

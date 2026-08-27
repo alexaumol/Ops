@@ -89,6 +89,7 @@ let currentTab = 'alive';
 let searchTerm = '';
 let activeProjectId = null;
 let activeBusinessPartnerId = null;
+let npBusinessPartnerId = null; // draft BP pick for the New Project modal — see assignBusinessPartner()
 let idCounter = 1000;
 
 /* ============================== ICONS ================================= */
@@ -455,7 +456,7 @@ async function openProjectModal(id){
 
   document.getElementById('mYear').textContent = '20' + String(p.code).slice(0, 2).padStart(2, '0');
   document.getElementById('mCode').textContent = p.code;
-  document.getElementById('mTitle').textContent = p.name;
+  document.getElementById('mTitle').value = p.name;
   document.getElementById('mLastUpdated').textContent = '—';
   document.getElementById('mLastUpdatedBy').textContent = '—';
   document.getElementById('mChangedBadge').classList.add('hidden');
@@ -487,8 +488,7 @@ async function openProjectModal(id){
     `<tr><td colspan="5" class="px-2.5 py-4 text-center text-slate-400 text-xs">${usingDemoData ? 'Not available in demo data' : 'Loading…'}</td></tr>`;
   document.getElementById('mNotesList').innerHTML =
     `<div class="text-xs text-slate-400 text-center py-6">${usingDemoData ? 'Not available in demo data' : 'Loading…'}</div>`;
-  document.getElementById('mNewDeliverableName').value = '';
-  document.getElementById('mNewDeliverableExpected').value = '';
+  cancelEditDeliverable(); // clears the deliverable form + edit state from any previous project
   document.getElementById('mNewNote').value = '';
 
   document.querySelectorAll('[data-mtab]').forEach(b => b.setAttribute('aria-selected', b.dataset.mtab === 'general' ? 'true' : 'false'));
@@ -545,9 +545,15 @@ async function openProjectModal(id){
  * ========================================================================== */
 const bpPickerOverlay = document.getElementById('bpPickerOverlay');
 let bpSearchDebounce = null;
+// Which UI assignBusinessPartner() below should update: the open project
+// modal (persists immediately via the API, like before), or the New
+// Project modal's own draft state (no project exists yet to assign to —
+// just remembers the pick locally until npSave creates the project).
+let bpPickerTarget = 'project';
 
-function openBpPicker(){
-  if (!activeProjectId) return;
+function openBpPicker(target){
+  bpPickerTarget = target || 'project';
+  if (bpPickerTarget === 'project' && !activeProjectId) return;
   document.getElementById('bpPickerSearch').value = '';
   document.getElementById('bpPickerNewName').value = '';
   document.getElementById('bpPickerResults').innerHTML =
@@ -561,6 +567,13 @@ function closeBpPicker(){
 }
 
 async function assignBusinessPartner(bpId, bpName){
+  if (bpPickerTarget === 'newProject') {
+    npBusinessPartnerId = bpId;
+    document.getElementById('npBusinessPartner').textContent = bpName || '—';
+    closeBpPicker();
+    toast(`<span class="font-mono text-xs opacity-80">${escapeHtml(bpName || '')}</span> will be assigned once the project is created`, 'green');
+    return;
+  }
   if (!activeProjectId) return;
   try {
     await HITT_API.assignProjectBusinessPartner(activeProjectId, bpId);
@@ -595,7 +608,7 @@ function renderBpPickerResults(rows){
   });
 }
 
-document.getElementById('mBPSearch').addEventListener('click', openBpPicker);
+document.getElementById('mBPSearch').addEventListener('click', () => openBpPicker('project'));
 document.getElementById('bpPickerClose').addEventListener('click', closeBpPicker);
 bpPickerOverlay.addEventListener('click', (e) => { if (e.target === bpPickerOverlay) closeBpPicker(); });
 document.addEventListener('keydown', (e) => {
@@ -641,6 +654,11 @@ function formatDateOnly(iso){
   return new Date(iso).toLocaleDateString();
 }
 
+function formatDateTime(iso){
+  if (!iso) return '—';
+  return new Date(iso).toLocaleString();
+}
+
 let DELIVERABLES = [];
 let editingDeliverableId = null;
 
@@ -649,6 +667,7 @@ function startEditDeliverable(id){
   if (!d) return;
   editingDeliverableId = id;
   document.getElementById('mNewDeliverableExpected').value = d.deliverydate ? d.deliverydate.slice(0, 10) : '';
+  document.getElementById('mNewDeliverableEffective').value = d.effectivedd ? d.effectivedd.slice(0, 10) : '';
   document.getElementById('mNewDeliverableName').value = d.deliverablename || '';
   document.getElementById('mAddDeliverable').textContent = 'Save';
   document.getElementById('mNewDeliverableName').focus();
@@ -657,6 +676,7 @@ function startEditDeliverable(id){
 function cancelEditDeliverable(){
   editingDeliverableId = null;
   document.getElementById('mNewDeliverableExpected').value = '';
+  document.getElementById('mNewDeliverableEffective').value = '';
   document.getElementById('mNewDeliverableName').value = '';
   document.getElementById('mAddDeliverable').textContent = 'Add';
 }
@@ -730,7 +750,7 @@ function renderNotes(rows){
     <div class="border border-slate-100 rounded-md p-2 bg-hitt-canvas">
       <div class="flex items-center justify-between gap-2 mb-1">
         <span class="text-[11px] font-semibold text-hitt-teal">${escapeHtml(n.authorName || 'Unknown')}</span>
-        <span class="text-[10px] text-slate-400 font-mono">${formatDateOnly(n.commentsts)}</span>
+        <span class="text-[10px] text-slate-400 font-mono">${formatDateTime(n.commentsts)}</span>
       </div>
       <div class="text-xs text-hitt-ink whitespace-pre-wrap">${escapeHtml(n.notes)}</div>
     </div>
@@ -754,9 +774,15 @@ document.addEventListener('keydown', (e) => {
 document.getElementById('mSave').addEventListener('click', async () => {
   const p = PROJECTS.find(x => x.id === activeProjectId);
   if (!p) return;
+  const newName = document.getElementById('mTitle').value.trim();
+  if (!newName) {
+    toast(`Missing required data: <b>Project name</b>`, 'red');
+    return;
+  }
   const newStatus = Number(document.getElementById('mStatus').value);
   const newProgress = Number(document.getElementById('mProgress').value) || 0;
   const statusChanged = newStatus !== p.stage;
+  p.name = newName;
   p.stage = newStatus;
   p.progress = newProgress;
 
@@ -764,6 +790,7 @@ document.getElementById('mSave').addEventListener('click', async () => {
   const projectTypeVal = document.getElementById('mProjectType').value;
   const bioSpectrumVal = document.getElementById('mBioSpectrum').value;
   const extraFields = {
+    name: newName,
     entityId: entityVal ? Number(entityVal) : null,
     projectTypeId: projectTypeVal ? Number(projectTypeVal) : null,
     biospectrumId: bioSpectrumVal ? Number(bioSpectrumVal) : null,
@@ -829,6 +856,7 @@ document.getElementById('mNewDeliverableName').addEventListener('keydown', (e) =
 document.getElementById('mAddDeliverable').addEventListener('click', async () => {
   const nameInput = document.getElementById('mNewDeliverableName');
   const dateInput = document.getElementById('mNewDeliverableExpected');
+  const effectiveInput = document.getElementById('mNewDeliverableEffective');
   const name = nameInput.value.trim();
   if (!name || !activeProjectId) return;
   if (usingDemoData) {
@@ -841,11 +869,13 @@ document.getElementById('mAddDeliverable').addEventListener('click', async () =>
       await HITT_API.updateProjectDeliverable(activeProjectId, editingId, {
         deliverablename: name,
         deliverydate: dateInput.value || null,
+        effectivedd: effectiveInput.value || null,
       });
     } else {
       await HITT_API.addProjectDeliverable(activeProjectId, {
         deliverablename: name,
         deliverydate: dateInput.value || null,
+        effectivedd: effectiveInput.value || null,
       });
     }
     cancelEditDeliverable(); // also clears the inputs
@@ -880,6 +910,12 @@ function openNewProjectModal(){
   statusSel.innerHTML = STAGES.filter(s => s.set === 'alive')
     .map(s => `<option value="${s.id}" ${s.id===0?'selected':''}>${s.label}</option>`).join('');
 
+  document.getElementById('npEntity').innerHTML = lookupOptionsHtml(LOOKUPS.entities, null, true);
+  document.getElementById('npProjectType').innerHTML = lookupOptionsHtml(LOOKUPS.projectTypes, null, true);
+  document.getElementById('npBioSpectrum').innerHTML = lookupOptionsHtml(LOOKUPS.biotechSpectrums, null, true);
+  npBusinessPartnerId = null;
+  document.getElementById('npBusinessPartner').textContent = '—';
+
   const nameInput = document.getElementById('npName');
   nameInput.addEventListener('focus', function selectPlaceholder(){
     if (this.value === NP_PLACEHOLDER) this.select();
@@ -898,12 +934,16 @@ function closeNewProjectModal(){
 document.getElementById('btnNewProject').addEventListener('click', openNewProjectModal);
 document.getElementById('npClose').addEventListener('click', closeNewProjectModal);
 document.getElementById('npCancel').addEventListener('click', closeNewProjectModal);
+document.getElementById('npBPSearch').addEventListener('click', () => openBpPicker('newProject'));
 newProjectOverlay.addEventListener('click', (e) => { if (e.target === newProjectOverlay) closeNewProjectModal(); });
 
 document.getElementById('npSave').addEventListener('click', async () => {
   const name = document.getElementById('npName').value.trim();
   const status = Number(document.getElementById('npStatus').value);
   const progress = Number(document.getElementById('npProgress').value) || 0;
+  const entityVal = document.getElementById('npEntity').value;
+  const projectTypeVal = document.getElementById('npProjectType').value;
+  const bioSpectrumVal = document.getElementById('npBioSpectrum').value;
 
   if (!name || name === NP_PLACEHOLDER) {
     toast(`Missing required data: <b>Project name</b>`, 'red');
@@ -922,7 +962,21 @@ document.getElementById('npSave').addEventListener('click', async () => {
   }
 
   try {
-    const created = await HITT_API.createProject({ code, name, stage: status, progress });
+    const created = await HITT_API.createProject({
+      code, name, stage: status, progress,
+      employeeId: currentEmployeeId,
+      entityId: entityVal ? Number(entityVal) : null,
+      projectTypeId: projectTypeVal ? Number(projectTypeVal) : null,
+      biospectrumId: bioSpectrumVal ? Number(bioSpectrumVal) : null,
+    });
+    if (npBusinessPartnerId) {
+      try {
+        await HITT_API.assignProjectBusinessPartner(created.id, npBusinessPartnerId);
+      } catch (bpErr) {
+        console.error(bpErr);
+        toast('Project created, but could not assign the business partner — assign it from the project card.', 'red');
+      }
+    }
     PROJECTS.push({
       id: created.id ?? idCounter++,
       code: created.code ?? code,

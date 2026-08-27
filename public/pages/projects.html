@@ -75,12 +75,13 @@
 
 <!-- ============================ PROJECT MODAL ============================ -->
 <div id="modalOverlay" class="modal-overlay hidden fixed inset-0 z-50 bg-hitt-ink/40 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6">
-  <div id="modalPanel" class="modal-panel bg-white w-full max-w-5xl max-h-[92vh] rounded-xl shadow-lift flex flex-col overflow-hidden">
+  <div id="modalPanel" class="modal-panel bg-white w-full max-w-6xl max-h-[92vh] rounded-xl shadow-lift flex flex-col overflow-hidden">
 
     <div class="shrink-0 px-4 sm:px-5 py-3 flex items-center gap-3" style="background:#5C757C">
       <span id="mYear" class="font-mono font-bold text-white/90 text-sm bg-white/10 rounded px-2 py-1">2026</span>
       <span id="mCode" class="font-mono font-bold text-white text-sm bg-white/15 rounded px-2 py-1">00000</span>
-      <h2 id="mTitle" class="flex-1 min-w-0 truncate text-white font-bold text-base sm:text-lg">Project name</h2>
+      <input id="mTitle" type="text" title="Project name" placeholder="Project name"
+        class="flex-1 min-w-0 truncate bg-transparent text-white font-bold text-base sm:text-lg outline-none border-b border-dashed border-transparent focus:border-white/60 placeholder:text-white/60" />
       <div class="hidden md:flex items-center gap-3 text-white/85 text-xs ml-2 border-l border-white/20 pl-3">
         <div>
           <div class="text-[10px] uppercase tracking-wide text-white/50">Last updated</div>
@@ -179,9 +180,10 @@
                 <tbody id="mDeliverables"></tbody>
               </table>
             </div>
-            <div class="px-2.5 py-2 border-t border-slate-100 flex items-center gap-1.5">
-              <input id="mNewDeliverableExpected" type="date" class="field-input" style="width:8.5rem;" title="Expected date" />
-              <input id="mNewDeliverableName" type="text" placeholder="New deliverable name…" class="field-input flex-1 italic text-hitt-teal" />
+            <div class="px-2.5 py-2 border-t border-slate-100 flex flex-wrap items-center gap-1.5">
+              <input id="mNewDeliverableExpected" type="date" class="field-input" style="width:8.5rem;" title="Expected date" placeholder="Expected date" />
+              <input id="mNewDeliverableEffective" type="date" class="field-input" style="width:8.5rem;" title="Effective date" placeholder="Effective date" />
+              <input id="mNewDeliverableName" type="text" placeholder="New deliverable name…" class="field-input flex-1 italic text-hitt-teal" style="min-width:12rem;" />
               <button id="mAddDeliverable" class="shrink-0 bg-hitt-teal text-white text-[11px] font-semibold px-3 py-2 rounded-md hover:bg-hitt-ink transition">Add</button>
             </div>
           </section>
@@ -310,13 +312,36 @@
     </div>
 
     <div class="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
-      <div>
-        <label class="field-label">Status <span class="text-hitt-red">*</span></label>
-        <select id="npStatus" class="field-input mt-1"></select>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="field-label">Status <span class="text-hitt-red">*</span></label>
+          <select id="npStatus" class="field-input mt-1"></select>
+        </div>
+        <div>
+          <label class="field-label">Progress (%)</label>
+          <input id="npProgress" type="number" min="0" max="100" value="0" class="field-input mt-1" />
+        </div>
+        <div>
+          <label class="field-label">Entity</label>
+          <select id="npEntity" class="field-input mt-1"></select>
+        </div>
+        <div>
+          <label class="field-label">Project type</label>
+          <select id="npProjectType" class="field-input mt-1"></select>
+        </div>
+        <div class="col-span-2">
+          <label class="field-label">Biotech spectrum</label>
+          <select id="npBioSpectrum" class="field-input mt-1"></select>
+        </div>
       </div>
       <div>
-        <label class="field-label">Progress (%)</label>
-        <input id="npProgress" type="number" min="0" max="100" value="0" class="field-input mt-1" />
+        <label class="field-label">Contracting Business Partner</label>
+        <div class="flex items-center gap-1.5 mt-1">
+          <div id="npBusinessPartner" class="field-input" style="background:#F5F4EE; color:#5C757C; flex:1;">—</div>
+          <button id="npBPSearch" type="button" title="Search and assign a business partner" class="shrink-0 w-8 h-8 rounded-md border border-slate-200 bg-white hover:bg-hitt-mist text-hitt-teal flex items-center justify-center">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M17 10a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+          </button>
+        </div>
       </div>
     </div>
 
