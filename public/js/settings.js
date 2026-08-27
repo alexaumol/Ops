@@ -83,10 +83,9 @@ function renderRow(emp) {
       </td>
       <td>
         <label class="switch" title="Time-off approver">
-          <input type="checkbox" class="approverToggle" data-emp="${emp.id}" ${emp.isTimeOffApprover ? "checked" : ""} ${(emp.isAdmin || deactivated) ? "disabled" : ""} />
+          <input type="checkbox" class="approverToggle" data-emp="${emp.id}" ${emp.isTimeOffApprover ? "checked" : ""} ${deactivated ? "disabled" : ""} />
           <span class="switch-track"></span>
         </label>
-        ${emp.isAdmin ? '<span class="settings-badge" title="Admins are always approvers">Auto</span>' : ""}
       </td>
       <td><div class="module-chip-row">${moduleChips}</div></td>
     </tr>`;
@@ -137,7 +136,10 @@ document.getElementById("empTableBody").addEventListener("change", async (e) => 
       const isAdmin = e.target.checked;
       await HITT_API.setEmployeeAdmin(empId, isAdmin);
       emp.isAdmin = isAdmin;
-      if (isAdmin) { emp.isTimeOffApprover = true; emp.restrictedModules = []; }
+      // Admins still bypass every module restriction (unrelated to
+      // time-off approval, which is a fully independent flag) — reflect
+      // that bypass locally without touching isTimeOffApprover.
+      if (isAdmin) { emp.restrictedModules = []; }
       toast(`${emp.name}: ${isAdmin ? "granted" : "removed"} admin.`, "green");
       render();
     } else if (e.target.classList.contains("approverToggle")) {

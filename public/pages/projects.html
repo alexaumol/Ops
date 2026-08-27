@@ -56,6 +56,33 @@
         </button>
       </div>
 
+      <div class="relative self-start sm:self-center">
+        <button id="btnFilters" title="Filters" class="kbd-focus shrink-0 h-9 px-3 rounded-lg border border-slate-200 bg-white hover:bg-hitt-mist text-hitt-teal flex items-center gap-1.5 shadow-card transition-all text-xs font-semibold">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 5h18M6 12h12M10 19h4"/></svg>
+          Filters<span id="filterCount" class="hidden ml-0.5 bg-hitt-teal text-white rounded-full px-1.5 text-[10px] font-bold"></span>
+        </button>
+        <div id="filterPanel" class="hidden absolute right-0 top-11 z-40 bg-white border border-slate-200 rounded-lg shadow-lift p-3 w-64 space-y-2.5">
+          <div>
+            <label class="field-label block mb-1">Project owner</label>
+            <select id="filterOwner" class="field-input"><option value="">Any owner</option></select>
+          </div>
+          <label class="flex items-center gap-2 text-xs font-medium text-hitt-ink">
+            <input type="checkbox" id="filterNotInvoiceable" class="w-3.5 h-3.5" /> Not invoiceable
+          </label>
+          <label class="flex items-center gap-2 text-xs font-medium text-hitt-ink">
+            <input type="checkbox" id="filterNoBudget" class="w-3.5 h-3.5" /> Missing budget
+          </label>
+          <div>
+            <label class="field-label block mb-1">Progress %</label>
+            <div class="flex items-center gap-1.5">
+              <input type="number" id="filterProgressMin" min="0" max="100" placeholder="Min" class="field-input" style="width:4.5rem;" />
+              <span class="text-slate-400">–</span>
+              <input type="number" id="filterProgressMax" min="0" max="100" placeholder="Max" class="field-input" style="width:4.5rem;" />
+            </div>
+          </div>
+          <button id="btnClearFilters" class="text-[11px] text-hitt-teal hover:underline">Clear filters</button>
+        </div>
+      </div>
       <button id="btnRefresh" title="Refresh from database" class="kbd-focus self-start sm:self-center shrink-0 w-9 h-9 rounded-lg border border-slate-200 bg-white hover:bg-hitt-mist text-hitt-teal flex items-center justify-center shadow-card transition-all">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582M20 20v-5h-.581M5.635 8.36A9 9 0 0119.364 5.64M18.365 15.64A9 9 0 014.636 18.36"/></svg>
       </button>
@@ -210,6 +237,10 @@
       </div>
 
       <div id="paneBudget" class="hidden p-4 sm:p-5 flex flex-col gap-4">
+        <label class="flex items-center gap-2 text-sm font-medium text-hitt-ink">
+          <input id="mNotInvoiceable" type="checkbox" class="w-4 h-4" />
+          Check if the project is NOT invoiceable
+        </label>
         <section class="bg-white rounded-lg border border-slate-200 shadow-card overflow-hidden">
           <div class="bg-hitt-teal px-3 py-1.5"><h3 class="text-white text-xs font-bold tracking-wide">PROJECT QUOTATIONS</h3></div>
           <div class="overflow-x-auto">
@@ -226,16 +257,19 @@
               <tbody id="mQuotations"></tbody>
             </table>
           </div>
-          <div class="px-2.5 py-2 text-[11px] text-slate-400">Read-only — quotations are entered through the finance workflow.</div>
+          <div class="px-2.5 py-2 border-t border-slate-100 flex flex-wrap items-center gap-1.5">
+            <input id="mNewQuotationDate" type="date" class="field-input" style="width:8.5rem;" title="Quotation date" />
+            <input id="mNewQuotationAmount" type="number" step="0.01" placeholder="Amount quoted" class="field-input" style="width:8rem;" />
+            <input id="mNewQuotationDiscount" type="number" step="0.01" placeholder="Discount" class="field-input" style="width:7rem;" />
+            <input id="mNewQuotationExpenses" type="number" step="0.01" placeholder="Expenses" class="field-input" style="width:7rem;" />
+            <input id="mNewQuotationFinal" type="number" step="0.01" placeholder="Final quotation" class="field-input" style="width:8.5rem;" />
+            <button id="mAddQuotation" class="shrink-0 bg-hitt-teal text-white text-[11px] font-semibold px-3 py-2 rounded-md hover:bg-hitt-ink transition">Add</button>
+          </div>
         </section>
         <section class="bg-white rounded-lg border border-slate-200 shadow-card overflow-hidden">
           <div class="bg-hitt-teal px-3 py-1.5"><h3 class="text-white text-xs font-bold tracking-wide">EXPENSES RECORDS</h3></div>
           <div class="p-3 text-xs text-slate-400">Expenses endpoint not wired yet — connect ExpensesRecordsProject table to populate this.</div>
         </section>
-        <label class="flex items-center gap-2 text-sm font-medium text-hitt-ink">
-          <input id="mNotInvoiceable" type="checkbox" class="w-4 h-4" />
-          Check if the project is NOT invoiceable
-        </label>
       </div>
     </div>
 

@@ -213,6 +213,22 @@ function matchesSearch(p){
   return String(p.code).toLowerCase().includes(t) || p.name.toLowerCase().includes(t);
 }
 
+// Filters panel state (search stays separate — the search box already has
+// its own always-visible input). ownerId filters against p.ownerId once
+// that's wired in (see the Project Owner follow-up).
+const FILTERS = { ownerId: '', notInvoiceable: false, noBudget: false, progressMin: null, progressMax: null };
+
+function matchesFilters(p){
+  if (!matchesSearch(p)) return false;
+  if (FILTERS.ownerId && String(p.ownerId ?? '') !== FILTERS.ownerId) return false;
+  if (FILTERS.notInvoiceable && !p.notInvoiceable) return false;
+  if (FILTERS.noBudget && p.hasBudget) return false;
+  const progress = p.progress ?? 0;
+  if (FILTERS.progressMin != null && progress < FILTERS.progressMin) return false;
+  if (FILTERS.progressMax != null && progress > FILTERS.progressMax) return false;
+  return true;
+}
+
 function escapeHtml(s){
   const d = document.createElement('div');
   d.textContent = s ?? "";
@@ -225,7 +241,7 @@ function renderBoard(){
   const visibleStages = STAGES.filter(s => s.set === currentTab);
 
   visibleStages.forEach(stage => {
-    const items = PROJECTS.filter(p => p.stage === stage.id && matchesSearch(p))
+    const items = PROJECTS.filter(p => p.stage === stage.id && matchesFilters(p))
                            .sort((a,b) => String(a.code+a.name).localeCompare(String(b.code+b.name)));
 
     const col = document.createElement('div');
@@ -363,8 +379,8 @@ async function moveProject(id, targetStageId){
 function updateTabCounts(){
   const aliveIds = STAGES.filter(s => s.set === 'alive').map(s => s.id);
   const closedIds = STAGES.filter(s => s.set === 'closed').map(s => s.id);
-  const alive = PROJECTS.filter(p => aliveIds.includes(p.stage) && matchesSearch(p)).length;
-  const closed = PROJECTS.filter(p => closedIds.includes(p.stage) && matchesSearch(p)).length;
+  const alive = PROJECTS.filter(p => aliveIds.includes(p.stage) && matchesFilters(p)).length;
+  const closed = PROJECTS.filter(p => closedIds.includes(p.stage) && matchesFilters(p)).length;
   document.getElementById('countAlive').textContent = `(${alive})`;
   document.getElementById('countClosed').textContent = `(${closed})`;
 }
@@ -527,6 +543,8 @@ async function openProjectModal(id){
   document.getElementById('historyList').innerHTML =
     `<div class="text-xs text-slate-400 text-center py-6">${usingDemoData ? 'Not available in demo data' : 'Loading…'}</div>`;
   cancelEditDeliverable(); // clears the deliverable form + edit state from any previous project
+  ['mNewQuotationDate', 'mNewQuotationAmount', 'mNewQuotationDiscount', 'mNewQuotationExpenses', 'mNewQuotationFinal']
+    .forEach(id2 => document.getElementById(id2).value = '');
   document.getElementById('mNewNote').value = '';
   document.getElementById('mNotesSearch').value = '';
   notesSearchTerm = '';
@@ -1004,6 +1022,37 @@ document.getElementById('mAddDeliverable').addEventListener('click', async () =>
   }
 });
 
+document.getElementById('mAddQuotation').addEventListener('click', async () => {
+  if (!activeProjectId) return;
+  if (usingDemoData) {
+    toast('Quotations aren\'t available in demo data.', 'navy');
+    return;
+  }
+  const amount = document.getElementById('mNewQuotationAmount').value;
+  const date = document.getElementById('mNewQuotationDate').value;
+  if (!amount && !date) {
+    toast('Enter at least a date or an amount for the quotation.', 'red');
+    return;
+  }
+  try {
+    await HITT_API.addProjectQuotation(activeProjectId, {
+      quotationdate: date || null,
+      amountquoted: amount || null,
+      discountnegotiation: document.getElementById('mNewQuotationDiscount').value || null,
+      expenses: document.getElementById('mNewQuotationExpenses').value || null,
+      finalquotation: document.getElementById('mNewQuotationFinal').value || null,
+      employeeId: currentEmployeeId,
+    });
+    ['mNewQuotationDate', 'mNewQuotationAmount', 'mNewQuotationDiscount', 'mNewQuotationExpenses', 'mNewQuotationFinal']
+      .forEach(id2 => document.getElementById(id2).value = '');
+    renderQuotations(await HITT_API.getProjectQuotations(activeProjectId));
+    toast('Quotation added', 'green');
+  } catch (err) {
+    console.error(err);
+    toast('Could not save the quotation.', 'red');
+  }
+});
+
 /* ============================== NEW PROJECT MODAL ======================= */
 const newProjectOverlay = document.getElementById('newProjectOverlay');
 const NP_PLACEHOLDER = 'Type here the name…';
@@ -1144,6 +1193,65 @@ clearBtn.addEventListener('click', () => {
   renderBoard();
   updateTabCounts();
   searchBox.focus();
+});
+
+/* ---------- Filters panel ---------- */
+const filterPanel = document.getElementById('filterPanel');
+document.getElementById('btnFilters').addEventListener('click', (e) => {
+  e.stopPropagation();
+  filterPanel.classList.toggle('hidden');
+});
+filterPanel.addEventListener('click', (e) => e.stopPropagation());
+document.addEventListener('click', () => filterPanel.classList.add('hidden'));
+
+function updateFilterCount(){
+  const active = [
+    FILTERS.ownerId, FILTERS.notInvoiceable, FILTERS.noBudget,
+    FILTERS.progressMin != null, FILTERS.progressMax != null,
+  ].filter(Boolean).length;
+  const badge = document.getElementById('filterCount');
+  badge.textContent = active || '';
+  badge.classList.toggle('hidden', !active);
+}
+
+function applyFilters(){
+  updateFilterCount();
+  renderBoard();
+  updateTabCounts();
+}
+
+document.getElementById('filterOwner').addEventListener('change', (e) => {
+  FILTERS.ownerId = e.target.value;
+  applyFilters();
+});
+document.getElementById('filterNotInvoiceable').addEventListener('change', (e) => {
+  FILTERS.notInvoiceable = e.target.checked;
+  applyFilters();
+});
+document.getElementById('filterNoBudget').addEventListener('change', (e) => {
+  FILTERS.noBudget = e.target.checked;
+  applyFilters();
+});
+document.getElementById('filterProgressMin').addEventListener('input', (e) => {
+  FILTERS.progressMin = e.target.value === '' ? null : Number(e.target.value);
+  applyFilters();
+});
+document.getElementById('filterProgressMax').addEventListener('input', (e) => {
+  FILTERS.progressMax = e.target.value === '' ? null : Number(e.target.value);
+  applyFilters();
+});
+document.getElementById('btnClearFilters').addEventListener('click', () => {
+  FILTERS.ownerId = '';
+  FILTERS.notInvoiceable = false;
+  FILTERS.noBudget = false;
+  FILTERS.progressMin = null;
+  FILTERS.progressMax = null;
+  document.getElementById('filterOwner').value = '';
+  document.getElementById('filterNotInvoiceable').checked = false;
+  document.getElementById('filterNoBudget').checked = false;
+  document.getElementById('filterProgressMin').value = '';
+  document.getElementById('filterProgressMax').value = '';
+  applyFilters();
 });
 
 document.getElementById('btnRefresh').addEventListener('click', () => {

@@ -17,8 +17,11 @@
  *   timeoffapprovers     employeeid — allow-list. Presence = can
  *                        approve/reject ANYONE's time-off requests.
  *
- * Admins bypass every module restriction and always count as a time-off
- * approver — mirrors Access's "global admins, regardless of environment".
+ * Admins bypass every module restriction (mirrors Access's "global admins,
+ * regardless of environment"), but do NOT automatically count as a
+ * time-off approver — that's a fully independent flag, requested
+ * explicitly after Settings' UI/copy implied otherwise. Someone who needs
+ * both has to be granted both.
  *
  * `employees.deactivated` (pre-existing column, already used to filter
  * lookups) is enforced here too: a deactivated employee is denied by every
@@ -73,7 +76,6 @@ async function isAdmin(employeeId) {
 
 async function isTimeOffApprover(employeeId) {
   if (!employeeId) return false;
-  if (await isAdmin(employeeId)) return true;
   const { rows } = await pool.query(`SELECT 1 FROM timeoffapprovers WHERE employeeid = $1`, [employeeId]);
   return rows.length > 0;
 }

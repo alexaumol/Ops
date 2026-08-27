@@ -669,8 +669,7 @@ router.post("/:id/notes", async (req, res) => {
   }
 });
 
-// GET /api/projects/:id/quotations — read-only; quotations are entered
-// through the finance workflow, not this modal.
+// GET /api/projects/:id/quotations
 router.get("/:id/quotations", async (req, res) => {
   try {
     const { rows } = await pool.query(
@@ -684,6 +683,37 @@ router.get("/:id/quotations", async (req, res) => {
     res.json(rows);
   } catch (err) {
     console.error("[GET /api/projects/:id/quotations] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
+// POST /api/projects/:id/quotations — add a new quotation row. Logs a
+// projectchangelog entry (see GET /:id/history) — this is real money data,
+// worth tracking who added what and when same as any other project edit.
+router.post("/:id/quotations", async (req, res) => {
+  const { quotationdate, amountquoted, discountnegotiation, expenses, finalquotation, details, employeeId } = req.body || {};
+  try {
+    const { rows } = await pool.query(
+      `INSERT INTO projectquotations
+         (projectid, quotationdate, amountquoted, discountnegotiation, expenses, finalquotation, details)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING id, amountquoted, expenses, discountnegotiation, finalquotation, quotationdate, details`,
+      [
+        req.params.id, quotationdate || null, amountquoted ?? null, discountnegotiation ?? null,
+        expenses ?? null, finalquotation ?? null, details || null,
+      ]
+    );
+    const q = rows[0];
+    const amount = q.finalquotation ?? q.amountquoted;
+    const summary = `Quotation added: ${amount != null ? `€${Number(amount).toLocaleString()}` : "(no amount)"}` +
+      (q.quotationdate ? ` dated ${new Date(q.quotationdate).toLocaleDateString()}` : "");
+    await pool.query(
+      `INSERT INTO projectchangelog (projectid, changedat, changedby, summary) VALUES ($1, now(), $2, $3)`,
+      [req.params.id, employeeId || null, summary]
+    );
+    res.status(201).json(q);
+  } catch (err) {
+    console.error("[POST /api/projects/:id/quotations] DB error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });
   }
 });
