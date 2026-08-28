@@ -67,7 +67,7 @@
 
       <!-- ==================== HOLIDAYS ==================== -->
       <section id="paneHolidays" class="settings-pane hidden">
-        <p class="settings-note">Public holidays imported from the Generalitat de Catalunya open-data feed, plus company days set here by HR. Both feed the calendars in Time allocation and Reports.</p>
+        <p class="settings-note">Public holidays (2024 onwards) imported from the Generalitat de Catalunya open-data feed, plus HITT company days and local bank holidays set here by HR. All feed the calendars in Time allocation and Reports.</p>
         <div class="settings-toolbar" style="gap:0.75rem; flex-wrap:wrap;">
           <label class="settings-inline-field">Year
             <select id="holidayYearFilter"><option value="">All years</option></select>
@@ -86,7 +86,11 @@
           <div class="settings-add-row">
             <input type="date" id="newHolidayDate" />
             <input type="text" id="newHolidayDesc" placeholder="Holiday description…" />
-            <button class="btn btn-primary" id="btnAddHoliday">Add HITT holiday</button>
+            <select id="newHolidayType" title="Holiday type">
+              <option value="hitt">HITT holiday</option>
+              <option value="local">Local bank holiday</option>
+            </select>
+            <button class="btn btn-primary" id="btnAddHoliday">Add</button>
           </div>
         </div>
       </section>
@@ -116,14 +120,17 @@
           <label class="settings-inline-field">User
             <select id="auditUserFilter"><option value="">Everyone</option></select>
           </label>
+          <label class="settings-inline-field">Action
+            <select id="auditKindFilter"><option value="">All actions</option></select>
+          </label>
           <label class="settings-inline-field">From
             <input type="date" id="auditStartDate" />
           </label>
           <label class="settings-inline-field">To
             <input type="date" id="auditEndDate" />
           </label>
-          <label class="settings-inline-field">Search
-            <input type="text" id="auditSearch" placeholder="text, action, IP…" />
+          <label class="settings-inline-field">Search details
+            <input type="text" id="auditSearch" placeholder="text in Details…" />
           </label>
           <button class="btn btn-secondary" id="btnAuditClear">Clear</button>
         </div>
@@ -131,12 +138,12 @@
           <table class="settings-table audit-table">
             <thead>
               <tr>
-                <th>When</th>
-                <th>User</th>
-                <th>Action</th>
-                <th>Details</th>
-                <th>IP</th>
-                <th>Computer / device</th>
+                <th data-sort="at">When<span class="sort-arrow"></span></th>
+                <th data-sort="user">User<span class="sort-arrow"></span></th>
+                <th data-sort="action">Action<span class="sort-arrow"></span></th>
+                <th data-sort="details">Details<span class="sort-arrow"></span></th>
+                <th data-sort="ip">IP<span class="sort-arrow"></span></th>
+                <th data-sort="computer">Computer / device<span class="sort-arrow"></span></th>
               </tr>
             </thead>
             <tbody id="auditTableBody"></tbody>

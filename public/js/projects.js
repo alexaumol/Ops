@@ -362,6 +362,49 @@ function renderBoard(){
     attachDropZone(body);
     board.appendChild(col);
   });
+
+  renderQuickDrop();
+}
+
+// Quick-drop targets for Closed / Cancelled, shown in the gap between the
+// board and the insights panel — only on the Alive tab, only visible while
+// a card is being dragged (#kanbanBody.is-dragging in projects.css). Lets
+// you close or cancel a project without switching to the Closed tab first.
+function renderQuickDrop(){
+  const qd = document.getElementById('kbQuickdrop');
+  if (!qd) return;
+  const closedStages = currentTab === 'alive' ? STAGES.filter(s => s.set === 'closed') : [];
+  if (!closedStages.length) {
+    qd.innerHTML = '';
+    qd.dataset.enabled = 'false';
+    return;
+  }
+  qd.dataset.enabled = 'true';
+  qd.innerHTML = closedStages.map(s => `
+    <div class="kb-quickdrop-zone" data-stage="${s.id}" style="--qd-color:${s.color}">
+      <span class="kb-quickdrop-icon">${s.icon}</span>
+      <span class="kb-quickdrop-label">Move to<br><b>${escapeHtml(s.label)}</b></span>
+    </div>
+  `).join('');
+  qd.querySelectorAll('.kb-quickdrop-zone').forEach(zone => {
+    zone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      zone.classList.add('drag-over');
+    });
+    zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+    zone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      zone.classList.remove('drag-over');
+      const id = e.dataTransfer.getData('text/plain');
+      if (id) moveProject(id, Number(zone.dataset.stage));
+    });
+  });
+}
+
+function setKanbanDragging(on){
+  document.getElementById('kanbanBody')?.classList.toggle('is-dragging', on);
+  if (!on) document.querySelectorAll('.kb-quickdrop-zone').forEach(z => z.classList.remove('drag-over'));
 }
 
 function renderCard(p, stage){
@@ -397,10 +440,12 @@ function renderCard(p, stage){
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', String(p.id));
     requestAnimationFrame(() => card.classList.add('dragging'));
+    setKanbanDragging(true);
   });
   card.addEventListener('dragend', () => {
     card.classList.remove('dragging');
     document.querySelectorAll('.col-body').forEach(b => b.classList.remove('drag-over','drag-invalid'));
+    setKanbanDragging(false);
   });
   card.addEventListener('dblclick', () => openProjectModal(p.id));
   card.addEventListener('keydown', (e) => {

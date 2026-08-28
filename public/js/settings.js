@@ -191,7 +191,7 @@ document.querySelectorAll("[data-stab]").forEach((btn) => {
     }
     if (tab === "audit" && !auditLoaded) {
       auditLoaded = true;
-      loadAuditUsers().then(loadAudit);
+      Promise.all([loadAuditUsers(), loadAuditKinds()]).then(loadAudit);
     }
   });
 });
@@ -243,9 +243,10 @@ function renderHolidays() {
     return;
   }
   empty.classList.add("hidden");
+  const SRC_LABELS = { catalonia: "Public", hitt: "HITT", local: "Local", legacy: "Legacy" };
   tbody.innerHTML = HOLIDAYS.map((h) => {
     const src = String(h.source || "legacy");
-    const srcLabel = src === "catalonia" ? "Public" : src === "hitt" ? "HITT" : "Legacy";
+    const srcLabel = SRC_LABELS[src] || "Legacy";
     return `
       <tr>
         <td>${fmtDate(h.date)}</td>
@@ -277,15 +278,16 @@ document.getElementById("holidayYearFilter").addEventListener("change", loadHoli
 document.getElementById("btnAddHoliday").addEventListener("click", async () => {
   const date = document.getElementById("newHolidayDate").value;
   const desc = document.getElementById("newHolidayDesc").value.trim();
+  const kind = document.getElementById("newHolidayType").value; // 'hitt' | 'local'
   if (!date || !desc) {
     toast("Pick a date and enter a description.", "red");
     return;
   }
   try {
-    await HITT_API.addHoliday({ date, description: desc });
+    await HITT_API.addHoliday({ date, description: desc, kind });
     document.getElementById("newHolidayDate").value = "";
     document.getElementById("newHolidayDesc").value = "";
-    toast("HITT holiday added.", "green");
+    toast(`${kind === "local" ? "Local bank holiday" : "HITT holiday"} added.`, "green");
     await loadHolidayYears();
     await loadHolidays();
   } catch (err) {
@@ -296,7 +298,7 @@ document.getElementById("btnAddHoliday").addEventListener("click", async () => {
 document.getElementById("btnImportHolidays").addEventListener("click", async () => {
   const btn = document.getElementById("btnImportHolidays");
   const status = document.getElementById("holidayImportStatus");
-  if (!confirm("Import public holidays from the Generalitat de Catalunya feed? This replaces the previously imported set — HITT holidays you added here are kept.")) return;
+  if (!confirm("Import public holidays (2024 onwards) from the Generalitat de Catalunya feed? This replaces the previously imported set — HITT and local holidays you added here are kept.")) return;
   btn.disabled = true;
   status.textContent = "Importing…";
   try {
@@ -405,6 +407,8 @@ document.getElementById("btnAddCalendarYear").addEventListener("click", async ()
 let auditPage = 1;
 let auditTotal = 0;
 let auditSearchDebounce = null;
+let auditSort = "at";
+let auditDir = "desc";
 
 const AUDIT_CATEGORY = {
   project: "Project",
@@ -440,16 +444,61 @@ async function loadAuditUsers() {
   }
 }
 
+async function loadAuditKinds() {
+  try {
+    const kinds = await HITT_API.getAuditKinds();
+    const sel = document.getElementById("auditKindFilter");
+    const current = sel.value;
+    // Category shortcuts first, then the exact codes actually present.
+    const cats = Object.entries({ session: "Session", ...AUDIT_CATEGORY })
+      .map(([k, label]) => `<option value="cat:${k}">All ${label}</option>`).join("");
+    const specific = kinds.map((k) => `<option value="${escapeHtml(k)}">${escapeHtml(k)}</option>`).join("");
+    sel.innerHTML =
+      `<option value="">All actions</option>` +
+      `<optgroup label="By category">${cats}</optgroup>` +
+      (specific ? `<optgroup label="Specific">${specific}</optgroup>` : "");
+    sel.value = current; // keep selection if still valid; browser drops it otherwise
+  } catch (err) {
+    console.error("[settings] audit kinds:", err.message);
+  }
+}
+
 function auditFilters() {
   return {
     userId: document.getElementById("auditUserFilter").value || undefined,
+    kind: document.getElementById("auditKindFilter").value || undefined,
     startDate: document.getElementById("auditStartDate").value || undefined,
     endDate: document.getElementById("auditEndDate").value || undefined,
     search: document.getElementById("auditSearch").value.trim() || undefined,
+    sort: auditSort,
+    dir: auditDir,
     page: auditPage,
     limit: Number(document.getElementById("auditPageSize").value),
   };
 }
+
+function updateAuditSortIndicators() {
+  document.querySelectorAll(".audit-table th[data-sort]").forEach((th) => {
+    const active = th.dataset.sort === auditSort;
+    th.classList.toggle("sorted", active);
+    const arrow = th.querySelector(".sort-arrow");
+    if (arrow) arrow.textContent = active ? (auditDir === "asc" ? "▲" : "▼") : "";
+  });
+}
+
+document.querySelectorAll(".audit-table th[data-sort]").forEach((th) => {
+  th.addEventListener("click", () => {
+    const col = th.dataset.sort;
+    if (auditSort === col) {
+      auditDir = auditDir === "asc" ? "desc" : "asc";
+    } else {
+      auditSort = col;
+      auditDir = col === "at" ? "desc" : "asc";
+    }
+    auditPage = 1;
+    loadAudit();
+  });
+});
 
 async function loadAudit() {
   const tbody = document.getElementById("auditTableBody");
@@ -468,6 +517,7 @@ async function loadAudit() {
     auditTotal = 0;
   }
   updateAuditPagination();
+  updateAuditSortIndicators();
 }
 
 function renderAudit(rows) {
@@ -508,7 +558,7 @@ function updateAuditPagination() {
   document.getElementById("btnAuditNext").disabled = auditPage >= pages;
 }
 
-["auditUserFilter", "auditStartDate", "auditEndDate", "auditPageSize"].forEach((id) => {
+["auditUserFilter", "auditKindFilter", "auditStartDate", "auditEndDate", "auditPageSize"].forEach((id) => {
   document.getElementById(id).addEventListener("change", () => { auditPage = 1; loadAudit(); });
 });
 document.getElementById("auditSearch").addEventListener("input", () => {
@@ -517,9 +567,12 @@ document.getElementById("auditSearch").addEventListener("input", () => {
 });
 document.getElementById("btnAuditClear").addEventListener("click", () => {
   document.getElementById("auditUserFilter").value = "";
+  document.getElementById("auditKindFilter").value = "";
   document.getElementById("auditStartDate").value = "";
   document.getElementById("auditEndDate").value = "";
   document.getElementById("auditSearch").value = "";
+  auditSort = "at";
+  auditDir = "desc";
   auditPage = 1;
   loadAudit();
 });

@@ -132,12 +132,16 @@ const HITT_API = (() => {
       request(`/api/settings/work-calendar/${year}`, { method: "PUT", body: JSON.stringify(payload) }),
 
     getAuditUsers: () => request("/api/audit/users"),
+    getAuditKinds: () => request("/api/audit/kinds"),
     getAuditLogs: (filters = {}) => {
       const params = new URLSearchParams();
       if (filters.userId) params.set("userId", filters.userId);
       if (filters.startDate) params.set("startDate", filters.startDate);
       if (filters.endDate) params.set("endDate", filters.endDate);
       if (filters.search) params.set("search", filters.search);
+      if (filters.kind) params.set("kind", filters.kind);
+      if (filters.sort) params.set("sort", filters.sort);
+      if (filters.dir) params.set("dir", filters.dir);
       if (filters.page) params.set("page", filters.page);
       if (filters.limit) params.set("limit", filters.limit);
       const qs = params.toString();

@@ -103,6 +103,11 @@
       <div id="board" class="h-full min-w-max grid grid-flow-col auto-cols-[264px] sm:auto-cols-[280px] gap-3"></div>
     </main>
 
+    <!-- Quick-drop targets for Closed / Cancelled — only revealed while a
+         card is being dragged on the Alive tab (see #kanbanBody.is-dragging
+         in projects.css and renderQuickDrop() in projects.js). -->
+    <div id="kbQuickdrop" data-enabled="false" aria-hidden="true"></div>
+
     <aside id="kanbanInsights">
       <div class="ki-section" data-ki-key="ready">
         <button type="button" class="ki-head" aria-expanded="true">

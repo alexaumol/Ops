@@ -82,7 +82,8 @@
   border-top: 1px solid var(--border-subtle);
   background: var(--bg-surface-alt);
 }
-.settings-add-row input {
+.settings-add-row input,
+.settings-add-row select {
   padding: 0.4rem 0.55rem;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border-subtle);
@@ -124,6 +125,13 @@
 }
 .hol-source-chip.is-hitt { background: rgba(110,143,90,0.15); color: #4C6B3A; }
 .hol-source-chip.is-catalonia { background: rgba(92,117,124,0.15); color: #3E5559; }
+.hol-source-chip.is-local { background: rgba(188,154,28,0.16); color: #8A6E12; }
+
+/* Sortable settings-table headers (Auditing) */
+.settings-table th[data-sort] { cursor: pointer; user-select: none; white-space: nowrap; }
+.settings-table th[data-sort]:hover { color: var(--text-primary); }
+.settings-table th[data-sort] .sort-arrow { margin-left: 0.25rem; font-size: 0.7em; opacity: 0.5; }
+.settings-table th[data-sort].sorted .sort-arrow { opacity: 1; }
 
 .settings-toolbar {
   display: flex;

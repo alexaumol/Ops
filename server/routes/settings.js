@@ -271,10 +271,12 @@ router.get("/holidays/years", async (req, res) => {
   }
 });
 
-// POST /api/settings/holidays   { date: 'YYYY-MM-DD', description }
-// Adds one HR-defined HITT holiday (source = 'hitt').
+// POST /api/settings/holidays   { date: 'YYYY-MM-DD', description, kind: 'hitt' | 'local' }
+// Adds one HR-defined holiday: a company ("hitt") day or a local bank
+// ("local") holiday. Both are left untouched by the Catalonia re-import.
 router.post("/holidays", async (req, res) => {
   const { date, description } = req.body || {};
+  const kind = req.body?.kind === "local" ? "local" : "hitt";
   if (!date || !description || !description.trim()) {
     return res.status(400).json({ error: "bad_request", message: "date and description are required." });
   }
@@ -282,13 +284,16 @@ router.post("/holidays", async (req, res) => {
     await ensureSettingsSchema();
     const { rows } = await pool.query(
       `INSERT INTO holidays (holidaycode, holidayyear, holidaydate, holidaydesc, holidayweekday, source)
-       VALUES ($1, EXTRACT(YEAR FROM $2::date), $2::date, $3, TRIM(TO_CHAR($2::date, 'Day')), 'hitt')
+       VALUES ($1, EXTRACT(YEAR FROM $2::date), $2::date, $3, TRIM(TO_CHAR($2::date, 'Day')), $4)
        RETURNING id, holidaydate AS date, holidaydesc AS description, holidaycode AS code,
                  holidayyear AS year, holidayweekday AS weekday, source`,
-      [`HITT-${Date.now()}`, date, description.trim()]
+      [`${kind.toUpperCase()}-${Date.now()}`, date, description.trim(), kind]
     );
     res.status(201).json(rows[0]);
-    logAudit(req, { kind: "settings.holiday.add", desc: `Added HITT holiday ${date} — "${description.trim()}"` });
+    logAudit(req, {
+      kind: "settings.holiday.add",
+      desc: `Added ${kind === "local" ? "local bank" : "HITT"} holiday ${date} — "${description.trim()}"`,
+    });
   } catch (err) {
     console.error("[POST /api/settings/holidays] DB error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });
@@ -348,6 +353,10 @@ router.post("/holidays/import", async (req, res) => {
       return res.status(502).json({ error: "upstream_error", message: "Holiday feed format not recognised." });
     }
 
+    // Only import 2024 onwards — the feed goes back to 2011 and older
+    // records aren't useful here (any that were imported before are removed
+    // by the DELETE below).
+    const IMPORT_FROM = "2024-01-01";
     const records = (payload.data || [])
       .map((r) => ({
         code: idx.code > -1 ? r[idx.code] : null,
@@ -355,7 +364,7 @@ router.post("/holidays/import", async (req, res) => {
         date: r[idx.date] ? String(r[idx.date]).slice(0, 10) : null,
         name: r[idx.name],
       }))
-      .filter((r) => r.date && r.name);
+      .filter((r) => r.date && r.name && r.date >= IMPORT_FROM);
 
     if (!records.length) {
       client.release();

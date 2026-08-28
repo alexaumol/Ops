@@ -141,3 +141,46 @@ body { background: #F5F4EE; }
 .ki-item-code { font-family: ui-monospace, "SFMono-Regular", monospace; font-size: 10px; font-weight: 700; color: #5C757C; }
 .ki-item-name { font-size: 12px; font-weight: 600; color: #171717; line-height: 1.25; }
 .ki-item-meta { font-size: 10px; color: #8A8676; margin-top: 0.1rem; }
+
+/* ---------- Kanban quick-drop (Closed / Cancelled) ---------- */
+#kbQuickdrop {
+  flex-shrink: 0;
+  width: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.9rem;
+  transition: width .14s ease, padding .14s ease;
+}
+#kanbanBody.is-dragging #kbQuickdrop[data-enabled="true"] {
+  width: 150px;
+  padding: 0 0.6rem;
+}
+@media (max-width: 900px) {
+  #kanbanBody.is-dragging #kbQuickdrop { width: 0 !important; padding: 0 !important; }
+}
+.kb-quickdrop-zone {
+  border: 2px dashed var(--qd-color, #8A8676);
+  border-radius: 12px;
+  background: #fff;
+  color: var(--qd-color, #8A8676);
+  min-height: 104px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  font-size: 12px;
+  line-height: 1.25;
+  text-align: center;
+  transition: background .12s ease, border-style .12s ease, transform .12s ease;
+}
+.kb-quickdrop-zone.drag-over {
+  background: var(--qd-color, #8A8676);
+  color: #fff;
+  border-style: solid;
+  transform: scale(1.03);
+}
+.kb-quickdrop-icon { width: 22px; height: 22px; display: flex; }
+.kb-quickdrop-icon svg { width: 100%; height: 100%; }
