@@ -31,6 +31,7 @@ function isoDay(v) { return v ? String(v).slice(0, 10) : ""; }
 
 let PROJECTS = [];
 let EMPLOYEES = [];
+let CATEGORIES = [];
 let ROWS = [];
 let page = 1;
 let total = 0;
@@ -52,12 +53,17 @@ function filters() {
   return {
     search: document.getElementById("expSearch").value.trim() || undefined,
     scope: currentScope() || undefined,
-    category: document.getElementById("expCategoryFilter").value || undefined,
+    categoryId: document.getElementById("expCategoryFilter").value || undefined,
     startDate: document.getElementById("expStartDate").value || undefined,
     endDate: document.getElementById("expEndDate").value || undefined,
     page,
     limit: Number(document.getElementById("expPageSize").value),
   };
+}
+
+function categoryOptions(selectedId, blankLabel) {
+  return `<option value="">${blankLabel || "—"}</option>` +
+    CATEGORIES.map((c) => `<option value="${c.id}" ${String(c.id) === String(selectedId) ? "selected" : ""}>${escapeHtml(c.name)}</option>`).join("");
 }
 
 document.querySelectorAll(".exp-scope-btn").forEach((btn) => {
@@ -201,8 +207,10 @@ function employeeOptions(selectedId) {
 }
 
 function syncProjectRow() {
-  document.getElementById("expProjectRow").style.display =
-    document.getElementById("expInternal").checked ? "none" : "";
+  const internal = document.getElementById("expInternal").checked;
+  document.getElementById("expProjectRow").style.display = internal ? "none" : "";
+  // "Re-invoiceable" only makes sense for a project expense.
+  document.getElementById("expInvoiceableRow").style.display = internal ? "none" : "";
 }
 document.getElementById("expInternal").addEventListener("change", syncProjectRow);
 
@@ -213,13 +221,13 @@ function openExpenseModal(row) {
   document.getElementById("expDelete").classList.toggle("hidden", !row);
 
   document.getElementById("expDate").value = isoDay(row?.expenseDate) || new Date().toISOString().slice(0, 10);
-  document.getElementById("expCategory").value = row?.category || "";
+  document.getElementById("expCategory").innerHTML = categoryOptions(row?.categoryId, "— none —");
   document.getElementById("expDescription").value = row?.description || "";
   document.getElementById("expAmount").value = row?.amount ?? "";
-  document.getElementById("expCurrency").value = row?.currency || "EUR";
   document.getElementById("expPaidBy").innerHTML = employeeOptions(row?.paidById);
   document.getElementById("expInternal").checked = !!row?.isInternal;
   document.getElementById("expProject").innerHTML = projectOptions(row?.projectId);
+  document.getElementById("expInvoiceable").checked = !!row?.invoiceable;
   syncProjectRow();
 
   document.getElementById("expDocFile").value = "";
@@ -266,13 +274,13 @@ document.getElementById("expSave").addEventListener("click", async () => {
 
   const fd = new FormData();
   fd.set("expenseDate", document.getElementById("expDate").value || "");
-  fd.set("category", document.getElementById("expCategory").value.trim());
+  fd.set("categoryId", document.getElementById("expCategory").value || "");
   fd.set("description", document.getElementById("expDescription").value.trim());
   fd.set("amount", amount);
-  fd.set("currency", document.getElementById("expCurrency").value.trim() || "EUR");
   fd.set("isInternal", internal ? "true" : "false");
   fd.set("projectId", internal ? "" : (document.getElementById("expProject").value || ""));
   fd.set("paidBy", document.getElementById("expPaidBy").value || "");
+  fd.set("invoiceable", (!internal && document.getElementById("expInvoiceable").checked) ? "true" : "false");
   const file = document.getElementById("expDocFile").files[0];
   if (file) fd.set("document", file);
 
@@ -305,7 +313,8 @@ document.getElementById("expDelete").addEventListener("click", async () => {
 const bulkOverlay = document.getElementById("bulkOverlay");
 document.getElementById("btnBulkEdit").addEventListener("click", () => {
   if (!selected.size) return;
-  document.getElementById("bulkCategory").value = "";
+  document.getElementById("bulkCategory").innerHTML = categoryOptions("", "— keep —");
+  document.getElementById("bulkInvoiceable").value = "";
   document.getElementById("bulkChangeProject").checked = false;
   document.getElementById("bulkInternal").checked = false;
   document.getElementById("bulkProjectWrap").style.display = "none";
@@ -322,8 +331,10 @@ document.getElementById("bulkChangeProject").addEventListener("change", (e) => {
 
 document.getElementById("bulkApply").addEventListener("click", async () => {
   const patch = {};
-  const cat = document.getElementById("bulkCategory").value.trim();
-  if (cat) patch.category = cat;
+  const cat = document.getElementById("bulkCategory").value;
+  if (cat) patch.categoryId = cat;
+  const inv = document.getElementById("bulkInvoiceable").value;
+  if (inv !== "") patch.invoiceable = inv === "true";
   if (document.getElementById("bulkChangeProject").checked) {
     const internal = document.getElementById("bulkInternal").checked;
     patch.isInternal = internal;
@@ -359,9 +370,10 @@ document.getElementById("btnBulkDelete").addEventListener("click", async () => {
     HITT_API.getProjects(),
   ]);
   if (cats.status === "fulfilled") {
-    const opts = cats.value.map((c) => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("");
-    document.getElementById("expCategoryList").innerHTML = opts;
-    document.getElementById("expCategoryFilter").innerHTML = `<option value="">Any</option>` + opts;
+    CATEGORIES = cats.value || [];
+    document.getElementById("expCategoryFilter").innerHTML =
+      `<option value="">Any category</option>` +
+      CATEGORIES.map((c) => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join("");
   }
   if (emps.status === "fulfilled") EMPLOYEES = emps.value;
   if (projs.status === "fulfilled") {

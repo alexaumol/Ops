@@ -297,6 +297,7 @@ let holidaysLoaded = false;
 let calendarLoaded = false;
 let auditLoaded = false;
 let pathsLoaded = false;
+let expCatsLoaded = false;
 
 document.querySelectorAll("[data-stab]").forEach((btn) => {
   btn.addEventListener("click", () => {
@@ -307,6 +308,7 @@ document.querySelectorAll("[data-stab]").forEach((btn) => {
     document.getElementById("paneHolidays").classList.toggle("hidden", tab !== "holidays");
     document.getElementById("paneCalendar").classList.toggle("hidden", tab !== "calendar");
     document.getElementById("panePaths").classList.toggle("hidden", tab !== "paths");
+    document.getElementById("paneExpCats").classList.toggle("hidden", tab !== "expcats");
     document.getElementById("paneAudit").classList.toggle("hidden", tab !== "audit");
     if (tab === "holidays" && !holidaysLoaded) {
       holidaysLoaded = true;
@@ -319,6 +321,10 @@ document.querySelectorAll("[data-stab]").forEach((btn) => {
     if (tab === "paths" && !pathsLoaded) {
       pathsLoaded = true;
       loadPaths();
+    }
+    if (tab === "expcats" && !expCatsLoaded) {
+      expCatsLoaded = true;
+      loadExpenseCategories();
     }
     if (tab === "audit" && !auditLoaded) {
       auditLoaded = true;
@@ -373,6 +379,96 @@ async function loadPaths() {
     });
   });
 }
+
+/* ============================== EXPENSE CATEGORIES =================== */
+let EXP_CATS = [];
+
+async function loadExpenseCategories() {
+  const tbody = document.getElementById("expCatTableBody");
+  const empty = document.getElementById("expCatEmpty");
+  tbody.innerHTML = `<tr><td colspan="3" class="settings-emp-sub" style="padding:1rem;">Loading…</td></tr>`;
+  empty.classList.add("hidden");
+  try {
+    EXP_CATS = await HITT_API.getExpenseCategoriesAdmin();
+    renderExpenseCategories();
+  } catch (err) {
+    console.error("[settings] expense categories:", err.message);
+    tbody.innerHTML = "";
+    empty.textContent = "Could not load expense categories.";
+    empty.classList.remove("hidden");
+  }
+}
+
+function renderExpenseCategories() {
+  const tbody = document.getElementById("expCatTableBody");
+  const empty = document.getElementById("expCatEmpty");
+  if (!EXP_CATS.length) {
+    tbody.innerHTML = "";
+    empty.textContent = "No categories yet.";
+    empty.classList.remove("hidden");
+    return;
+  }
+  empty.classList.add("hidden");
+  tbody.innerHTML = EXP_CATS.map((c) => `
+    <tr data-id="${c.id}">
+      <td><input type="text" class="cal-input" style="width:16rem; text-align:left;" data-cat-name value="${escapeHtml(c.name)}" /></td>
+      <td class="settings-emp-sub" style="text-align:right;">${c.usageCount}</td>
+      <td style="text-align:right;">
+        <button class="icon-btn" data-del-cat title="${c.usageCount ? "In use — cannot delete" : "Delete"}" ${c.usageCount ? "disabled style='opacity:.35;'" : ""}>✕</button>
+      </td>
+    </tr>
+  `).join("");
+  tbody.querySelectorAll("input[data-cat-name]").forEach((input) => {
+    let original = input.value;
+    input.addEventListener("focus", () => { original = input.value; });
+    input.addEventListener("change", async () => {
+      const name = input.value.trim();
+      const id = input.closest("tr").dataset.id;
+      if (!name || name === original) { input.value = original; return; }
+      try {
+        await HITT_API.renameExpenseCategory(id, name);
+        original = name;
+        const cat = EXP_CATS.find((x) => String(x.id) === String(id));
+        if (cat) cat.name = name;
+        toast("Category renamed.", "green");
+      } catch (err) {
+        input.value = original;
+        toast(`Couldn't rename: ${err.message}`, "red");
+      }
+    });
+  });
+  tbody.querySelectorAll("[data-del-cat]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const id = btn.closest("tr").dataset.id;
+      const cat = EXP_CATS.find((x) => String(x.id) === String(id));
+      if (!cat || !confirm(`Delete the "${cat.name}" expense category?`)) return;
+      try {
+        await HITT_API.deleteExpenseCategory(id);
+        EXP_CATS = EXP_CATS.filter((x) => String(x.id) !== String(id));
+        renderExpenseCategories();
+        toast("Category deleted.", "navy");
+      } catch (err) {
+        toast(`Couldn't delete: ${err.message}`, "red");
+      }
+    });
+  });
+}
+
+document.getElementById("btnAddExpCat").addEventListener("click", async () => {
+  const input = document.getElementById("newExpCatName");
+  const name = input.value.trim();
+  if (!name) { toast("Enter a category name.", "red"); return; }
+  try {
+    const created = await HITT_API.createExpenseCategory(name);
+    EXP_CATS.push(created);
+    EXP_CATS.sort((a, b) => a.name.localeCompare(b.name));
+    input.value = "";
+    renderExpenseCategories();
+    toast("Category added.", "green");
+  } catch (err) {
+    toast(`Couldn't add: ${err.message}`, "red");
+  }
+});
 
 /* ============================== HOLIDAYS ============================== */
 let HOLIDAYS = [];

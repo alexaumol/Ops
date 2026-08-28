@@ -37,6 +37,7 @@
         <button data-stab="holidays" class="settings-tab" role="tab" aria-selected="false">Holidays</button>
         <button data-stab="calendar" class="settings-tab" role="tab" aria-selected="false">Work calendar</button>
         <button data-stab="paths" class="settings-tab" role="tab" aria-selected="false">Paths</button>
+        <button data-stab="expcats" class="settings-tab" role="tab" aria-selected="false">Expense categories</button>
         <button data-stab="audit" class="settings-tab" role="tab" aria-selected="false">Auditing</button>
       </div>
 
@@ -120,6 +121,24 @@
       <section id="panePaths" class="settings-pane hidden">
         <p class="settings-note">Configurable file paths used elsewhere in the app. Changes take effect on the next add/edit that uses them (existing records aren't rewritten automatically).</p>
         <div id="pathsList" class="paths-list"></div>
+      </section>
+
+      <!-- ==================== EXPENSE CATEGORIES ==================== -->
+      <section id="paneExpCats" class="settings-pane hidden">
+        <p class="settings-note">The category list for the Expenses module. A category can't be deleted while any expense still uses it.</p>
+        <div class="settings-table-wrap">
+          <table class="settings-table">
+            <thead>
+              <tr><th>Category</th><th style="text-align:right;">In use</th><th></th></tr>
+            </thead>
+            <tbody id="expCatTableBody"></tbody>
+          </table>
+          <div id="expCatEmpty" class="settings-pane-empty hidden">No categories yet.</div>
+          <div class="settings-add-row">
+            <input type="text" id="newExpCatName" placeholder="New category name…" />
+            <button class="btn btn-primary" id="btnAddExpCat">Add category</button>
+          </div>
+        </div>
       </section>
 
       <!-- ==================== AUDITING ==================== -->

@@ -102,26 +102,20 @@
             </div>
             <div>
               <label class="field-label">Category</label>
-              <input id="expCategory" type="text" class="field-input" list="expCategoryList" placeholder="e.g. Hotel" />
-              <datalist id="expCategoryList"></datalist>
+              <select id="expCategory" class="field-input"></select>
             </div>
             <div class="span-2">
               <label class="field-label">Description</label>
               <input id="expDescription" type="text" class="field-input" placeholder="What was it for?" />
             </div>
             <div>
-              <label class="field-label">Amount</label>
+              <label class="field-label">Amount (EUR)</label>
               <input id="expAmount" type="number" step="0.01" min="0" class="field-input" />
-            </div>
-            <div>
-              <label class="field-label">Currency</label>
-              <input id="expCurrency" type="text" class="field-input" value="EUR" maxlength="8" />
             </div>
             <div>
               <label class="field-label">Paid by</label>
               <select id="expPaidBy" class="field-input"></select>
             </div>
-            <div></div>
             <div class="span-2">
               <label style="display:flex; align-items:center; gap:0.4rem; font-size:0.85rem;">
                 <input id="expInternal" type="checkbox" /> Internal expense (not tied to a project)
@@ -130,6 +124,11 @@
             <div class="span-2" id="expProjectRow">
               <label class="field-label">Project</label>
               <select id="expProject" class="field-input"></select>
+            </div>
+            <div class="span-2" id="expInvoiceableRow">
+              <label style="display:flex; align-items:center; gap:0.4rem; font-size:0.85rem;">
+                <input id="expInvoiceable" type="checkbox" /> Re-invoiceable to the client
+              </label>
             </div>
           </div>
         </div>
@@ -170,7 +169,15 @@
           <div class="field-grid">
             <div class="span-2">
               <label class="field-label">Category</label>
-              <input id="bulkCategory" type="text" class="field-input" list="expCategoryList" placeholder="— keep —" />
+              <select id="bulkCategory" class="field-input"><option value="">— keep —</option></select>
+            </div>
+            <div class="span-2">
+              <label class="field-label">Re-invoiceable</label>
+              <select id="bulkInvoiceable" class="field-input">
+                <option value="">— keep —</option>
+                <option value="true">Yes</option>
+                <option value="false">No</option>
+              </select>
             </div>
             <div class="span-2">
               <label style="display:flex; align-items:center; gap:0.4rem; font-size:0.85rem;">

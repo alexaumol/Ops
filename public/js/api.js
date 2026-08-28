@@ -158,10 +158,17 @@ const HITT_API = (() => {
     getWorkCalendar: () => request("/api/settings/work-calendar"),
     setWorkCalendarYear: (year, payload) =>
       request(`/api/settings/work-calendar/${year}`, { method: "PUT", body: JSON.stringify(payload) }),
+    getExpenseCategoriesAdmin: () => request("/api/settings/expense-categories"),
+    createExpenseCategory: (name) =>
+      request("/api/settings/expense-categories", { method: "POST", body: JSON.stringify({ name }) }),
+    renameExpenseCategory: (id, name) =>
+      request(`/api/settings/expense-categories/${id}`, { method: "PATCH", body: JSON.stringify({ name }) }),
+    deleteExpenseCategory: (id) =>
+      request(`/api/settings/expense-categories/${id}`, { method: "DELETE" }),
 
     getExpenses: (filters = {}) => {
       const params = new URLSearchParams();
-      ["search", "projectId", "category", "scope", "startDate", "endDate", "page", "limit"].forEach((k) => {
+      ["search", "projectId", "categoryId", "scope", "startDate", "endDate", "page", "limit"].forEach((k) => {
         if (filters[k] != null && filters[k] !== "") params.set(k, filters[k]);
       });
       const qs = params.toString();

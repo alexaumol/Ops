@@ -726,4 +726,81 @@ router.put("/work-calendar/:year", async (req, res) => {
   }
 });
 
+/* ============================== EXPENSE CATEGORIES =================== */
+// The controlled vocabulary for the Expenses module (expensescategories).
+
+router.get("/expense-categories", async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT ec.id, ec.categorydesc AS name, COALESCE(u.n, 0)::int AS "usageCount"
+       FROM expensescategories ec
+       LEFT JOIN (
+         SELECT categoryid::bigint AS cid, COUNT(*) AS n FROM expenses GROUP BY categoryid::bigint
+       ) u ON u.cid = ec.id
+       ORDER BY ec.categorydesc`
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error("[GET /api/settings/expense-categories] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
+router.post("/expense-categories", async (req, res) => {
+  const name = (req.body?.name || "").trim();
+  if (!name) return res.status(400).json({ error: "bad_request", message: "A category name is required." });
+  try {
+    const dup = await pool.query(`SELECT 1 FROM expensescategories WHERE LOWER(categorydesc) = LOWER($1)`, [name]);
+    if (dup.rows.length) return res.status(409).json({ error: "conflict", message: "That category already exists." });
+    const { rows } = await pool.query(
+      `INSERT INTO expensescategories (categorydesc) VALUES ($1) RETURNING id, categorydesc AS name`, [name]
+    );
+    res.status(201).json({ ...rows[0], usageCount: 0 });
+    logAudit(req, { kind: "settings.expense-category", desc: `Added expense category "${name}"` });
+  } catch (err) {
+    console.error("[POST /api/settings/expense-categories] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
+router.patch("/expense-categories/:id", async (req, res) => {
+  const name = (req.body?.name || "").trim();
+  if (!name) return res.status(400).json({ error: "bad_request", message: "A category name is required." });
+  try {
+    const dup = await pool.query(
+      `SELECT 1 FROM expensescategories WHERE LOWER(categorydesc) = LOWER($1) AND id <> $2`, [name, req.params.id]
+    );
+    if (dup.rows.length) return res.status(409).json({ error: "conflict", message: "Another category already has that name." });
+    const { rowCount } = await pool.query(
+      `UPDATE expensescategories SET categorydesc = $1 WHERE id = $2`, [name, req.params.id]
+    );
+    if (!rowCount) return res.status(404).json({ error: "not_found", message: "Category not found." });
+    res.json({ id: Number(req.params.id), name });
+    logAudit(req, { kind: "settings.expense-category", desc: `Renamed expense category #${req.params.id} to "${name}"` });
+  } catch (err) {
+    console.error("[PATCH /api/settings/expense-categories/:id] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
+router.delete("/expense-categories/:id", async (req, res) => {
+  try {
+    const used = await pool.query(
+      `SELECT 1 FROM expenses WHERE categoryid::bigint = $1::bigint LIMIT 1`, [req.params.id]
+    );
+    if (used.rows.length) {
+      return res.status(409).json({ error: "conflict", message: "This category is used by at least one expense and can't be deleted." });
+    }
+    const { rows } = await pool.query(
+      `DELETE FROM expensescategories WHERE id = $1 RETURNING categorydesc`, [req.params.id]
+    );
+    if (!rows.length) return res.status(404).json({ error: "not_found", message: "Category not found." });
+    res.status(204).end();
+    logAudit(req, { kind: "settings.expense-category", desc: `Deleted expense category "${rows[0].categorydesc}"` });
+  } catch (err) {
+    console.error("[DELETE /api/settings/expense-categories/:id] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
 module.exports = router;
