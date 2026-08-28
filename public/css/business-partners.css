@@ -218,6 +218,32 @@
 }
 .sub-add-row input { flex: 1; }
 
+/* ---------- Tax company add/edit form ---------- */
+.tc-form {
+  padding: 0.7rem 0.75rem;
+  border-top: 1px solid var(--border-subtle);
+  display: flex; flex-direction: column; gap: 0.55rem;
+}
+.tc-form-grid {
+  display: grid; grid-template-columns: 1.4fr 1fr 1.4fr; gap: 0.5rem;
+}
+.tc-same-addr {
+  display: flex; align-items: center; gap: 0.4rem;
+  font-size: 0.8rem; color: var(--text-primary);
+}
+.tc-address-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;
+  padding: 0.6rem; border: 1px dashed var(--border-subtle); border-radius: var(--radius-sm);
+  background: var(--bg-app);
+}
+.tc-address-grid.hidden { display: none; }
+.tc-address-grid .tc-span-2 { grid-column: 1 / -1; }
+.tc-form-actions { display: flex; gap: 0.4rem; }
+@media (max-width: 560px) {
+  .tc-form-grid { grid-template-columns: 1fr; }
+  .tc-address-grid { grid-template-columns: 1fr; }
+}
+
 .mini-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
 .mini-table th {
   text-align: left; padding: 0.4rem 0.6rem; background: var(--bg-surface-alt);

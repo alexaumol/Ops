@@ -315,23 +315,132 @@ function renderNotes(rows){
   `).join('');
 }
 
+let TAX_COMPANIES = [];
+let editingTcId = null;
+
 function renderTaxCompanies(rows){
-  const tbody = document.getElementById('mTaxCompanies');
-  if (!rows || !rows.length) {
-    tbody.innerHTML = `<tr><td colspan="4" class="sub-empty">No tax companies yet</td></tr>`;
+  if (rows) TAX_COMPANIES = rows;
+  const list = document.getElementById('mTaxCompanyList');
+  if (!TAX_COMPANIES.length) {
+    list.innerHTML = `<div class="sub-empty">No tax companies yet</div>`;
     return;
   }
-  tbody.innerHTML = rows.map(tc => {
-    const addr = [tc.streetname, tc.city, tc.countryLabel].filter(Boolean).join(', ');
+  list.innerHTML = TAX_COMPANIES.map(tc => {
+    const addrParts = tc.sameAddress
+      ? ['Same address as the business partner']
+      : [tc.streetname, tc.zipcode, tc.city, tc.state, tc.countryLabel].filter(Boolean);
     return `
-      <tr>
-        <td>${escapeHtml(tc.taxcompanyname || '—')}</td>
-        <td>${escapeHtml(tc.vatnumber || '—')}</td>
-        <td>${escapeHtml(tc.emailinvoicing || '—')}</td>
-        <td>${escapeHtml(addr || '—')}</td>
-      </tr>
+      <div class="sub-item ${String(editingTcId) === String(tc.id) ? 'is-editing' : ''}">
+        <div class="sub-item-row">
+          <span class="sub-item-title">${escapeHtml(tc.taxcompanyname || '—')}</span>
+          <span style="display:flex; align-items:center; gap:0.35rem;">
+            <span class="sub-item-meta">${escapeHtml(tc.vatnumber || '')}</span>
+            <button type="button" data-edit-tc="${tc.id}" class="sub-item-btn" title="Edit tax company">✎</button>
+            <button type="button" data-delete-tc="${tc.id}" class="sub-item-btn sub-item-btn--danger" title="Delete tax company">✕</button>
+          </span>
+        </div>
+        <div class="sub-item-meta">${escapeHtml(tc.emailinvoicing || '—')}</div>
+        <div class="sub-item-meta">${escapeHtml(addrParts.join(', ') || '—')}</div>
+      </div>
     `;
   }).join('');
+  list.querySelectorAll('[data-edit-tc]').forEach(btn => {
+    btn.addEventListener('click', () => startEditTaxCompany(btn.dataset.editTc));
+  });
+  list.querySelectorAll('[data-delete-tc]').forEach(btn => {
+    btn.addEventListener('click', () => deleteTaxCompany(btn.dataset.deleteTc));
+  });
+}
+
+function tcFormInputs(){
+  return {
+    name: document.getElementById('mTcName'),
+    vat: document.getElementById('mTcVat'),
+    email: document.getElementById('mTcEmail'),
+    same: document.getElementById('mTcSameAddress'),
+    street: document.getElementById('mTcStreet'),
+    city: document.getElementById('mTcCity'),
+    state: document.getElementById('mTcState'),
+    zip: document.getElementById('mTcZip'),
+    country: document.getElementById('mTcCountry'),
+    phone1: document.getElementById('mTcPhone1'),
+    phone2: document.getElementById('mTcPhone2'),
+  };
+}
+
+function syncTcAddressVisibility(){
+  const same = document.getElementById('mTcSameAddress').checked;
+  document.getElementById('mTcAddressFields').classList.toggle('hidden', same);
+}
+
+function resetTaxCompanyForm(){
+  editingTcId = null;
+  const f = tcFormInputs();
+  [f.name, f.vat, f.email, f.street, f.city, f.state, f.zip, f.phone1, f.phone2].forEach(el => { el.value = ''; });
+  f.same.checked = true;
+  f.country.innerHTML = lookupOptionsHtml(LOOKUPS.countries, null, true);
+  document.getElementById('mTcSave').textContent = 'Add';
+  document.getElementById('mTcCancel').style.display = 'none';
+  syncTcAddressVisibility();
+}
+
+function startEditTaxCompany(id){
+  const tc = TAX_COMPANIES.find(x => String(x.id) === String(id));
+  if (!tc) return;
+  editingTcId = tc.id;
+  const f = tcFormInputs();
+  f.name.value = tc.taxcompanyname || '';
+  f.vat.value = tc.vatnumber || '';
+  f.email.value = tc.emailinvoicing || '';
+  f.same.checked = !!tc.sameAddress;
+  f.street.value = tc.streetname || '';
+  f.city.value = tc.city || '';
+  f.state.value = tc.state || '';
+  f.zip.value = tc.zipcode || '';
+  f.phone1.value = tc.phonenumber || '';
+  f.phone2.value = tc.phonenumber2 || '';
+  f.country.innerHTML = lookupOptionsHtml(LOOKUPS.countries, tc.countryid, true);
+  document.getElementById('mTcSave').textContent = 'Save';
+  document.getElementById('mTcCancel').style.display = '';
+  syncTcAddressVisibility();
+  renderTaxCompanies();
+  f.name.focus();
+}
+
+function taxCompanyPayload(){
+  const f = tcFormInputs();
+  const same = f.same.checked;
+  return {
+    taxcompanyname: f.name.value.trim(),
+    vatnumber: f.vat.value.trim() || null,
+    emailinvoicing: f.email.value.trim() || null,
+    sameAddress: same,
+    address: same ? null : {
+      streetname: f.street.value.trim() || null,
+      city: f.city.value.trim() || null,
+      state: f.state.value.trim() || null,
+      zipcode: f.zip.value.trim() || null,
+      phonenumber: f.phone1.value.trim() || null,
+      phonenumber2: f.phone2.value.trim() || null,
+      countryid: f.country.value ? Number(f.country.value) : null,
+    },
+  };
+}
+
+async function deleteTaxCompany(id){
+  const tc = TAX_COMPANIES.find(x => String(x.id) === String(id));
+  if (!tc || !confirm(`Delete tax company "${tc.taxcompanyname || ''}"? This cannot be undone.`)) return;
+  try {
+    await HITT_API.deleteBusinessPartnerTaxCompany(activeBpId, id);
+    const wasEditingThis = String(editingTcId) === String(id);
+    TAX_COMPANIES = await HITT_API.getBusinessPartnerTaxCompanies(activeBpId);
+    if (wasEditingThis) resetTaxCompanyForm();
+    renderTaxCompanies();
+    toast('Tax company deleted', 'navy');
+  } catch (err) {
+    console.error(err);
+    toast(err.message || 'Could not delete the tax company.', 'red');
+  }
 }
 
 // businesspartnerchangelog rows — same shape/design as the Projects
@@ -384,8 +493,10 @@ async function openDetailModal(id){
   const loadingMsg = usingDemoData ? 'Not available in demo data' : 'Loading…';
   document.getElementById('mContactsList').innerHTML = `<div class="sub-empty">${loadingMsg}</div>`;
   document.getElementById('mNotesList').innerHTML = `<div class="sub-empty">${loadingMsg}</div>`;
-  document.getElementById('mTaxCompanies').innerHTML = `<tr><td colspan="4" class="sub-empty">${loadingMsg}</td></tr>`;
+  document.getElementById('mTaxCompanyList').innerHTML = `<div class="sub-empty">${loadingMsg}</div>`;
   document.getElementById('historyList').innerHTML = `<div class="sub-empty">${loadingMsg}</div>`;
+  TAX_COMPANIES = [];
+  resetTaxCompanyForm();
 
   document.querySelectorAll('[data-mtab]').forEach(b => b.setAttribute('aria-selected', b.dataset.mtab === 'general' ? 'true' : 'false'));
   document.getElementById('paneGeneral').classList.remove('hidden');
@@ -591,26 +702,32 @@ document.getElementById('mNotesSearch').addEventListener('input', (e) => {
   renderNotes();
 });
 
-document.getElementById('mAddTaxCompany').addEventListener('click', async () => {
-  const name = document.getElementById('mNewTcName').value.trim();
-  if (!name || !activeBpId) return;
+document.getElementById('mTcSameAddress').addEventListener('change', syncTcAddressVisibility);
+document.getElementById('mTcCancel').addEventListener('click', () => { resetTaxCompanyForm(); renderTaxCompanies(); });
+
+document.getElementById('mTcSave').addEventListener('click', async () => {
+  if (!activeBpId) return;
   if (usingDemoData) { toast("Tax companies aren't available in demo data.", 'navy'); return; }
+  const payload = taxCompanyPayload();
+  if (!payload.taxcompanyname) { toast('Tax company name is required.', 'red'); return; }
+  const wasEditing = editingTcId;
+  const btn = document.getElementById('mTcSave');
+  btn.disabled = true;
   try {
-    await HITT_API.addBusinessPartnerTaxCompany(activeBpId, {
-      taxcompanyname: name,
-      vatnumber: document.getElementById('mNewTcVat').value || null,
-      emailinvoicing: document.getElementById('mNewTcEmail').value || null,
-      sameAddress: document.getElementById('mNewTcSameAddress').checked,
-    });
-    document.getElementById('mNewTcName').value = '';
-    document.getElementById('mNewTcVat').value = '';
-    document.getElementById('mNewTcEmail').value = '';
-    document.getElementById('mNewTcSameAddress').checked = true;
-    renderTaxCompanies(await HITT_API.getBusinessPartnerTaxCompanies(activeBpId));
-    toast('Tax company added', 'green');
+    if (wasEditing) {
+      await HITT_API.updateBusinessPartnerTaxCompany(activeBpId, wasEditing, payload);
+    } else {
+      await HITT_API.addBusinessPartnerTaxCompany(activeBpId, payload);
+    }
+    TAX_COMPANIES = await HITT_API.getBusinessPartnerTaxCompanies(activeBpId);
+    resetTaxCompanyForm();
+    renderTaxCompanies();
+    toast(wasEditing ? 'Tax company updated' : 'Tax company added', 'green');
   } catch (err) {
     console.error(err);
-    toast('Could not save the tax company.', 'red');
+    toast(err.message || 'Could not save the tax company.', 'red');
+  } finally {
+    btn.disabled = false;
   }
 });
 

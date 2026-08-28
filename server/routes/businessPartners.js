@@ -267,6 +267,24 @@ router.patch("/:id", async (req, res) => {
       }
     }
 
+    // Keep every tax-company address that mirrors the BP address in sync
+    // with the change (sameaddress = true rows hold a copy — see
+    // writeTaxCompanyAddress below and the invoice-PDF join).
+    if (address) {
+      await client.query(
+        `UPDATE taxcompaniesaddresses tca SET
+           streetname = $1, city = $2, state = $3, zipcode = $4,
+           phonenumber = $5, phonenumber2 = $6, countryid = $7
+         FROM taxcompanies tc
+         WHERE tc.id = tca.taxcompanyid::bigint
+           AND tc.businesspartnerid = $8::double precision
+           AND tca.sameaddress IS TRUE`,
+        [address.streetname || null, address.city || null, address.state || null,
+         address.zipcode || null, address.phonenumber || null, address.phonenumber2 || null,
+         address.countryid || null, id]
+      );
+    }
+
     for (const summary of changes) {
       await client.query(
         `INSERT INTO businesspartnerchangelog (businesspartnerid, changedat, changedby, summary) VALUES ($1, now(), $2, $3)`,
@@ -471,17 +489,62 @@ router.post("/:id/notes", async (req, res) => {
   }
 });
 
+// Upserts a tax company's single address row. `sameAddress` true → copy the
+// BP's current address and flag sameaddress=true (kept in sync by the BP
+// PATCH handler, and read directly by the invoice-PDF query). false → store
+// the address the user entered. Runs on the caller's transaction client.
+async function writeTaxCompanyAddress(client, tcId, bpId, sameAddress, address) {
+  let addr = address || {};
+  if (sameAddress) {
+    const { rows } = await client.query(
+      `SELECT streetname, city, state, zipcode, phonenumber, phonenumber2, countryid
+       FROM addresses WHERE businesspartnerid = $1::double precision LIMIT 1`,
+      [bpId]
+    );
+    addr = rows[0] || {};
+  }
+  const vals = [
+    addr.streetname || null, addr.city || null, addr.state || null, addr.zipcode || null,
+    addr.phonenumber || null, addr.phonenumber2 || null, addr.countryid || null, !!sameAddress,
+  ];
+  const existing = await client.query(
+    `SELECT id FROM taxcompaniesaddresses WHERE taxcompanyid = $1::double precision ORDER BY id LIMIT 1`,
+    [tcId]
+  );
+  if (existing.rows.length) {
+    await client.query(
+      `UPDATE taxcompaniesaddresses SET
+         streetname=$1, city=$2, state=$3, zipcode=$4,
+         phonenumber=$5, phonenumber2=$6, countryid=$7, sameaddress=$8
+       WHERE id = $9`,
+      [...vals, existing.rows[0].id]
+    );
+  } else {
+    await client.query(
+      `INSERT INTO taxcompaniesaddresses
+         (taxcompanyid, streetname, city, state, zipcode, phonenumber, phonenumber2, countryid, sameaddress)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [tcId, ...vals]
+    );
+  }
+}
+
 // GET /api/business-partners/:id/tax-companies
 router.get("/:id/tax-companies", async (req, res) => {
   try {
     const { rows } = await pool.query(
       `SELECT tc.id, tc.taxcompanyname, tc.vatnumber, tc.emailinvoicing,
+              tca.id AS "addressId", COALESCE(tca.sameaddress, true) AS "sameAddress",
               tca.streetname, tca.city, tca.state, tca.zipcode,
+              tca.phonenumber, tca.phonenumber2, tca.countryid,
               country.countrydesc AS "countryLabel"
        FROM taxcompanies tc
-       LEFT JOIN taxcompaniesaddresses tca ON tca.taxcompanyid = tc.id
+       LEFT JOIN LATERAL (
+         SELECT * FROM taxcompaniesaddresses
+         WHERE taxcompanyid = tc.id::double precision ORDER BY id LIMIT 1
+       ) tca ON true
        LEFT JOIN countries country ON country.id = tca.countryid::bigint
-       WHERE tc.businesspartnerid = $1
+       WHERE tc.businesspartnerid = $1::double precision
        ORDER BY tc.taxcompanyname`,
       [req.params.id]
     );
@@ -493,10 +556,7 @@ router.get("/:id/tax-companies", async (req, res) => {
 });
 
 // POST /api/business-partners/:id/tax-companies — add an invoicing entity
-// for this business partner (mirrors TaxCompanies_BP.frm). If sameAddress
-// is true, copies the BP's own address instead of requiring a separate
-// one entered (matches the form's "Set main address as invoicing
-// address" checkbox).
+// for this business partner (mirrors TaxCompanies_BP.frm).
 router.post("/:id/tax-companies", async (req, res) => {
   const { taxcompanyname, vatnumber, emailinvoicing, sameAddress, address } = req.body || {};
   if (!taxcompanyname || !taxcompanyname.trim()) {
@@ -505,7 +565,6 @@ router.post("/:id/tax-companies", async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-
     const { rows } = await client.query(
       `INSERT INTO taxcompanies (businesspartnerid, taxcompanyname, vatnumber, emailinvoicing)
        VALUES ($1, $2, $3, $4)
@@ -513,29 +572,7 @@ router.post("/:id/tax-companies", async (req, res) => {
       [req.params.id, taxcompanyname.trim(), vatnumber || null, emailinvoicing || null]
     );
     const taxCompany = rows[0];
-
-    let addr = address;
-    if (sameAddress) {
-      const bpAddr = await client.query(
-        `SELECT streetname, city, state, zipcode, phonenumber, phonenumber2, countryid
-         FROM addresses WHERE businesspartnerid = $1 LIMIT 1`,
-        [req.params.id]
-      );
-      addr = bpAddr.rows[0] || null;
-    }
-    if (addr) {
-      await client.query(
-        `INSERT INTO taxcompaniesaddresses
-           (taxcompanyid, streetname, city, state, zipcode, phonenumber, phonenumber2, countryid, sameaddress)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-        [
-          taxCompany.id, addr.streetname || null, addr.city || null, addr.state || null,
-          addr.zipcode || null, addr.phonenumber || null, addr.phonenumber2 || null,
-          addr.countryid || null, !!sameAddress,
-        ]
-      );
-    }
-
+    await writeTaxCompanyAddress(client, taxCompany.id, req.params.id, sameAddress, address);
     await client.query("COMMIT");
     res.status(201).json(taxCompany);
     bpAuditLabel(req.params.id).then((bp) =>
@@ -543,6 +580,80 @@ router.post("/:id/tax-companies", async (req, res) => {
   } catch (err) {
     await client.query("ROLLBACK");
     console.error("[POST /api/business-partners/:id/tax-companies] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  } finally {
+    client.release();
+  }
+});
+
+// PATCH /api/business-partners/:id/tax-companies/:tcId — edit name/VAT/email
+// and the address (same-as-BP toggle + fields).
+router.patch("/:id/tax-companies/:tcId", async (req, res) => {
+  const { taxcompanyname, vatnumber, emailinvoicing, sameAddress, address } = req.body || {};
+  if (!taxcompanyname || !taxcompanyname.trim()) {
+    return res.status(400).json({ error: "validation_error", message: "taxcompanyname is required" });
+  }
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const { rowCount } = await client.query(
+      `UPDATE taxcompanies SET taxcompanyname = $1, vatnumber = $2, emailinvoicing = $3
+       WHERE id = $4 AND businesspartnerid = $5::double precision`,
+      [taxcompanyname.trim(), vatnumber || null, emailinvoicing || null, req.params.tcId, req.params.id]
+    );
+    if (!rowCount) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ error: "not_found", message: "Tax company not found on this business partner" });
+    }
+    await writeTaxCompanyAddress(client, req.params.tcId, req.params.id, sameAddress, address);
+    await client.query("COMMIT");
+    res.status(204).end();
+    bpAuditLabel(req.params.id).then((bp) =>
+      logAudit(req, { kind: "bp.taxcompany.update", desc: `BP "${bp}": tax company updated "${taxcompanyname.trim()}"` }));
+  } catch (err) {
+    await client.query("ROLLBACK");
+    console.error("[PATCH /api/business-partners/:id/tax-companies/:tcId] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  } finally {
+    client.release();
+  }
+});
+
+// DELETE /api/business-partners/:id/tax-companies/:tcId — blocked while the
+// tax company is assigned to a project or referenced by an invoice.
+router.delete("/:id/tax-companies/:tcId", async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const inUse = await client.query(
+      `SELECT
+         EXISTS(SELECT 1 FROM projects WHERE busspartnertoinvoiceid::bigint = $1::bigint) AS "inProjects",
+         EXISTS(SELECT 1 FROM invoicesdetails WHERE busspartnertoinvoiceid::bigint = $1::bigint) AS "inInvoices"`,
+      [req.params.tcId]
+    );
+    if (inUse.rows[0].inProjects || inUse.rows[0].inInvoices) {
+      await client.query("ROLLBACK");
+      return res.status(409).json({
+        error: "conflict",
+        message: "This tax company is used by a project or an invoice and can't be deleted.",
+      });
+    }
+    await client.query(`DELETE FROM taxcompaniesaddresses WHERE taxcompanyid = $1::double precision`, [req.params.tcId]);
+    const { rows } = await client.query(
+      `DELETE FROM taxcompanies WHERE id = $1 AND businesspartnerid = $2::double precision RETURNING taxcompanyname`,
+      [req.params.tcId, req.params.id]
+    );
+    if (!rows.length) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ error: "not_found", message: "Tax company not found on this business partner" });
+    }
+    await client.query("COMMIT");
+    res.status(204).end();
+    bpAuditLabel(req.params.id).then((bp) =>
+      logAudit(req, { kind: "bp.taxcompany.delete", desc: `BP "${bp}": tax company removed "${rows[0].taxcompanyname || "—"}"` }));
+  } catch (err) {
+    await client.query("ROLLBACK");
+    console.error("[DELETE /api/business-partners/:id/tax-companies/:tcId] DB error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });
   } finally {
     client.release();

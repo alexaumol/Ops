@@ -102,6 +102,10 @@ const HITT_API = (() => {
     getBusinessPartnerTaxCompanies: (id) => request(`/api/business-partners/${id}/tax-companies`),
     addBusinessPartnerTaxCompany: (id, payload) =>
       request(`/api/business-partners/${id}/tax-companies`, { method: "POST", body: JSON.stringify(payload) }),
+    updateBusinessPartnerTaxCompany: (id, tcId, payload) =>
+      request(`/api/business-partners/${id}/tax-companies/${tcId}`, { method: "PATCH", body: JSON.stringify(payload) }),
+    deleteBusinessPartnerTaxCompany: (id, tcId) =>
+      request(`/api/business-partners/${id}/tax-companies/${tcId}`, { method: "DELETE" }),
 
     getEmployees: () => request("/api/employees"),
     getTimeTracking: (userId, weekStart) =>

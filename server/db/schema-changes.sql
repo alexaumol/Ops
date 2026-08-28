@@ -43,6 +43,15 @@ CREATE TABLE IF NOT EXISTS public.appconfig (
 -- pre-existing table, one row per employee via empid). No changes needed;
 -- employeedocumentpath is set to <appconfig base>/<username> on save.
 
+-- 2026-08 — BP edit form: tax companies + addresses
+-- --------------------------------------------------------------------------
+-- No schema changes. taxcompanies / taxcompaniesaddresses / addresses are
+-- all pre-existing. The BP modal's Invoicing tab now does full CRUD on a
+-- BP's tax companies; each tax-company address either mirrors the BP
+-- address (taxcompaniesaddresses.sameaddress = true, kept in sync when the
+-- BP address is edited) or holds its own. Deleting a tax company is blocked
+-- while it's assigned to a project or referenced by an invoice.
+
 -- 2026-08 — Auditing (Settings → Auditing, admins only)
 -- --------------------------------------------------------------------------
 -- Every security-/data-relevant action is appended to public.actionsaudit
