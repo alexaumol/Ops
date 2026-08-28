@@ -148,6 +148,10 @@ router.post("/", requireModuleAccess("business-partners"), async (req, res) => {
          address.zipcode || null, address.phonenumber || null, address.phonenumber2 || null, address.countryid || null]
       );
     }
+    await client.query(
+      `INSERT INTO businesspartnerchangelog (businesspartnerid, changedat, changedby, summary) VALUES ($1, now(), $2, $3)`,
+      [bp.id, employeeId || null, "Business partner created"]
+    );
     await client.query("COMMIT");
     res.status(201).json(bp);
   } catch (err) {
@@ -330,7 +334,7 @@ router.get("/:id/contacts", async (req, res) => {
 });
 
 router.post("/:id/contacts", async (req, res) => {
-  const { contactname, position, emailaddress, phonenumber } = req.body || {};
+  const { contactname, position, emailaddress, phonenumber, employeeId } = req.body || {};
   if (!contactname || !contactname.trim()) {
     return res.status(400).json({ error: "validation_error", message: "contactname is required" });
   }
@@ -341,9 +345,65 @@ router.post("/:id/contacts", async (req, res) => {
        RETURNING id, contactname, position, emailaddress, phonenumber`,
       [req.params.id, contactname.trim(), position || null, emailaddress || null, phonenumber || null]
     );
+    await pool.query(
+      `INSERT INTO businesspartnerchangelog (businesspartnerid, changedat, changedby, summary) VALUES ($1, now(), $2, $3)`,
+      [req.params.id, employeeId || null, `Contact added: ${contactname.trim()}`]
+    );
     res.status(201).json(rows[0]);
   } catch (err) {
     console.error("[POST /api/business-partners/:id/contacts] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
+// PATCH /api/business-partners/:id/contacts/:contactId — edit an existing
+// contact (name/position/email/phone). Logs to businesspartnerchangelog.
+router.patch("/:id/contacts/:contactId", async (req, res) => {
+  const { contactname, position, emailaddress, phonenumber, employeeId } = req.body || {};
+  if (!contactname || !contactname.trim()) {
+    return res.status(400).json({ error: "validation_error", message: "contactname is required" });
+  }
+  try {
+    const { rows } = await pool.query(
+      `UPDATE contacts
+       SET contactname = $1, position = $2, emailaddress = $3, phonenumber = $4
+       WHERE id = $5 AND businesspartnerid = $6
+       RETURNING id, contactname, position, emailaddress, phonenumber`,
+      [contactname.trim(), position || null, emailaddress || null, phonenumber || null,
+       req.params.contactId, req.params.id]
+    );
+    if (!rows.length) {
+      return res.status(404).json({ error: "not_found", message: "Contact not found on this business partner" });
+    }
+    await pool.query(
+      `INSERT INTO businesspartnerchangelog (businesspartnerid, changedat, changedby, summary) VALUES ($1, now(), $2, $3)`,
+      [req.params.id, employeeId || null, `Contact updated: ${contactname.trim()}`]
+    );
+    res.json(rows[0]);
+  } catch (err) {
+    console.error("[PATCH /api/business-partners/:id/contacts/:contactId] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
+// DELETE /api/business-partners/:id/contacts/:contactId
+router.delete("/:id/contacts/:contactId", async (req, res) => {
+  const { employeeId } = req.body || {};
+  try {
+    const { rows } = await pool.query(
+      `DELETE FROM contacts WHERE id = $1 AND businesspartnerid = $2 RETURNING contactname`,
+      [req.params.contactId, req.params.id]
+    );
+    if (!rows.length) {
+      return res.status(404).json({ error: "not_found", message: "Contact not found on this business partner" });
+    }
+    await pool.query(
+      `INSERT INTO businesspartnerchangelog (businesspartnerid, changedat, changedby, summary) VALUES ($1, now(), $2, $3)`,
+      [req.params.id, employeeId || null, `Contact removed: ${rows[0].contactname || "—"}`]
+    );
+    res.status(204).end();
+  } catch (err) {
+    console.error("[DELETE /api/business-partners/:id/contacts/:contactId] DB error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });
   }
 });

@@ -38,6 +38,19 @@
       <input id="searchBox" type="text" placeholder="Search by project code or name…" />
     </div>
 
+    <div class="inv-filters inv-filters--row2">
+      <div class="inv-lifecycle-toggle" role="group" aria-label="Filter by project lifecycle">
+        <button data-lifecycle="alive" class="inv-lifecycle-btn" aria-selected="false">Only alive projects</button>
+        <button data-lifecycle="closed" class="inv-lifecycle-btn" aria-selected="false">Only closed projects</button>
+        <button data-lifecycle="all" class="inv-lifecycle-btn" aria-selected="true">All projects</button>
+      </div>
+      <div class="inv-filter-spacer"></div>
+      <label class="inv-status-filter">
+        Project status
+        <select id="projectStatusFilter"><option value="">All statuses</option></select>
+      </label>
+    </div>
+
     <div class="inv-table-wrap">
       <table class="inv-table">
         <thead>
@@ -45,10 +58,11 @@
             <th class="inv-proceed-col" title="Proceed to invoice"></th>
             <th data-sort="code">Project<span class="sort-arrow"></span></th>
             <th data-sort="entityLabel">Entity<span class="sort-arrow"></span></th>
+            <th data-sort="projectStatusLabel">Project status<span class="sort-arrow"></span></th>
             <th data-sort="budget" style="text-align:right;">Budget<span class="sort-arrow"></span></th>
             <th data-sort="invoicedTotal" style="text-align:right;">Invoiced<span class="sort-arrow"></span></th>
             <th data-sort="invoiceCount" style="text-align:right;">Generated invoices<span class="sort-arrow"></span></th>
-            <th data-sort="bucket">Status<span class="sort-arrow"></span></th>
+            <th data-sort="bucket">Invoice status<span class="sort-arrow"></span></th>
           </tr>
         </thead>
         <tbody id="invTableBody"></tbody>

@@ -16,7 +16,7 @@ document.getElementById("btnSignOut").addEventListener("click", () => HITT_AUTH.
 HITT_PERMS.applyRealName();
 
 const DEMO_SEED = [
-  { id: 1, code: '26018', name: 'Demo Project', entityLabel: 'HiTT', budget: 5000, proceedtoinvoice: true, invoiceCount: 1, invoicedTotal: 2000 },
+  { id: 1, code: '26018', name: 'Demo Project', entityLabel: 'HiTT', projectStatusLabel: 'WIP', budget: 5000, proceedtoinvoice: true, invoiceCount: 1, invoicedTotal: 2000 },
 ];
 
 let PROJECTS = [];
@@ -27,6 +27,8 @@ let currentBucket = 'all';
 let searchTerm = '';
 let sortColumn = 'code';
 let sortDirection = 'desc';
+let lifecycleFilter = 'all'; // 'alive' | 'closed' | 'all'
+let projectStatusFilter = '';
 let activeProjectId = null;
 let activeProjectBpId = null;
 let activeInvoiceId = null;
@@ -56,6 +58,23 @@ function setDataSourcePill(){
     pill.style.color = "#4C6B3A";
   }
 }
+// Project-status chip colours, kept consistent with the Projects kanban
+// columns (see STAGE_STYLE_BY_KEY in js/projects.js) and the Reports
+// hours-per-project table. Matched on the lower-cased status label.
+const STATUS_CHIP_COLORS = {
+  lead: '#5C757C', oferta: '#BC9A1C', guanyat: '#6E8F5A', wip: '#171717',
+  delivered: '#211916', closed: '#8A8676', cancelled: '#B24A3A',
+};
+const CLOSED_STATUSES = new Set(['closed', 'cancelled']);
+function isClosedStatus(label){
+  return CLOSED_STATUSES.has(String(label || '').trim().toLowerCase());
+}
+function statusChipHtml(label){
+  if (!label) return '—';
+  const color = STATUS_CHIP_COLORS[String(label).trim().toLowerCase()] || '#8A8676';
+  return `<span class="inv-status-chip" style="background:${color}">${escapeHtml(label)}</span>`;
+}
+
 function formatDateOnly(iso){ return iso ? new Date(iso).toLocaleDateString() : '—'; }
 function formatMoney(n){
   if (n === null || n === undefined) return '—';
@@ -100,13 +119,15 @@ function computeBucket(row){
 const BUCKET_LABEL = { 'not-released': 'Not released', 'not-started': 'Not started', 'partial': 'Partially invoiced', 'total': 'Totally invoiced' };
 const BUCKET_ORDER = ['not-released', 'not-started', 'partial', 'total'];
 
-// Portfolio-wide count per invoice-status bucket, shown inside each filter
-// chip (e.g. "Partially invoiced (23)"). Independent of the search box and
-// the currently-selected filter — these are always the full totals.
+// Count per invoice-status bucket, shown inside each filter chip (e.g.
+// "Partially invoiced (23)"). Reflects the lifecycle + project-status
+// filters (so the chips describe the set you're looking at) but not the
+// search box or the bucket selection itself.
 function updateBucketCounts(){
-  const counts = { all: PROJECTS.length };
+  const scope = PROJECTS.filter(matchesLifecycleStatus);
+  const counts = { all: scope.length };
   BUCKET_ORDER.forEach(b => counts[b] = 0);
-  PROJECTS.forEach(p => { counts[computeBucket(p)]++; });
+  scope.forEach(p => { counts[computeBucket(p)]++; });
   document.querySelectorAll('.inv-filter-count').forEach(el => {
     const n = counts[el.dataset.countFor];
     el.textContent = n == null ? '' : `(${n})`;
@@ -117,6 +138,7 @@ function sortValue(row, col){
   if (col === 'bucket') return BUCKET_ORDER.indexOf(computeBucket(row));
   if (col === 'code') return String(row.code);
   if (col === 'entityLabel') return String(row.entityLabel || '');
+  if (col === 'projectStatusLabel') return String(row.projectStatusLabel || '');
   return Number(row[col]) || 0;
 }
 
@@ -127,7 +149,15 @@ function compareRows(a, b){
   return String(av).localeCompare(String(bv), undefined, { numeric: true }) * dir;
 }
 
+function matchesLifecycleStatus(row){
+  if (lifecycleFilter === 'alive' && isClosedStatus(row.projectStatusLabel)) return false;
+  if (lifecycleFilter === 'closed' && !isClosedStatus(row.projectStatusLabel)) return false;
+  if (projectStatusFilter && String(row.projectStatusLabel || '') !== projectStatusFilter) return false;
+  return true;
+}
+
 function matchesFilters(row){
+  if (!matchesLifecycleStatus(row)) return false;
   if (currentBucket !== 'all' && computeBucket(row) !== currentBucket) return false;
   if (searchTerm) {
     const t = searchTerm.toLowerCase();
@@ -136,9 +166,23 @@ function matchesFilters(row){
   return true;
 }
 
+// Populates the "Project status" dropdown from the statuses actually
+// present in the loaded projects (same approach as the kanban's owner
+// filter), preserving the current selection.
+function populateProjectStatusOptions(){
+  const sel = document.getElementById('projectStatusFilter');
+  const current = sel.value;
+  const labels = [...new Set(PROJECTS.map(p => p.projectStatusLabel).filter(Boolean))].sort();
+  sel.innerHTML = `<option value="">All statuses</option>` +
+    labels.map(l => `<option value="${escapeHtml(l)}">${escapeHtml(l)}</option>`).join('');
+  if (labels.includes(current)) sel.value = current;
+  else projectStatusFilter = sel.value;
+}
+
 function renderTable(){
   const tbody = document.getElementById('invTableBody');
   const empty = document.getElementById('invEmpty');
+  populateProjectStatusOptions();
   const rows = PROJECTS.filter(matchesFilters).sort(compareRows);
 
   updateBucketCounts();
@@ -157,6 +201,7 @@ function renderTable(){
         <td class="inv-proceed-col">${p.proceedtoinvoice ? `<span class="inv-proceed-icon" title="Proceed to invoice">✔</span>` : ''}</td>
         <td><span style="font-weight:600;">${escapeHtml(p.code)}</span> — ${escapeHtml(p.name)}</td>
         <td>${escapeHtml(p.entityLabel || '—')}</td>
+        <td>${statusChipHtml(p.projectStatusLabel)}</td>
         <td style="text-align:right;">${formatMoney(p.budget)}</td>
         <td style="text-align:right;">${formatMoney(p.invoicedTotal)}</td>
         <td style="text-align:right;">${Number(p.invoiceCount) || 0}</td>
@@ -186,8 +231,8 @@ document.querySelectorAll('.inv-table th[data-sort]').forEach(th => {
       sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
     } else {
       sortColumn = col;
-      // Text columns read best A→Z; numeric columns most-first.
-      sortDirection = (col === 'code' || col === 'entityLabel') ? 'asc' : 'desc';
+      // Numeric columns read best most-first; text columns A→Z.
+      sortDirection = ['budget', 'invoicedTotal', 'invoiceCount', 'bucket'].includes(col) ? 'desc' : 'asc';
     }
     renderTable();
   });
@@ -203,6 +248,20 @@ document.querySelectorAll('[data-bucket]').forEach(btn => {
 });
 document.getElementById('searchBox').addEventListener('input', (e) => {
   searchTerm = e.target.value.trim();
+  renderTable();
+});
+
+document.querySelectorAll('[data-lifecycle]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('[data-lifecycle]').forEach(b => b.setAttribute('aria-selected', 'false'));
+    btn.setAttribute('aria-selected', 'true');
+    lifecycleFilter = btn.dataset.lifecycle;
+    renderTable();
+  });
+});
+
+document.getElementById('projectStatusFilter').addEventListener('change', (e) => {
+  projectStatusFilter = e.target.value;
   renderTable();
 });
 

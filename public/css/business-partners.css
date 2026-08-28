@@ -201,9 +201,17 @@
   border: 1px solid var(--border-subtle); border-radius: var(--radius-sm);
   padding: 0.5rem 0.6rem; background: var(--bg-app);
 }
+.sub-item.is-editing { border-color: var(--brand); box-shadow: 0 0 0 2px rgba(92,117,124,0.15); }
 .sub-item-row { display: flex; justify-content: space-between; gap: 0.5rem; font-size: 0.78rem; }
 .sub-item-title { font-weight: 700; color: var(--brand); }
 .sub-item-meta { color: var(--text-secondary); font-size: 0.72rem; }
+.sub-item-btn {
+  border: none; background: none; cursor: pointer;
+  color: var(--brand); font-size: 0.8rem; line-height: 1;
+  padding: 0.15rem 0.35rem; border-radius: var(--radius-sm);
+}
+.sub-item-btn:hover { background: var(--bg-surface-alt); }
+.sub-item-btn--danger { color: var(--danger); }
 .sub-add-row {
   display: flex; gap: 0.4rem; padding: 0.6rem 0.75rem;
   border-top: 1px solid var(--border-subtle);

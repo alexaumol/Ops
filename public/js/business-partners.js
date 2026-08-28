@@ -203,21 +203,86 @@ function formatDateTime(iso){
 /* ============================== DETAIL MODAL ============================= */
 const modalOverlay = document.getElementById('modalOverlay');
 
+let CONTACTS = [];
+let editingContactId = null;
+
+// Called with fresh rows (a fetch) or with no argument (re-render after a
+// local edit-state change).
 function renderContacts(rows){
+  if (rows) CONTACTS = rows;
   const list = document.getElementById('mContactsList');
-  if (!rows || !rows.length) {
+  if (!CONTACTS.length) {
     list.innerHTML = `<div class="sub-empty">No contacts yet</div>`;
     return;
   }
-  list.innerHTML = rows.map(c => `
-    <div class="sub-item">
+  list.innerHTML = CONTACTS.map(c => `
+    <div class="sub-item ${String(editingContactId) === String(c.id) ? 'is-editing' : ''}">
       <div class="sub-item-row">
         <span class="sub-item-title">${escapeHtml(c.contactname)}</span>
-        <span class="sub-item-meta">${escapeHtml(c.position || '')}</span>
+        <span style="display:flex; align-items:center; gap:0.35rem;">
+          <span class="sub-item-meta">${escapeHtml(c.position || '')}</span>
+          <button type="button" data-edit-contact="${c.id}" class="sub-item-btn" title="Edit contact">✎</button>
+          <button type="button" data-delete-contact="${c.id}" class="sub-item-btn sub-item-btn--danger" title="Delete contact">✕</button>
+        </span>
       </div>
       <div class="sub-item-meta">${escapeHtml(c.emailaddress || '—')}${c.phonenumber ? ' · ' + escapeHtml(c.phonenumber) : ''}</div>
     </div>
   `).join('');
+  list.querySelectorAll('[data-edit-contact]').forEach(btn => {
+    btn.addEventListener('click', () => startEditContact(btn.dataset.editContact));
+  });
+  list.querySelectorAll('[data-delete-contact]').forEach(btn => {
+    btn.addEventListener('click', () => deleteContact(btn.dataset.deleteContact));
+  });
+}
+
+function contactFormInputs(){
+  return {
+    name: document.getElementById('mNewContactName'),
+    position: document.getElementById('mNewContactPosition'),
+    email: document.getElementById('mNewContactEmail'),
+    phone: document.getElementById('mNewContactPhone'),
+  };
+}
+
+function startEditContact(id){
+  const c = CONTACTS.find(x => String(x.id) === String(id));
+  if (!c) return;
+  editingContactId = c.id;
+  const f = contactFormInputs();
+  f.name.value = c.contactname || '';
+  f.position.value = c.position || '';
+  f.email.value = c.emailaddress || '';
+  f.phone.value = c.phonenumber || '';
+  document.getElementById('mAddContact').textContent = 'Save';
+  document.getElementById('mCancelEditContact').style.display = '';
+  renderContacts();
+  f.name.focus();
+}
+
+function cancelEditContact(){
+  editingContactId = null;
+  const f = contactFormInputs();
+  [f.name, f.position, f.email, f.phone].forEach(el => { el.value = ''; });
+  document.getElementById('mAddContact').textContent = 'Add';
+  document.getElementById('mCancelEditContact').style.display = 'none';
+  renderContacts();
+}
+
+async function deleteContact(id){
+  const c = CONTACTS.find(x => String(x.id) === String(id));
+  if (!c || !confirm(`Delete contact "${c.contactname || ''}"? This cannot be undone.`)) return;
+  try {
+    await HITT_API.deleteBusinessPartnerContact(activeBpId, id, currentEmployeeId);
+    const wasEditingThis = String(editingContactId) === String(id);
+    CONTACTS = await HITT_API.getBusinessPartnerContacts(activeBpId);
+    if (wasEditingThis) cancelEditContact(); // resets the form + re-renders
+    else renderContacts();
+    toast('Contact deleted', 'navy');
+  } catch (err) {
+    console.error(err);
+    toast('Could not delete the contact.', 'red');
+  }
 }
 
 let NOTES = [];
@@ -300,10 +365,14 @@ async function openDetailModal(id){
   document.getElementById('mCountry').innerHTML = lookupOptionsHtml(LOOKUPS.countries, null, true);
   document.getElementById('mWebpage').value = '';
   ['mStreetName', 'mCity', 'mState', 'mZipCode', 'mPhone1', 'mPhone2'].forEach(id2 => document.getElementById(id2).value = '');
+  CONTACTS = [];
+  editingContactId = null;
   document.getElementById('mNewContactName').value = '';
   document.getElementById('mNewContactPosition').value = '';
   document.getElementById('mNewContactEmail').value = '';
   document.getElementById('mNewContactPhone').value = '';
+  document.getElementById('mAddContact').textContent = 'Add';
+  document.getElementById('mCancelEditContact').style.display = 'none';
   document.getElementById('mNewNote').value = '';
   document.getElementById('mNotesSearch').value = '';
   notesSearchTerm = '';
@@ -466,27 +535,34 @@ document.getElementById('mSave').addEventListener('click', async () => {
 });
 
 document.getElementById('mAddContact').addEventListener('click', async () => {
-  const name = document.getElementById('mNewContactName').value.trim();
+  const f = contactFormInputs();
+  const name = f.name.value.trim();
   if (!name || !activeBpId) return;
   if (usingDemoData) { toast("Contacts aren't available in demo data.", 'navy'); return; }
+  const payload = {
+    contactname: name,
+    position: f.position.value.trim() || null,
+    emailaddress: f.email.value.trim() || null,
+    phonenumber: f.phone.value.trim() || null,
+    employeeId: currentEmployeeId,
+  };
+  const wasEditing = editingContactId;
   try {
-    await HITT_API.addBusinessPartnerContact(activeBpId, {
-      contactname: name,
-      position: document.getElementById('mNewContactPosition').value || null,
-      emailaddress: document.getElementById('mNewContactEmail').value || null,
-      phonenumber: document.getElementById('mNewContactPhone').value || null,
-    });
-    document.getElementById('mNewContactName').value = '';
-    document.getElementById('mNewContactPosition').value = '';
-    document.getElementById('mNewContactEmail').value = '';
-    document.getElementById('mNewContactPhone').value = '';
-    renderContacts(await HITT_API.getBusinessPartnerContacts(activeBpId));
-    toast('Contact added', 'green');
+    if (wasEditing) {
+      await HITT_API.updateBusinessPartnerContact(activeBpId, wasEditing, payload);
+    } else {
+      await HITT_API.addBusinessPartnerContact(activeBpId, payload);
+    }
+    CONTACTS = await HITT_API.getBusinessPartnerContacts(activeBpId);
+    cancelEditContact(); // clears inputs, resets the button, re-renders
+    toast(wasEditing ? 'Contact updated' : 'Contact added', 'green');
   } catch (err) {
     console.error(err);
     toast('Could not save the contact.', 'red');
   }
 });
+
+document.getElementById('mCancelEditContact').addEventListener('click', cancelEditContact);
 
 document.getElementById('mAddNote').addEventListener('click', async () => {
   const text = document.getElementById('mNewNote').value.trim();
@@ -508,6 +584,7 @@ document.getElementById('mNewNote').addEventListener('keydown', (e) => {
 });
 document.getElementById('mNewContactName').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') document.getElementById('mAddContact').click();
+  if (e.key === 'Escape' && editingContactId) { e.stopPropagation(); cancelEditContact(); }
 });
 document.getElementById('mNotesSearch').addEventListener('input', (e) => {
   notesSearchTerm = e.target.value.trim();
@@ -544,6 +621,16 @@ const newBpOverlay = document.getElementById('newBpOverlay');
 // one right after the partner is created (a contact row needs a bpid to
 // attach to, so it can't be saved until then).
 let npContacts = [];
+let npEditingContactIndex = null;
+
+function npContactFormInputs(){
+  return {
+    name: document.getElementById('npNewContactName'),
+    position: document.getElementById('npNewContactPosition'),
+    email: document.getElementById('npNewContactEmail'),
+    phone: document.getElementById('npNewContactPhone'),
+  };
+}
 
 function renderNpContacts(){
   const list = document.getElementById('npContactsList');
@@ -552,41 +639,74 @@ function renderNpContacts(){
     return;
   }
   list.innerHTML = npContacts.map((c, i) => `
-    <div class="sub-item">
+    <div class="sub-item ${npEditingContactIndex === i ? 'is-editing' : ''}">
       <div class="sub-item-row">
         <span class="sub-item-title">${escapeHtml(c.contactname)}</span>
-        <span style="display:flex; align-items:center; gap:0.5rem;">
+        <span style="display:flex; align-items:center; gap:0.35rem;">
           <span class="sub-item-meta">${escapeHtml(c.position || '')}</span>
-          <button type="button" data-remove-np-contact="${i}" class="btn-icon-add" style="background:var(--danger); padding:0 0.5rem;" title="Remove">✕</button>
+          <button type="button" data-edit-np-contact="${i}" class="sub-item-btn" title="Edit">✎</button>
+          <button type="button" data-remove-np-contact="${i}" class="sub-item-btn sub-item-btn--danger" title="Remove">✕</button>
         </span>
       </div>
       <div class="sub-item-meta">${escapeHtml(c.emailaddress || '—')}${c.phonenumber ? ' · ' + escapeHtml(c.phonenumber) : ''}</div>
     </div>
   `).join('');
+  list.querySelectorAll('[data-edit-np-contact]').forEach(btn => {
+    btn.addEventListener('click', () => startEditNpContact(Number(btn.dataset.editNpContact)));
+  });
   list.querySelectorAll('[data-remove-np-contact]').forEach(btn => {
     btn.addEventListener('click', () => {
-      npContacts.splice(Number(btn.dataset.removeNpContact), 1);
-      renderNpContacts();
+      const i = Number(btn.dataset.removeNpContact);
+      npContacts.splice(i, 1);
+      if (npEditingContactIndex === i) cancelEditNpContact();
+      else { if (npEditingContactIndex > i) npEditingContactIndex--; renderNpContacts(); }
     });
   });
 }
 
-document.getElementById('npAddContact').addEventListener('click', () => {
-  const name = document.getElementById('npNewContactName').value.trim();
-  if (!name) { toast('Contact name is required', 'red'); return; }
-  npContacts.push({
-    contactname: name,
-    position: document.getElementById('npNewContactPosition').value.trim() || null,
-    emailaddress: document.getElementById('npNewContactEmail').value.trim() || null,
-    phonenumber: document.getElementById('npNewContactPhone').value.trim() || null,
-  });
-  ['npNewContactName', 'npNewContactPosition', 'npNewContactEmail', 'npNewContactPhone']
-    .forEach(id => document.getElementById(id).value = '');
+function startEditNpContact(i){
+  const c = npContacts[i];
+  if (!c) return;
+  npEditingContactIndex = i;
+  const f = npContactFormInputs();
+  f.name.value = c.contactname || '';
+  f.position.value = c.position || '';
+  f.email.value = c.emailaddress || '';
+  f.phone.value = c.phonenumber || '';
+  document.getElementById('npAddContact').textContent = 'Save';
+  document.getElementById('npCancelEditContact').style.display = '';
   renderNpContacts();
-  document.getElementById('npNewContactName').focus();
+  f.name.focus();
+}
+
+function cancelEditNpContact(){
+  npEditingContactIndex = null;
+  const f = npContactFormInputs();
+  [f.name, f.position, f.email, f.phone].forEach(el => { el.value = ''; });
+  document.getElementById('npAddContact').textContent = 'Add';
+  document.getElementById('npCancelEditContact').style.display = 'none';
+  renderNpContacts();
+}
+
+document.getElementById('npAddContact').addEventListener('click', () => {
+  const f = npContactFormInputs();
+  const name = f.name.value.trim();
+  if (!name) { toast('Contact name is required', 'red'); return; }
+  const contact = {
+    contactname: name,
+    position: f.position.value.trim() || null,
+    emailaddress: f.email.value.trim() || null,
+    phonenumber: f.phone.value.trim() || null,
+  };
+  if (npEditingContactIndex != null) npContacts[npEditingContactIndex] = contact;
+  else npContacts.push(contact);
+  cancelEditNpContact(); // clears inputs, resets button, re-renders
+  f.name.focus();
 });
+document.getElementById('npCancelEditContact').addEventListener('click', cancelEditNpContact);
 document.getElementById('npNewContactName').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') { e.preventDefault(); document.getElementById('npAddContact').click(); }
+  if (e.key === 'Escape' && npEditingContactIndex != null) { e.stopPropagation(); cancelEditNpContact(); }
 });
 
 function openNewBpModal(){
@@ -596,9 +716,8 @@ function openNewBpModal(){
   document.getElementById('npCountry').innerHTML = lookupOptionsHtml(LOOKUPS.countries, null, true);
   document.getElementById('npWebpage').value = '';
   ['npStreetName', 'npCity', 'npState', 'npZipCode', 'npPhone1', 'npPhone2'].forEach(id => document.getElementById(id).value = '');
-  ['npNewContactName', 'npNewContactPosition', 'npNewContactEmail', 'npNewContactPhone'].forEach(id => document.getElementById(id).value = '');
   npContacts = [];
-  renderNpContacts();
+  cancelEditNpContact(); // clears the contact inputs, button state, and re-renders the (now empty) list
   newBpOverlay.classList.remove('hidden');
   document.body.style.overflow = 'hidden';
   setTimeout(() => document.getElementById('npName').focus(), 50);
