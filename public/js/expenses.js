@@ -272,23 +272,33 @@ document.getElementById("expSave").addEventListener("click", async () => {
   if (amount === "" || Number.isNaN(Number(amount))) { toast("Enter an amount.", "red"); return; }
   const internal = document.getElementById("expInternal").checked;
 
-  const fd = new FormData();
-  fd.set("expenseDate", document.getElementById("expDate").value || "");
-  fd.set("categoryId", document.getElementById("expCategory").value || "");
-  fd.set("description", document.getElementById("expDescription").value.trim());
-  fd.set("amount", amount);
-  fd.set("isInternal", internal ? "true" : "false");
-  fd.set("projectId", internal ? "" : (document.getElementById("expProject").value || ""));
-  fd.set("paidBy", document.getElementById("expPaidBy").value || "");
-  fd.set("invoiceable", (!internal && document.getElementById("expInvoiceable").checked) ? "true" : "false");
+  const fields = {
+    expenseDate: document.getElementById("expDate").value || "",
+    categoryId: document.getElementById("expCategory").value || "",
+    description: document.getElementById("expDescription").value.trim(),
+    amount,
+    isInternal: internal ? "true" : "false",
+    projectId: internal ? "" : (document.getElementById("expProject").value || ""),
+    paidBy: document.getElementById("expPaidBy").value || "",
+    invoiceable: (!internal && document.getElementById("expInvoiceable").checked) ? "true" : "false",
+  };
   const file = document.getElementById("expDocFile").files[0];
-  if (file) fd.set("document", file);
+  // Plain JSON unless there's a file to send — keeps no-file edits working
+  // even when server uploads aren't wired up yet.
+  let payload;
+  if (file) {
+    payload = new FormData();
+    Object.entries(fields).forEach(([k, v]) => payload.set(k, v));
+    payload.set("document", file);
+  } else {
+    payload = fields;
+  }
 
   const btn = document.getElementById("expSave");
   btn.disabled = true;
   try {
-    if (editingId) await HITT_API.updateExpense(editingId, fd);
-    else await HITT_API.createExpense(fd);
+    if (editingId) await HITT_API.updateExpense(editingId, payload);
+    else await HITT_API.createExpense(payload);
     toast(editingId ? "Expense saved." : "Expense added.", "green");
     closeExpenseModal();
     loadExpenses();

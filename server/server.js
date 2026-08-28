@@ -16,17 +16,31 @@ const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
 
-const projectsRouter = require("./routes/projects");
-const businessPartnersRouter = require("./routes/businessPartners");
-const timeTrackingRouter = require("./routes/timeTracking");
-const timeOffRouter = require("./routes/timeOff");
-const invoicingRouter = require("./routes/invoicing");
-const employeesRouter = require("./routes/employees");
-const permissionsRouter = require("./routes/permissions");
-const settingsRouter = require("./routes/settings");
-const reportsRouter = require("./routes/reports");
-const auditRouter = require("./routes/audit");
-const expensesRouter = require("./routes/expenses");
+// Load each router in isolation — a single route file failing to load
+// (e.g. a missing optional dependency) shouldn't take the whole API down.
+// A failed router is replaced with one that returns 503 for that path.
+function loadRouter(name) {
+  try {
+    return require(`./routes/${name}`);
+  } catch (err) {
+    console.error(`[server] route "${name}" failed to load — it will return 503:\n  ${err.message}`);
+    const stub = require("express").Router();
+    stub.use((req, res) => res.status(503).json({ error: "route_unavailable", message: `The ${name} API is unavailable — check the server logs.` }));
+    return stub;
+  }
+}
+
+const projectsRouter = loadRouter("projects");
+const businessPartnersRouter = loadRouter("businessPartners");
+const timeTrackingRouter = loadRouter("timeTracking");
+const timeOffRouter = loadRouter("timeOff");
+const invoicingRouter = loadRouter("invoicing");
+const employeesRouter = loadRouter("employees");
+const permissionsRouter = loadRouter("permissions");
+const settingsRouter = loadRouter("settings");
+const reportsRouter = loadRouter("reports");
+const auditRouter = loadRouter("audit");
+const expensesRouter = loadRouter("expenses");
 const { attachHittUser } = require("./lib/permissions");
 
 const app = express();

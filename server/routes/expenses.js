@@ -24,10 +24,16 @@ const path = require("path");
 const fs = require("fs");
 const crypto = require("crypto");
 const express = require("express");
-const multer = require("multer");
 const { pool } = require("../config/db");
 const { requireModuleAccess } = require("../lib/permissions");
 const { logAudit } = require("../lib/audit");
+
+// multer is only needed for evidence uploads. If it's missing (server not
+// `npm install`ed yet) the module still runs — list + no-file CRUD work,
+// upload/replace endpoints return 503 until it's installed.
+let multer = null;
+try { multer = require("multer"); }
+catch { console.error("[expenses] multer not installed — evidence uploads disabled. Run `npm install` in server/."); }
 
 const router = express.Router();
 router.use(requireModuleAccess("expenses"));
@@ -35,7 +41,13 @@ router.use(requireModuleAccess("expenses"));
 const UPLOAD_DIR = process.env.UPLOAD_DIR
   ? path.resolve(process.env.UPLOAD_DIR, "expenses")
   : path.join(__dirname, "..", "uploads", "expenses");
-fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+let uploadsReady = false;
+try {
+  fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+  uploadsReady = !!multer;
+} catch (e) {
+  console.error(`[expenses] upload dir "${UPLOAD_DIR}" not available — uploads disabled:`, e.message);
+}
 
 const ALLOWED_MIME = new Set([
   "application/pdf",
@@ -48,7 +60,7 @@ const EXT_MIME = {
 };
 const mimeFor = (name) => EXT_MIME[path.extname(name || "").toLowerCase()] || "application/octet-stream";
 
-const upload = multer({
+const upload = multer && multer({
   storage: multer.diskStorage({
     destination: (req, file, cb) => cb(null, UPLOAD_DIR),
     filename: (req, file, cb) => {
@@ -60,11 +72,25 @@ const upload = multer({
   fileFilter: (req, file, cb) =>
     ALLOWED_MIME.has(file.mimetype) ? cb(null, true) : cb(new Error("Only images or PDF files are allowed.")),
 });
-const acceptDocument = (req, res, next) =>
-  upload.single("document")(req, res, (err) => {
-    if (err) return res.status(400).json({ error: "upload_error", message: err.message });
-    next();
-  });
+
+// Parses a multipart body (with the optional `document` file). A JSON body
+// passes straight through. When uploads aren't available, a multipart
+// request is rejected with a clear 503 but JSON still works.
+const acceptDocument = uploadsReady
+  ? (req, res, next) =>
+      upload.single("document")(req, res, (err) => {
+        if (err) return res.status(400).json({ error: "upload_error", message: err.message });
+        next();
+      })
+  : (req, res, next) => {
+      if (req.is("multipart/form-data")) {
+        return res.status(503).json({
+          error: "uploads_unavailable",
+          message: "Evidence uploads aren't available yet — the server needs `npm install` (multer).",
+        });
+      }
+      next();
+    };
 
 function removeFileQuietly(storedName) {
   if (!storedName) return;
