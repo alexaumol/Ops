@@ -103,9 +103,10 @@
       <div id="board" class="h-full min-w-max grid grid-flow-col auto-cols-[264px] sm:auto-cols-[280px] gap-3"></div>
     </main>
 
-    <!-- Quick-drop targets for Closed / Cancelled — only revealed while a
-         card is being dragged on the Alive tab (see #kanbanBody.is-dragging
-         in projects.css and renderQuickDrop() in projects.js). -->
+    <!-- Quick-drop targets for the opposite lifecycle (Closed/Cancelled on
+         the Alive tab, alive stages on the Closed tab) — only revealed
+         while a card is being dragged (see #kanbanBody.is-dragging in
+         projects.css and renderQuickDrop() in projects.js). -->
     <div id="kbQuickdrop" data-enabled="false" aria-hidden="true"></div>
 
     <aside id="kanbanInsights">

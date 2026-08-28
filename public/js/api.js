@@ -9,6 +9,18 @@
 const HITT_API = (() => {
   const base = () => (window.HITT_CONFIG?.API_BASE_URL || "").replace(/\/$/, "");
 
+  // Best a browser can report as the client "computer" — a real OS hostname
+  // isn't available to a web page (see server/lib/audit.js). Sent on every
+  // request so the audit log's Computer/device column is populated for all
+  // actions, not just sign in/out.
+  const clientPlatform = () => {
+    try {
+      return (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || "";
+    } catch {
+      return "";
+    }
+  };
+
   async function request(path, options = {}) {
     const session = HITT_AUTH?.getSession?.();
     const res = await fetch(`${base()}${path}`, {
@@ -19,6 +31,7 @@ const HITT_API = (() => {
         // MSAL auth is wired in, replace this with a Bearer ID token and
         // verify it server-side instead of trusting a plain header.
         "X-HITT-User": session?.username || "unknown",
+        "X-HITT-Client": clientPlatform(),
         ...(options.headers || {}),
       },
     });

@@ -66,7 +66,12 @@ async function logAudit(req, entry) {
   try {
     await ensureAuditSchema();
     const u = (req && req.hittUser) || {};
-    const { kind, desc, level = 1, computerName = null, userAgent = null } = entry || {};
+    const { kind, desc, level = 1 } = entry || {};
+    // Device info comes from headers the frontend sets on every request
+    // (X-HITT-Client + the standard User-Agent); session-event passes them
+    // explicitly, which takes precedence.
+    const computerName = entry?.computerName || req?.headers?.["x-hitt-client"] || null;
+    const userAgent = entry?.userAgent || req?.headers?.["user-agent"] || null;
     await pool.query(
       `INSERT INTO public.actionsaudit
          (actionuserid, actionusername, actionkind, actiondesc, actionts,

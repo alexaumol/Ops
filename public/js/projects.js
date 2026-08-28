@@ -366,21 +366,25 @@ function renderBoard(){
   renderQuickDrop();
 }
 
-// Quick-drop targets for Closed / Cancelled, shown in the gap between the
-// board and the insights panel — only on the Alive tab, only visible while
-// a card is being dragged (#kanbanBody.is-dragging in projects.css). Lets
-// you close or cancel a project without switching to the Closed tab first.
+// Quick-drop targets shown in the gap between the board and the insights
+// panel, only while a card is being dragged (#kanbanBody.is-dragging in
+// projects.css). They offer the OPPOSITE lifecycle to the current tab —
+// Closed/Cancelled while on Alive, and the alive stages while on
+// Closed/Cancelled — so a card can jump between the two without switching
+// tabs first.
 function renderQuickDrop(){
   const qd = document.getElementById('kbQuickdrop');
   if (!qd) return;
-  const closedStages = currentTab === 'alive' ? STAGES.filter(s => s.set === 'closed') : [];
-  if (!closedStages.length) {
+  const targetSet = currentTab === 'alive' ? 'closed' : 'alive';
+  const zones = STAGES.filter(s => s.set === targetSet);
+  if (!zones.length) {
     qd.innerHTML = '';
     qd.dataset.enabled = 'false';
     return;
   }
   qd.dataset.enabled = 'true';
-  qd.innerHTML = closedStages.map(s => `
+  qd.dataset.count = String(zones.length);
+  qd.innerHTML = zones.map(s => `
     <div class="kb-quickdrop-zone" data-stage="${s.id}" style="--qd-color:${s.color}">
       <span class="kb-quickdrop-icon">${s.icon}</span>
       <span class="kb-quickdrop-label">Move to<br><b>${escapeHtml(s.label)}</b></span>
