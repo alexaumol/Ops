@@ -29,6 +29,7 @@
 const express = require("express");
 const { pool } = require("../config/db");
 const { requireModuleAccess } = require("../lib/permissions");
+const { logAudit } = require("../lib/audit");
 
 const router = express.Router();
 
@@ -153,6 +154,12 @@ router.post("/", requireModuleAccess("business-partners"), async (req, res) => {
       [bp.id, employeeId || null, "Business partner created"]
     );
     await client.query("COMMIT");
+    logAudit(req, {
+      action: "bp.insert",
+      entityType: "business_partner",
+      entityId: bp.id,
+      summary: `Created business partner "${bp.name}"`,
+    });
     res.status(201).json(bp);
   } catch (err) {
     await client.query("ROLLBACK");
@@ -263,6 +270,13 @@ router.patch("/:id", async (req, res) => {
     }
 
     await client.query("COMMIT");
+    logAudit(req, {
+      action: "bp.update",
+      entityType: "business_partner",
+      entityId: id,
+      summary: `Updated business partner "${name || cur.bpname || `#${id}`}"` +
+        (changes.length ? `: ${changes.join("; ")}` : " (no field changes)"),
+    });
     res.status(204).end();
   } catch (err) {
     await client.query("ROLLBACK");

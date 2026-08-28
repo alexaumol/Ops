@@ -170,6 +170,7 @@ document.getElementById("empTableBody").addEventListener("change", async (e) => 
 /* ============================== TABS ================================== */
 let holidaysLoaded = false;
 let calendarLoaded = false;
+let auditLoaded = false;
 
 document.querySelectorAll("[data-stab]").forEach((btn) => {
   btn.addEventListener("click", () => {
@@ -179,6 +180,7 @@ document.querySelectorAll("[data-stab]").forEach((btn) => {
     document.getElementById("paneUserPerms").classList.toggle("hidden", tab !== "permissions");
     document.getElementById("paneHolidays").classList.toggle("hidden", tab !== "holidays");
     document.getElementById("paneCalendar").classList.toggle("hidden", tab !== "calendar");
+    document.getElementById("paneAudit").classList.toggle("hidden", tab !== "audit");
     if (tab === "holidays" && !holidaysLoaded) {
       holidaysLoaded = true;
       loadHolidayYears().then(loadHolidays);
@@ -186,6 +188,10 @@ document.querySelectorAll("[data-stab]").forEach((btn) => {
     if (tab === "calendar" && !calendarLoaded) {
       calendarLoaded = true;
       loadWorkCalendar();
+    }
+    if (tab === "audit" && !auditLoaded) {
+      auditLoaded = true;
+      loadAuditUsers().then(loadAudit);
     }
   });
 });
@@ -393,6 +399,129 @@ document.getElementById("btnAddCalendarYear").addEventListener("click", async ()
   } catch (err) {
     toast(`Couldn't add that year: ${err.message}`, "red");
   }
+});
+
+/* ============================== AUDITING ============================= */
+let auditPage = 1;
+let auditTotal = 0;
+let auditSearchDebounce = null;
+
+const AUDIT_ACTION_LABELS = {
+  login: "Sign in",
+  logout: "Sign out",
+  "project.create": "Project created",
+  "timetracking.insert": "Time tracking added",
+  "timetracking.update": "Time tracking updated",
+  "timetracking.delete": "Time tracking deleted",
+  "bp.insert": "Business partner created",
+  "bp.update": "Business partner updated",
+};
+function auditActionLabel(a) { return AUDIT_ACTION_LABELS[a] || a; }
+function auditActionClass(a) {
+  if (a === "login" || a === "logout") return "is-session";
+  if (a.endsWith(".delete")) return "is-delete";
+  if (a.endsWith(".create") || a.endsWith(".insert")) return "is-create";
+  return "is-update";
+}
+
+async function loadAuditUsers() {
+  try {
+    const users = await HITT_API.getAuditUsers();
+    const sel = document.getElementById("auditUserFilter");
+    const current = sel.value;
+    sel.innerHTML = `<option value="">Everyone</option>` +
+      users.map((u) => `<option value="${u.id}">${escapeHtml(u.name || `#${u.id}`)}</option>`).join("");
+    if (users.some((u) => String(u.id) === current)) sel.value = current;
+  } catch (err) {
+    console.error("[settings] audit users:", err.message);
+  }
+}
+
+function auditFilters() {
+  return {
+    userId: document.getElementById("auditUserFilter").value || undefined,
+    startDate: document.getElementById("auditStartDate").value || undefined,
+    endDate: document.getElementById("auditEndDate").value || undefined,
+    search: document.getElementById("auditSearch").value.trim() || undefined,
+    page: auditPage,
+    limit: Number(document.getElementById("auditPageSize").value),
+  };
+}
+
+async function loadAudit() {
+  const tbody = document.getElementById("auditTableBody");
+  const empty = document.getElementById("auditEmpty");
+  tbody.innerHTML = `<tr><td colspan="6" class="settings-emp-sub" style="padding:1rem;">Loading…</td></tr>`;
+  empty.classList.add("hidden");
+  try {
+    const { rows, total } = await HITT_API.getAuditLogs(auditFilters());
+    auditTotal = total;
+    renderAudit(rows);
+  } catch (err) {
+    console.error("[settings] audit logs:", err.message);
+    tbody.innerHTML = "";
+    empty.textContent = "Could not load the audit log.";
+    empty.classList.remove("hidden");
+    auditTotal = 0;
+  }
+  updateAuditPagination();
+}
+
+function renderAudit(rows) {
+  const tbody = document.getElementById("auditTableBody");
+  const empty = document.getElementById("auditEmpty");
+  if (!rows.length) {
+    tbody.innerHTML = "";
+    empty.textContent = "No audit entries match these filters.";
+    empty.classList.remove("hidden");
+    return;
+  }
+  empty.classList.add("hidden");
+  tbody.innerHTML = rows.map((r) => `
+    <tr>
+      <td class="settings-emp-sub" style="white-space:nowrap;">${new Date(r.at).toLocaleString()}</td>
+      <td>${escapeHtml(r.employeeName || r.username || "—")}</td>
+      <td><span class="audit-action-chip ${auditActionClass(r.action)}">${escapeHtml(auditActionLabel(r.action))}</span></td>
+      <td>${escapeHtml(r.summary || "")}</td>
+      <td class="settings-emp-sub">${escapeHtml(r.ip || "—")}</td>
+      <td class="settings-emp-sub" title="${escapeHtml(r.userAgent || "")}">${escapeHtml(r.computer || "—")}</td>
+    </tr>
+  `).join("");
+}
+
+function auditTotalPages() {
+  return Math.max(1, Math.ceil(auditTotal / Number(document.getElementById("auditPageSize").value)));
+}
+
+function updateAuditPagination() {
+  const pages = auditTotalPages();
+  document.getElementById("auditPageInfo").textContent = auditTotal
+    ? `Page ${auditPage} of ${pages} · ${auditTotal} ${auditTotal === 1 ? "entry" : "entries"}`
+    : "";
+  document.getElementById("btnAuditPrev").disabled = auditPage <= 1;
+  document.getElementById("btnAuditNext").disabled = auditPage >= pages;
+}
+
+["auditUserFilter", "auditStartDate", "auditEndDate", "auditPageSize"].forEach((id) => {
+  document.getElementById(id).addEventListener("change", () => { auditPage = 1; loadAudit(); });
+});
+document.getElementById("auditSearch").addEventListener("input", () => {
+  clearTimeout(auditSearchDebounce);
+  auditSearchDebounce = setTimeout(() => { auditPage = 1; loadAudit(); }, 300);
+});
+document.getElementById("btnAuditClear").addEventListener("click", () => {
+  document.getElementById("auditUserFilter").value = "";
+  document.getElementById("auditStartDate").value = "";
+  document.getElementById("auditEndDate").value = "";
+  document.getElementById("auditSearch").value = "";
+  auditPage = 1;
+  loadAudit();
+});
+document.getElementById("btnAuditPrev").addEventListener("click", () => {
+  if (auditPage > 1) { auditPage--; loadAudit(); }
+});
+document.getElementById("btnAuditNext").addEventListener("click", () => {
+  if (auditPage < auditTotalPages()) { auditPage++; loadAudit(); }
 });
 
 loadEmployees();

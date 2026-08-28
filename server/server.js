@@ -25,10 +25,15 @@ const employeesRouter = require("./routes/employees");
 const permissionsRouter = require("./routes/permissions");
 const settingsRouter = require("./routes/settings");
 const reportsRouter = require("./routes/reports");
+const auditRouter = require("./routes/audit");
 const { attachHittUser } = require("./lib/permissions");
 
 const app = express();
 const PORT = process.env.PORT || 4000;
+
+// nginx on the VPS proxies to this app — trust its X-Forwarded-For so
+// req.ip (and the audit log's client IP) reflect the real caller.
+app.set("trust proxy", true);
 
 const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS || "")
   .split(",")
@@ -67,6 +72,7 @@ app.use("/api/employees", employeesRouter);
 app.use("/api/permissions", permissionsRouter);
 app.use("/api/settings", settingsRouter);
 app.use("/api/reports", reportsRouter);
+app.use("/api/audit", auditRouter);
 
 // Fallback 404 for unknown API routes.
 app.use("/api", (req, res) => {

@@ -21,8 +21,19 @@
 const express = require("express");
 const { pool } = require("../config/db");
 const { requireModuleAccess } = require("../lib/permissions");
+const { logAudit } = require("../lib/audit");
 
 const router = express.Router();
+
+// Small helper so audit summaries name the project rather than just its id.
+async function projectLabel(projectId) {
+  try {
+    const { rows } = await pool.query(`SELECT projectnumber FROM projects WHERE id = $1::bigint`, [projectId]);
+    return rows[0]?.projectnumber ? `project ${rows[0].projectnumber}` : `project #${projectId}`;
+  } catch {
+    return `project #${projectId}`;
+  }
+}
 
 // GET /api/time-tracking?userId=X&weekStart=YYYY-MM-DD
 router.get("/", requireModuleAccess("time-allocation"), async (req, res) => {
@@ -61,7 +72,9 @@ router.post("/", requireModuleAccess("time-allocation"), async (req, res) => {
       [userId, projectId, weekStart]
     );
     let row;
+    let wasUpdate;
     if (existing.rows.length) {
+      wasUpdate = true;
       const { rows } = await pool.query(
         `UPDATE projectstimetracking SET projtimetrackhours = $1, po_res = $2, projtimetrackts = now()
          WHERE id = $3
@@ -70,6 +83,7 @@ router.post("/", requireModuleAccess("time-allocation"), async (req, res) => {
       );
       row = rows[0];
     } else {
+      wasUpdate = false;
       const { rows } = await pool.query(
         `INSERT INTO projectstimetracking
            (userid, projectid, projtimetrackweek, projtimetrackdate, projtimetrackhours, po_res, projtimetrackts)
@@ -79,7 +93,17 @@ router.post("/", requireModuleAccess("time-allocation"), async (req, res) => {
       );
       row = rows[0];
     }
+
     res.status(200).json(row);
+
+    projectLabel(projectId).then((label) =>
+      logAudit(req, {
+        action: wasUpdate ? "timetracking.update" : "timetracking.insert",
+        entityType: "time_tracking",
+        entityId: row.id,
+        summary: `${wasUpdate ? "Updated" : "Logged"} ${hours}h (${poRes || "—"}) on ${label}, week of ${weekStart}`,
+      })
+    );
   } catch (err) {
     console.error("[POST /api/time-tracking] DB error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });
@@ -89,8 +113,24 @@ router.post("/", requireModuleAccess("time-allocation"), async (req, res) => {
 // DELETE /api/time-tracking/:id — remove a project row from the week.
 router.delete("/:id", async (req, res) => {
   try {
-    await pool.query(`DELETE FROM projectstimetracking WHERE id = $1`, [req.params.id]);
+    const { rows } = await pool.query(
+      `DELETE FROM projectstimetracking WHERE id = $1
+       RETURNING projectid, projtimetrackhours AS hours, projtimetrackdate AS "weekStart"`,
+      [req.params.id]
+    );
     res.status(204).end();
+
+    if (rows.length) {
+      const r = rows[0];
+      projectLabel(r.projectid).then((label) =>
+        logAudit(req, {
+          action: "timetracking.delete",
+          entityType: "time_tracking",
+          entityId: req.params.id,
+          summary: `Deleted time tracking (${r.hours ?? "—"}h) on ${label}`,
+        })
+      );
+    }
   } catch (err) {
     console.error("[DELETE /api/time-tracking/:id] DB error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });

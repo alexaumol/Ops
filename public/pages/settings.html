@@ -36,6 +36,7 @@
         <button data-stab="permissions" class="settings-tab" role="tab" aria-selected="true">User permissions</button>
         <button data-stab="holidays" class="settings-tab" role="tab" aria-selected="false">Holidays</button>
         <button data-stab="calendar" class="settings-tab" role="tab" aria-selected="false">Work calendar</button>
+        <button data-stab="audit" class="settings-tab" role="tab" aria-selected="false">Auditing</button>
       </div>
 
       <!-- ==================== USER PERMISSIONS ==================== -->
@@ -105,6 +106,56 @@
             <input type="number" id="newCalendarYear" min="2000" max="2100" placeholder="Year" style="width:6rem;" />
             <button class="btn btn-primary" id="btnAddCalendarYear">Add year</button>
           </div>
+        </div>
+      </section>
+
+      <!-- ==================== AUDITING ==================== -->
+      <section id="paneAudit" class="settings-pane hidden">
+        <p class="settings-note">Sign in / out (with client IP and reported device), project creation, project time-tracking changes, and business-partner changes. Admins only.</p>
+        <div class="settings-toolbar" style="gap:0.6rem; flex-wrap:wrap;">
+          <label class="settings-inline-field">User
+            <select id="auditUserFilter"><option value="">Everyone</option></select>
+          </label>
+          <label class="settings-inline-field">From
+            <input type="date" id="auditStartDate" />
+          </label>
+          <label class="settings-inline-field">To
+            <input type="date" id="auditEndDate" />
+          </label>
+          <label class="settings-inline-field">Search
+            <input type="text" id="auditSearch" placeholder="text, action, IP…" />
+          </label>
+          <button class="btn btn-secondary" id="btnAuditClear">Clear</button>
+        </div>
+        <div class="settings-table-wrap">
+          <table class="settings-table audit-table">
+            <thead>
+              <tr>
+                <th>When</th>
+                <th>User</th>
+                <th>Action</th>
+                <th>Details</th>
+                <th>IP</th>
+                <th>Computer / device</th>
+              </tr>
+            </thead>
+            <tbody id="auditTableBody"></tbody>
+          </table>
+          <div id="auditEmpty" class="settings-pane-empty hidden">No audit entries match these filters.</div>
+        </div>
+        <div class="settings-pagination">
+          <span id="auditPageInfo" class="settings-emp-sub"></span>
+          <div style="flex:1;"></div>
+          <label class="settings-inline-field">Per page
+            <select id="auditPageSize">
+              <option value="25">25</option>
+              <option value="50" selected>50</option>
+              <option value="100">100</option>
+              <option value="250">250</option>
+            </select>
+          </label>
+          <button class="btn btn-secondary" id="btnAuditPrev">&larr; Prev</button>
+          <button class="btn btn-secondary" id="btnAuditNext">Next &rarr;</button>
         </div>
       </section>
     </div>

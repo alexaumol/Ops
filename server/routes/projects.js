@@ -39,6 +39,7 @@ const express = require("express");
 const { pool } = require("../config/db");
 const { requireModuleAccess } = require("../lib/permissions");
 const { graphConfigured, createProjectFolder } = require("../lib/graph");
+const { logAudit } = require("../lib/audit");
 
 const router = express.Router();
 
@@ -332,6 +333,13 @@ router.post("/", requireModuleAccess("projects"), async (req, res) => {
       oneDriveFolder = { created: false, error: err.message };
     }
   }
+
+  logAudit(req, {
+    action: "project.create",
+    entityType: "project",
+    entityId: project.id,
+    summary: `Created project ${project.code || "(no number)"} — ${project.name}`,
+  });
 
   res.status(201).json({ ...project, progress: progress || 0, oneDriveFolder });
 });

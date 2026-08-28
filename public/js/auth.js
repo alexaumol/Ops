@@ -98,6 +98,7 @@ const HITT_AUTH = (() => {
       mode: "msal",
     };
     sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
+    auditSessionEvent("login");
     return session;
   }
 
@@ -111,6 +112,7 @@ const HITT_AUTH = (() => {
       mode: "stub",
     };
     sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
+    auditSessionEvent("login");
     return session;
   }
 
@@ -118,6 +120,30 @@ const HITT_AUTH = (() => {
     if (!username) return "Employee";
     const local = username.split("@")[0].replace(/[._]/g, " ");
     return local.replace(/\b\w/g, (c) => c.toUpperCase());
+  }
+
+  // Fire-and-forget audit ping for sign in / sign out. Best-effort: never
+  // blocks or fails the auth flow. A browser can't read the OS hostname, so
+  // `platform` is the closest a web page can report ("computer name" in the
+  // audit UI). `keepalive` lets the logout ping survive the page unload.
+  function auditSessionEvent(type, keepalive) {
+    try {
+      const base = (window.HITT_CONFIG?.API_BASE_URL || "").replace(/\/$/, "");
+      const session = getSession();
+      fetch(`${base}/api/audit/session-event`, {
+        method: "POST",
+        keepalive: !!keepalive,
+        headers: {
+          "Content-Type": "application/json",
+          "X-HITT-User": session?.username || "unknown",
+        },
+        body: JSON.stringify({
+          type,
+          userAgent: navigator.userAgent || "",
+          platform: (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || "",
+        }),
+      }).catch(() => {});
+    } catch { /* never let audit logging break sign in/out */ }
   }
 
   function getSession() {
@@ -143,6 +169,7 @@ const HITT_AUTH = (() => {
   // Microsoft 365 session (Outlook, Teams, ...) across the browser, which
   // would be a surprising side effect for an internal line-of-business app.
   function signOut(redirectTo = "index.html") {
+    auditSessionEvent("logout", true); // keepalive — must outlive the redirect
     sessionStorage.removeItem(SESSION_KEY);
     window.location.href = redirectTo;
   }

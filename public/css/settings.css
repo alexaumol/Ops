@@ -33,7 +33,8 @@
   font-size: 0.82rem;
   color: var(--text-secondary);
 }
-.settings-inline-field select {
+.settings-inline-field select,
+.settings-inline-field input {
   padding: 0.35rem 0.5rem;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border-subtle);
@@ -41,6 +42,35 @@
   color: var(--text-primary);
   font-size: 0.85rem;
 }
+.settings-inline-field input[type="text"] { min-width: 12rem; }
+
+.settings-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0.85rem 0 1.5rem;
+}
+.settings-pagination .btn { padding: 0.35rem 0.85rem; font-size: 0.82rem; }
+
+.audit-table { font-size: 0.82rem; }
+.audit-table td { vertical-align: top; }
+.audit-action-chip {
+  display: inline-block;
+  font-size: 0.66rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  padding: 0.12rem 0.45rem;
+  border-radius: 999px;
+  white-space: nowrap;
+  background: var(--bg-surface-alt);
+  color: var(--text-secondary);
+}
+.audit-action-chip.is-session { background: rgba(92,117,124,0.15); color: #3E5559; }
+.audit-action-chip.is-create { background: rgba(110,143,90,0.15); color: #4C6B3A; }
+.audit-action-chip.is-update { background: rgba(188,154,28,0.16); color: #8A6E12; }
+.audit-action-chip.is-delete { background: rgba(178,74,58,0.14); color: var(--danger); }
 .settings-pane-empty { text-align: center; color: var(--text-secondary); padding: 1.75rem 1rem; font-size: 0.88rem; }
 .settings-add-row {
   display: flex;

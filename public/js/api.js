@@ -131,6 +131,19 @@ const HITT_API = (() => {
     setWorkCalendarYear: (year, payload) =>
       request(`/api/settings/work-calendar/${year}`, { method: "PUT", body: JSON.stringify(payload) }),
 
+    getAuditUsers: () => request("/api/audit/users"),
+    getAuditLogs: (filters = {}) => {
+      const params = new URLSearchParams();
+      if (filters.userId) params.set("userId", filters.userId);
+      if (filters.startDate) params.set("startDate", filters.startDate);
+      if (filters.endDate) params.set("endDate", filters.endDate);
+      if (filters.search) params.set("search", filters.search);
+      if (filters.page) params.set("page", filters.page);
+      if (filters.limit) params.set("limit", filters.limit);
+      const qs = params.toString();
+      return request(`/api/audit/logs${qs ? `?${qs}` : ""}`);
+    },
+
     getInvoicingLookups: () => request("/api/invoicing/lookups"),
     getInvoicingProjects: () => request("/api/invoicing/projects"),
     getProjectRelease: (projectId) => request(`/api/invoicing/projects/${projectId}/release`),
