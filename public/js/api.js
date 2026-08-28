@@ -42,6 +42,7 @@ const HITT_API = (() => {
   return {
     getProjects: () => request("/api/projects"),
     getProjectStatuses: () => request("/api/projects/statuses"),
+    getProjectAttention: () => request("/api/projects/attention"),
     getProjectLookups: () => request("/api/projects/lookups"),
     getProject: (id) => request(`/api/projects/${id}`),
     getProjectDeliverables: (id) => request(`/api/projects/${id}/deliverables`),

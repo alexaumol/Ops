@@ -85,7 +85,7 @@
   overflow: hidden;
 }
 .modal-panel--sm { max-width: 480px; }
-.modal-panel--lg { max-width: 1100px; }
+.modal-panel--lg { max-width: 1200px; }
 
 /* Edit modal's two-column General pane (form fields left, Notes right —
    mirrors the Projects modal) + collapsible History side panel, both new
@@ -94,7 +94,7 @@
 .modal-columns .modal-body { min-width: 0; }
 #paneGeneral.modal-pane { display: grid; grid-template-columns: 1.5fr 1fr; gap: 0.9rem; align-items: start; }
 #historyPanel {
-  flex-shrink: 0; width: 260px; overflow: hidden;
+  flex-shrink: 0; width: 300px; overflow: hidden;
   border-left: 1px solid var(--border-subtle);
   background: var(--bg-surface);
   display: flex; flex-direction: column;

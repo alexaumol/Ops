@@ -168,6 +168,61 @@ router.get("/lookups", async (req, res) => {
   }
 });
 
+// GET /api/projects/attention — two watch-lists for the kanban side panel:
+//   readyToClose  Delivered projects whose invoiced-to-date total has
+//                 reached (or passed) the latest quotation's finalquotation.
+//   stale         Lead/Oferta/Guanyat projects opened more than 3 months
+//                 ago whose most recent status change (or, if none logged,
+//                 their entry date) is more than 2 weeks old.
+// Must be declared before GET /:id so "attention" isn't taken as an id.
+router.get("/attention", requireModuleAccess("projects"), async (req, res) => {
+  try {
+    const [readyToClose, stale] = await Promise.all([
+      pool.query(`
+        SELECT p.id, p.projectnumber AS code, p.projectname AS name,
+               q.finalquotation AS budget,
+               COALESCE(inv.total, 0) AS "invoicedTotal"
+        FROM projects p
+        JOIN projectstatus ps ON ps.id = p.projectstatusid::bigint
+        LEFT JOIN LATERAL (
+          SELECT finalquotation FROM projectquotations
+          WHERE projectid = p.id ORDER BY quotationdate DESC NULLS LAST, id DESC LIMIT 1
+        ) q ON true
+        LEFT JOIN LATERAL (
+          SELECT COALESCE(SUM(d.amount), 0) AS total
+          FROM invoices i
+          LEFT JOIN invoicesdetails d ON d.invoiceid = i.id
+          WHERE i.projectid = p.id::double precision AND i.invoicestatusid IS DISTINCT FROM 6
+        ) inv ON true
+        WHERE LOWER(ps.projectstatusdesc) = 'delivered'
+          AND q.finalquotation IS NOT NULL AND q.finalquotation > 0
+          AND COALESCE(inv.total, 0) >= q.finalquotation
+        ORDER BY p.projectnumber DESC
+      `),
+      pool.query(`
+        SELECT p.id, p.projectnumber AS code, p.projectname AS name,
+               ps.projectstatusdesc AS "statusLabel",
+               p.entrydate AS "entryDate",
+               lsc.changedat AS "lastStatusChangeAt"
+        FROM projects p
+        JOIN projectstatus ps ON ps.id = p.projectstatusid::bigint
+        LEFT JOIN LATERAL (
+          SELECT MAX(changedat) AS changedat FROM projectstatushistory h WHERE h.projectid = p.id
+        ) lsc ON true
+        WHERE LOWER(ps.projectstatusdesc) IN ('lead', 'oferta', 'guanyat')
+          AND p.entrydate IS NOT NULL
+          AND p.entrydate < now() - INTERVAL '3 months'
+          AND COALESCE(lsc.changedat, p.entrydate) < now() - INTERVAL '2 weeks'
+        ORDER BY COALESCE(lsc.changedat, p.entrydate) ASC
+      `),
+    ]);
+    res.json({ readyToClose: readyToClose.rows, stale: stale.rows });
+  } catch (err) {
+    console.error("[GET /api/projects/attention] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
 // GET /api/projects/:id — single project detail, including the fields
 // shown on the Access "EditProject" form's General tab (entity, biotech
 // spectrum, project type, contracting business partner, invoicing business

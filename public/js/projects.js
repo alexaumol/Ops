@@ -202,6 +202,58 @@ async function loadProjects() {
   setDataSourcePill();
   renderBoard();
   updateTabCounts();
+  loadKanbanInsights();
+}
+
+/* ============================== KANBAN INSIGHTS ========================= */
+function kiMoney(n){
+  if (n === null || n === undefined) return '—';
+  return Number(n).toLocaleString(undefined, { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });
+}
+
+async function loadKanbanInsights(){
+  const readyHost = document.getElementById('kiReadyToClose');
+  const staleHost = document.getElementById('kiStale');
+  if (!readyHost || !staleHost) return;
+  if (usingDemoData) {
+    readyHost.innerHTML = staleHost.innerHTML = `<div class="ki-empty">Not available in demo data</div>`;
+    return;
+  }
+  readyHost.innerHTML = staleHost.innerHTML = `<div class="ki-empty">Loading…</div>`;
+  let data;
+  try {
+    data = await HITT_API.getProjectAttention();
+  } catch (err) {
+    console.warn('Could not load kanban insights:', err);
+    readyHost.innerHTML = staleHost.innerHTML = `<div class="ki-empty">Could not load</div>`;
+    return;
+  }
+  renderKiList(readyHost, data.readyToClose, (p) =>
+    `${kiMoney(p.invoicedTotal)} invoiced / ${kiMoney(p.budget)} budget`);
+  renderKiList(staleHost, data.stale, (p) => {
+    const opened = p.entryDate ? new Date(p.entryDate).toLocaleDateString() : '—';
+    const changed = p.lastStatusChangeAt
+      ? `last change ${new Date(p.lastStatusChangeAt).toLocaleDateString()}`
+      : 'no status change logged';
+    return `${escapeHtml(p.statusLabel || '')} · opened ${opened} · ${changed}`;
+  });
+}
+
+function renderKiList(host, rows, metaFn){
+  if (!rows || !rows.length) {
+    host.innerHTML = `<div class="ki-empty">Nothing right now</div>`;
+    return;
+  }
+  host.innerHTML = rows.map(p => `
+    <button class="ki-item" data-project-id="${escapeHtml(String(p.id))}">
+      <span class="ki-item-code">${escapeHtml(p.code || '')}</span>
+      <span class="ki-item-name">${escapeHtml(p.name || '(unnamed)')}</span>
+      <span class="ki-item-meta">${metaFn(p)}</span>
+    </button>
+  `).join('');
+  host.querySelectorAll('.ki-item').forEach(btn => {
+    btn.addEventListener('click', () => openProjectModal(btn.dataset.projectId));
+  });
 }
 
 /* ============================== TOASTS ================================= */
@@ -378,6 +430,7 @@ async function moveProject(id, targetStageId){
   if (!usingDemoData) {
     try {
       await HITT_API.updateProjectStage(id, targetStageId, currentEmployeeId);
+      loadKanbanInsights();
     } catch (err) {
       console.error("Failed to persist stage change:", err);
       p.stage = previousStage; // rollback
@@ -1093,6 +1146,7 @@ document.getElementById('mSave').addEventListener('click', async () => {
   if (!usingDemoData) {
     try {
       await HITT_API.updateProject(p.id, { stage: newStatus, progress: newProgress, employeeId: currentEmployeeId, ...extraFields });
+      loadKanbanInsights();
       toast(`<span class="font-mono text-xs opacity-80">${escapeHtml(p.code)}</span> saved${statusChanged ? ' · status updated' : ''}`, 'green');
     } catch (err) {
       console.error(err);

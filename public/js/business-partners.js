@@ -465,7 +465,7 @@ let historyCollapsed = false;
 // visually collapse for a real user).
 historyCollapseBtn.addEventListener('click', () => {
   historyCollapsed = !historyCollapsed;
-  historyPanel.style.width = historyCollapsed ? '0px' : '260px';
+  historyPanel.style.width = historyCollapsed ? '0px' : '300px';
   historyPanel.style.borderLeft = historyCollapsed ? 'none' : '';
   historyCollapseBtn.textContent = historyCollapsed ? '«' : '»';
   historyCollapseBtn.title = historyCollapsed ? 'Expand history' : 'Collapse history';

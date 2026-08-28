@@ -260,6 +260,8 @@ async function loadLeavesMonth() {
   const cal = document.getElementById("leavesCalendar");
   cal.innerHTML = `<div class="rpt-cal-weekdays">${WEEKDAY_LABELS.map((d) => `<div>${d}</div>`).join("")}</div><div class="sub-empty" style="padding:2rem; text-align:center; color:var(--text-secondary);">Loading…</div>`;
 
+  document.getElementById("leavesMonthList").innerHTML = `<div class="rpt-leaves-empty">Loading…</div>`;
+
   let data;
   try {
     data = await HITT_API.getResourceLeaves(toISODate(gridStart), toISODate(gridEnd));
@@ -269,9 +271,56 @@ async function loadLeavesMonth() {
     lastLeavesData = null;
     toast("Could not load the resource leaves calendar.", "red");
     cal.innerHTML = `<div class="rpt-cal-weekdays">${WEEKDAY_LABELS.map((d) => `<div>${d}</div>`).join("")}</div><div style="padding:2rem; text-align:center; color:var(--text-secondary);">Could not load this report.</div>`;
+    document.getElementById("leavesMonthList").innerHTML = `<div class="rpt-leaves-empty">Could not load.</div>`;
     return;
   }
   renderCalendar(gridStart, gridEnd, data);
+  renderMonthLeavesList(data);
+}
+
+// "This month's leaves" side table — employee time-off overlapping the
+// visible month (not the padding days of adjacent months), grouped by
+// employee, each with their day count for the month.
+function renderMonthLeavesList(data) {
+  const host = document.getElementById("leavesMonthList");
+  const monthStart = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1);
+  const monthEnd = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 0);
+
+  const inMonth = (data.timeOff || []).filter((t) => {
+    const s = startOfDay(new Date(t.startDate));
+    const e = startOfDay(new Date(t.endDate));
+    return s <= monthEnd && e >= monthStart;
+  });
+
+  if (!inMonth.length) {
+    host.innerHTML = `<div class="rpt-leaves-empty">No leaves this month.</div>`;
+    return;
+  }
+
+  const byEmp = new Map();
+  inMonth.forEach((t) => {
+    const name = t.employeeName || `Employee #${t.empId}`;
+    if (!byEmp.has(name)) byEmp.set(name, []);
+    byEmp.get(name).push(t);
+  });
+
+  host.innerHTML = [...byEmp.keys()].sort((a, b) => a.localeCompare(b)).map((name) => {
+    const rows = byEmp.get(name).sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
+    const totalDays = rows.reduce((sum, r) => sum + (Number(r.daysRequested) || 0), 0);
+    return `
+      <div class="rpt-leaves-emp">
+        <div class="rpt-leaves-emp-head">
+          <span>${escapeHtml(name)}</span>
+          <span class="rpt-leaves-emp-days">${totalDays} day${totalDays === 1 ? "" : "s"}</span>
+        </div>
+        ${rows.map((r) => `
+          <div class="rpt-leaves-row">
+            <span>${new Date(r.startDate).toLocaleDateString()} – ${new Date(r.endDate).toLocaleDateString()}</span>
+            <span class="rpt-leaves-badge ${r.statusLabel === "Approved" ? "is-approved" : "is-pending"}">${escapeHtml(r.statusLabel || "—")}</span>
+          </div>
+        `).join("")}
+      </div>`;
+  }).join("");
 }
 
 function renderCalendar(gridStart, gridEnd, data) {

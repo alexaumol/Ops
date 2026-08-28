@@ -97,10 +97,25 @@
     </div>
   </div>
 
-  <!-- Board -->
-  <main class="flex-1 overflow-x-auto overflow-y-hidden px-3 sm:px-4 py-4">
-    <div id="board" class="h-full min-w-max grid grid-flow-col auto-cols-[264px] sm:auto-cols-[280px] gap-3"></div>
-  </main>
+  <!-- Board + insights side panel -->
+  <div id="kanbanBody" class="flex-1 flex overflow-hidden">
+    <main class="flex-1 overflow-x-auto overflow-y-hidden px-3 sm:px-4 py-4">
+      <div id="board" class="h-full min-w-max grid grid-flow-col auto-cols-[264px] sm:auto-cols-[280px] gap-3"></div>
+    </main>
+
+    <aside id="kanbanInsights">
+      <div class="ki-section">
+        <h3 class="ki-title">Candidate projects to close</h3>
+        <p class="ki-hint">Delivered, with invoiced total at or above the budgeted amount.</p>
+        <div id="kiReadyToClose" class="ki-list"></div>
+      </div>
+      <div class="ki-section">
+        <h3 class="ki-title">Stale early-stage projects</h3>
+        <p class="ki-hint">Lead / Oferta / Guanyat · opened over 3 months ago · no status change in over 2 weeks.</p>
+        <div id="kiStale" class="ki-list"></div>
+      </div>
+    </aside>
+  </div>
 </div>
 
 <div id="toastHost" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 items-end"></div>

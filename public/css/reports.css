@@ -99,6 +99,56 @@
 .rpt-swatch-approved { background: var(--brand); }
 .rpt-swatch-pending { background: var(--bg-surface); border: 1.5px dashed var(--text-secondary); }
 
+/* ---------- Resource-leaves layout: calendar + month list ---------- */
+.rpt-leaves-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 1.25rem;
+  align-items: start;
+}
+@media (max-width: 960px) {
+  .rpt-leaves-layout { grid-template-columns: 1fr; }
+}
+.rpt-leaves-side {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: 0.9rem 1rem 1rem;
+}
+.rpt-leaves-side-title {
+  margin: 0 0 0.6rem;
+  font-size: 0.8rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-primary);
+}
+.rpt-leaves-list { display: flex; flex-direction: column; gap: 0.75rem; }
+.rpt-leaves-empty { font-size: 0.82rem; color: var(--text-secondary); padding: 0.5rem 0; }
+.rpt-leaves-emp { border-top: 1px solid var(--border-subtle); padding-top: 0.6rem; }
+.rpt-leaves-emp:first-child { border-top: none; padding-top: 0; }
+.rpt-leaves-emp-head {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem;
+  font-size: 0.82rem; font-weight: 700; color: var(--text-primary);
+  margin-bottom: 0.3rem;
+}
+.rpt-leaves-emp-days { font-size: 0.72rem; font-weight: 600; color: var(--text-secondary); white-space: nowrap; }
+.rpt-leaves-row {
+  display: flex; justify-content: space-between; align-items: center; gap: 0.5rem;
+  font-size: 0.76rem; color: var(--text-secondary);
+  padding: 0.15rem 0;
+}
+.rpt-leaves-badge {
+  font-size: 0.64rem; font-weight: 700; padding: 0.08rem 0.4rem;
+  border-radius: 999px; white-space: nowrap;
+}
+.rpt-leaves-badge.is-approved { background: var(--brand); color: #fff; }
+.rpt-leaves-badge.is-pending {
+  background: var(--bg-surface); color: var(--text-secondary);
+  border: 1px dashed var(--text-secondary);
+}
+
 /* ---------- Calendar grid ---------- */
 .rpt-calendar {
   background: var(--bg-surface);

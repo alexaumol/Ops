@@ -28,7 +28,7 @@ let searchTerm = '';
 let sortColumn = 'code';
 let sortDirection = 'desc';
 let lifecycleFilter = 'all'; // 'alive' | 'closed' | 'all'
-let projectStatusFilter = '';
+const projectStatusSel = new Set(); // selected project-status labels; empty = all
 let activeProjectId = null;
 let activeProjectBpId = null;
 let activeInvoiceId = null;
@@ -92,6 +92,7 @@ async function loadProjects(){
     PROJECTS = structuredClone(DEMO_SEED);
     usingDemoData = true;
     setDataSourcePill();
+    populateProjectStatusOptions();
     renderTable();
     return;
   }
@@ -105,6 +106,7 @@ async function loadProjects(){
     usingDemoData = true;
   }
   setDataSourcePill();
+  populateProjectStatusOptions();
   renderTable();
 }
 
@@ -152,7 +154,7 @@ function compareRows(a, b){
 function matchesLifecycleStatus(row){
   if (lifecycleFilter === 'alive' && isClosedStatus(row.projectStatusLabel)) return false;
   if (lifecycleFilter === 'closed' && !isClosedStatus(row.projectStatusLabel)) return false;
-  if (projectStatusFilter && String(row.projectStatusLabel || '') !== projectStatusFilter) return false;
+  if (projectStatusSel.size && !projectStatusSel.has(String(row.projectStatusLabel || ''))) return false;
   return true;
 }
 
@@ -166,23 +168,42 @@ function matchesFilters(row){
   return true;
 }
 
-// Populates the "Project status" dropdown from the statuses actually
-// present in the loaded projects (same approach as the kanban's owner
-// filter), preserving the current selection.
+// Builds the multi-select "Project status" checkbox menu from the statuses
+// actually present in the loaded projects, preserving any still-valid
+// selection. Called once per data load, not per render.
 function populateProjectStatusOptions(){
-  const sel = document.getElementById('projectStatusFilter');
-  const current = sel.value;
+  const menu = document.getElementById('projectStatusMenu');
   const labels = [...new Set(PROJECTS.map(p => p.projectStatusLabel).filter(Boolean))].sort();
-  sel.innerHTML = `<option value="">All statuses</option>` +
-    labels.map(l => `<option value="${escapeHtml(l)}">${escapeHtml(l)}</option>`).join('');
-  if (labels.includes(current)) sel.value = current;
-  else projectStatusFilter = sel.value;
+  [...projectStatusSel].forEach(l => { if (!labels.includes(l)) projectStatusSel.delete(l); });
+  menu.innerHTML = labels.length
+    ? labels.map(l => `
+        <label class="inv-status-opt">
+          <input type="checkbox" value="${escapeHtml(l)}" ${projectStatusSel.has(l) ? 'checked' : ''} />
+          <span>${escapeHtml(l)}</span>
+        </label>`).join('')
+    : `<div class="inv-status-opt inv-status-opt--empty">No statuses</div>`;
+  menu.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+    cb.addEventListener('change', () => {
+      if (cb.checked) projectStatusSel.add(cb.value);
+      else projectStatusSel.delete(cb.value);
+      updateProjectStatusLabel();
+      renderTable();
+    });
+  });
+  updateProjectStatusLabel();
+}
+
+function updateProjectStatusLabel(){
+  const el = document.getElementById('projectStatusBtnLabel');
+  if (!el) return;
+  if (projectStatusSel.size === 0) el.textContent = 'all';
+  else if (projectStatusSel.size === 1) el.textContent = [...projectStatusSel][0];
+  else el.textContent = `${projectStatusSel.size} selected`;
 }
 
 function renderTable(){
   const tbody = document.getElementById('invTableBody');
   const empty = document.getElementById('invEmpty');
-  populateProjectStatusOptions();
   const rows = PROJECTS.filter(matchesFilters).sort(compareRows);
 
   updateBucketCounts();
@@ -260,9 +281,18 @@ document.querySelectorAll('[data-lifecycle]').forEach(btn => {
   });
 });
 
-document.getElementById('projectStatusFilter').addEventListener('change', (e) => {
-  projectStatusFilter = e.target.value;
-  renderTable();
+// Project-status multi-select menu open/close.
+const projectStatusBtn = document.getElementById('projectStatusBtn');
+const projectStatusMenu = document.getElementById('projectStatusMenu');
+projectStatusBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  const open = projectStatusMenu.classList.toggle('hidden');
+  projectStatusBtn.setAttribute('aria-expanded', String(!open));
+});
+projectStatusMenu.addEventListener('click', (e) => e.stopPropagation());
+document.addEventListener('click', () => {
+  projectStatusMenu.classList.add('hidden');
+  projectStatusBtn.setAttribute('aria-expanded', 'false');
 });
 
 /* ============================== PROJECT MODAL ============================= */

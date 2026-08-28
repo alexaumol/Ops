@@ -45,10 +45,12 @@
         <button data-lifecycle="all" class="inv-lifecycle-btn" aria-selected="true">All projects</button>
       </div>
       <div class="inv-filter-spacer"></div>
-      <label class="inv-status-filter">
-        Project status
-        <select id="projectStatusFilter"><option value="">All statuses</option></select>
-      </label>
+      <div class="inv-status-filter" id="projectStatusFilterWrap">
+        <button type="button" id="projectStatusBtn" class="inv-status-filter-btn" aria-expanded="false" aria-haspopup="true">
+          Project status: <span id="projectStatusBtnLabel">all</span> <span aria-hidden="true">▾</span>
+        </button>
+        <div id="projectStatusMenu" class="inv-status-filter-menu hidden"></div>
+      </div>
     </div>
 
     <div class="inv-table-wrap">
