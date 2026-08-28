@@ -201,10 +201,18 @@ router.get("/balance", async (req, res) => {
   const { empId, year } = req.query;
   if (!empId || !year) return res.status(400).json({ error: "validation_error", message: "empId and year are required" });
   try {
-    const calendar = await pool.query(
+    let calendar = await pool.query(
       `SELECT holidaysamount, corporateholidaysamount FROM employeeworkcalendar WHERE empid = $1 AND workyear = $2 LIMIT 1`,
       [empId, year]
     );
+    // Fall back to the org-wide row managed in Settings → Work calendar
+    // when this employee has no per-person calendar entry for the year.
+    if (!calendar.rows.length) {
+      calendar = await pool.query(
+        `SELECT holidaysamount, corporateholidaysamount FROM corporateworkcalendar WHERE workyear = $1 LIMIT 1`,
+        [year]
+      );
+    }
     const totalDays = calendar.rows.length
       ? Number(calendar.rows[0].holidaysamount || 0) + Number(calendar.rows[0].corporateholidaysamount || 0)
       : null;

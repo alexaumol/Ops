@@ -23,8 +23,7 @@
 
   <main class="page-shell">
     <h1 class="page-title">Settings</h1>
-    <p class="page-subtitle">Manage who's an admin, who can approve/reject time-off requests, and which modules each employee can access.</p>
-    <p class="settings-note">Module access defaults to open — everyone can use every module unless restricted here. Admins bypass every module restriction, but Role and Time-off approver are independent — granting one doesn't grant the other.</p>
+    <p class="page-subtitle">Permissions, public/company holidays, and the yearly work calendar.</p>
 
     <div id="settingsBlocked" class="hidden">
       <div class="settings-table-wrap" style="padding:2rem; text-align:center; color:var(--text-secondary);">
@@ -33,27 +32,81 @@
     </div>
 
     <div id="settingsContent" class="hidden">
-      <div class="settings-toolbar">
-        <label class="settings-toggle-deactivated">
-          <input type="checkbox" id="showDeactivated" />
-          Show deactivated users
-          <span id="deactivatedCount" class="settings-emp-sub"></span>
-        </label>
+      <div class="settings-tabs" role="tablist">
+        <button data-stab="permissions" class="settings-tab" role="tab" aria-selected="true">User permissions</button>
+        <button data-stab="holidays" class="settings-tab" role="tab" aria-selected="false">Holidays</button>
+        <button data-stab="calendar" class="settings-tab" role="tab" aria-selected="false">Work calendar</button>
       </div>
-      <div class="settings-table-wrap">
-        <table class="settings-table">
-          <thead>
-            <tr>
-              <th>Employee</th>
-              <th>Status</th>
-              <th>Role</th>
-              <th>Time-off approver</th>
-              <th>Module access</th>
-            </tr>
-          </thead>
-          <tbody id="empTableBody"></tbody>
-        </table>
-      </div>
+
+      <!-- ==================== USER PERMISSIONS ==================== -->
+      <section id="paneUserPerms" class="settings-pane">
+        <p class="settings-note">Module access defaults to open — everyone can use every module unless restricted here. Admins bypass every module restriction, but Role and Time-off approver are independent — granting one doesn't grant the other.</p>
+        <div class="settings-toolbar">
+          <label class="settings-toggle-deactivated">
+            <input type="checkbox" id="showDeactivated" />
+            Show deactivated users
+            <span id="deactivatedCount" class="settings-emp-sub"></span>
+          </label>
+        </div>
+        <div class="settings-table-wrap">
+          <table class="settings-table">
+            <thead>
+              <tr>
+                <th>Employee</th>
+                <th>Status</th>
+                <th>Role</th>
+                <th>Time-off approver</th>
+                <th>Module access</th>
+              </tr>
+            </thead>
+            <tbody id="empTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ==================== HOLIDAYS ==================== -->
+      <section id="paneHolidays" class="settings-pane hidden">
+        <p class="settings-note">Public holidays imported from the Generalitat de Catalunya open-data feed, plus company days set here by HR. Both feed the calendars in Time allocation and Reports.</p>
+        <div class="settings-toolbar" style="gap:0.75rem; flex-wrap:wrap;">
+          <label class="settings-inline-field">Year
+            <select id="holidayYearFilter"><option value="">All years</option></select>
+          </label>
+          <button class="btn btn-secondary" id="btnImportHolidays">Import public holidays (Catalonia)</button>
+          <span id="holidayImportStatus" class="settings-emp-sub"></span>
+        </div>
+        <div class="settings-table-wrap">
+          <table class="settings-table">
+            <thead>
+              <tr><th>Date</th><th>Weekday</th><th>Description</th><th>Source</th><th></th></tr>
+            </thead>
+            <tbody id="holidaysTableBody"></tbody>
+          </table>
+          <div id="holidaysEmpty" class="settings-pane-empty hidden">No holidays for this selection.</div>
+          <div class="settings-add-row">
+            <input type="date" id="newHolidayDate" />
+            <input type="text" id="newHolidayDesc" placeholder="Holiday description…" />
+            <button class="btn btn-primary" id="btnAddHoliday">Add HITT holiday</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================== WORK CALENDAR ==================== -->
+      <section id="paneCalendar" class="settings-pane hidden">
+        <p class="settings-note">One row per year — the company-wide leave-day allowance and yearly working hours. Used for the time-off balance when an employee has no personal calendar entry of their own.</p>
+        <div class="settings-table-wrap">
+          <table class="settings-table">
+            <thead>
+              <tr><th>Year</th><th>Leave days</th><th>Working hours / year</th><th>Last updated</th></tr>
+            </thead>
+            <tbody id="workCalendarTableBody"></tbody>
+          </table>
+          <div id="workCalendarEmpty" class="settings-pane-empty hidden">No years configured yet.</div>
+          <div class="settings-add-row">
+            <input type="number" id="newCalendarYear" min="2000" max="2100" placeholder="Year" style="width:6rem;" />
+            <button class="btn btn-primary" id="btnAddCalendarYear">Add year</button>
+          </div>
+        </div>
+      </section>
     </div>
   </main>
 

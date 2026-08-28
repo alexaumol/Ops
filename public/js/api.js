@@ -121,6 +121,16 @@ const HITT_API = (() => {
     setEmployeeStatus: (id, isDeactivated) =>
       request(`/api/settings/employees/${id}/status`, { method: "PATCH", body: JSON.stringify({ isDeactivated }) }),
 
+    getHolidays: (year) => request(`/api/settings/holidays${year ? `?year=${encodeURIComponent(year)}` : ""}`),
+    getHolidayYears: () => request("/api/settings/holidays/years"),
+    addHoliday: (payload) =>
+      request("/api/settings/holidays", { method: "POST", body: JSON.stringify(payload) }),
+    deleteHoliday: (id) => request(`/api/settings/holidays/${id}`, { method: "DELETE" }),
+    importPublicHolidays: () => request("/api/settings/holidays/import", { method: "POST" }),
+    getWorkCalendar: () => request("/api/settings/work-calendar"),
+    setWorkCalendarYear: (year, payload) =>
+      request(`/api/settings/work-calendar/${year}`, { method: "PUT", body: JSON.stringify(payload) }),
+
     getInvoicingLookups: () => request("/api/invoicing/lookups"),
     getInvoicingProjects: () => request("/api/invoicing/projects"),
     getProjectRelease: (projectId) => request(`/api/invoicing/projects/${projectId}/release`),

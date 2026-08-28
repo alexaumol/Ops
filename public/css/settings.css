@@ -6,6 +6,94 @@
 
 .hidden { display: none !important; }
 
+/* ---------- Tabs ---------- */
+.settings-tabs {
+  display: flex;
+  gap: 1.5rem;
+  border-bottom: 1px solid var(--border-subtle);
+  margin-bottom: 1.25rem;
+}
+.settings-tab {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.6rem 0.1rem;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  border-bottom: 2px solid transparent;
+}
+.settings-tab[aria-selected="true"] { color: var(--text-primary); border-bottom-color: var(--accent); }
+.settings-pane.hidden { display: none !important; }
+
+.settings-inline-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+.settings-inline-field select {
+  padding: 0.35rem 0.5rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+}
+.settings-pane-empty { text-align: center; color: var(--text-secondary); padding: 1.75rem 1rem; font-size: 0.88rem; }
+.settings-add-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.75rem;
+  border-top: 1px solid var(--border-subtle);
+  background: var(--bg-surface-alt);
+}
+.settings-add-row input {
+  padding: 0.4rem 0.55rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+}
+.settings-add-row input[type="text"] { flex: 1; min-width: 12rem; }
+.settings-add-row .btn { padding: 0.4rem 0.9rem; font-size: 0.82rem; }
+
+.settings-table .cal-input {
+  width: 7rem;
+  padding: 0.3rem 0.45rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  text-align: right;
+}
+.settings-table .icon-btn {
+  width: 1.6rem; height: 1.6rem;
+  border: none; background: none; cursor: pointer;
+  color: var(--danger); border-radius: var(--radius-sm);
+  font-size: 0.9rem; line-height: 1;
+}
+.settings-table .icon-btn:hover { background: var(--bg-surface-alt); }
+
+.hol-source-chip {
+  display: inline-block;
+  font-size: 0.66rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  padding: 0.12rem 0.45rem;
+  border-radius: 999px;
+  background: var(--bg-surface-alt);
+  color: var(--text-secondary);
+}
+.hol-source-chip.is-hitt { background: rgba(110,143,90,0.15); color: #4C6B3A; }
+.hol-source-chip.is-catalonia { background: rgba(92,117,124,0.15); color: #3E5559; }
+
 .settings-toolbar {
   display: flex;
   align-items: center;

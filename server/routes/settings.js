@@ -3,6 +3,19 @@
  * (server/lib/permissions.js). Backs the Settings page: who's an admin,
  * who's a time-off approver, which modules each employee is restricted
  * from, and who's deactivated. Every route here requires requireAdmin.
+ *
+ * Also backs the Settings "Holidays" and "Work calendar" tabs:
+ *   holidays               dated company/public holidays. A `source`
+ *                          column (added lazily below) tags each row as
+ *                          'catalonia' (bulk-imported from the Generalitat
+ *                          open-data feed), 'hitt' (added by HR here), or
+ *                          'legacy' (pre-existing rows, never touched by
+ *                          re-import). See server/db/schema-changes.sql.
+ *   corporateworkcalendar  one row per year: holidaysamount (leave-day
+ *                          allowance) + labourhoursperyear (working hours).
+ *                          Used as the fallback for the time-off balance
+ *                          view when an employee has no employeeworkcalendar
+ *                          row of their own (see routes/timeOff.js).
  * ---------------------------------------------------------------------------
  */
 const express = require("express");
@@ -12,6 +25,30 @@ const { MODULE_KEYS, requireAdmin } = require("../lib/permissions");
 const router = express.Router();
 
 router.use(requireAdmin);
+
+// Public holidays open-data feed (Generalitat de Catalunya — "Dies festius
+// a Catalunya"). rows.json format: meta.view.columns describes field order,
+// data is an array of arrays. Columns of interest: codi / any / data /
+// nom_del_festiu.
+const CATALONIA_HOLIDAYS_URL =
+  "https://analisi.transparenciacatalunya.cat/api/views/8qnu-agns/rows.json?accessType=DOWNLOAD";
+
+// Idempotent one-time schema top-up for the holidays feature — keeps this
+// self-contained instead of requiring a manual migration step on deploy.
+// Mirrored in server/db/schema-changes.sql for anyone applying it by hand.
+let schemaReady = null;
+function ensureSettingsSchema() {
+  if (!schemaReady) {
+    schemaReady = (async () => {
+      await pool.query(`ALTER TABLE public.holidays ADD COLUMN IF NOT EXISTS source varchar(32)`);
+      await pool.query(`UPDATE public.holidays SET source = 'legacy' WHERE source IS NULL`);
+    })().catch((err) => {
+      schemaReady = null; // allow a later request to retry
+      throw err;
+    });
+  }
+  return schemaReady;
+}
 
 // GET /api/settings/employees
 // Full roster with current role/approver/module-restriction state, for the
@@ -169,6 +206,206 @@ router.patch("/employees/:id/module-access", async (req, res) => {
     res.json({ employeeId, moduleKey, hasAccess });
   } catch (err) {
     console.error("[PATCH /employees/:id/module-access] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
+/* ============================== HOLIDAYS ================================= */
+
+// GET /api/settings/holidays?year=YYYY
+router.get("/holidays", async (req, res) => {
+  try {
+    await ensureSettingsSchema();
+    const year = req.query.year ? Number(req.query.year) : null;
+    const { rows } = await pool.query(
+      `SELECT id, holidaydate AS date, holidaydesc AS description, holidaycode AS code,
+              holidayyear AS year, holidayweekday AS weekday,
+              COALESCE(source, 'legacy') AS source
+       FROM holidays
+       WHERE ($1::int IS NULL OR holidayyear = $1)
+       ORDER BY holidaydate NULLS LAST`,
+      [year]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error("[GET /api/settings/holidays] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
+// GET /api/settings/holidays/years — distinct years present, for the filter.
+router.get("/holidays/years", async (req, res) => {
+  try {
+    await ensureSettingsSchema();
+    const { rows } = await pool.query(
+      `SELECT DISTINCT holidayyear::int AS year FROM holidays WHERE holidayyear IS NOT NULL ORDER BY year DESC`
+    );
+    res.json(rows.map((r) => r.year));
+  } catch (err) {
+    console.error("[GET /api/settings/holidays/years] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
+// POST /api/settings/holidays   { date: 'YYYY-MM-DD', description }
+// Adds one HR-defined HITT holiday (source = 'hitt').
+router.post("/holidays", async (req, res) => {
+  const { date, description } = req.body || {};
+  if (!date || !description || !description.trim()) {
+    return res.status(400).json({ error: "bad_request", message: "date and description are required." });
+  }
+  try {
+    await ensureSettingsSchema();
+    const { rows } = await pool.query(
+      `INSERT INTO holidays (holidaycode, holidayyear, holidaydate, holidaydesc, holidayweekday, source)
+       VALUES ($1, EXTRACT(YEAR FROM $2::date), $2::date, $3, TRIM(TO_CHAR($2::date, 'Day')), 'hitt')
+       RETURNING id, holidaydate AS date, holidaydesc AS description, holidaycode AS code,
+                 holidayyear AS year, holidayweekday AS weekday, source`,
+      [`HITT-${Date.now()}`, date, description.trim()]
+    );
+    res.status(201).json(rows[0]);
+  } catch (err) {
+    console.error("[POST /api/settings/holidays] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
+// DELETE /api/settings/holidays/:id
+router.delete("/holidays/:id", async (req, res) => {
+  try {
+    const { rowCount } = await pool.query(`DELETE FROM holidays WHERE id = $1`, [req.params.id]);
+    if (!rowCount) return res.status(404).json({ error: "not_found", message: "Holiday not found." });
+    res.status(204).end();
+  } catch (err) {
+    console.error("[DELETE /api/settings/holidays/:id] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
+// POST /api/settings/holidays/import — pull the Catalonia public-holiday
+// feed and replace every source='catalonia' row with it. HR's own
+// source='hitt' rows and legacy rows are left untouched.
+router.post("/holidays/import", async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await ensureSettingsSchema();
+
+    let payload;
+    try {
+      const resp = await fetch(CATALONIA_HOLIDAYS_URL, { headers: { Accept: "application/json" } });
+      if (!resp.ok) {
+        client.release();
+        return res.status(502).json({ error: "upstream_error", message: `Holiday feed returned HTTP ${resp.status}.` });
+      }
+      payload = await resp.json();
+    } catch (fetchErr) {
+      client.release();
+      console.error("[POST /api/settings/holidays/import] fetch failed:", fetchErr.message);
+      return res.status(502).json({ error: "upstream_unreachable", message: "Could not reach the public-holiday feed." });
+    }
+
+    const cols = (payload.meta?.view?.columns || []).map((c) => c.fieldName);
+    const idx = {
+      code: cols.indexOf("codi"),
+      year: cols.indexOf("any"),
+      date: cols.indexOf("data"),
+      name: cols.indexOf("nom_del_festiu"),
+    };
+    if (idx.date === -1 || idx.name === -1) {
+      client.release();
+      return res.status(502).json({ error: "upstream_error", message: "Holiday feed format not recognised." });
+    }
+
+    const records = (payload.data || [])
+      .map((r) => ({
+        code: idx.code > -1 ? r[idx.code] : null,
+        year: idx.year > -1 && r[idx.year] != null ? Number(r[idx.year]) : null,
+        date: r[idx.date] ? String(r[idx.date]).slice(0, 10) : null,
+        name: r[idx.name],
+      }))
+      .filter((r) => r.date && r.name);
+
+    if (!records.length) {
+      client.release();
+      return res.status(502).json({ error: "upstream_error", message: "Holiday feed contained no usable rows." });
+    }
+
+    await client.query("BEGIN");
+    await client.query(`DELETE FROM holidays WHERE source = 'catalonia'`);
+    for (const rec of records) {
+      await client.query(
+        `INSERT INTO holidays (holidaycode, holidayyear, holidaydate, holidaydesc, holidayweekday, source)
+         VALUES ($1, $2, $3::date, $4, TRIM(TO_CHAR($3::date, 'Day')), 'catalonia')`,
+        [rec.code, rec.year, rec.date, rec.name]
+      );
+    }
+    await client.query("COMMIT");
+
+    const years = [...new Set(records.map((r) => r.year).filter(Boolean))].sort();
+    res.json({ imported: records.length, years });
+  } catch (err) {
+    await client.query("ROLLBACK").catch(() => {});
+    console.error("[POST /api/settings/holidays/import] error:", err.message);
+    res.status(502).json({ error: "import_failed", message: err.message });
+  } finally {
+    client.release();
+  }
+});
+
+/* ============================== WORK CALENDAR =========================== */
+
+// GET /api/settings/work-calendar — one row per year.
+router.get("/work-calendar", async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, workyear::int AS year, holidaysamount AS "leaveDays",
+              labourhoursperyear AS "workingHours",
+              corporateholidaysamount AS "corporateHolidayDays",
+              updatedat AS "updatedAt"
+       FROM corporateworkcalendar
+       WHERE workyear IS NOT NULL
+       ORDER BY workyear DESC`
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error("[GET /api/settings/work-calendar] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
+// PUT /api/settings/work-calendar/:year   { leaveDays, workingHours }
+// Upsert (one row per year). Nulls are allowed — a year can have just one
+// of the two set.
+router.put("/work-calendar/:year", async (req, res) => {
+  const year = Number(req.params.year);
+  const { leaveDays, workingHours } = req.body || {};
+  if (!Number.isInteger(year) || year < 2000 || year > 2100) {
+    return res.status(400).json({ error: "bad_request", message: "A valid year (2000–2100) is required." });
+  }
+  const leave = leaveDays === "" || leaveDays == null ? null : Number(leaveDays);
+  const hours = workingHours === "" || workingHours == null ? null : Number(workingHours);
+  if ((leave != null && !Number.isFinite(leave)) || (hours != null && !Number.isFinite(hours))) {
+    return res.status(400).json({ error: "bad_request", message: "leaveDays and workingHours must be numbers." });
+  }
+  try {
+    const existing = await pool.query(`SELECT id FROM corporateworkcalendar WHERE workyear = $1 LIMIT 1`, [year]);
+    if (existing.rows.length) {
+      await pool.query(
+        `UPDATE corporateworkcalendar
+         SET holidaysamount = $1, labourhoursperyear = $2, updatedat = now(), updatedby = $3
+         WHERE id = $4`,
+        [leave, hours, req.hittUser.employeeId || null, existing.rows[0].id]
+      );
+    } else {
+      await pool.query(
+        `INSERT INTO corporateworkcalendar (workyear, holidaysamount, labourhoursperyear, updatedat, updatedby)
+         VALUES ($1, $2, $3, now(), $4)`,
+        [year, leave, hours, req.hittUser.employeeId || null]
+      );
+    }
+    res.json({ year, leaveDays: leave, workingHours: hours });
+  } catch (err) {
+    console.error("[PUT /api/settings/work-calendar/:year] DB error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });
   }
 });

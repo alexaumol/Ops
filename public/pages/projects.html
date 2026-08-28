@@ -104,15 +104,27 @@
     </main>
 
     <aside id="kanbanInsights">
-      <div class="ki-section">
-        <h3 class="ki-title">Candidate projects to close</h3>
-        <p class="ki-hint">Delivered, with invoiced total at or above the budgeted amount.</p>
-        <div id="kiReadyToClose" class="ki-list"></div>
+      <div class="ki-section" data-ki-key="ready">
+        <button type="button" class="ki-head" aria-expanded="true">
+          <span class="ki-chevron" aria-hidden="true">▾</span>
+          <span class="ki-title">Candidate projects to close</span>
+          <span class="ki-count" id="kiReadyCount"></span>
+        </button>
+        <div class="ki-body">
+          <p class="ki-hint">Delivered, with invoiced total at or above the budgeted amount.</p>
+          <div id="kiReadyToClose" class="ki-list"></div>
+        </div>
       </div>
-      <div class="ki-section">
-        <h3 class="ki-title">Stale early-stage projects</h3>
-        <p class="ki-hint">Lead / Oferta / Guanyat · opened over 3 months ago · no status change in over 2 weeks.</p>
-        <div id="kiStale" class="ki-list"></div>
+      <div class="ki-section" data-ki-key="stale">
+        <button type="button" class="ki-head" aria-expanded="true">
+          <span class="ki-chevron" aria-hidden="true">▾</span>
+          <span class="ki-title">Stale early-stage projects</span>
+          <span class="ki-count" id="kiStaleCount"></span>
+        </button>
+        <div class="ki-body">
+          <p class="ki-hint">Lead / Oferta / Guanyat · opened over 3 months ago · no status change in over 2 weeks.</p>
+          <div id="kiStale" class="ki-list"></div>
+        </div>
       </div>
     </aside>
   </div>

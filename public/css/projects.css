@@ -113,11 +113,21 @@ body { background: #F5F4EE; }
   gap: 1.25rem;
 }
 @media (max-width: 1180px) { #kanbanInsights { display: none; } }
-.ki-section { display: flex; flex-direction: column; gap: 0.3rem; }
-.ki-title {
-  font-size: 0.7rem; font-weight: 800; text-transform: uppercase;
-  letter-spacing: 0.03em; color: #171717; margin: 0;
+.ki-section { display: flex; flex-direction: column; }
+.ki-head {
+  display: flex; align-items: center; gap: 0.4rem;
+  width: 100%; background: none; border: none;
+  padding: 0.2rem 0; cursor: pointer; text-align: left;
 }
+.ki-chevron { font-size: 0.65rem; color: #5C757C; transition: transform .15s ease; flex-shrink: 0; }
+.ki-section.is-collapsed .ki-chevron { transform: rotate(-90deg); }
+.ki-section.is-collapsed .ki-body { display: none; }
+.ki-title {
+  flex: 1; margin: 0;
+  font-size: 0.78rem; font-weight: 800; color: #171717; letter-spacing: 0.01em;
+}
+.ki-count { font-size: 0.72rem; font-weight: 700; color: #5C757C; flex-shrink: 0; }
+.ki-body { display: flex; flex-direction: column; gap: 0.3rem; padding-top: 0.35rem; }
 .ki-hint { font-size: 0.66rem; color: #8A8676; margin: 0 0 0.2rem; line-height: 1.35; }
 .ki-list { display: flex; flex-direction: column; gap: 0.4rem; }
 .ki-empty { font-size: 0.72rem; color: #8A8676; padding: 0.4rem 0; }

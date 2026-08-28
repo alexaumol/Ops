@@ -226,20 +226,22 @@ async function loadKanbanInsights(){
   } catch (err) {
     console.warn('Could not load kanban insights:', err);
     readyHost.innerHTML = staleHost.innerHTML = `<div class="ki-empty">Could not load</div>`;
+    ['kiReadyCount', 'kiStaleCount'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = ''; });
     return;
   }
   renderKiList(readyHost, data.readyToClose, (p) =>
-    `${kiMoney(p.invoicedTotal)} invoiced / ${kiMoney(p.budget)} budget`);
+    `${kiMoney(p.invoicedTotal)} invoiced / ${kiMoney(p.budget)} budget`, document.getElementById('kiReadyCount'));
   renderKiList(staleHost, data.stale, (p) => {
     const opened = p.entryDate ? new Date(p.entryDate).toLocaleDateString() : '—';
     const changed = p.lastStatusChangeAt
       ? `last change ${new Date(p.lastStatusChangeAt).toLocaleDateString()}`
       : 'no status change logged';
     return `${escapeHtml(p.statusLabel || '')} · opened ${opened} · ${changed}`;
-  });
+  }, document.getElementById('kiStaleCount'));
 }
 
-function renderKiList(host, rows, metaFn){
+function renderKiList(host, rows, metaFn, countEl){
+  if (countEl) countEl.textContent = `(${rows ? rows.length : 0})`;
   if (!rows || !rows.length) {
     host.innerHTML = `<div class="ki-empty">Nothing right now</div>`;
     return;
@@ -255,6 +257,34 @@ function renderKiList(host, rows, metaFn){
     btn.addEventListener('click', () => openProjectModal(btn.dataset.projectId));
   });
 }
+
+// Collapsible insight sections — state persisted per section in
+// localStorage (best-effort; a private window / blocked storage just
+// means sections always start expanded).
+(function initKiCollapse(){
+  const aside = document.getElementById('kanbanInsights');
+  if (!aside) return;
+  const KEY = 'hitt.kanbanInsights.collapsed';
+  let stored = {};
+  try { stored = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch { stored = {}; }
+  aside.querySelectorAll('.ki-section').forEach(sec => {
+    if (stored[sec.dataset.kiKey]) {
+      sec.classList.add('is-collapsed');
+      sec.querySelector('.ki-head')?.setAttribute('aria-expanded', 'false');
+    }
+  });
+  aside.addEventListener('click', (e) => {
+    const head = e.target.closest('.ki-head');
+    if (!head) return;
+    const sec = head.closest('.ki-section');
+    const collapsed = sec.classList.toggle('is-collapsed');
+    head.setAttribute('aria-expanded', String(!collapsed));
+    try {
+      stored[sec.dataset.kiKey] = collapsed;
+      localStorage.setItem(KEY, JSON.stringify(stored));
+    } catch { /* storage unavailable — collapse still works for this session */ }
+  });
+})();
 
 /* ============================== TOASTS ================================= */
 function toast(msg, tone='navy'){
