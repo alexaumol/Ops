@@ -36,6 +36,7 @@
         <button data-stab="permissions" class="settings-tab" role="tab" aria-selected="true">User permissions</button>
         <button data-stab="holidays" class="settings-tab" role="tab" aria-selected="false">Holidays</button>
         <button data-stab="calendar" class="settings-tab" role="tab" aria-selected="false">Work calendar</button>
+        <button data-stab="paths" class="settings-tab" role="tab" aria-selected="false">Paths</button>
         <button data-stab="audit" class="settings-tab" role="tab" aria-selected="false">Auditing</button>
       </div>
 
@@ -115,6 +116,12 @@
         </div>
       </section>
 
+      <!-- ==================== PATHS ==================== -->
+      <section id="panePaths" class="settings-pane hidden">
+        <p class="settings-note">Configurable file paths used elsewhere in the app. Changes take effect on the next add/edit that uses them (existing records aren't rewritten automatically).</p>
+        <div id="pathsList" class="paths-list"></div>
+      </section>
+
       <!-- ==================== AUDITING ==================== -->
       <section id="paneAudit" class="settings-pane hidden">
         <p class="settings-note">Sign in / out (with client IP and reported device) plus every data change across the app — projects (create, status, edits, deliverables, quotations, notes, resources, partner assignment), time tracking, business partners (create, edits, contacts, notes, tax companies), invoicing, time-off decisions, and these settings. Admins only.</p>
@@ -178,19 +185,63 @@
         <button id="userModalClose" class="settings-modal-x" title="Close">✕</button>
       </div>
       <div class="settings-modal-body">
-        <label class="settings-field">First name <span class="req">*</span>
-          <input type="text" id="userFirstName" autocomplete="off" />
-        </label>
-        <label class="settings-field">Last name <span class="req">*</span>
-          <input type="text" id="userLastName" autocomplete="off" />
-        </label>
-        <label class="settings-field">Username
-          <input type="text" id="userUsername" placeholder="e.g. name.surname" autocomplete="off" />
-        </label>
-        <label class="settings-field">Email
-          <input type="email" id="userEmail" placeholder="name.surname@fhitt.org" autocomplete="off" />
-        </label>
-        <p class="settings-emp-sub" style="margin:0;">Sign-in matches the M365 identity against username / email — set at least one so the user can log in.</p>
+        <div class="settings-modal-section">
+          <h3>Profile</h3>
+          <div class="settings-form-grid">
+            <label class="settings-field">First name <span class="req">*</span>
+              <input type="text" id="userFirstName" autocomplete="off" />
+            </label>
+            <label class="settings-field">Last name <span class="req">*</span>
+              <input type="text" id="userLastName" autocomplete="off" />
+            </label>
+            <label class="settings-field">Username
+              <input type="text" id="userUsername" placeholder="e.g. name.surname" autocomplete="off" />
+            </label>
+            <label class="settings-field">Work email
+              <input type="email" id="userEmail" placeholder="name.surname@fhitt.org" autocomplete="off" />
+            </label>
+          </div>
+          <p class="settings-emp-sub" style="margin:0.35rem 0 0;">Sign-in matches the M365 identity against username / work email — set at least one so the user can log in.</p>
+        </div>
+
+        <div class="settings-modal-section">
+          <h3>Employment</h3>
+          <div class="settings-form-grid">
+            <label class="settings-field">Onboard date<input type="date" id="userOnboard" /></label>
+            <label class="settings-field">Termination date<input type="date" id="userTermination" /></label>
+            <label class="settings-field">Birthday<input type="date" id="userBirthday" /></label>
+          </div>
+          <label class="settings-field" style="margin-top:0.6rem;">Documents folder
+            <input type="text" id="userDocPath" readonly placeholder="Set the base folder on the Paths tab" />
+          </label>
+          <p class="settings-emp-sub" id="userDocPathHint" style="margin:0.3rem 0 0;"></p>
+        </div>
+
+        <div class="settings-modal-section">
+          <h3>Personal contact</h3>
+          <div class="settings-form-grid">
+            <label class="settings-field">Personal phone<input type="text" id="userPhonePersonal" autocomplete="off" /></label>
+            <label class="settings-field">Personal email<input type="text" id="userEmailPersonal" autocomplete="off" /></label>
+          </div>
+        </div>
+
+        <div class="settings-modal-section">
+          <h3>Emergency contacts</h3>
+          <div class="settings-form-grid">
+            <label class="settings-field">Contact 1<input type="text" id="userContact1" autocomplete="off" /></label>
+            <label class="settings-field">Phone 1<input type="text" id="userPhone1" autocomplete="off" /></label>
+            <label class="settings-field">Contact 2<input type="text" id="userContact2" autocomplete="off" /></label>
+            <label class="settings-field">Phone 2<input type="text" id="userPhone2" autocomplete="off" /></label>
+          </div>
+        </div>
+
+        <div class="settings-modal-section">
+          <h3>Bank</h3>
+          <div class="settings-form-grid">
+            <label class="settings-field">Bank name<input type="text" id="userBankName" autocomplete="off" /></label>
+            <label class="settings-field">Account<input type="text" id="userBankAcct" autocomplete="off" /></label>
+          </div>
+        </div>
       </div>
       <div class="settings-modal-foot">
         <button id="userModalCancel" class="btn btn-secondary">Cancel</button>

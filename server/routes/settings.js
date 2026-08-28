@@ -46,7 +46,7 @@ async function employeeName(id) {
 const CATALONIA_HOLIDAYS_URL =
   "https://analisi.transparenciacatalunya.cat/api/views/8qnu-agns/rows.json?accessType=DOWNLOAD";
 
-// Idempotent one-time schema top-up for the holidays feature — keeps this
+// Idempotent one-time schema top-up — keeps the Settings features
 // self-contained instead of requiring a manual migration step on deploy.
 // Mirrored in server/db/schema-changes.sql for anyone applying it by hand.
 let schemaReady = null;
@@ -55,12 +55,48 @@ function ensureSettingsSchema() {
     schemaReady = (async () => {
       await pool.query(`ALTER TABLE public.holidays ADD COLUMN IF NOT EXISTS source varchar(32)`);
       await pool.query(`UPDATE public.holidays SET source = 'legacy' WHERE source IS NULL`);
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS public.appconfig (
+          configkey   varchar(64) PRIMARY KEY,
+          configvalue text,
+          updatedat   timestamp without time zone,
+          updatedby   bigint
+        )
+      `);
     })().catch((err) => {
       schemaReady = null; // allow a later request to retry
       throw err;
     });
   }
   return schemaReady;
+}
+
+// Configurable paths / values, surfaced on the Settings → Paths tab. The
+// server owns this list so the frontend never writes an arbitrary key.
+const CONFIG_KEYS = {
+  "onedrive.employee_docs_base": {
+    label: "OneDrive — employee documents base folder",
+    hint: "Each employee's document folder is this path plus their username. Used to fill employeesinfo.employeedocumentpath when a user is added or edited.",
+    placeholder: "/HITT Shared/HR/Employees",
+  },
+};
+
+async function getConfig(key) {
+  try {
+    const { rows } = await pool.query(`SELECT configvalue FROM appconfig WHERE configkey = $1`, [key]);
+    return rows[0]?.configvalue ?? null;
+  } catch {
+    return null;
+  }
+}
+
+// <base>/<username> with the base's trailing slashes trimmed. Null unless
+// both parts are present.
+function employeeDocPath(base, username) {
+  const b = (base || "").trim().replace(/[/\\]+$/, "");
+  const u = (username || "").trim();
+  if (!b || !u) return null;
+  return `${b}/${u}`;
 }
 
 // Shared projection for an employee row as the Settings table wants it —
@@ -142,15 +178,92 @@ async function countActiveAdmins(excludeEmployeeId = null) {
   return Number(rows[0].count);
 }
 
-// POST /api/settings/employees   { firstName, lastName, username, email }
-// Creates an employee record. Roles / module access / approver are managed
-// separately with the toggles once the row exists.
+// The employeesinfo columns the add/edit modal manages. employeedocumentpath
+// is derived server-side (base folder + username), never taken from the
+// client. onboard/termination/birthday are timestamps stored via ::date.
+const INFO_DATE_COLS = ["onboarddate", "terminationdate", "birthdaydate"];
+const INFO_TEXT_COLS = [
+  "phone_personal", "email_personal",
+  "phone_emergency1", "contact_emergency1",
+  "phone_emergency2", "contact_emergency2",
+  "bankname", "bankacctemp",
+];
+const trimOrNull = (x) => (x != null && String(x).trim() !== "" ? String(x).trim() : null);
+
+// One employeesinfo row per employee: update the earliest if present, else
+// insert. Column names are hardcoded above — never client input.
+async function upsertEmployeeInfo(empId, info = {}, docPath) {
+  const cols = [...INFO_DATE_COLS, ...INFO_TEXT_COLS, "employeedocumentpath"];
+  const values = [
+    ...INFO_DATE_COLS.map((c) => info[c] || null),
+    ...INFO_TEXT_COLS.map((c) => trimOrNull(info[c])),
+    docPath || null,
+  ];
+  const cast = (c, ph) => (INFO_DATE_COLS.includes(c) ? `${ph}::date` : ph);
+
+  const existing = await pool.query(
+    `SELECT id FROM employeesinfo WHERE empid = $1::double precision ORDER BY id LIMIT 1`,
+    [empId]
+  );
+  if (existing.rows.length) {
+    const setClause = cols.map((c, i) => `${c} = ${cast(c, `$${i + 1}`)}`).join(", ");
+    await pool.query(
+      `UPDATE employeesinfo SET ${setClause} WHERE id = $${cols.length + 1}`,
+      [...values, existing.rows[0].id]
+    );
+  } else {
+    const placeholders = cols.map((c, i) => cast(c, `$${i + 2}`)).join(", ");
+    await pool.query(
+      `INSERT INTO employeesinfo (empid, ${cols.join(", ")}) VALUES ($1, ${placeholders})`,
+      [empId, ...values]
+    );
+  }
+}
+
+async function employeeInfoRow(empId) {
+  const { rows } = await pool.query(
+    `SELECT TO_CHAR(onboarddate, 'YYYY-MM-DD') AS onboarddate,
+            TO_CHAR(terminationdate, 'YYYY-MM-DD') AS terminationdate,
+            TO_CHAR(birthdaydate, 'YYYY-MM-DD') AS birthdaydate,
+            employeedocumentpath,
+            phone_personal, email_personal,
+            phone_emergency1, contact_emergency1,
+            phone_emergency2, contact_emergency2,
+            bankname, bankacctemp
+     FROM employeesinfo WHERE empid = $1::double precision ORDER BY id LIMIT 1`,
+    [empId]
+  );
+  return rows[0] || {};
+}
+
+// GET /api/settings/employees/:id — full detail for the edit modal
+// (profile + roles + employeesinfo).
+router.get("/employees/:id", async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) {
+    return res.status(400).json({ error: "bad_request", message: "A valid employee id is required." });
+  }
+  try {
+    await ensureSettingsSchema();
+    const row = await employeeRow(id);
+    if (!row) return res.status(404).json({ error: "not_found", message: "Employee not found." });
+    res.json({ ...row, info: await employeeInfoRow(id) });
+  } catch (err) {
+    console.error("[GET /api/settings/employees/:id] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
+// POST /api/settings/employees   { firstName, lastName, username, email, info }
+// Creates an employees record + its employeesinfo row. Roles / module
+// access / approver are managed with the toggles once the row exists.
 router.post("/employees", async (req, res) => {
-  const { firstName, lastName, username, email } = req.body || {};
+  const { firstName, lastName, username, email, info } = req.body || {};
   if (!firstName || !firstName.trim() || !lastName || !lastName.trim()) {
     return res.status(400).json({ error: "bad_request", message: "First and last name are required." });
   }
   try {
+    await ensureSettingsSchema();
     const conflict = await usernameEmailConflict(username, email);
     if (conflict) return res.status(409).json({ error: "conflict", message: conflict });
 
@@ -160,8 +273,12 @@ router.post("/employees", async (req, res) => {
        RETURNING id`,
       [firstName.trim(), lastName.trim(), username?.trim() || null, email?.trim() || null]
     );
-    const row = await employeeRow(rows[0].id);
-    res.status(201).json(row);
+    const newId = rows[0].id;
+    const docPath = employeeDocPath(await getConfig("onedrive.employee_docs_base"), username);
+    await upsertEmployeeInfo(newId, info || {}, docPath);
+
+    const row = await employeeRow(newId);
+    res.status(201).json({ ...row, info: await employeeInfoRow(newId) });
     logAudit(req, {
       kind: "settings.user.add",
       desc: `Added user ${firstName.trim()} ${lastName.trim()}${username?.trim() ? ` (${username.trim()})` : ""}`,
@@ -172,12 +289,13 @@ router.post("/employees", async (req, res) => {
   }
 });
 
-// PATCH /api/settings/employees/:id/profile   { firstName, lastName, username, email }
-// Edits the employee's own fields. Role / status / approver / module access
-// have their own endpoints.
+// PATCH /api/settings/employees/:id/profile
+//   { firstName, lastName, username, email, info }
+// Edits the employee's own fields + employeesinfo. Role / status / approver
+// / module access have their own endpoints.
 router.patch("/employees/:id/profile", async (req, res) => {
   const employeeId = Number(req.params.id);
-  const { firstName, lastName, username, email } = req.body || {};
+  const { firstName, lastName, username, email, info } = req.body || {};
   if (!Number.isInteger(employeeId)) {
     return res.status(400).json({ error: "bad_request", message: "A valid employee id is required." });
   }
@@ -185,6 +303,7 @@ router.patch("/employees/:id/profile", async (req, res) => {
     return res.status(400).json({ error: "bad_request", message: "First and last name are required." });
   }
   try {
+    await ensureSettingsSchema();
     const conflict = await usernameEmailConflict(username, email, employeeId);
     if (conflict) return res.status(409).json({ error: "conflict", message: conflict });
 
@@ -195,14 +314,62 @@ router.patch("/employees/:id/profile", async (req, res) => {
       [firstName.trim(), lastName.trim(), username?.trim() || null, email?.trim() || null, employeeId]
     );
     if (!rowCount) return res.status(404).json({ error: "not_found", message: "Employee not found." });
+
+    const docPath = employeeDocPath(await getConfig("onedrive.employee_docs_base"), username);
+    await upsertEmployeeInfo(employeeId, info || {}, docPath);
+
     const row = await employeeRow(employeeId);
-    res.json(row);
+    res.json({ ...row, info: await employeeInfoRow(employeeId) });
     logAudit(req, {
       kind: "settings.user.edit",
       desc: `Edited user ${firstName.trim()} ${lastName.trim()}`,
     });
   } catch (err) {
     console.error("[PATCH /api/settings/employees/:id/profile] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
+/* ============================== APP CONFIG (Paths tab) ================= */
+
+// GET /api/settings/config — the configurable values, with their metadata.
+router.get("/config", async (req, res) => {
+  try {
+    await ensureSettingsSchema();
+    const { rows } = await pool.query(`SELECT configkey, configvalue FROM appconfig`);
+    const stored = Object.fromEntries(rows.map((r) => [r.configkey, r.configvalue]));
+    res.json({
+      keys: Object.entries(CONFIG_KEYS).map(([key, meta]) => ({ key, ...meta, value: stored[key] ?? "" })),
+    });
+  } catch (err) {
+    console.error("[GET /api/settings/config] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
+// PUT /api/settings/config/:key   { value }
+router.put("/config/:key", async (req, res) => {
+  const key = req.params.key;
+  if (!CONFIG_KEYS[key]) {
+    return res.status(400).json({ error: "bad_request", message: "Unknown config key." });
+  }
+  const value = typeof req.body?.value === "string" ? req.body.value.trim() : null;
+  try {
+    await ensureSettingsSchema();
+    await pool.query(
+      `INSERT INTO appconfig (configkey, configvalue, updatedat, updatedby)
+       VALUES ($1, $2, now(), $3)
+       ON CONFLICT (configkey)
+       DO UPDATE SET configvalue = EXCLUDED.configvalue, updatedat = now(), updatedby = EXCLUDED.updatedby`,
+      [key, value, req.hittUser.employeeId || null]
+    );
+    res.json({ key, value });
+    logAudit(req, {
+      kind: "settings.config",
+      desc: `Set "${CONFIG_KEYS[key].label}" to ${value || "(empty)"}`,
+    });
+  } catch (err) {
+    console.error("[PUT /api/settings/config/:key] DB error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });
   }
 });

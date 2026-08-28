@@ -28,6 +28,21 @@ UPDATE public.holidays SET source = 'legacy' WHERE source IS NULL;
 -- CREATE UNIQUE INDEX IF NOT EXISTS corporateworkcalendar_workyear_uidx
 --   ON public.corporateworkcalendar (workyear);
 
+-- 2026-08 — Settings "Paths" tab + employee detail
+-- --------------------------------------------------------------------------
+-- appconfig is a small key/value store for configurable paths (currently
+-- just onedrive.employee_docs_base). Created at runtime by
+-- ensureSettingsSchema() in server/routes/settings.js.
+CREATE TABLE IF NOT EXISTS public.appconfig (
+    configkey   varchar(64) PRIMARY KEY,
+    configvalue text,
+    updatedat   timestamp without time zone,
+    updatedby   bigint
+);
+-- The add/edit-user modal also reads/writes public.employeesinfo (a
+-- pre-existing table, one row per employee via empid). No changes needed;
+-- employeedocumentpath is set to <appconfig base>/<username> on save.
+
 -- 2026-08 — Auditing (Settings → Auditing, admins only)
 -- --------------------------------------------------------------------------
 -- Every security-/data-relevant action is appended to public.actionsaudit

@@ -107,19 +107,73 @@ document.getElementById("showDeactivated").addEventListener("change", render);
 
 /* ---------- Add / edit user ---------- */
 let editingUserId = null;
+let oneDriveDocsBase = "";
 const userModal = document.getElementById("userModal");
 
-function openUserModal(emp) {
-  editingUserId = emp ? emp.id : null;
-  document.getElementById("userModalTitle").textContent = emp ? "Edit user" : "Add new user";
-  document.getElementById("userFirstName").value = emp?.firstName || "";
-  document.getElementById("userLastName").value = emp?.lastName || "";
-  document.getElementById("userUsername").value = emp?.username || "";
-  document.getElementById("userEmail").value = emp?.emailid || "";
+// modal field id -> employeesinfo column
+const USER_INFO_FIELDS = {
+  userOnboard: "onboarddate",
+  userTermination: "terminationdate",
+  userBirthday: "birthdaydate",
+  userPhonePersonal: "phone_personal",
+  userEmailPersonal: "email_personal",
+  userContact1: "contact_emergency1",
+  userPhone1: "phone_emergency1",
+  userContact2: "contact_emergency2",
+  userPhone2: "phone_emergency2",
+  userBankName: "bankname",
+  userBankAcct: "bankacctemp",
+};
+const isoDay = (v) => (v ? String(v).slice(0, 10) : "");
+
+function updateDocPathPreview() {
+  const username = document.getElementById("userUsername").value.trim();
+  const el = document.getElementById("userDocPath");
+  const hint = document.getElementById("userDocPathHint");
+  if (oneDriveDocsBase && username) {
+    el.value = `${oneDriveDocsBase.replace(/[/\\]+$/, "")}/${username}`;
+    hint.textContent = "Saved automatically as the base folder (Paths tab) plus the username.";
+  } else {
+    el.value = "";
+    hint.textContent = oneDriveDocsBase
+      ? "Set a username to generate the documents folder."
+      : "Set the base folder on the Paths tab to generate this.";
+  }
+}
+document.getElementById("userUsername").addEventListener("input", updateDocPathPreview);
+
+function fillUserModal(detail) {
+  const emp = detail || {};
+  document.getElementById("userModalTitle").textContent = detail ? "Edit user" : "Add new user";
+  document.getElementById("userFirstName").value = emp.firstName || "";
+  document.getElementById("userLastName").value = emp.lastName || "";
+  document.getElementById("userUsername").value = emp.username || "";
+  document.getElementById("userEmail").value = emp.emailid || "";
+  const info = emp.info || {};
+  Object.entries(USER_INFO_FIELDS).forEach(([fieldId, col]) => {
+    const isDate = fieldId === "userOnboard" || fieldId === "userTermination" || fieldId === "userBirthday";
+    document.getElementById(fieldId).value = isDate ? isoDay(info[col]) : (info[col] || "");
+  });
+  updateDocPathPreview();
+}
+
+async function openUserModal(empId) {
+  editingUserId = empId || null;
+  fillUserModal(null); // reset first
+  if (empId) {
+    try {
+      const detail = await HITT_API.getEmployeeDetail(empId);
+      if (editingUserId !== empId) return; // modal closed/reopened while loading
+      fillUserModal(detail);
+    } catch (err) {
+      toast(`Couldn't load that user: ${err.message}`, "red");
+      return;
+    }
+  }
   userModal.classList.remove("hidden");
   setTimeout(() => document.getElementById("userFirstName").focus(), 50);
 }
-function closeUserModal() { userModal.classList.add("hidden"); }
+function closeUserModal() { userModal.classList.add("hidden"); editingUserId = null; }
 
 document.getElementById("btnAddUser").addEventListener("click", () => openUserModal(null));
 document.getElementById("userModalClose").addEventListener("click", closeUserModal);
@@ -131,17 +185,20 @@ document.addEventListener("keydown", (e) => {
 
 document.getElementById("empTableBody").addEventListener("click", (e) => {
   const btn = e.target.closest("[data-edit-user]");
-  if (!btn) return;
-  const emp = EMPLOYEES.find((x) => Number(x.id) === Number(btn.dataset.editUser));
-  if (emp) openUserModal(emp);
+  if (btn) openUserModal(Number(btn.dataset.editUser));
 });
 
 document.getElementById("userModalSave").addEventListener("click", async () => {
+  const info = {};
+  Object.entries(USER_INFO_FIELDS).forEach(([fieldId, col]) => {
+    info[col] = document.getElementById(fieldId).value.trim() || null;
+  });
   const payload = {
     firstName: document.getElementById("userFirstName").value.trim(),
     lastName: document.getElementById("userLastName").value.trim(),
     username: document.getElementById("userUsername").value.trim(),
     email: document.getElementById("userEmail").value.trim(),
+    info,
   };
   if (!payload.firstName || !payload.lastName) {
     toast("First and last name are required.", "red");
@@ -172,6 +229,9 @@ async function loadEmployees() {
     document.getElementById("settingsBlocked").classList.add("hidden");
     document.getElementById("settingsContent").classList.remove("hidden");
     render();
+    // Prime the OneDrive base so the user modal's folder preview works
+    // before the Paths tab is opened.
+    HITT_API.getAppConfig().then((d) => applyOneDriveBase(d.keys)).catch(() => {});
   } catch (err) {
     console.error("[settings] failed to load employees:", err.message);
     document.getElementById("settingsContent").classList.add("hidden");
@@ -235,6 +295,7 @@ document.getElementById("empTableBody").addEventListener("change", async (e) => 
 let holidaysLoaded = false;
 let calendarLoaded = false;
 let auditLoaded = false;
+let pathsLoaded = false;
 
 document.querySelectorAll("[data-stab]").forEach((btn) => {
   btn.addEventListener("click", () => {
@@ -244,6 +305,7 @@ document.querySelectorAll("[data-stab]").forEach((btn) => {
     document.getElementById("paneUserPerms").classList.toggle("hidden", tab !== "permissions");
     document.getElementById("paneHolidays").classList.toggle("hidden", tab !== "holidays");
     document.getElementById("paneCalendar").classList.toggle("hidden", tab !== "calendar");
+    document.getElementById("panePaths").classList.toggle("hidden", tab !== "paths");
     document.getElementById("paneAudit").classList.toggle("hidden", tab !== "audit");
     if (tab === "holidays" && !holidaysLoaded) {
       holidaysLoaded = true;
@@ -253,12 +315,63 @@ document.querySelectorAll("[data-stab]").forEach((btn) => {
       calendarLoaded = true;
       loadWorkCalendar();
     }
+    if (tab === "paths" && !pathsLoaded) {
+      pathsLoaded = true;
+      loadPaths();
+    }
     if (tab === "audit" && !auditLoaded) {
       auditLoaded = true;
       Promise.all([loadAuditUsers(), loadAuditKinds()]).then(loadAudit);
     }
   });
 });
+
+/* ============================== PATHS ================================== */
+function applyOneDriveBase(keys) {
+  const k = (keys || []).find((x) => x.key === "onedrive.employee_docs_base");
+  oneDriveDocsBase = k?.value || "";
+}
+
+async function loadPaths() {
+  const host = document.getElementById("pathsList");
+  host.innerHTML = `<div class="settings-emp-sub">Loading…</div>`;
+  let data;
+  try {
+    data = await HITT_API.getAppConfig();
+  } catch (err) {
+    console.error("[settings] config:", err.message);
+    host.innerHTML = `<div class="settings-pane-empty">Could not load the configuration.</div>`;
+    return;
+  }
+  applyOneDriveBase(data.keys);
+  host.innerHTML = data.keys.map((k, i) => `
+    <div class="path-item" data-key="${escapeHtml(k.key)}">
+      <label for="pathInput${i}">${escapeHtml(k.label)}</label>
+      <div class="path-row">
+        <input id="pathInput${i}" type="text" value="${escapeHtml(k.value || "")}" placeholder="${escapeHtml(k.placeholder || "")}" />
+        <button type="button" class="btn btn-primary" data-save-path>Save</button>
+      </div>
+      ${k.hint ? `<p class="path-hint">${escapeHtml(k.hint)}</p>` : ""}
+    </div>
+  `).join("");
+  host.querySelectorAll("[data-save-path]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const item = btn.closest(".path-item");
+      const key = item.dataset.key;
+      const value = item.querySelector("input").value.trim();
+      btn.disabled = true;
+      try {
+        await HITT_API.setAppConfig(key, value);
+        if (key === "onedrive.employee_docs_base") oneDriveDocsBase = value;
+        toast("Saved.", "green");
+      } catch (err) {
+        toast(`Couldn't save: ${err.message}`, "red");
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  });
+}
 
 /* ============================== HOLIDAYS ============================== */
 let HOLIDAYS = [];

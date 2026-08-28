@@ -125,10 +125,14 @@ const HITT_API = (() => {
     getModuleKeys: () => request("/api/permissions/module-keys"),
 
     getSettingsEmployees: () => request("/api/settings/employees"),
+    getEmployeeDetail: (id) => request(`/api/settings/employees/${id}`),
     createEmployee: (payload) =>
       request("/api/settings/employees", { method: "POST", body: JSON.stringify(payload) }),
     updateEmployeeProfile: (id, payload) =>
       request(`/api/settings/employees/${id}/profile`, { method: "PATCH", body: JSON.stringify(payload) }),
+    getAppConfig: () => request("/api/settings/config"),
+    setAppConfig: (key, value) =>
+      request(`/api/settings/config/${encodeURIComponent(key)}`, { method: "PUT", body: JSON.stringify({ value }) }),
     setEmployeeAdmin: (id, isAdmin) =>
       request(`/api/settings/employees/${id}/role`, { method: "PATCH", body: JSON.stringify({ isAdmin }) }),
     setEmployeeTimeOffApprover: (id, isTimeOffApprover) =>
