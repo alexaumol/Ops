@@ -1,5 +1,9 @@
 node_modules/
 
+# Uploaded evidence files (expense documents, …) — stored on the API host,
+# never in the repo.
+server/uploads/
+
 # Internal-only notes (real infra details, real client/project names) —
 # never goes to the public repo. See README.md for the public-facing docs.
 INTERNAL.md

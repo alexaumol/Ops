@@ -23,10 +23,13 @@ const HITT_API = (() => {
 
   async function request(path, options = {}) {
     const session = HITT_AUTH?.getSession?.();
+    const isForm = typeof FormData !== "undefined" && options.body instanceof FormData;
     const res = await fetch(`${base()}${path}`, {
       ...options,
       headers: {
-        "Content-Type": "application/json",
+        // FormData sets its own multipart Content-Type (with boundary) —
+        // don't override it.
+        ...(isForm ? {} : { "Content-Type": "application/json" }),
         // Prototype: identify the caller by their M365 username. Once real
         // MSAL auth is wired in, replace this with a Bearer ID token and
         // verify it server-side instead of trusting a plain header.
@@ -155,6 +158,35 @@ const HITT_API = (() => {
     getWorkCalendar: () => request("/api/settings/work-calendar"),
     setWorkCalendarYear: (year, payload) =>
       request(`/api/settings/work-calendar/${year}`, { method: "PUT", body: JSON.stringify(payload) }),
+
+    getExpenses: (filters = {}) => {
+      const params = new URLSearchParams();
+      ["search", "projectId", "category", "scope", "startDate", "endDate", "page", "limit"].forEach((k) => {
+        if (filters[k] != null && filters[k] !== "") params.set(k, filters[k]);
+      });
+      const qs = params.toString();
+      return request(`/api/expenses${qs ? `?${qs}` : ""}`);
+    },
+    getExpenseCategories: () => request("/api/expenses/categories"),
+    // payload: FormData (with optional `document` file) or a plain object.
+    createExpense: (payload) =>
+      request("/api/expenses", { method: "POST", body: payload instanceof FormData ? payload : JSON.stringify(payload) }),
+    updateExpense: (id, payload) =>
+      request(`/api/expenses/${id}`, { method: "PATCH", body: payload instanceof FormData ? payload : JSON.stringify(payload) }),
+    deleteExpense: (id) => request(`/api/expenses/${id}`, { method: "DELETE" }),
+    bulkExpenses: (body) => request("/api/expenses/bulk", { method: "POST", body: JSON.stringify(body) }),
+    deleteExpenseDocument: (id) => request(`/api/expenses/${id}/document`, { method: "DELETE" }),
+    expenseDocumentUrl: (id) => `${base()}/api/expenses/${id}/document`,
+    // Fetches the evidence file as a blob (keeps the X-HITT-User header —
+    // a plain <a>/window.open can't send it and the route is guarded).
+    fetchExpenseDocument: async (id) => {
+      const session = HITT_AUTH?.getSession?.();
+      const res = await fetch(`${base()}/api/expenses/${id}/document`, {
+        headers: { "X-HITT-User": session?.username || "unknown" },
+      });
+      if (!res.ok) throw new Error("Could not load the document.");
+      return res.blob();
+    },
 
     getAuditUsers: () => request("/api/audit/users"),
     getAuditKinds: () => request("/api/audit/kinds"),

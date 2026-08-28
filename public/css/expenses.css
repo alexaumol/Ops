@@ -1,0 +1,95 @@
+/* ==========================================================================
+   HITT Ops — Expenses page
+   Reuses modal / field-input / toast / bp-empty from business-partners.css.
+   ========================================================================== */
+
+.exp-filters {
+  display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.6rem;
+  margin-bottom: 1rem;
+}
+.exp-filters > input[type="text"] {
+  flex: 1; min-width: 220px;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  font-size: 0.85rem;
+}
+.exp-field {
+  display: flex; flex-direction: column; gap: 0.2rem;
+  font-size: 0.72rem; color: var(--text-secondary);
+}
+.exp-field select, .exp-field input {
+  padding: 0.4rem 0.5rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-size: 0.82rem;
+}
+.exp-filter-spacer { flex: 1; }
+
+.exp-scope { display: inline-flex; border: 1px solid var(--border-subtle); border-radius: 999px; overflow: hidden; }
+.exp-scope-btn {
+  background: var(--bg-surface); border: none; border-left: 1px solid var(--border-subtle);
+  padding: 0.4rem 0.85rem; font-size: 0.78rem; font-weight: 600; color: var(--text-secondary); cursor: pointer;
+}
+.exp-scope-btn:first-child { border-left: none; }
+.exp-scope-btn[aria-selected="true"] { background: var(--hitt-teal); color: #fff; }
+
+.exp-bulk-bar {
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.55rem 0.85rem; margin-bottom: 0.85rem;
+  background: rgba(92,117,124,0.1);
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-sm);
+  font-size: 0.85rem; font-weight: 600;
+}
+.exp-bulk-bar.hidden { display: none; }
+.exp-bulk-bar .btn { padding: 0.35rem 0.8rem; font-size: 0.8rem; }
+
+.exp-table-wrap {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  overflow-x: auto;
+  box-shadow: var(--shadow-sm);
+}
+.exp-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.exp-table thead th {
+  text-align: left; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.03em;
+  color: var(--text-secondary); background: var(--bg-surface-alt);
+  padding: 0.5rem 0.7rem; border-bottom: 1px solid var(--border-subtle); white-space: nowrap;
+}
+.exp-table tbody td { padding: 0.45rem 0.7rem; border-bottom: 1px solid var(--border-subtle); vertical-align: middle; }
+.exp-table tbody tr:last-child td { border-bottom: none; }
+.exp-table tbody tr:hover { background: var(--bg-surface-alt); }
+.exp-table tbody tr.is-selected { background: rgba(92,117,124,0.12); }
+.exp-check-col, .exp-doc-col { width: 1px; text-align: center; }
+.exp-table a { color: var(--brand); text-decoration: none; }
+.exp-table a:hover { text-decoration: underline; }
+.exp-amount { font-weight: 700; white-space: nowrap; text-align: right; }
+.exp-internal-tag {
+  font-size: 0.64rem; font-weight: 700; text-transform: uppercase;
+  padding: 0.1rem 0.4rem; border-radius: 999px;
+  background: var(--bg-surface-alt); color: var(--text-secondary);
+}
+.exp-row-btn {
+  border: none; background: none; cursor: pointer; color: var(--brand);
+  font-size: 0.9rem; padding: 0.15rem 0.35rem; border-radius: var(--radius-sm);
+}
+.exp-row-btn:hover { background: var(--bg-surface-alt); }
+.exp-doc-link { font-size: 1rem; text-decoration: none; }
+
+.exp-pagination {
+  display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.75rem; margin-top: 0.85rem;
+}
+.exp-page-info { font-size: 0.82rem; color: var(--text-secondary); padding-bottom: 0.35rem; }
+.exp-sum { font-size: 0.85rem; font-weight: 700; color: var(--text-primary); padding-bottom: 0.35rem; }
+.exp-pagination .btn { padding: 0.35rem 0.85rem; font-size: 0.82rem; }
+
+.exp-doc-current {
+  display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
+  margin-bottom: 0.6rem; font-size: 0.82rem;
+}
+.exp-doc-current.hidden { display: none; }
+.exp-doc-current .btn-icon-add { padding: 0.15rem 0.6rem; }

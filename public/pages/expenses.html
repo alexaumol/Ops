@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Expenses · HITT Ops</title>
+<link rel="stylesheet" href="../css/styles.css" />
+<link rel="stylesheet" href="../css/business-partners.css" />
+<link rel="stylesheet" href="../css/time-allocation.css" />
+<link rel="stylesheet" href="../css/expenses.css" />
+</head>
+<body>
+  <header class="app-header">
+    <a class="app-header__brand" href="../welcome.html">HITT<span class="dot">·</span>Ops</a>
+    <nav class="app-header__nav" aria-label="Primary">
+      <a href="../welcome.html">Home</a>
+      <a href="expenses.html" class="active">Expenses</a>
+    </nav>
+    <div class="app-header__user">
+      <span id="dataSourcePill" class="data-pill" style="font-size:10px; font-weight:700; padding:2px 8px; border-radius:999px;">…</span>
+      <div class="avatar" id="userAvatar">?</div>
+      <span id="userName">Signed in</span>
+      <button class="btn btn-secondary" id="btnSignOut" style="padding:0.35rem 0.75rem; font-size:0.8rem;">Sign out</button>
+    </div>
+  </header>
+
+  <main class="page-shell">
+    <h1 class="page-title">Expenses</h1>
+    <p class="page-subtitle">Every company expense — travel, meals, materials — bound to a project or internal, with its evidence document.</p>
+
+    <div class="exp-filters">
+      <input id="expSearch" type="text" placeholder="Search description, category, project…" />
+      <div class="exp-scope" role="group" aria-label="Scope">
+        <button data-scope="" class="exp-scope-btn" aria-selected="true">All</button>
+        <button data-scope="project" class="exp-scope-btn" aria-selected="false">On a project</button>
+        <button data-scope="internal" class="exp-scope-btn" aria-selected="false">Internal</button>
+      </div>
+      <label class="exp-field">Category
+        <select id="expCategoryFilter"><option value="">Any</option></select>
+      </label>
+      <label class="exp-field">From <input type="date" id="expStartDate" /></label>
+      <label class="exp-field">To <input type="date" id="expEndDate" /></label>
+      <div class="exp-filter-spacer"></div>
+      <button class="btn btn-primary" id="btnNewExpense">+ New expense</button>
+    </div>
+
+    <div id="expBulkBar" class="exp-bulk-bar hidden">
+      <span id="expBulkCount"></span>
+      <div class="exp-filter-spacer"></div>
+      <button class="btn btn-secondary" id="btnBulkEdit">Edit selected…</button>
+      <button class="btn btn-secondary" id="btnBulkDelete" style="color:var(--danger);">Delete selected</button>
+      <button class="btn btn-secondary" id="btnBulkClear">Clear</button>
+    </div>
+
+    <div class="exp-table-wrap">
+      <table class="exp-table">
+        <thead>
+          <tr>
+            <th class="exp-check-col"><input type="checkbox" id="expCheckAll" title="Select all on this page" /></th>
+            <th>Date</th>
+            <th>Category</th>
+            <th>Description</th>
+            <th>Project</th>
+            <th>Paid by</th>
+            <th style="text-align:right;">Amount</th>
+            <th class="exp-doc-col" title="Evidence">📎</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="expTableBody"></tbody>
+      </table>
+      <div id="expEmpty" class="bp-empty hidden">No expenses match these filters.</div>
+    </div>
+
+    <div class="exp-pagination">
+      <span id="expPageInfo" class="exp-page-info"></span>
+      <span id="expSum" class="exp-sum"></span>
+      <div class="exp-filter-spacer"></div>
+      <label class="exp-field">Per page
+        <select id="expPageSize"><option>25</option><option selected>50</option><option>100</option><option>250</option></select>
+      </label>
+      <button class="btn btn-secondary" id="btnExpPrev">&larr; Prev</button>
+      <button class="btn btn-secondary" id="btnExpNext">Next &rarr;</button>
+    </div>
+  </main>
+
+  <div id="toastHost" class="toast-host"></div>
+
+  <!-- ============================ EXPENSE MODAL ============================ -->
+  <div id="expenseOverlay" class="modal-overlay hidden">
+    <div class="modal-panel" style="max-width:560px;">
+      <div class="modal-head">
+        <h2 id="expModalTitle" style="flex:1; font-size:1rem; font-weight:700; color:#fff; margin:0;">New expense</h2>
+        <button id="expClose" class="modal-head-btn modal-head-btn--close" title="Close">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="field-section">
+          <div class="field-grid">
+            <div>
+              <label class="field-label">Date</label>
+              <input id="expDate" type="date" class="field-input" />
+            </div>
+            <div>
+              <label class="field-label">Category</label>
+              <input id="expCategory" type="text" class="field-input" list="expCategoryList" placeholder="e.g. Hotel" />
+              <datalist id="expCategoryList"></datalist>
+            </div>
+            <div class="span-2">
+              <label class="field-label">Description</label>
+              <input id="expDescription" type="text" class="field-input" placeholder="What was it for?" />
+            </div>
+            <div>
+              <label class="field-label">Amount</label>
+              <input id="expAmount" type="number" step="0.01" min="0" class="field-input" />
+            </div>
+            <div>
+              <label class="field-label">Currency</label>
+              <input id="expCurrency" type="text" class="field-input" value="EUR" maxlength="8" />
+            </div>
+            <div>
+              <label class="field-label">Paid by</label>
+              <select id="expPaidBy" class="field-input"></select>
+            </div>
+            <div></div>
+            <div class="span-2">
+              <label style="display:flex; align-items:center; gap:0.4rem; font-size:0.85rem;">
+                <input id="expInternal" type="checkbox" /> Internal expense (not tied to a project)
+              </label>
+            </div>
+            <div class="span-2" id="expProjectRow">
+              <label class="field-label">Project</label>
+              <select id="expProject" class="field-input"></select>
+            </div>
+          </div>
+        </div>
+
+        <div class="field-section">
+          <h3>Evidence</h3>
+          <div style="padding:0.75rem;">
+            <div id="expDocCurrent" class="exp-doc-current hidden">
+              <span id="expDocName"></span>
+              <button type="button" id="expDocView" class="btn-icon-add" style="background:var(--hitt-teal);">View</button>
+              <button type="button" id="expDocRemove" class="btn-icon-add" style="background:var(--danger);">Remove</button>
+            </div>
+            <input id="expDocFile" type="file" accept="image/*,application/pdf" />
+            <p style="font-size:0.72rem; color:var(--text-secondary); margin:0.4rem 0 0;">Image or PDF, up to 15 MB.</p>
+          </div>
+        </div>
+      </div>
+      <div style="flex-shrink:0; border-top:1px solid var(--border-subtle); padding:0.75rem 1.1rem; display:flex; justify-content:space-between; gap:0.5rem;">
+        <button id="expDelete" class="btn btn-secondary hidden" style="color:var(--danger);">Delete</button>
+        <div style="display:flex; gap:0.5rem; margin-left:auto;">
+          <button id="expCancel" class="btn btn-secondary">Cancel</button>
+          <button id="expSave" class="btn btn-primary">Save expense</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================ BULK EDIT MODAL ============================ -->
+  <div id="bulkOverlay" class="modal-overlay hidden">
+    <div class="modal-panel" style="max-width:420px;">
+      <div class="modal-head">
+        <h2 style="flex:1; font-size:1rem; font-weight:700; color:#fff; margin:0;">Edit selected expenses</h2>
+        <button id="bulkClose" class="modal-head-btn modal-head-btn--close" title="Close">✕</button>
+      </div>
+      <div class="modal-body">
+        <p class="bp-empty" style="padding:0 0 0.75rem; text-align:left;">Only the fields you fill in are changed. Leave a field blank to keep it as-is.</p>
+        <div class="field-section">
+          <div class="field-grid">
+            <div class="span-2">
+              <label class="field-label">Category</label>
+              <input id="bulkCategory" type="text" class="field-input" list="expCategoryList" placeholder="— keep —" />
+            </div>
+            <div class="span-2">
+              <label style="display:flex; align-items:center; gap:0.4rem; font-size:0.85rem;">
+                <input id="bulkChangeProject" type="checkbox" /> Change project / internal
+              </label>
+            </div>
+            <div class="span-2" id="bulkProjectWrap" style="display:none;">
+              <label style="display:flex; align-items:center; gap:0.4rem; font-size:0.85rem; margin-bottom:0.4rem;">
+                <input id="bulkInternal" type="checkbox" /> Set as internal (no project)
+              </label>
+              <select id="bulkProject" class="field-input"></select>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style="flex-shrink:0; border-top:1px solid var(--border-subtle); padding:0.75rem 1.1rem; display:flex; justify-content:flex-end; gap:0.5rem;">
+        <button id="bulkCancel" class="btn btn-secondary">Cancel</button>
+        <button id="bulkApply" class="btn btn-primary">Apply</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="../js/config.js"></script>
+  <script src="../js/auth.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/permissions.js"></script>
+  <script src="../js/expenses.js"></script>
+</body>
+</html>

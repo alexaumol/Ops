@@ -66,9 +66,13 @@ database credential — all data access goes through the API over HTTPS.
 ```bash
 cd server
 cp .env.example .env   # fill in your own PostgreSQL connection details
-npm install
+npm install            # includes multer, used for expense evidence uploads
 npm start               # listens on PORT (default 4000)
 ```
+
+Expense evidence files are written to `UPLOAD_DIR/expenses` (env var,
+default `server/uploads/`). That directory is gitignored — back it up
+alongside the database.
 
 **Frontend:**
 

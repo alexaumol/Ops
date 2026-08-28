@@ -30,6 +30,7 @@ const MODULE_LABELS = {
   "business-partners": "Business partners",
   "time-allocation": "Time allocation",
   "invoicing": "Invoicing",
+  "expenses": "Expenses",
   "reports": "Reports",
 };
 
@@ -592,6 +593,7 @@ const AUDIT_CATEGORY = {
   timetracking: "Time tracking",
   bp: "Business partner",
   invoice: "Invoicing",
+  expense: "Expenses",
   timeoff: "Time off",
   settings: "Settings",
 };

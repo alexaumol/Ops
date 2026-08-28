@@ -26,6 +26,7 @@ const permissionsRouter = require("./routes/permissions");
 const settingsRouter = require("./routes/settings");
 const reportsRouter = require("./routes/reports");
 const auditRouter = require("./routes/audit");
+const expensesRouter = require("./routes/expenses");
 const { attachHittUser } = require("./lib/permissions");
 
 const app = express();
@@ -68,6 +69,7 @@ app.use("/api/business-partners", businessPartnersRouter);
 app.use("/api/time-tracking", timeTrackingRouter);
 app.use("/api/time-off", timeOffRouter);
 app.use("/api/invoicing", invoicingRouter);
+app.use("/api/expenses", expensesRouter);
 app.use("/api/employees", employeesRouter);
 app.use("/api/permissions", permissionsRouter);
 app.use("/api/settings", settingsRouter);

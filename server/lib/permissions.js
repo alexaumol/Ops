@@ -44,7 +44,7 @@
  */
 const { pool } = require("../config/db");
 
-const MODULE_KEYS = ["projects", "business-partners", "time-allocation", "invoicing", "reports"];
+const MODULE_KEYS = ["projects", "business-partners", "time-allocation", "invoicing", "expenses", "reports"];
 
 // Resolves the X-HITT-User header (a stub-mode short username OR a real
 // MSAL UPN/email — this app supports both auth modes) to an employees row.
