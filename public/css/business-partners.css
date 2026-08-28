@@ -25,6 +25,11 @@
 }
 .bp-toolbar input[type="text"]:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 1px; }
 .bp-count { font-size: 0.85rem; color: var(--text-secondary); white-space: nowrap; }
+.bp-filter-toggle {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  font-size: 0.82rem; color: var(--text-secondary); white-space: nowrap;
+  cursor: pointer; user-select: none;
+}
 
 .bp-table-wrap {
   background: var(--bg-surface);

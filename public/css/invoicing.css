@@ -48,6 +48,17 @@
 .inv-table tbody tr { cursor: pointer; }
 .inv-table tbody tr:hover { background: var(--bg-surface-alt); }
 
+.inv-table th[data-sort] { cursor: pointer; user-select: none; }
+.inv-table th[data-sort]:hover { color: var(--text-primary); }
+.inv-table th[data-sort] .sort-arrow { font-size: 0.7em; }
+.inv-table th[data-sort].sorted { color: var(--text-primary); }
+
+.inv-proceed-col { width: 1.75rem; text-align: center; padding-left: 0.4rem !important; padding-right: 0.4rem !important; }
+.inv-proceed-icon { color: var(--success); font-weight: 700; }
+
+.inv-filter-count { opacity: 0.7; font-weight: 700; }
+.inv-filter-btn[aria-selected="true"] .inv-filter-count { opacity: 0.85; }
+
 .inv-bucket-pill {
   font-size: 0.68rem; font-weight: 700; padding: 0.15rem 0.55rem;
   border-radius: 999px; white-space: nowrap;

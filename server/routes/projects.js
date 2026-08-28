@@ -448,14 +448,18 @@ router.patch("/:id", async (req, res) => {
       }
     }
     if (progress !== undefined) {
-      await client.query(
-        `INSERT INTO projectportfolioprogress (projectid, progress, updatedby, updatedat, datadate)
-         VALUES ($1, $2, $3, now(), now())`,
-        [id, progress, employeeId || null]
-      );
-      const prevProgress = cur.currentProgress != null ? Number(cur.currentProgress) : null;
+      // Only write a new progress snapshot (and a history line) when the
+      // value actually changed. A project with no progress row yet is
+      // treated as 0% — otherwise saving the modal with progress left at 0
+      // logged a bogus "Progress changed from 0% to 0%" every time.
+      const prevProgress = cur.currentProgress != null ? Number(cur.currentProgress) : 0;
       if (prevProgress !== Number(progress)) {
-        changes.push(`Progress changed from ${prevProgress ?? 0}% to ${progress}%`);
+        await client.query(
+          `INSERT INTO projectportfolioprogress (projectid, progress, updatedby, updatedat, datadate)
+           VALUES ($1, $2, $3, now(), now())`,
+          [id, progress, employeeId || null]
+        );
+        changes.push(`Progress changed from ${prevProgress}% to ${progress}%`);
       }
     }
     if (name !== undefined && !name.trim()) {

@@ -31,6 +31,7 @@ let PARTNERS = [];
 let LOOKUPS = { entities: [], companyTypes: [], countries: [], languages: [] };
 let usingDemoData = false;
 let searchTerm = "";
+let onlyAliveProjects = false;
 let activeBpId = null;
 let sortColumn = "name";
 let sortDirection = "asc"; // 'asc' | 'desc'
@@ -105,11 +106,17 @@ function matchesSearch(p){
   return String(p.name || '').toLowerCase().includes(searchTerm.toLowerCase());
 }
 
+function matchesFilters(p){
+  if (!matchesSearch(p)) return false;
+  if (onlyAliveProjects && Number(p.projectsAlive ?? 0) <= 0) return false;
+  return true;
+}
+
 function renderTable(){
   const tbody = document.getElementById('bpTableBody');
   const empty = document.getElementById('bpEmpty');
   const dir = sortDirection === 'asc' ? 1 : -1;
-  const rows = PARTNERS.filter(matchesSearch).sort((a, b) => {
+  const rows = PARTNERS.filter(matchesFilters).sort((a, b) => {
     const av = a[sortColumn], bv = b[sortColumn];
     if (typeof av === 'number' || typeof bv === 'number') {
       return ((av ?? 0) - (bv ?? 0)) * dir;
@@ -157,6 +164,11 @@ function renderTable(){
 
 document.getElementById('searchBox').addEventListener('input', (e) => {
   searchTerm = e.target.value.trim();
+  renderTable();
+});
+
+document.getElementById('filterAliveProjects').addEventListener('change', (e) => {
+  onlyAliveProjects = e.target.checked;
   renderTable();
 });
 
@@ -528,6 +540,55 @@ document.getElementById('mAddTaxCompany').addEventListener('click', async () => 
 /* ============================== NEW BP MODAL ============================= */
 const newBpOverlay = document.getElementById('newBpOverlay');
 
+// Contacts entered on the New BP form are collected here and POSTed one by
+// one right after the partner is created (a contact row needs a bpid to
+// attach to, so it can't be saved until then).
+let npContacts = [];
+
+function renderNpContacts(){
+  const list = document.getElementById('npContactsList');
+  if (!npContacts.length) {
+    list.innerHTML = `<div class="sub-empty">No contacts added yet</div>`;
+    return;
+  }
+  list.innerHTML = npContacts.map((c, i) => `
+    <div class="sub-item">
+      <div class="sub-item-row">
+        <span class="sub-item-title">${escapeHtml(c.contactname)}</span>
+        <span style="display:flex; align-items:center; gap:0.5rem;">
+          <span class="sub-item-meta">${escapeHtml(c.position || '')}</span>
+          <button type="button" data-remove-np-contact="${i}" class="btn-icon-add" style="background:var(--danger); padding:0 0.5rem;" title="Remove">✕</button>
+        </span>
+      </div>
+      <div class="sub-item-meta">${escapeHtml(c.emailaddress || '—')}${c.phonenumber ? ' · ' + escapeHtml(c.phonenumber) : ''}</div>
+    </div>
+  `).join('');
+  list.querySelectorAll('[data-remove-np-contact]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      npContacts.splice(Number(btn.dataset.removeNpContact), 1);
+      renderNpContacts();
+    });
+  });
+}
+
+document.getElementById('npAddContact').addEventListener('click', () => {
+  const name = document.getElementById('npNewContactName').value.trim();
+  if (!name) { toast('Contact name is required', 'red'); return; }
+  npContacts.push({
+    contactname: name,
+    position: document.getElementById('npNewContactPosition').value.trim() || null,
+    emailaddress: document.getElementById('npNewContactEmail').value.trim() || null,
+    phonenumber: document.getElementById('npNewContactPhone').value.trim() || null,
+  });
+  ['npNewContactName', 'npNewContactPosition', 'npNewContactEmail', 'npNewContactPhone']
+    .forEach(id => document.getElementById(id).value = '');
+  renderNpContacts();
+  document.getElementById('npNewContactName').focus();
+});
+document.getElementById('npNewContactName').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); document.getElementById('npAddContact').click(); }
+});
+
 function openNewBpModal(){
   document.getElementById('npName').value = '';
   document.getElementById('npCompanyType').innerHTML = lookupOptionsHtml(LOOKUPS.companyTypes, null, true);
@@ -535,6 +596,9 @@ function openNewBpModal(){
   document.getElementById('npCountry').innerHTML = lookupOptionsHtml(LOOKUPS.countries, null, true);
   document.getElementById('npWebpage').value = '';
   ['npStreetName', 'npCity', 'npState', 'npZipCode', 'npPhone1', 'npPhone2'].forEach(id => document.getElementById(id).value = '');
+  ['npNewContactName', 'npNewContactPosition', 'npNewContactEmail', 'npNewContactPhone'].forEach(id => document.getElementById(id).value = '');
+  npContacts = [];
+  renderNpContacts();
   newBpOverlay.classList.remove('hidden');
   document.body.style.overflow = 'hidden';
   setTimeout(() => document.getElementById('npName').focus(), 50);
@@ -584,6 +648,15 @@ document.getElementById('npSave').addEventListener('click', async () => {
 
   try {
     const created = await HITT_API.createBusinessPartner(payload);
+    if (npContacts.length) {
+      const results = await Promise.allSettled(
+        npContacts.map(c => HITT_API.addBusinessPartnerContact(created.id, c))
+      );
+      const failed = results.filter(r => r.status === 'rejected').length;
+      if (failed) {
+        toast(`Business partner created, but ${failed} contact${failed === 1 ? '' : 's'} could not be saved — add them from the partner.`, 'red');
+      }
+    }
     await loadPartners();
     closeNewBpModal();
     toast('Business partner created', 'green');

@@ -107,7 +107,7 @@
 
 <!-- ============================ PROJECT MODAL ============================ -->
 <div id="modalOverlay" class="modal-overlay hidden fixed inset-0 z-50 bg-hitt-ink/40 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6">
-  <div id="modalPanel" class="modal-panel bg-white w-full max-w-6xl max-h-[92vh] rounded-xl shadow-lift flex flex-col overflow-hidden">
+  <div id="modalPanel" class="modal-panel bg-white w-full max-h-[92vh] rounded-xl shadow-lift flex flex-col overflow-hidden" style="max-width:84rem;">
 
     <div class="shrink-0 px-4 sm:px-5 py-3 flex items-center gap-3" style="background:#5C757C">
       <span id="mYear" class="font-mono font-bold text-white/90 text-sm bg-white/10 rounded px-2 py-1">2026</span>
@@ -143,7 +143,7 @@
 
     <div class="flex-1 flex overflow-hidden">
     <div class="flex-1 min-w-0 overflow-y-auto bg-hitt-canvas">
-      <div id="paneGeneral" class="grid grid-cols-1 lg:grid-cols-2 gap-4 p-4 sm:p-5">
+      <div id="paneGeneral" class="grid grid-cols-1 gap-4 p-4 sm:p-5">
         <div class="flex flex-col gap-4">
           <section class="bg-white rounded-lg border border-slate-200 shadow-card overflow-hidden">
             <div class="bg-hitt-teal px-3 py-1.5"><h3 class="text-white text-xs font-bold tracking-wide">GENERAL PROJECT INFO</h3></div>
@@ -308,7 +308,7 @@
     </div>
 
     <!-- Collapsible via #historyCollapse — width set directly from JS, see projects.js -->
-    <div id="historyPanel" class="shrink-0 border-l border-slate-200 bg-white flex flex-col overflow-hidden" style="width:260px;">
+    <div id="historyPanel" class="shrink-0 border-l border-slate-200 bg-white flex flex-col overflow-hidden" style="width:300px;">
       <div class="shrink-0 px-3 py-2 border-b border-slate-100">
         <h3 id="historyTitle" class="text-xs font-bold text-hitt-teal tracking-wide">HISTORY</h3>
       </div>

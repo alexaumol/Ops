@@ -70,6 +70,13 @@ body { background: #F5F4EE; }
    despite testing clean in isolation. */
 #historyPanel { transition: width .16s ease; }
 
+/* Project modal General pane: the form-fields column (col 1) absorbs the
+   extra width of the widened modal; the Notes column (col 2) keeps a
+   fixed, comfortable width. Replaces the old lg:grid-cols-2 50/50 split. */
+@media (min-width: 1024px) {
+  #paneGeneral { grid-template-columns: minmax(0, 1fr) 26rem; }
+}
+
 .modal-overlay { animation: overlay-in .18s ease; }
 @keyframes overlay-in { from { opacity: 0; } to { opacity: 1; } }
 .modal-panel { animation: panel-in .22s cubic-bezier(.2,.9,.3,1.1); }

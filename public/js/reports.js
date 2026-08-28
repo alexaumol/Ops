@@ -56,6 +56,24 @@ function downloadCsv(filename, headers, rows) {
   URL.revokeObjectURL(url);
 }
 
+// Project status → chip colour, kept consistent with the Projects kanban
+// column colours (see STAGE_STYLE_BY_KEY in js/projects.js). Matched on the
+// lower-cased status label; anything unrecognised falls back to neutral grey.
+const STATUS_CHIP_COLORS = {
+  lead: "#5C757C",
+  oferta: "#BC9A1C",
+  guanyat: "#6E8F5A",
+  wip: "#171717",
+  delivered: "#211916",
+  closed: "#8A8676",
+  cancelled: "#B24A3A",
+};
+function statusChipHtml(label) {
+  if (!label) return "—";
+  const color = STATUS_CHIP_COLORS[String(label).trim().toLowerCase()] || "#8A8676";
+  return `<span class="rpt-status-chip" style="background:${color}">${escapeHtml(label)}</span>`;
+}
+
 function pad2(n) { return String(n).padStart(2, "0"); }
 // Uses the browser's local date components (not UTC) — matches how the
 // rest of the app already displays timestamp-without-timezone columns
@@ -96,7 +114,7 @@ let lastHoursRows = [];
 async function loadHours() {
   const tbody = document.getElementById("hoursTableBody");
   const empty = document.getElementById("hoursEmpty");
-  tbody.innerHTML = `<tr><td colspan="6" class="sub-empty">Loading…</td></tr>`;
+  tbody.innerHTML = `<tr><td colspan="8" class="sub-empty">Loading…</td></tr>`;
   empty.classList.add("hidden");
   try {
     const rows = await HITT_API.getHoursPerProject(hoursStartInput.value || null, hoursEndInput.value || null);
@@ -110,10 +128,12 @@ async function loadHours() {
     tbody.innerHTML = rows.map((r) => `
       <tr data-project-id="${r.projectId}" data-project-name="${escapeHtml(r.name)}" title="Click for a per-employee breakdown">
         <td>
-          <div>${escapeHtml(r.name)}</div>
+          <div><a href="projects.html?projectId=${encodeURIComponent(r.projectId)}">${escapeHtml(r.name)}</a></div>
           <div class="rpt-proj-code">${escapeHtml(r.code)}</div>
         </td>
-        <td>${escapeHtml(r.statusLabel || "—")}</td>
+        <td>${escapeHtml(r.ownerName || "—")}</td>
+        <td>${escapeHtml(r.entityLabel || "—")}</td>
+        <td>${statusChipHtml(r.statusLabel)}</td>
         <td style="text-align:right; font-weight:700;">${Number(r.totalHours).toLocaleString()}</td>
         <td style="text-align:right; color:var(--text-secondary);">${Number(r.poHours).toLocaleString()}</td>
         <td style="text-align:right; color:var(--text-secondary);">${Number(r.resHours).toLocaleString()}</td>
@@ -147,12 +167,13 @@ document.getElementById("btnHoursExport").addEventListener("click", () => {
     : "all-time";
   downloadCsv(
     `hours-per-project_${range}.csv`,
-    ["Project code", "Project name", "Status", "Total hours", "PO hours", "RES hours", "Employees"],
-    lastHoursRows.map((r) => [r.code, r.name, r.statusLabel || "", r.totalHours, r.poHours, r.resHours, r.employeeCount])
+    ["Project code", "Project name", "Project owner", "Entity", "Status", "Total hours", "PO hours", "RES hours", "Resources"],
+    lastHoursRows.map((r) => [r.code, r.name, r.ownerName || "", r.entityLabel || "", r.statusLabel || "", r.totalHours, r.poHours, r.resHours, r.employeeCount])
   );
 });
 
 document.getElementById("hoursTableBody").addEventListener("click", (e) => {
+  if (e.target.closest("a")) return; // let the project-name link navigate
   const row = e.target.closest("tr[data-project-id]");
   if (!row) return;
   openDrillDown(row.dataset.projectId, row.dataset.projectName);

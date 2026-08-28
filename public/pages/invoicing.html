@@ -29,11 +29,11 @@
     <p class="page-subtitle">Proceed-to-invoice settings and invoice follow-up, per project.</p>
 
     <div class="inv-filters">
-      <button data-bucket="not-released" class="inv-filter-btn" aria-selected="false">Not released</button>
-      <button data-bucket="not-started" class="inv-filter-btn" aria-selected="false">Not started</button>
-      <button data-bucket="partial" class="inv-filter-btn" aria-selected="false">Partially invoiced</button>
-      <button data-bucket="total" class="inv-filter-btn" aria-selected="false">Totally invoiced</button>
-      <button data-bucket="all" class="inv-filter-btn" aria-selected="true">All</button>
+      <button data-bucket="not-released" class="inv-filter-btn" aria-selected="false">Not released <span class="inv-filter-count" data-count-for="not-released"></span></button>
+      <button data-bucket="not-started" class="inv-filter-btn" aria-selected="false">Not started <span class="inv-filter-count" data-count-for="not-started"></span></button>
+      <button data-bucket="partial" class="inv-filter-btn" aria-selected="false">Partially invoiced <span class="inv-filter-count" data-count-for="partial"></span></button>
+      <button data-bucket="total" class="inv-filter-btn" aria-selected="false">Totally invoiced <span class="inv-filter-count" data-count-for="total"></span></button>
+      <button data-bucket="all" class="inv-filter-btn" aria-selected="true">All <span class="inv-filter-count" data-count-for="all"></span></button>
       <div class="inv-filter-spacer"></div>
       <input id="searchBox" type="text" placeholder="Search by project code or name…" />
     </div>
@@ -42,11 +42,13 @@
       <table class="inv-table">
         <thead>
           <tr>
-            <th>Project</th>
-            <th>Entity</th>
-            <th style="text-align:right;">Budget</th>
-            <th style="text-align:right;">Invoiced</th>
-            <th>Status</th>
+            <th class="inv-proceed-col" title="Proceed to invoice"></th>
+            <th data-sort="code">Project<span class="sort-arrow"></span></th>
+            <th data-sort="entityLabel">Entity<span class="sort-arrow"></span></th>
+            <th data-sort="budget" style="text-align:right;">Budget<span class="sort-arrow"></span></th>
+            <th data-sort="invoicedTotal" style="text-align:right;">Invoiced<span class="sort-arrow"></span></th>
+            <th data-sort="invoiceCount" style="text-align:right;">Generated invoices<span class="sort-arrow"></span></th>
+            <th data-sort="bucket">Status<span class="sort-arrow"></span></th>
           </tr>
         </thead>
         <tbody id="invTableBody"></tbody>

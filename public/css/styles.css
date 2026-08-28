@@ -150,6 +150,13 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; }
   color: var(--text-inverse);
 }
 .app-header__brand .dot { color: var(--accent); }
+.app-header__logo {
+  height: 26px;
+  width: auto;
+  background: #fff;
+  border-radius: 3px;
+  padding: 2px 4px;
+}
 .app-header__nav {
   display: flex;
   gap: 1.25rem;

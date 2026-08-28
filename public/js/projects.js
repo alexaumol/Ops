@@ -1026,7 +1026,7 @@ let historyCollapsed = false;
 // way instead of chasing it further.
 historyCollapseBtn.addEventListener('click', () => {
   historyCollapsed = !historyCollapsed;
-  historyPanel.style.width = historyCollapsed ? '0px' : '260px';
+  historyPanel.style.width = historyCollapsed ? '0px' : '300px';
   historyPanel.style.borderLeft = historyCollapsed ? 'none' : '';
   historyCollapseBtn.textContent = historyCollapsed ? '«' : '»';
   historyCollapseBtn.title = historyCollapsed ? 'Expand history' : 'Collapse history';
@@ -1080,6 +1080,9 @@ document.getElementById('mSave').addEventListener('click', async () => {
   };
   p.ownerId = extraFields.ownerId;
   p.ownerName = ownerVal ? (EMPLOYEES.find(e => String(e.id) === ownerVal)?.name ?? null) : null;
+  // Keep the card badges in sync without a full reload — the "not
+  // invoiceable" badge otherwise only appeared after F5.
+  p.notInvoiceable = extraFields.notInvoiceable;
 
   document.getElementById('mChangedBadge').classList.add('hidden');
   renderBoard();

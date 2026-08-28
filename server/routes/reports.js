@@ -63,6 +63,8 @@ router.get("/hours-per-project", requireModuleAccess("reports"), async (req, res
     const { rows } = await pool.query(
       `SELECT p.id AS "projectId", p.projectnumber AS code, p.projectname AS name,
               ps.projectstatusdesc AS "statusLabel",
+              ent.entitydesc AS "entityLabel",
+              owner."ownerName",
               COALESCE(SUM(t.projtimetrackhours), 0) AS "totalHours",
               COALESCE(SUM(t.projtimetrackhours) FILTER (WHERE t.po_res = 'PO'), 0) AS "poHours",
               COALESCE(SUM(t.projtimetrackhours) FILTER (WHERE t.po_res = 'RES'), 0) AS "resHours",
@@ -70,9 +72,18 @@ router.get("/hours-per-project", requireModuleAccess("reports"), async (req, res
        FROM projectstimetracking t
        JOIN projects p ON p.id = t.projectid::bigint
        LEFT JOIN projectstatus ps ON ps.id = p.projectstatusid::bigint
+       LEFT JOIN entity ent ON ent.id = p.entityid::bigint
+       LEFT JOIN LATERAL (
+         SELECT TRIM(CONCAT(e.employeefirstname, ' ', e.employeelastname)) AS "ownerName"
+         FROM projectowners po
+         JOIN employees e ON e.id = po.projectownerid::bigint
+         WHERE po.projectid = p.id
+         ORDER BY po.id DESC
+         LIMIT 1
+       ) owner ON true
        WHERE ($1::date IS NULL OR t.projtimetrackdate >= $1::date)
          AND ($2::date IS NULL OR t.projtimetrackdate <= $2::date)
-       GROUP BY p.id, p.projectnumber, p.projectname, ps.projectstatusdesc
+       GROUP BY p.id, p.projectnumber, p.projectname, ps.projectstatusdesc, ent.entitydesc, owner."ownerName"
        HAVING COALESCE(SUM(t.projtimetrackhours), 0) > 0
        ORDER BY "totalHours" DESC`,
       [startDate || null, endDate || null]

@@ -28,6 +28,10 @@
 
     <div class="bp-toolbar">
       <input id="searchBox" type="text" placeholder="Search by name…" />
+      <label class="bp-filter-toggle">
+        <input type="checkbox" id="filterAliveProjects" />
+        Only partners with live projects
+      </label>
       <span id="bpCount" class="bp-count"></span>
       <button class="btn btn-primary" id="btnNewBp">+ New business partner</button>
     </div>
@@ -199,8 +203,10 @@
        Mirrors the Edit form's General tab (VBA_Export/BusinessPartner-New_
        Edit.frm — the same Access form serves both New and Edit) — minus
        Entity (dropped from BP forms entirely, see the Edit form above) and
-       minus Contacts/Notes/Invoicing, which need a bpid to attach to and so
-       only make sense once the partner already exists. ============================ -->
+       minus Notes/Invoicing, which need a bpid to attach to and so only
+       make sense once the partner already exists. Contacts ARE offered
+       here — they're collected client-side and POSTed right after the
+       partner is created (see npSave in business-partners.js). ============================ -->
   <div id="newBpOverlay" class="modal-overlay hidden">
     <div class="modal-panel">
       <div class="modal-head">
@@ -257,6 +263,18 @@
               <label class="field-label">Phone number #2</label>
               <input id="npPhone2" type="text" class="field-input" />
             </div>
+          </div>
+        </div>
+
+        <div class="field-section">
+          <h3>Contacts</h3>
+          <div id="npContactsList" class="sub-list"></div>
+          <div class="sub-add-row" style="flex-wrap:wrap;">
+            <input id="npNewContactName" type="text" placeholder="Contact name…" class="field-input" />
+            <input id="npNewContactPosition" type="text" placeholder="Position…" class="field-input" style="max-width:9rem;" />
+            <input id="npNewContactEmail" type="text" placeholder="Email…" class="field-input" style="max-width:12rem;" />
+            <input id="npNewContactPhone" type="text" placeholder="Phone…" class="field-input" style="max-width:9rem;" />
+            <button id="npAddContact" class="btn-icon-add" type="button">Add</button>
           </div>
         </div>
       </div>

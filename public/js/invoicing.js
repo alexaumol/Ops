@@ -25,6 +25,8 @@ let INVOICES = [];
 let usingDemoData = false;
 let currentBucket = 'all';
 let searchTerm = '';
+let sortColumn = 'code';
+let sortDirection = 'desc';
 let activeProjectId = null;
 let activeProjectBpId = null;
 let activeInvoiceId = null;
@@ -96,6 +98,34 @@ function computeBucket(row){
   return 'partial';
 }
 const BUCKET_LABEL = { 'not-released': 'Not released', 'not-started': 'Not started', 'partial': 'Partially invoiced', 'total': 'Totally invoiced' };
+const BUCKET_ORDER = ['not-released', 'not-started', 'partial', 'total'];
+
+// Portfolio-wide count per invoice-status bucket, shown inside each filter
+// chip (e.g. "Partially invoiced (23)"). Independent of the search box and
+// the currently-selected filter — these are always the full totals.
+function updateBucketCounts(){
+  const counts = { all: PROJECTS.length };
+  BUCKET_ORDER.forEach(b => counts[b] = 0);
+  PROJECTS.forEach(p => { counts[computeBucket(p)]++; });
+  document.querySelectorAll('.inv-filter-count').forEach(el => {
+    const n = counts[el.dataset.countFor];
+    el.textContent = n == null ? '' : `(${n})`;
+  });
+}
+
+function sortValue(row, col){
+  if (col === 'bucket') return BUCKET_ORDER.indexOf(computeBucket(row));
+  if (col === 'code') return String(row.code);
+  if (col === 'entityLabel') return String(row.entityLabel || '');
+  return Number(row[col]) || 0;
+}
+
+function compareRows(a, b){
+  const dir = sortDirection === 'asc' ? 1 : -1;
+  const av = sortValue(a, sortColumn), bv = sortValue(b, sortColumn);
+  if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * dir;
+  return String(av).localeCompare(String(bv), undefined, { numeric: true }) * dir;
+}
 
 function matchesFilters(row){
   if (currentBucket !== 'all' && computeBucket(row) !== currentBucket) return false;
@@ -109,7 +139,10 @@ function matchesFilters(row){
 function renderTable(){
   const tbody = document.getElementById('invTableBody');
   const empty = document.getElementById('invEmpty');
-  const rows = PROJECTS.filter(matchesFilters).sort((a, b) => String(b.code).localeCompare(String(a.code)));
+  const rows = PROJECTS.filter(matchesFilters).sort(compareRows);
+
+  updateBucketCounts();
+  updateSortIndicators();
 
   if (!rows.length) {
     tbody.innerHTML = '';
@@ -121,10 +154,12 @@ function renderTable(){
     const bucket = computeBucket(p);
     return `
       <tr data-i="${i}">
+        <td class="inv-proceed-col">${p.proceedtoinvoice ? `<span class="inv-proceed-icon" title="Proceed to invoice">✔</span>` : ''}</td>
         <td><span style="font-weight:600;">${escapeHtml(p.code)}</span> — ${escapeHtml(p.name)}</td>
         <td>${escapeHtml(p.entityLabel || '—')}</td>
         <td style="text-align:right;">${formatMoney(p.budget)}</td>
         <td style="text-align:right;">${formatMoney(p.invoicedTotal)}</td>
+        <td style="text-align:right;">${Number(p.invoiceCount) || 0}</td>
         <td><span class="inv-bucket-pill inv-bucket-${bucket}">${BUCKET_LABEL[bucket]}</span></td>
       </tr>
     `;
@@ -134,6 +169,29 @@ function renderTable(){
     tr.addEventListener('click', () => openProjectModal(rows[i].id));
   });
 }
+
+function updateSortIndicators(){
+  document.querySelectorAll('.inv-table th[data-sort]').forEach(th => {
+    const active = th.dataset.sort === sortColumn;
+    th.classList.toggle('sorted', active);
+    const arrow = th.querySelector('.sort-arrow');
+    if (arrow) arrow.textContent = active ? (sortDirection === 'asc' ? ' ▲' : ' ▼') : '';
+  });
+}
+
+document.querySelectorAll('.inv-table th[data-sort]').forEach(th => {
+  th.addEventListener('click', () => {
+    const col = th.dataset.sort;
+    if (sortColumn === col) {
+      sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+    } else {
+      sortColumn = col;
+      // Text columns read best A→Z; numeric columns most-first.
+      sortDirection = (col === 'code' || col === 'entityLabel') ? 'asc' : 'desc';
+    }
+    renderTable();
+  });
+});
 
 document.querySelectorAll('[data-bucket]').forEach(btn => {
   btn.addEventListener('click', () => {

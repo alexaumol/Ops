@@ -7,10 +7,9 @@
  * and the time-off request workflow (timeoffrequests) are different
  * tables/forms in Access and are NOT covered here (see INTERNAL.md).
  *
- * There's no real employee identity yet (MSAL/Entra ID sign-in isn't
- * wired up — see js/auth.js), so this asks the user which employee
- * record they are and remembers the choice in sessionStorage for the
- * rest of the tab's session.
+ * Every employee tracks only their own time — the logged-in identity is
+ * resolved to an employee record via GET /api/permissions/me (see
+ * js/permissions.js), so there's no "log time as someone else" picker.
  * ---------------------------------------------------------------------------
  */
 
@@ -21,13 +20,10 @@ document.getElementById("userAvatar").textContent = HITT_AUTH.initials(session);
 document.getElementById("btnSignOut").addEventListener("click", () => HITT_AUTH.signOut("../index.html"));
 HITT_PERMS.applyRealName();
 
-const EMPLOYEE_KEY = "hitt.timeTrackingEmployeeId";
-
-let EMPLOYEES = [];
 let ALL_PROJECTS = [];
 let ROWS = [];
 let usingDemoData = false;
-let currentEmployeeId = sessionStorage.getItem(EMPLOYEE_KEY) || "";
+let currentEmployeeId = "";
 
 function escapeHtml(s){
   const d = document.createElement('div');
@@ -101,37 +97,29 @@ function shiftWeek(days){
 }
 weekPicker.addEventListener('change', loadWeek);
 
-/* ============================== EMPLOYEE PICKER =========================== */
-async function loadEmployees(){
-  const select = document.getElementById('employeeSelect');
+/* ============================== EMPLOYEE IDENTITY ========================= */
+// Every employee only ever tracks their own time — resolve who that is
+// from the signed-in identity, no picker.
+async function initEmployee(){
   if (!window.HITT_CONFIG?.FEATURES?.timeAllocationLive) {
-    EMPLOYEES = [{ id: 'demo', name: 'Demo Employee' }];
     usingDemoData = true;
+    currentEmployeeId = '';
   } else {
     try {
-      EMPLOYEES = await HITT_API.getEmployees();
+      const perms = await HITT_PERMS.get();
+      currentEmployeeId = perms.employeeId ? String(perms.employeeId) : '';
       usingDemoData = false;
+      if (!currentEmployeeId) {
+        toast("Your sign-in isn't linked to an employee record — contact an admin.", 'red');
+      }
     } catch (err) {
-      console.warn('Falling back to demo data — could not reach API:', err);
-      EMPLOYEES = [{ id: 'demo', name: 'Demo Employee' }];
+      console.warn('Could not resolve your employee identity — falling back to demo mode:', err);
       usingDemoData = true;
+      currentEmployeeId = '';
     }
   }
   setDataSourcePill();
-
-  select.innerHTML = `<option value="">Select your name…</option>` +
-    EMPLOYEES.map(e => `<option value="${e.id}" ${String(e.id) === String(currentEmployeeId) ? 'selected' : ''}>${escapeHtml(e.name)}</option>`).join('');
-
-  if (!EMPLOYEES.some(e => String(e.id) === String(currentEmployeeId))) {
-    currentEmployeeId = '';
-  }
 }
-
-document.getElementById('employeeSelect').addEventListener('change', (e) => {
-  currentEmployeeId = e.target.value;
-  sessionStorage.setItem(EMPLOYEE_KEY, currentEmployeeId);
-  refreshActiveTab();
-});
 
 /* ============================== PAGE TABS ================================= */
 let currentPageTab = 'tracking';
@@ -160,7 +148,9 @@ async function loadWeek(){
   if (!currentEmployeeId) {
     ROWS = [];
     tbody.innerHTML = '';
-    empty.textContent = 'Pick your name above to see and log your time.';
+    empty.textContent = usingDemoData
+      ? 'Not available in demo data.'
+      : "Your account isn't linked to an employee record — contact an admin.";
     empty.classList.remove('hidden');
     updateWeekTotal();
     return;
@@ -327,7 +317,7 @@ function renderProjectPickerResults(term){
 }
 
 async function openProjectPicker(){
-  if (!currentEmployeeId) { toast('Pick your name first.', 'navy'); return; }
+  if (!currentEmployeeId) { toast("Your account isn't linked to an employee record — contact an admin.", 'red'); return; }
   if (usingDemoData) { toast("Adding projects isn't available in demo data.", 'navy'); return; }
   await ensureProjectsLoaded();
   document.getElementById('projectPickerSearch').value = '';
@@ -443,7 +433,9 @@ async function loadTimeOff(){
   if (!currentEmployeeId) {
     TIME_OFF_REQUESTS = [];
     tbody.innerHTML = '';
-    empty.textContent = 'Pick your name above to see your time-off requests.';
+    empty.textContent = usingDemoData
+      ? 'Not available in demo data.'
+      : "Your account isn't linked to an employee record — contact an admin.";
     empty.classList.remove('hidden');
     return;
   }
@@ -554,7 +546,7 @@ function renderApprovalsTable(pending){
 const timeOffOverlay = document.getElementById('timeOffOverlay');
 
 function openTimeOffModal(){
-  if (!currentEmployeeId) { toast('Pick your name first.', 'navy'); return; }
+  if (!currentEmployeeId) { toast("Your account isn't linked to an employee record — contact an admin.", 'red'); return; }
   if (usingDemoData) { toast("Time-off requests aren't available in demo data.", 'navy'); return; }
   document.getElementById('toStartDate').value = '';
   document.getElementById('toEndDate').value = '';
@@ -605,6 +597,6 @@ document.getElementById('timeOffSubmit').addEventListener('click', async () => {
 
 /* ============================== INIT ==================================== */
 (async () => {
-  await loadEmployees();
+  await initEmployee();
   await loadWeek();
 })();

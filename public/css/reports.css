@@ -78,6 +78,18 @@
 .rpt-table a:hover { text-decoration: underline; }
 .rpt-proj-code { font-size: 0.78rem; color: var(--text-secondary); }
 
+/* Status chip — colours kept in sync with the Projects kanban columns
+   (see statusChipHtml + STATUS_CHIP_COLORS in js/reports.js). */
+.rpt-status-chip {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #fff;
+  padding: 0.12rem 0.5rem;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
 .rpt-month-label { font-size: 1rem; font-weight: 700; min-width: 11ch; text-align: center; }
 
 .rpt-legend { display: flex; gap: 1rem; font-size: 0.8rem; color: var(--text-secondary); }
