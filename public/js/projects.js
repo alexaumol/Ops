@@ -329,7 +329,9 @@ function escapeHtml(s){
 function renderBoard(){
   const board = document.getElementById('board');
   board.innerHTML = '';
-  board.classList.remove('kb-dragging'); // any re-render ends a drag (drop / tab switch)
+  // Any re-render ends a drag (drop / tab switch) — clear the dragging
+  // state so the quick-drop column hides and the insights panel comes back.
+  document.getElementById('kanbanBody')?.classList.remove('is-dragging');
   const visibleStages = STAGES.filter(s => s.set === currentTab);
 
   visibleStages.forEach(stage => {
@@ -369,10 +371,11 @@ function renderBoard(){
 
 // Quick-drop targets, appended as the last column of the board so they sit
 // right beside the last stage column. Only shown while a card is being
-// dragged (#board.kb-dragging in projects.css). They offer the OPPOSITE
-// lifecycle to the current tab — Closed/Cancelled while on Alive, the alive
-// stages while on Closed/Cancelled — so a card can jump between the two
-// without switching tabs first.
+// dragged — see #kanbanBody.is-dragging in projects.css, which also folds
+// the insights panel away to make room. They offer the OPPOSITE lifecycle
+// to the current tab — Closed/Cancelled while on Alive, the alive stages
+// while on Closed/Cancelled — so a card can jump between the two without
+// switching tabs first.
 function renderQuickDrop(){
   const board = document.getElementById('board');
   if (!board) return;
@@ -407,7 +410,9 @@ function renderQuickDrop(){
 }
 
 function setKanbanDragging(on){
-  document.getElementById('board')?.classList.toggle('kb-dragging', on);
+  // On #kanbanBody (not #board) so CSS can also collapse the insights panel
+  // during a drag, freeing room for the quick-drop column.
+  document.getElementById('kanbanBody')?.classList.toggle('is-dragging', on);
   if (!on) document.querySelectorAll('.kb-quickdrop-zone').forEach(z => z.classList.remove('drag-over'));
 }
 
