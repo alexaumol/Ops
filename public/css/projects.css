@@ -142,54 +142,52 @@ body { background: #F5F4EE; }
 .ki-item-name { font-size: 12px; font-weight: 600; color: #171717; line-height: 1.25; }
 .ki-item-meta { font-size: 10px; color: #8A8676; margin-top: 0.1rem; }
 
-/* ---------- Kanban quick-drop (Closed / Cancelled) ---------- */
-#kbQuickdrop {
-  flex-shrink: 0;
-  width: 0;
-  overflow: hidden;
-  display: flex;
+/* ---------- Kanban quick-drop column (opposite-lifecycle targets) ----------
+   Appended as the last column of #board so it sits right beside the last
+   stage column; only shown while a card is being dragged. */
+.kb-quickdrop-col {
+  display: none;
   flex-direction: column;
   justify-content: center;
-  gap: 0.7rem;
-  transition: width .14s ease, padding .14s ease;
-}
-#kanbanBody.is-dragging #kbQuickdrop[data-enabled="true"] {
-  width: 160px;
-  padding: 0.75rem 0.6rem;
+  gap: 0.9rem;
+  height: 100%;
+  padding: 0.5rem 0.25rem;
   overflow-y: auto;
 }
-@media (max-width: 900px) {
-  #kanbanBody.is-dragging #kbQuickdrop { width: 0 !important; padding: 0 !important; }
-}
+#board.kb-dragging .kb-quickdrop-col { display: flex; }
+
 .kb-quickdrop-zone {
   flex: 0 0 auto;
-  border: 2px dashed var(--qd-color, #8A8676);
-  border-radius: 12px;
+  border: 3px dashed var(--qd-color, #8A8676);
+  border-radius: 16px;
   background: #fff;
   color: var(--qd-color, #8A8676);
-  min-height: 96px;
+  min-height: 130px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.4rem;
-  font-size: 12px;
-  line-height: 1.25;
+  gap: 0.5rem;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
   text-align: center;
   transition: background .12s ease, border-style .12s ease, transform .12s ease;
 }
-/* Compact zones when the opposite lifecycle has many stages (Alive set). */
-#kbQuickdrop:not([data-count="1"]):not([data-count="2"]) .kb-quickdrop-zone {
-  min-height: 58px;
-  font-size: 11px;
-  gap: 0.2rem;
+.kb-quickdrop-col[data-count="1"] .kb-quickdrop-zone,
+.kb-quickdrop-col[data-count="2"] .kb-quickdrop-zone { min-height: 165px; }
+/* The alive set (5 stages), shown on the Closed tab — a touch more compact. */
+.kb-quickdrop-col:not([data-count="1"]):not([data-count="2"]) .kb-quickdrop-zone {
+  min-height: 86px;
+  font-size: 12px;
+  gap: 0.3rem;
 }
-#kbQuickdrop:not([data-count="1"]):not([data-count="2"]) .kb-quickdrop-icon { width: 15px; height: 15px; }
 .kb-quickdrop-zone.drag-over {
   background: var(--qd-color, #8A8676);
   color: #fff;
   border-style: solid;
-  transform: scale(1.03);
+  transform: scale(1.04);
 }
-.kb-quickdrop-icon { width: 22px; height: 22px; display: flex; }
+.kb-quickdrop-icon { width: 28px; height: 28px; display: flex; }
+.kb-quickdrop-col:not([data-count="1"]):not([data-count="2"]) .kb-quickdrop-icon { width: 18px; height: 18px; }
 .kb-quickdrop-icon svg { width: 100%; height: 100%; }

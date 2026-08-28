@@ -329,6 +329,7 @@ function escapeHtml(s){
 function renderBoard(){
   const board = document.getElementById('board');
   board.innerHTML = '';
+  board.classList.remove('kb-dragging'); // any re-render ends a drag (drop / tab switch)
   const visibleStages = STAGES.filter(s => s.set === currentTab);
 
   visibleStages.forEach(stage => {
@@ -366,31 +367,29 @@ function renderBoard(){
   renderQuickDrop();
 }
 
-// Quick-drop targets shown in the gap between the board and the insights
-// panel, only while a card is being dragged (#kanbanBody.is-dragging in
-// projects.css). They offer the OPPOSITE lifecycle to the current tab —
-// Closed/Cancelled while on Alive, and the alive stages while on
-// Closed/Cancelled — so a card can jump between the two without switching
-// tabs first.
+// Quick-drop targets, appended as the last column of the board so they sit
+// right beside the last stage column. Only shown while a card is being
+// dragged (#board.kb-dragging in projects.css). They offer the OPPOSITE
+// lifecycle to the current tab — Closed/Cancelled while on Alive, the alive
+// stages while on Closed/Cancelled — so a card can jump between the two
+// without switching tabs first.
 function renderQuickDrop(){
-  const qd = document.getElementById('kbQuickdrop');
-  if (!qd) return;
+  const board = document.getElementById('board');
+  if (!board) return;
   const targetSet = currentTab === 'alive' ? 'closed' : 'alive';
   const zones = STAGES.filter(s => s.set === targetSet);
-  if (!zones.length) {
-    qd.innerHTML = '';
-    qd.dataset.enabled = 'false';
-    return;
-  }
-  qd.dataset.enabled = 'true';
-  qd.dataset.count = String(zones.length);
-  qd.innerHTML = zones.map(s => `
+  if (!zones.length) return;
+
+  const col = document.createElement('div');
+  col.className = 'kb-quickdrop-col';
+  col.dataset.count = String(zones.length);
+  col.innerHTML = zones.map(s => `
     <div class="kb-quickdrop-zone" data-stage="${s.id}" style="--qd-color:${s.color}">
       <span class="kb-quickdrop-icon">${s.icon}</span>
       <span class="kb-quickdrop-label">Move to<br><b>${escapeHtml(s.label)}</b></span>
     </div>
   `).join('');
-  qd.querySelectorAll('.kb-quickdrop-zone').forEach(zone => {
+  col.querySelectorAll('.kb-quickdrop-zone').forEach(zone => {
     zone.addEventListener('dragover', (e) => {
       e.preventDefault();
       e.dataTransfer.dropEffect = 'move';
@@ -404,10 +403,11 @@ function renderQuickDrop(){
       if (id) moveProject(id, Number(zone.dataset.stage));
     });
   });
+  board.appendChild(col);
 }
 
 function setKanbanDragging(on){
-  document.getElementById('kanbanBody')?.classList.toggle('is-dragging', on);
+  document.getElementById('board')?.classList.toggle('kb-dragging', on);
   if (!on) document.querySelectorAll('.kb-quickdrop-zone').forEach(z => z.classList.remove('drag-over'));
 }
 

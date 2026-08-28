@@ -27,11 +27,18 @@
  * logAudit() is best-effort: it never throws back to the caller, so an
  * audit-write failure can't break the action being audited.
  *
- * "Computer name" note: a browser cannot read the client's OS hostname, so
- * actioncomputer holds the best a web page can report — the platform string
- * from navigator.userAgentData / navigator.platform.
+ * "Computer name" note: a browser can NOT hand a web page the client's
+ * NetBIOS / OS hostname — there's no API for it. actioncomputer is filled
+ * best-effort, in order of preference:
+ *   1. a reverse-DNS (PTR) lookup of the client IP — on a network that
+ *      registers client machines in DNS (common on a corporate LAN / VPN)
+ *      this yields the real machine name; the first label is stored,
+ *      upper-cased, NetBIOS-style.
+ *   2. failing that, the browser platform string the frontend sends in the
+ *      X-HITT-Client header ("Windows", "macOS", …).
  * ---------------------------------------------------------------------------
  */
+const dns = require("dns").promises;
 const { pool } = require("../config/db");
 
 let ready = null;
@@ -57,6 +64,35 @@ function clientIp(req) {
   return req.socket?.remoteAddress || req.ip || null;
 }
 
+// Reverse-DNS the client IP to a machine name, best-effort. Cached per IP
+// (5 min, negatives included) so repeated actions from the same client
+// don't each pay for a lookup. Times out fast so a slow/dead resolver
+// never delays an audit write for long.
+const hostCache = new Map();
+async function reverseHostname(ip) {
+  if (!ip) return null;
+  const clean = String(ip).replace(/^::ffff:/i, "").replace(/[[\]]/g, "");
+  if (!clean || clean === "127.0.0.1" || clean === "::1") return null;
+
+  const cached = hostCache.get(clean);
+  if (cached && cached.exp > Date.now()) return cached.name;
+
+  let name = null;
+  try {
+    const names = await Promise.race([
+      dns.reverse(clean),
+      new Promise((_, reject) => setTimeout(() => reject(new Error("dns timeout")), 600)),
+    ]);
+    if (Array.isArray(names) && names[0]) {
+      name = names[0].split(".")[0].toUpperCase() || null;
+    }
+  } catch {
+    /* no PTR record, or resolver slow/unreachable — fall back to the header */
+  }
+  hostCache.set(clean, { name, exp: Date.now() + 5 * 60 * 1000 });
+  return name;
+}
+
 /**
  * Best-effort audit write. Never throws.
  * @param {import('express').Request} req  for IP + the resolved req.hittUser
@@ -67,10 +103,12 @@ async function logAudit(req, entry) {
     await ensureAuditSchema();
     const u = (req && req.hittUser) || {};
     const { kind, desc, level = 1 } = entry || {};
-    // Device info comes from headers the frontend sets on every request
-    // (X-HITT-Client + the standard User-Agent); session-event passes them
-    // explicitly, which takes precedence.
-    const computerName = entry?.computerName || req?.headers?.["x-hitt-client"] || null;
+    const ip = req ? clientIp(req) : null;
+    // Prefer a resolved machine name (reverse DNS of the client IP); fall
+    // back to the browser platform string the frontend sends on every
+    // request (X-HITT-Client), or an explicit value from session-event.
+    const fallbackComputer = entry?.computerName || req?.headers?.["x-hitt-client"] || null;
+    const computerName = (await reverseHostname(ip)) || fallbackComputer || null;
     const userAgent = entry?.userAgent || req?.headers?.["user-agent"] || null;
     await pool.query(
       `INSERT INTO public.actionsaudit
@@ -84,7 +122,7 @@ async function logAudit(req, entry) {
         desc || null,
         computerName ? String(computerName).slice(0, 255) : null,
         userAgent ? String(userAgent).slice(0, 255) : null,
-        req ? clientIp(req) : null,
+        ip,
         Number.isFinite(level) ? level : 1,
       ]
     );
