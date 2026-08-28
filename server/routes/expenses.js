@@ -115,25 +115,31 @@ function expenseBody(req) {
   };
 }
 
-const EXPENSE_SELECT = `
-  SELECT x.id,
-         TO_CHAR(x.expensets, 'YYYY-MM-DD') AS "expenseDate",
-         x.categoryid AS "categoryId", c.categorydesc AS "category",
-         x.comments AS "description",
-         x.amount, 'EUR' AS currency,
-         (x.projectid IS NULL) AS "isInternal",
-         x.projectid AS "projectId", p.projectnumber AS "projectCode", p.projectname AS "projectName",
-         x.employeeid AS "paidById",
-         NULLIF(TRIM(CONCAT(e.employeefirstname, ' ', e.employeelastname)), '') AS "paidByName",
-         x.invoiceable AS "invoiceable",
-         (x.ticketurl IS NOT NULL AND x.ticketurl <> '') AS "hasDocument",
-         x.picturetitle AS "documentName",
-         x.countedat AS "countedAt"
+// Kept as two fragments so the list query can splice a
+// `COUNT(*) OVER()` column into the SELECT list without landing it after
+// the FROM/JOIN block (which is a syntax error).
+const EXPENSE_COLUMNS = `
+  x.id,
+  TO_CHAR(x.expensets, 'YYYY-MM-DD') AS "expenseDate",
+  x.categoryid AS "categoryId", c.categorydesc AS "category",
+  x.comments AS "description",
+  x.amount, 'EUR' AS currency,
+  (x.projectid IS NULL) AS "isInternal",
+  x.projectid AS "projectId", p.projectnumber AS "projectCode", p.projectname AS "projectName",
+  x.employeeid AS "paidById",
+  NULLIF(TRIM(CONCAT(e.employeefirstname, ' ', e.employeelastname)), '') AS "paidByName",
+  x.invoiceable AS "invoiceable",
+  (x.ticketurl IS NOT NULL AND x.ticketurl <> '') AS "hasDocument",
+  x.picturetitle AS "documentName",
+  x.countedat AS "countedAt"
+`;
+const EXPENSE_FROM = `
   FROM expenses x
   LEFT JOIN expensescategories c ON c.id = x.categoryid::bigint
   LEFT JOIN projects p ON p.id = x.projectid::bigint
   LEFT JOIN employees e ON e.id = x.employeeid::bigint
 `;
+const EXPENSE_SELECT = `SELECT ${EXPENSE_COLUMNS} ${EXPENSE_FROM}`;
 
 async function expenseRow(id) {
   const { rows } = await pool.query(`${EXPENSE_SELECT} WHERE x.id = $1`, [id]);
@@ -167,7 +173,8 @@ router.get("/", async (req, res) => {
 
     const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
     const { rows } = await pool.query(
-      `${EXPENSE_SELECT}, COUNT(*) OVER() AS "totalCount"
+      `SELECT ${EXPENSE_COLUMNS}, COUNT(*) OVER() AS "totalCount"
+       ${EXPENSE_FROM}
        ${whereSql}
        ORDER BY x.expensets DESC NULLS LAST, x.id DESC
        LIMIT $${fp.length + 1} OFFSET $${fp.length + 2}`,
