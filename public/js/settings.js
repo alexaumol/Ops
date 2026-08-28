@@ -64,8 +64,11 @@ function renderRow(emp) {
   return `
     <tr class="${deactivated ? "is-deactivated-row" : ""}">
       <td>
-        <div class="settings-emp-name">${escapeHtml(emp.name || emp.username)}</div>
-        <div class="settings-emp-sub">${escapeHtml(emp.emailid || emp.username)}</div>
+        <div class="settings-emp-name">
+          <span>${escapeHtml(emp.name || emp.username || "—")}</span>
+          <button type="button" class="settings-emp-edit" data-edit-user="${emp.id}" title="Edit this user">✎</button>
+        </div>
+        <div class="settings-emp-sub">${escapeHtml(emp.emailid || emp.username || "")}</div>
       </td>
       <td>
         <label class="switch" title="Deactivate this user">
@@ -101,6 +104,67 @@ function render() {
 }
 
 document.getElementById("showDeactivated").addEventListener("change", render);
+
+/* ---------- Add / edit user ---------- */
+let editingUserId = null;
+const userModal = document.getElementById("userModal");
+
+function openUserModal(emp) {
+  editingUserId = emp ? emp.id : null;
+  document.getElementById("userModalTitle").textContent = emp ? "Edit user" : "Add new user";
+  document.getElementById("userFirstName").value = emp?.firstName || "";
+  document.getElementById("userLastName").value = emp?.lastName || "";
+  document.getElementById("userUsername").value = emp?.username || "";
+  document.getElementById("userEmail").value = emp?.emailid || "";
+  userModal.classList.remove("hidden");
+  setTimeout(() => document.getElementById("userFirstName").focus(), 50);
+}
+function closeUserModal() { userModal.classList.add("hidden"); }
+
+document.getElementById("btnAddUser").addEventListener("click", () => openUserModal(null));
+document.getElementById("userModalClose").addEventListener("click", closeUserModal);
+document.getElementById("userModalCancel").addEventListener("click", closeUserModal);
+userModal.addEventListener("click", (e) => { if (e.target === userModal) closeUserModal(); });
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && !userModal.classList.contains("hidden")) closeUserModal();
+});
+
+document.getElementById("empTableBody").addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-edit-user]");
+  if (!btn) return;
+  const emp = EMPLOYEES.find((x) => Number(x.id) === Number(btn.dataset.editUser));
+  if (emp) openUserModal(emp);
+});
+
+document.getElementById("userModalSave").addEventListener("click", async () => {
+  const payload = {
+    firstName: document.getElementById("userFirstName").value.trim(),
+    lastName: document.getElementById("userLastName").value.trim(),
+    username: document.getElementById("userUsername").value.trim(),
+    email: document.getElementById("userEmail").value.trim(),
+  };
+  if (!payload.firstName || !payload.lastName) {
+    toast("First and last name are required.", "red");
+    return;
+  }
+  const btn = document.getElementById("userModalSave");
+  btn.disabled = true;
+  try {
+    if (editingUserId) {
+      await HITT_API.updateEmployeeProfile(editingUserId, payload);
+      toast("User updated.", "green");
+    } else {
+      await HITT_API.createEmployee(payload);
+      toast("User added.", "green");
+    }
+    closeUserModal();
+    await loadEmployees();
+  } catch (err) {
+    toast(`Couldn't save the user: ${err.message}`, "red");
+  } finally {
+    btn.disabled = false;
+  }
+});
 
 async function loadEmployees() {
   try {

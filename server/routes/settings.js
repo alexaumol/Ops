@@ -63,26 +63,60 @@ function ensureSettingsSchema() {
   return schemaReady;
 }
 
+// Shared projection for an employee row as the Settings table wants it —
+// profile fields + role/approver/module-restriction state. Callers append
+// their own WHERE (optional) + the GROUP BY + ORDER BY.
+const EMPLOYEE_ROW_SELECT = `
+  SELECT e.id, e.username, e.emailid, e.deactivated AS "isDeactivated",
+         e.employeefirstname AS "firstName", e.employeelastname AS "lastName",
+         TRIM(CONCAT(e.employeefirstname, ' ', e.employeelastname)) AS name,
+         (a.employeeid IS NOT NULL) AS "isAdmin",
+         (t.employeeid IS NOT NULL) AS "isTimeOffApprover",
+         COALESCE(ARRAY_AGG(mr.modulekey) FILTER (WHERE mr.modulekey IS NOT NULL), '{}') AS "restrictedModules"
+  FROM employees e
+  LEFT JOIN admins a ON a.employeeid = e.id
+  LEFT JOIN timeoffapprovers t ON t.employeeid = e.id
+  LEFT JOIN modulerestrictions mr ON mr.employeeid = e.id
+`;
+const EMPLOYEE_ROW_GROUP_BY = `
+  GROUP BY e.id, e.username, e.emailid, e.deactivated, e.employeefirstname, e.employeelastname,
+           a.employeeid, t.employeeid
+`;
+
+async function employeeRow(id) {
+  const { rows } = await pool.query(
+    `${EMPLOYEE_ROW_SELECT} WHERE e.id = $1 ${EMPLOYEE_ROW_GROUP_BY}`,
+    [id]
+  );
+  return rows[0] || null;
+}
+
+// Rejects a username/email that already belongs to another employee (case-
+// insensitive) — a duplicate would break identity resolution in
+// lib/permissions.js. Returns an error message string, or null if clear.
+async function usernameEmailConflict(username, email, excludeId = null) {
+  const u = (username || "").trim();
+  const m = (email || "").trim();
+  if (!u && !m) return null;
+  const { rows } = await pool.query(
+    `SELECT username, emailid FROM employees
+     WHERE id <> COALESCE($3, -1)
+       AND (($1 <> '' AND LOWER(username) = LOWER($1))
+         OR ($2 <> '' AND LOWER(emailid) = LOWER($2)))
+     LIMIT 1`,
+    [u, m, excludeId]
+  );
+  if (!rows.length) return null;
+  return "Another user already has that username or email.";
+}
+
 // GET /api/settings/employees
 // Full roster with current role/approver/module-restriction state, for the
 // Settings page's employee table.
 router.get("/employees", async (req, res) => {
   try {
     const { rows } = await pool.query(
-      `SELECT e.id, e.username, e.emailid, e.deactivated AS "isDeactivated",
-              TRIM(CONCAT(e.employeefirstname, ' ', e.employeelastname)) AS name,
-              (a.employeeid IS NOT NULL) AS "isAdmin",
-              (t.employeeid IS NOT NULL) AS "isTimeOffApprover",
-              COALESCE(
-                ARRAY_AGG(mr.modulekey) FILTER (WHERE mr.modulekey IS NOT NULL),
-                '{}'
-              ) AS "restrictedModules"
-       FROM employees e
-       LEFT JOIN admins a ON a.employeeid = e.id
-       LEFT JOIN timeoffapprovers t ON t.employeeid = e.id
-       LEFT JOIN modulerestrictions mr ON mr.employeeid = e.id
-       GROUP BY e.id, e.username, e.emailid, e.deactivated, e.employeefirstname, e.employeelastname,
-                a.employeeid, t.employeeid
+      `${EMPLOYEE_ROW_SELECT} ${EMPLOYEE_ROW_GROUP_BY}
        ORDER BY e.deactivated, e.employeefirstname, e.employeelastname`
     );
     res.json(rows);
@@ -107,6 +141,71 @@ async function countActiveAdmins(excludeEmployeeId = null) {
   );
   return Number(rows[0].count);
 }
+
+// POST /api/settings/employees   { firstName, lastName, username, email }
+// Creates an employee record. Roles / module access / approver are managed
+// separately with the toggles once the row exists.
+router.post("/employees", async (req, res) => {
+  const { firstName, lastName, username, email } = req.body || {};
+  if (!firstName || !firstName.trim() || !lastName || !lastName.trim()) {
+    return res.status(400).json({ error: "bad_request", message: "First and last name are required." });
+  }
+  try {
+    const conflict = await usernameEmailConflict(username, email);
+    if (conflict) return res.status(409).json({ error: "conflict", message: conflict });
+
+    const { rows } = await pool.query(
+      `INSERT INTO employees (employeefirstname, employeelastname, username, emailid, deactivated)
+       VALUES ($1, $2, $3, $4, false)
+       RETURNING id`,
+      [firstName.trim(), lastName.trim(), username?.trim() || null, email?.trim() || null]
+    );
+    const row = await employeeRow(rows[0].id);
+    res.status(201).json(row);
+    logAudit(req, {
+      kind: "settings.user.add",
+      desc: `Added user ${firstName.trim()} ${lastName.trim()}${username?.trim() ? ` (${username.trim()})` : ""}`,
+    });
+  } catch (err) {
+    console.error("[POST /api/settings/employees] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
+// PATCH /api/settings/employees/:id/profile   { firstName, lastName, username, email }
+// Edits the employee's own fields. Role / status / approver / module access
+// have their own endpoints.
+router.patch("/employees/:id/profile", async (req, res) => {
+  const employeeId = Number(req.params.id);
+  const { firstName, lastName, username, email } = req.body || {};
+  if (!Number.isInteger(employeeId)) {
+    return res.status(400).json({ error: "bad_request", message: "A valid employee id is required." });
+  }
+  if (!firstName || !firstName.trim() || !lastName || !lastName.trim()) {
+    return res.status(400).json({ error: "bad_request", message: "First and last name are required." });
+  }
+  try {
+    const conflict = await usernameEmailConflict(username, email, employeeId);
+    if (conflict) return res.status(409).json({ error: "conflict", message: conflict });
+
+    const { rowCount } = await pool.query(
+      `UPDATE employees
+       SET employeefirstname = $1, employeelastname = $2, username = $3, emailid = $4
+       WHERE id = $5`,
+      [firstName.trim(), lastName.trim(), username?.trim() || null, email?.trim() || null, employeeId]
+    );
+    if (!rowCount) return res.status(404).json({ error: "not_found", message: "Employee not found." });
+    const row = await employeeRow(employeeId);
+    res.json(row);
+    logAudit(req, {
+      kind: "settings.user.edit",
+      desc: `Edited user ${firstName.trim()} ${lastName.trim()}`,
+    });
+  } catch (err) {
+    console.error("[PATCH /api/settings/employees/:id/profile] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
 
 // PATCH /api/settings/employees/:id/role   { isAdmin: boolean }
 router.patch("/employees/:id/role", async (req, res) => {

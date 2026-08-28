@@ -78,6 +78,7 @@
   .icon-time       { background: var(--hitt-amber); }
   .icon-invoicing  { background: var(--hitt-charcoal); }
   .icon-reports    { background: var(--hitt-sage); }
+  .icon-crm        { background: var(--hitt-olive); }
   .icon-settings   { background: var(--hitt-ink); }
 
   .module-card.is-restricted {
@@ -86,6 +87,16 @@
     filter: grayscale(0.4);
   }
   .status-restricted { background: rgba(160,40,40,0.12); color: #A02828; }
+
+  .module-card.is-soon {
+    opacity: 0.72;
+    cursor: default;
+  }
+  .module-card.is-soon:hover {
+    transform: none;
+    box-shadow: none;
+    border-color: var(--border-subtle);
+  }
 </style>
 </head>
 <body>
@@ -142,6 +153,13 @@
         <h2 class="module-card__title">Reports</h2>
         <p class="module-card__desc">Hours spent per project, and a calendar of resource leaves and holidays.</p>
       </a>
+
+      <div class="module-card is-soon" data-module="patient-crm" aria-disabled="true">
+        <span class="module-card__status status-soon">Coming soon</span>
+        <div class="module-card__icon icon-crm" aria-hidden="true">🩺</div>
+        <h2 class="module-card__title">Patient programme CRM</h2>
+        <p class="module-card__desc">Patient-support programmes: enrolment, follow-up and outcomes tracking.</p>
+      </div>
 
       <a class="module-card" href="pages/settings.html" id="settingsTile" style="display:none;">
         <span class="module-card__status status-live">Admin</span>

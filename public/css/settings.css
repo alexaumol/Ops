@@ -178,8 +178,64 @@
 .settings-table tbody tr.is-deactivated-row { opacity: 0.55; }
 .settings-table tbody tr.is-deactivated-row .settings-emp-name { text-decoration: line-through; }
 
-.settings-emp-name { font-weight: 600; }
+.settings-emp-name { font-weight: 600; display: inline-flex; align-items: center; gap: 0.4rem; }
 .settings-emp-sub { font-size: 0.78rem; color: var(--text-secondary); }
+.settings-emp-edit {
+  border: none; background: none; cursor: pointer;
+  color: var(--brand); font-size: 0.85rem; line-height: 1;
+  padding: 0.1rem 0.3rem; border-radius: var(--radius-sm);
+}
+.settings-emp-edit:hover { background: var(--bg-surface-alt); }
+
+/* ---------- Add / edit user modal ---------- */
+.settings-modal {
+  position: fixed; inset: 0; z-index: 60;
+  background: rgba(23,23,23,0.45);
+  display: flex; align-items: center; justify-content: center;
+  padding: 1rem;
+}
+.settings-modal.hidden { display: none !important; }
+.settings-modal-panel {
+  background: var(--bg-surface);
+  width: 100%; max-width: 440px;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+.settings-modal-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0.9rem 1.1rem;
+  background: var(--hitt-teal); color: #fff;
+}
+.settings-modal-head h2 { margin: 0; font-size: 1rem; font-weight: 700; }
+.settings-modal-x {
+  width: 30px; height: 30px; border: none; border-radius: var(--radius-sm);
+  background: var(--danger); color: #fff; cursor: pointer; font-weight: 700;
+}
+.settings-modal-body {
+  padding: 1.1rem; display: flex; flex-direction: column; gap: 0.85rem;
+}
+.settings-field {
+  display: flex; flex-direction: column; gap: 0.3rem;
+  font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);
+}
+.settings-field .req { color: var(--danger); }
+.settings-field input {
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-size: 0.9rem; font-weight: 400;
+}
+.settings-field input:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+.settings-modal-foot {
+  display: flex; justify-content: flex-end; gap: 0.5rem;
+  padding: 0.85rem 1.1rem;
+  border-top: 1px solid var(--border-subtle);
+}
+.settings-modal-foot .btn { padding: 0.45rem 1rem; font-size: 0.85rem; }
 
 .settings-note {
   font-size: 0.85rem;

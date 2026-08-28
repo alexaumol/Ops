@@ -48,6 +48,8 @@
             Show deactivated users
             <span id="deactivatedCount" class="settings-emp-sub"></span>
           </label>
+          <div style="flex:1;"></div>
+          <button class="btn btn-primary" id="btnAddUser">+ Add new user</button>
         </div>
         <div class="settings-table-wrap">
           <table class="settings-table">
@@ -167,6 +169,35 @@
       </section>
     </div>
   </main>
+
+  <!-- ==================== ADD / EDIT USER ==================== -->
+  <div id="userModal" class="settings-modal hidden">
+    <div class="settings-modal-panel">
+      <div class="settings-modal-head">
+        <h2 id="userModalTitle">Add new user</h2>
+        <button id="userModalClose" class="settings-modal-x" title="Close">✕</button>
+      </div>
+      <div class="settings-modal-body">
+        <label class="settings-field">First name <span class="req">*</span>
+          <input type="text" id="userFirstName" autocomplete="off" />
+        </label>
+        <label class="settings-field">Last name <span class="req">*</span>
+          <input type="text" id="userLastName" autocomplete="off" />
+        </label>
+        <label class="settings-field">Username
+          <input type="text" id="userUsername" placeholder="e.g. name.surname" autocomplete="off" />
+        </label>
+        <label class="settings-field">Email
+          <input type="email" id="userEmail" placeholder="name.surname@fhitt.org" autocomplete="off" />
+        </label>
+        <p class="settings-emp-sub" style="margin:0;">Sign-in matches the M365 identity against username / email — set at least one so the user can log in.</p>
+      </div>
+      <div class="settings-modal-foot">
+        <button id="userModalCancel" class="btn btn-secondary">Cancel</button>
+        <button id="userModalSave" class="btn btn-primary">Save</button>
+      </div>
+    </div>
+  </div>
 
   <div id="toastHost" class="toast-host"></div>
 
