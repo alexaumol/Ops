@@ -33,6 +33,16 @@ const { logAudit } = require("../lib/audit");
 
 const router = express.Router();
 
+// Resolves a business partner's name for an audit description.
+async function bpAuditLabel(id) {
+  try {
+    const { rows } = await pool.query(`SELECT bpname FROM businesspartners WHERE id = $1`, [id]);
+    return rows[0]?.bpname || `#${id}`;
+  } catch {
+    return `#${id}`;
+  }
+}
+
 // GET /api/business-partners/lookups
 router.get("/lookups", async (req, res) => {
   try {
@@ -154,12 +164,7 @@ router.post("/", requireModuleAccess("business-partners"), async (req, res) => {
       [bp.id, employeeId || null, "Business partner created"]
     );
     await client.query("COMMIT");
-    logAudit(req, {
-      action: "bp.insert",
-      entityType: "business_partner",
-      entityId: bp.id,
-      summary: `Created business partner "${bp.name}"`,
-    });
+    logAudit(req, { kind: "bp.insert", desc: `Created business partner "${bp.name}"` });
     res.status(201).json(bp);
   } catch (err) {
     await client.query("ROLLBACK");
@@ -271,10 +276,8 @@ router.patch("/:id", async (req, res) => {
 
     await client.query("COMMIT");
     logAudit(req, {
-      action: "bp.update",
-      entityType: "business_partner",
-      entityId: id,
-      summary: `Updated business partner "${name || cur.bpname || `#${id}`}"` +
+      kind: "bp.update",
+      desc: `Updated business partner "${name || cur.bpname || `#${id}`}"` +
         (changes.length ? `: ${changes.join("; ")}` : " (no field changes)"),
     });
     res.status(204).end();
@@ -364,6 +367,8 @@ router.post("/:id/contacts", async (req, res) => {
       [req.params.id, employeeId || null, `Contact added: ${contactname.trim()}`]
     );
     res.status(201).json(rows[0]);
+    bpAuditLabel(req.params.id).then((bp) =>
+      logAudit(req, { kind: "bp.contact.add", desc: `BP "${bp}": contact added "${contactname.trim()}"` }));
   } catch (err) {
     console.error("[POST /api/business-partners/:id/contacts] DB error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });
@@ -394,6 +399,8 @@ router.patch("/:id/contacts/:contactId", async (req, res) => {
       [req.params.id, employeeId || null, `Contact updated: ${contactname.trim()}`]
     );
     res.json(rows[0]);
+    bpAuditLabel(req.params.id).then((bp) =>
+      logAudit(req, { kind: "bp.contact.update", desc: `BP "${bp}": contact updated "${contactname.trim()}"` }));
   } catch (err) {
     console.error("[PATCH /api/business-partners/:id/contacts/:contactId] DB error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });
@@ -416,6 +423,8 @@ router.delete("/:id/contacts/:contactId", async (req, res) => {
       [req.params.id, employeeId || null, `Contact removed: ${rows[0].contactname || "—"}`]
     );
     res.status(204).end();
+    bpAuditLabel(req.params.id).then((bp) =>
+      logAudit(req, { kind: "bp.contact.delete", desc: `BP "${bp}": contact removed "${rows[0].contactname || "—"}"` }));
   } catch (err) {
     console.error("[DELETE /api/business-partners/:id/contacts/:contactId] DB error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });
@@ -453,6 +462,9 @@ router.post("/:id/notes", async (req, res) => {
       [req.params.id, notes.trim(), employeeId || null]
     );
     res.status(201).json(rows[0]);
+    const preview = notes.trim().length > 80 ? `${notes.trim().slice(0, 80)}…` : notes.trim();
+    bpAuditLabel(req.params.id).then((bp) =>
+      logAudit(req, { kind: "bp.note.add", desc: `BP "${bp}": note added — "${preview}"` }));
   } catch (err) {
     console.error("[POST /api/business-partners/:id/notes] DB error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });
@@ -526,6 +538,8 @@ router.post("/:id/tax-companies", async (req, res) => {
 
     await client.query("COMMIT");
     res.status(201).json(taxCompany);
+    bpAuditLabel(req.params.id).then((bp) =>
+      logAudit(req, { kind: "bp.taxcompany.add", desc: `BP "${bp}": tax company added "${taxCompany.taxcompanyname}"` }));
   } catch (err) {
     await client.query("ROLLBACK");
     console.error("[POST /api/business-partners/:id/tax-companies] DB error:", err.message);

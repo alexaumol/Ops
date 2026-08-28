@@ -52,8 +52,18 @@ const express = require("express");
 const { pool } = require("../config/db");
 const { requireModuleAccess } = require("../lib/permissions");
 const { streamInvoicePdf } = require("../lib/invoicePdf");
+const { logAudit } = require("../lib/audit");
 
 const router = express.Router();
+
+async function invoiceProjectCode(projectId) {
+  try {
+    const { rows } = await pool.query(`SELECT projectnumber FROM projects WHERE id = $1::bigint`, [projectId]);
+    return rows[0]?.projectnumber ? `project ${rows[0].projectnumber}` : `project #${projectId}`;
+  } catch {
+    return `project #${projectId}`;
+  }
+}
 
 // GET /api/invoicing/lookups
 router.get("/lookups", async (req, res) => {
@@ -160,6 +170,12 @@ router.patch("/projects/:projectId/release", async (req, res) => {
       );
     }
     res.status(204).end();
+    invoiceProjectCode(projectId).then((label) =>
+      logAudit(req, {
+        kind: "invoice.release",
+        desc: `Proceed-to-invoice settings saved for ${label} (proceed: ${proceedToInvoice ? "yes" : "no"})`,
+      })
+    );
   } catch (err) {
     console.error("[PATCH /api/invoicing/projects/:projectId/release] DB error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });
@@ -309,6 +325,13 @@ router.post("/projects/:projectId/invoices", async (req, res) => {
 
     await client.query("COMMIT");
     res.status(201).json({ id: invoiceId, invoicecode: code, invoicestatusid: status });
+    invoiceProjectCode(projectId).then((label) =>
+      logAudit(req, {
+        kind: "invoice.create",
+        desc: `Created invoice ${code}${isCorrective ? " (corrective)" : ""} for ${label}` +
+          (amount != null ? `, €${Number(amount).toLocaleString()}` : ""),
+      })
+    );
   } catch (err) {
     await client.query("ROLLBACK");
     console.error("[POST /api/invoicing/projects/:projectId/invoices] DB error:", err.message);
@@ -370,9 +393,14 @@ router.patch("/invoices/:id", async (req, res) => {
       ]
     );
     await client.query(`UPDATE invoices SET invoicestatusid = $1 WHERE id = $2`, [status, id]);
+    const { rows: codeRows } = await client.query(`SELECT invoicecode FROM invoices WHERE id = $1`, [id]);
 
     await client.query("COMMIT");
     res.json({ invoicestatusid: status, vatamount: vatAmount });
+    logAudit(req, {
+      kind: "invoice.update",
+      desc: `Updated invoice ${codeRows[0]?.invoicecode || `#${id}`}`,
+    });
   } catch (err) {
     await client.query("ROLLBACK");
     console.error("[PATCH /api/invoicing/invoices/:id] DB error:", err.message);
@@ -388,9 +416,12 @@ router.delete("/invoices/:id", async (req, res) => {
   try {
     await client.query("BEGIN");
     await client.query(`DELETE FROM invoicesdetails WHERE invoiceid = $1`, [req.params.id]);
-    await client.query(`DELETE FROM invoices WHERE id = $1`, [req.params.id]);
+    const { rows: delRows } = await client.query(`DELETE FROM invoices WHERE id = $1 RETURNING invoicecode`, [req.params.id]);
     await client.query("COMMIT");
     res.status(204).end();
+    if (delRows.length) {
+      logAudit(req, { kind: "invoice.delete", desc: `Deleted invoice ${delRows[0].invoicecode || `#${req.params.id}`}` });
+    }
   } catch (err) {
     await client.query("ROLLBACK");
     console.error("[DELETE /api/invoicing/invoices/:id] DB error:", err.message);

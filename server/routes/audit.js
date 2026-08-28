@@ -9,9 +9,8 @@
  * - GET  /users           admin-only: the distinct users present in the log,
  *                          for the filter dropdown.
  *
- * See server/lib/audit.js for the table and the best-effort logAudit()
- * helper used by the mutation routes (projects, time-tracking, business
- * partners).
+ * Reads public.actionsaudit. See server/lib/audit.js for the column layout
+ * and the best-effort logAudit() helper the mutation routes call.
  * ---------------------------------------------------------------------------
  */
 const express = require("express");
@@ -28,9 +27,9 @@ router.post("/session-event", async (req, res) => {
     return res.status(400).json({ error: "bad_request", message: "type must be 'login' or 'logout'." });
   }
   await logAudit(req, {
-    action: type,
-    entityType: "session",
-    summary: type === "login" ? "Signed in" : "Signed out",
+    kind: type,
+    desc: type === "login" ? "Signed in" : "Signed out",
+    level: 2,
     computerName: platform || null,
     userAgent: userAgent || null,
   });
@@ -46,20 +45,21 @@ router.get("/logs", requireAdmin, async (req, res) => {
     const page = Math.max(Number(req.query.page) || 1, 1);
     const offset = (page - 1) * limit;
     const { rows } = await pool.query(
-      `SELECT a.id, a.at, a.employeeid AS "employeeId", a.username,
+      `SELECT a.id, a.actionts AS at, a.actionuserid AS "employeeId", a.actionusername AS username,
               NULLIF(TRIM(CONCAT(e.employeefirstname, ' ', e.employeelastname)), '') AS "employeeName",
-              a.action, a.entitytype AS "entityType", a.entityid AS "entityId",
-              a.summary, a.ipaddress AS "ip", a.computername AS "computer", a.useragent AS "userAgent",
+              a.actionkind AS action, a.actiondesc AS summary,
+              a.actionip AS ip, a.actioncomputer AS computer, a.actionenvironment AS "userAgent",
+              a.loglevel AS level,
               COUNT(*) OVER() AS "totalCount"
-       FROM auditlog a
-       LEFT JOIN employees e ON e.id = a.employeeid
-       WHERE ($1::bigint IS NULL OR a.employeeid = $1::bigint)
-         AND ($2::date IS NULL OR a.at >= $2::date)
-         AND ($3::date IS NULL OR a.at < ($3::date + INTERVAL '1 day'))
-         AND ($4::text IS NULL OR a.summary ILIKE '%' || $4 || '%' OR a.action ILIKE '%' || $4 || '%'
-              OR a.username ILIKE '%' || $4 || '%' OR a.ipaddress ILIKE '%' || $4 || '%'
+       FROM actionsaudit a
+       LEFT JOIN employees e ON e.id = a.actionuserid
+       WHERE ($1::bigint IS NULL OR a.actionuserid = $1::bigint)
+         AND ($2::date IS NULL OR a.actionts >= $2::date)
+         AND ($3::date IS NULL OR a.actionts < ($3::date + INTERVAL '1 day'))
+         AND ($4::text IS NULL OR a.actiondesc ILIKE '%' || $4 || '%' OR a.actionkind ILIKE '%' || $4 || '%'
+              OR a.actionusername ILIKE '%' || $4 || '%' OR a.actionip ILIKE '%' || $4 || '%'
               OR TRIM(CONCAT(e.employeefirstname, ' ', e.employeelastname)) ILIKE '%' || $4 || '%')
-       ORDER BY a.at DESC
+       ORDER BY a.actionts DESC NULLS LAST
        LIMIT $5 OFFSET $6`,
       [userId || null, startDate || null, endDate || null, search || null, limit, offset]
     );
@@ -76,11 +76,12 @@ router.get("/users", requireAdmin, async (req, res) => {
   try {
     await ensureAuditSchema();
     const { rows } = await pool.query(
-      `SELECT DISTINCT a.employeeid AS id,
-              COALESCE(NULLIF(TRIM(CONCAT(e.employeefirstname, ' ', e.employeelastname)), ''), a.username) AS name
-       FROM auditlog a
-       LEFT JOIN employees e ON e.id = a.employeeid
-       WHERE a.employeeid IS NOT NULL
+      `SELECT DISTINCT a.actionuserid AS id,
+              COALESCE(NULLIF(TRIM(CONCAT(e.employeefirstname, ' ', e.employeelastname)), ''),
+                       a.actionusername, 'Employee #' || a.actionuserid) AS name
+       FROM actionsaudit a
+       LEFT JOIN employees e ON e.id = a.actionuserid
+       WHERE a.actionuserid IS NOT NULL
        ORDER BY name`
     );
     res.json(rows);

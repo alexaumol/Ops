@@ -98,10 +98,8 @@ router.post("/", requireModuleAccess("time-allocation"), async (req, res) => {
 
     projectLabel(projectId).then((label) =>
       logAudit(req, {
-        action: wasUpdate ? "timetracking.update" : "timetracking.insert",
-        entityType: "time_tracking",
-        entityId: row.id,
-        summary: `${wasUpdate ? "Updated" : "Logged"} ${hours}h (${poRes || "—"}) on ${label}, week of ${weekStart}`,
+        kind: wasUpdate ? "timetracking.update" : "timetracking.insert",
+        desc: `${wasUpdate ? "Updated" : "Logged"} ${hours}h (${poRes || "—"}) on ${label}, week of ${weekStart}`,
       })
     );
   } catch (err) {
@@ -124,10 +122,8 @@ router.delete("/:id", async (req, res) => {
       const r = rows[0];
       projectLabel(r.projectid).then((label) =>
         logAudit(req, {
-          action: "timetracking.delete",
-          entityType: "time_tracking",
-          entityId: req.params.id,
-          summary: `Deleted time tracking (${r.hours ?? "—"}h) on ${label}`,
+          kind: "timetracking.delete",
+          desc: `Deleted time tracking (${r.hours ?? "—"}h) on ${label}`,
         })
       );
     }

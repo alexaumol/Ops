@@ -406,21 +406,24 @@ let auditPage = 1;
 let auditTotal = 0;
 let auditSearchDebounce = null;
 
-const AUDIT_ACTION_LABELS = {
-  login: "Sign in",
-  logout: "Sign out",
-  "project.create": "Project created",
-  "timetracking.insert": "Time tracking added",
-  "timetracking.update": "Time tracking updated",
-  "timetracking.delete": "Time tracking deleted",
-  "bp.insert": "Business partner created",
-  "bp.update": "Business partner updated",
+const AUDIT_CATEGORY = {
+  project: "Project",
+  timetracking: "Time tracking",
+  bp: "Business partner",
+  invoice: "Invoicing",
+  timeoff: "Time off",
+  settings: "Settings",
 };
-function auditActionLabel(a) { return AUDIT_ACTION_LABELS[a] || a; }
-function auditActionClass(a) {
-  if (a === "login" || a === "logout") return "is-session";
-  if (a.endsWith(".delete")) return "is-delete";
-  if (a.endsWith(".create") || a.endsWith(".insert")) return "is-create";
+function auditCategory(kind) {
+  if (!kind) return "Other";
+  if (kind === "login" || kind === "logout") return "Session";
+  return AUDIT_CATEGORY[String(kind).split(".")[0]] || "Other";
+}
+function auditActionClass(kind) {
+  if (!kind) return "is-update";
+  if (kind === "login" || kind === "logout") return "is-session";
+  if (/\.(delete|remove)$/.test(kind)) return "is-delete";
+  if (/\.(create|insert|add|submit|import)$/.test(kind)) return "is-create";
   return "is-update";
 }
 
@@ -481,7 +484,10 @@ function renderAudit(rows) {
     <tr>
       <td class="settings-emp-sub" style="white-space:nowrap;">${new Date(r.at).toLocaleString()}</td>
       <td>${escapeHtml(r.employeeName || r.username || "—")}</td>
-      <td><span class="audit-action-chip ${auditActionClass(r.action)}">${escapeHtml(auditActionLabel(r.action))}</span></td>
+      <td>
+        <span class="audit-action-chip ${auditActionClass(r.action)}">${escapeHtml(auditCategory(r.action))}</span>
+        ${r.action ? `<div class="audit-action-kind">${escapeHtml(r.action)}</div>` : ""}
+      </td>
       <td>${escapeHtml(r.summary || "")}</td>
       <td class="settings-emp-sub">${escapeHtml(r.ip || "—")}</td>
       <td class="settings-emp-sub" title="${escapeHtml(r.userAgent || "")}">${escapeHtml(r.computer || "—")}</td>

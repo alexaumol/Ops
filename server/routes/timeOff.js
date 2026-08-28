@@ -27,8 +27,28 @@
 const express = require("express");
 const { pool } = require("../config/db");
 const { requireModuleAccess, requireTimeOffApprover } = require("../lib/permissions");
+const { logAudit } = require("../lib/audit");
 
 const router = express.Router();
+
+// Employee name + date range for a request, for audit descriptions.
+async function timeOffAuditLabel(requestId) {
+  try {
+    const { rows } = await pool.query(
+      `SELECT TRIM(CONCAT(e.employeefirstname, ' ', e.employeelastname)) AS name,
+              r.startdate, r.enddate, r.daysrequested AS days
+       FROM timeoffrequests r LEFT JOIN employees e ON e.id = r.empid
+       WHERE r.id = $1`,
+      [requestId]
+    );
+    const r = rows[0];
+    if (!r) return `request #${requestId}`;
+    const range = `${r.startdate ? new Date(r.startdate).toISOString().slice(0, 10) : "?"}–${r.enddate ? new Date(r.enddate).toISOString().slice(0, 10) : "?"}`;
+    return `${r.name || "an employee"}'s time off ${range} (${r.days ?? "?"}d)`;
+  } catch {
+    return `request #${requestId}`;
+  }
+}
 
 // GET /api/time-off/requests/pending — cross-employee queue for approvers.
 // Registered before the /:id routes so "pending" doesn't get swallowed as
@@ -98,6 +118,10 @@ router.post("/requests", requireModuleAccess("time-allocation"), async (req, res
     );
     await client.query("COMMIT");
     res.status(201).json({ ...reqRow, statusid: 2, statusLabel: "Submitted" });
+    logAudit(req, {
+      kind: "timeoff.submit",
+      desc: `Submitted time-off request ${startDate}–${endDate} (${daysRequested}d)`,
+    });
   } catch (err) {
     await client.query("ROLLBACK");
     console.error("[POST /api/time-off/requests] DB error:", err.message);
@@ -126,6 +150,8 @@ router.patch("/requests/:id/withdraw", async (req, res) => {
 
     await client.query("COMMIT");
     res.status(204).end();
+    timeOffAuditLabel(req.params.id).then((label) =>
+      logAudit(req, { kind: "timeoff.withdraw", desc: `Withdrew ${label}` }));
   } catch (err) {
     await client.query("ROLLBACK");
     console.error("[PATCH /api/time-off/requests/:id/withdraw] DB error:", err.message);
@@ -156,6 +182,8 @@ router.patch("/requests/:id/approve", requireTimeOffApprover(), async (req, res)
 
     await client.query("COMMIT");
     res.status(204).end();
+    timeOffAuditLabel(req.params.id).then((label) =>
+      logAudit(req, { kind: "timeoff.approve", desc: `Approved ${label}` }));
   } catch (err) {
     await client.query("ROLLBACK");
     console.error("[PATCH /api/time-off/requests/:id/approve] DB error:", err.message);
@@ -187,6 +215,8 @@ router.patch("/requests/:id/reject", requireTimeOffApprover(), async (req, res) 
 
     await client.query("COMMIT");
     res.status(204).end();
+    timeOffAuditLabel(req.params.id).then((label) =>
+      logAudit(req, { kind: "timeoff.reject", desc: `Rejected ${label}${comment ? ` — "${comment}"` : ""}` }));
   } catch (err) {
     await client.query("ROLLBACK");
     console.error("[PATCH /api/time-off/requests/:id/reject] DB error:", err.message);

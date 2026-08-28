@@ -21,10 +21,23 @@
 const express = require("express");
 const { pool } = require("../config/db");
 const { MODULE_KEYS, requireAdmin } = require("../lib/permissions");
+const { logAudit } = require("../lib/audit");
 
 const router = express.Router();
 
 router.use(requireAdmin);
+
+async function employeeName(id) {
+  try {
+    const { rows } = await pool.query(
+      `SELECT NULLIF(TRIM(CONCAT(employeefirstname, ' ', employeelastname)), '') AS name, username FROM employees WHERE id = $1`,
+      [id]
+    );
+    return rows[0]?.name || rows[0]?.username || `#${id}`;
+  } catch {
+    return `#${id}`;
+  }
+}
 
 // Public holidays open-data feed (Generalitat de Catalunya — "Dies festius
 // a Catalunya"). rows.json format: meta.view.columns describes field order,
@@ -119,6 +132,8 @@ router.patch("/employees/:id/role", async (req, res) => {
       await pool.query(`DELETE FROM admins WHERE employeeid = $1`, [employeeId]);
     }
     res.json({ employeeId, isAdmin });
+    employeeName(employeeId).then((name) =>
+      logAudit(req, { kind: "settings.role", desc: `${isAdmin ? "Granted" : "Removed"} admin role: ${name}` }));
   } catch (err) {
     console.error("[PATCH /employees/:id/role] DB error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });
@@ -143,6 +158,8 @@ router.patch("/employees/:id/timeoff-approver", async (req, res) => {
       await pool.query(`DELETE FROM timeoffapprovers WHERE employeeid = $1`, [employeeId]);
     }
     res.json({ employeeId, isTimeOffApprover });
+    employeeName(employeeId).then((name) =>
+      logAudit(req, { kind: "settings.approver", desc: `${isTimeOffApprover ? "Granted" : "Removed"} time-off approver: ${name}` }));
   } catch (err) {
     console.error("[PATCH /employees/:id/timeoff-approver] DB error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });
@@ -174,6 +191,8 @@ router.patch("/employees/:id/status", async (req, res) => {
     }
     await pool.query(`UPDATE employees SET deactivated = $2 WHERE id = $1`, [employeeId, isDeactivated]);
     res.json({ employeeId, isDeactivated });
+    employeeName(employeeId).then((name) =>
+      logAudit(req, { kind: "settings.status", desc: `${isDeactivated ? "Deactivated" : "Reactivated"} account: ${name}`, level: 2 }));
   } catch (err) {
     console.error("[PATCH /employees/:id/status] DB error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });
@@ -204,6 +223,11 @@ router.patch("/employees/:id/module-access", async (req, res) => {
       );
     }
     res.json({ employeeId, moduleKey, hasAccess });
+    employeeName(employeeId).then((name) =>
+      logAudit(req, {
+        kind: "settings.module-access",
+        desc: `${hasAccess ? "Restored" : "Restricted"} ${moduleKey} access for ${name}`,
+      }));
   } catch (err) {
     console.error("[PATCH /employees/:id/module-access] DB error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });
@@ -264,6 +288,7 @@ router.post("/holidays", async (req, res) => {
       [`HITT-${Date.now()}`, date, description.trim()]
     );
     res.status(201).json(rows[0]);
+    logAudit(req, { kind: "settings.holiday.add", desc: `Added HITT holiday ${date} — "${description.trim()}"` });
   } catch (err) {
     console.error("[POST /api/settings/holidays] DB error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });
@@ -273,9 +298,16 @@ router.post("/holidays", async (req, res) => {
 // DELETE /api/settings/holidays/:id
 router.delete("/holidays/:id", async (req, res) => {
   try {
-    const { rowCount } = await pool.query(`DELETE FROM holidays WHERE id = $1`, [req.params.id]);
-    if (!rowCount) return res.status(404).json({ error: "not_found", message: "Holiday not found." });
+    const { rows } = await pool.query(
+      `DELETE FROM holidays WHERE id = $1 RETURNING holidaydesc, holidaydate`,
+      [req.params.id]
+    );
+    if (!rows.length) return res.status(404).json({ error: "not_found", message: "Holiday not found." });
     res.status(204).end();
+    logAudit(req, {
+      kind: "settings.holiday.delete",
+      desc: `Deleted holiday "${rows[0].holidaydesc || "—"}"${rows[0].holidaydate ? ` (${new Date(rows[0].holidaydate).toISOString().slice(0, 10)})` : ""}`,
+    });
   } catch (err) {
     console.error("[DELETE /api/settings/holidays/:id] DB error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });
@@ -343,6 +375,11 @@ router.post("/holidays/import", async (req, res) => {
 
     const years = [...new Set(records.map((r) => r.year).filter(Boolean))].sort();
     res.json({ imported: records.length, years });
+    logAudit(req, {
+      kind: "settings.holiday.import",
+      desc: `Imported ${records.length} public holidays (Catalonia)` +
+        (years.length ? ` for ${years[0]}–${years[years.length - 1]}` : ""),
+    });
   } catch (err) {
     await client.query("ROLLBACK").catch(() => {});
     console.error("[POST /api/settings/holidays/import] error:", err.message);
@@ -404,6 +441,10 @@ router.put("/work-calendar/:year", async (req, res) => {
       );
     }
     res.json({ year, leaveDays: leave, workingHours: hours });
+    logAudit(req, {
+      kind: "settings.workcalendar",
+      desc: `Work calendar ${year}: leave days ${leave ?? "—"}, working hours ${hours ?? "—"}`,
+    });
   } catch (err) {
     console.error("[PUT /api/settings/work-calendar/:year] DB error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });

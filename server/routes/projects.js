@@ -68,7 +68,8 @@ async function logStatusChangeAndUpdate(projectId, newStatus, employeeId) {
       `UPDATE projects SET projectstatusid = $1, lastupdated = now(), lastupdatedby = $2 WHERE id = $3`,
       [newStatus, employeeId || null, projectId]
     );
-    if (oldStatus !== null && String(oldStatus) !== String(newStatus)) {
+    const changed = oldStatus !== null && String(oldStatus) !== String(newStatus);
+    if (changed) {
       await client.query(
         `INSERT INTO projectstatushistory (projectid, oldstatusid, newstatusid, changedat, changedby)
          VALUES ($1, $2, $3, now(), $4)`,
@@ -76,11 +77,36 @@ async function logStatusChangeAndUpdate(projectId, newStatus, employeeId) {
       );
     }
     await client.query("COMMIT");
+    return { oldStatus, newStatus, changed };
   } catch (err) {
     await client.query("ROLLBACK");
     throw err;
   } finally {
     client.release();
+  }
+}
+
+// Resolves a project number + status labels for an audit description.
+async function projectAuditContext(projectId) {
+  try {
+    const { rows } = await pool.query(
+      `SELECT p.projectnumber AS code, ps.projectstatusdesc AS status
+       FROM projects p LEFT JOIN projectstatus ps ON ps.id = p.projectstatusid::bigint
+       WHERE p.id = $1`,
+      [projectId]
+    );
+    return { code: rows[0]?.code || `#${projectId}`, status: rows[0]?.status || null };
+  } catch {
+    return { code: `#${projectId}`, status: null };
+  }
+}
+async function statusLabelById(statusId) {
+  if (statusId == null) return null;
+  try {
+    const { rows } = await pool.query(`SELECT projectstatusdesc FROM projectstatus WHERE id = $1::bigint`, [statusId]);
+    return rows[0]?.projectstatusdesc || `#${statusId}`;
+  } catch {
+    return `#${statusId}`;
   }
 }
 
@@ -335,10 +361,8 @@ router.post("/", requireModuleAccess("projects"), async (req, res) => {
   }
 
   logAudit(req, {
-    action: "project.create",
-    entityType: "project",
-    entityId: project.id,
-    summary: `Created project ${project.code || "(no number)"} — ${project.name}`,
+    kind: "project.create",
+    desc: `Created project ${project.code || "(no number)"} — ${project.name}`,
   });
 
   res.status(201).json({ ...project, progress: progress || 0, oneDriveFolder });
@@ -352,8 +376,17 @@ router.patch("/:id/stage", async (req, res) => {
     return res.status(400).json({ error: "validation_error", message: "stage is required" });
   }
   try {
-    await logStatusChangeAndUpdate(id, stage, employeeId);
+    const result = await logStatusChangeAndUpdate(id, stage, employeeId);
     res.status(204).end();
+    if (result.changed) {
+      const [ctx, oldLabel, newLabel] = await Promise.all([
+        projectAuditContext(id), statusLabelById(result.oldStatus), statusLabelById(result.newStatus),
+      ]);
+      logAudit(req, {
+        kind: "project.stage",
+        desc: `Project ${ctx.code}: status ${oldLabel || "—"} → ${newLabel || "—"}`,
+      });
+    }
   } catch (err) {
     console.error("[PATCH /api/projects/:id/stage] DB error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });
@@ -387,8 +420,9 @@ router.patch("/:id/business-partner", async (req, res) => {
       `UPDATE projects SET busspartnerid = $1, lastupdated = now(), lastupdatedby = $2 WHERE id = $3`,
       [businessPartnerId, employeeId || null, id]
     );
+    let summary = null;
     if (String(businessPartnerId) !== String(cur.busspartnerid)) {
-      const summary = cur.busspartnerid
+      summary = cur.busspartnerid
         ? `Business partner changed from ${cur.businessPartnerLabel || "—"} to ${newLabel || "—"}`
         : `Business partner assigned: ${newLabel || "—"}`;
       await client.query(
@@ -398,6 +432,10 @@ router.patch("/:id/business-partner", async (req, res) => {
     }
     await client.query("COMMIT");
     res.status(204).end();
+    if (summary) {
+      const ctx = await projectAuditContext(id);
+      logAudit(req, { kind: "project.assign-bp", desc: `Project ${ctx.code}: ${summary}` });
+    }
   } catch (err) {
     await client.query("ROLLBACK");
     console.error("[PATCH /api/projects/:id/business-partner] DB error:", err.message);
@@ -434,8 +472,9 @@ router.patch("/:id/invoicing-partner", async (req, res) => {
       `UPDATE projects SET busspartnertoinvoiceid = $1, lastupdated = now(), lastupdatedby = $2 WHERE id = $3`,
       [taxCompanyId, employeeId || null, id]
     );
+    let summary = null;
     if (String(taxCompanyId) !== String(cur.busspartnertoinvoiceid)) {
-      const summary = cur.busspartnertoinvoiceid
+      summary = cur.busspartnertoinvoiceid
         ? `Invoicing partner changed from ${cur.taxCompanyLabel || "—"} to ${newLabel || "—"}`
         : `Invoicing partner assigned: ${newLabel || "—"}`;
       await client.query(
@@ -445,6 +484,10 @@ router.patch("/:id/invoicing-partner", async (req, res) => {
     }
     await client.query("COMMIT");
     res.status(204).end();
+    if (summary) {
+      const ctx = await projectAuditContext(id);
+      logAudit(req, { kind: "project.assign-invoicing", desc: `Project ${ctx.code}: ${summary}` });
+    }
   } catch (err) {
     await client.query("ROLLBACK");
     console.error("[PATCH /api/projects/:id/invoicing-partner] DB error:", err.message);
@@ -495,6 +538,7 @@ router.patch("/:id", async (req, res) => {
     const cur = curRows[0] || {};
     const changes = []; // human-readable summaries -> projectchangelog
 
+    let statusChangedFrom = null; // set to the old status id when the stage actually moved (for the audit summary)
     if (stage !== undefined) {
       // Same history-logging as /:id/stage.
       const oldStatus = cur.projectstatusid ?? null;
@@ -503,6 +547,7 @@ router.patch("/:id", async (req, res) => {
         [stage, employeeId || null, id]
       );
       if (oldStatus !== null && String(oldStatus) !== String(stage)) {
+        statusChangedFrom = oldStatus;
         await client.query(
           `INSERT INTO projectstatushistory (projectid, oldstatusid, newstatusid, changedat, changedby)
            VALUES ($1, $2, $3, now(), $4)`,
@@ -625,6 +670,16 @@ router.patch("/:id", async (req, res) => {
 
     await client.query("COMMIT");
     res.status(204).end();
+
+    const auditParts = [...changes];
+    if (statusChangedFrom !== null) {
+      const [oldL, newL] = await Promise.all([statusLabelById(statusChangedFrom), statusLabelById(stage)]);
+      auditParts.unshift(`Status ${oldL || "—"} → ${newL || "—"}`);
+    }
+    if (auditParts.length) {
+      const ctx = await projectAuditContext(id);
+      logAudit(req, { kind: "project.update", desc: `Project ${ctx.code}: ${auditParts.join("; ")}` });
+    }
   } catch (err) {
     await client.query("ROLLBACK");
     console.error("[PATCH /api/projects/:id] DB error:", err.message);
@@ -725,11 +780,14 @@ router.post("/:id/resources", async (req, res) => {
       [resourceId]
     );
     const empName = empRows[0]?.name ?? "—";
+    const summary = `Resource added: ${empName} (${workload}%)`;
     await pool.query(
       `INSERT INTO projectchangelog (projectid, changedat, changedby, summary) VALUES ($1, now(), $2, $3)`,
-      [req.params.id, employeeId || null, `Resource added: ${empName} (${workload}%)`]
+      [req.params.id, employeeId || null, summary]
     );
     res.status(201).json({ ...rows[0], employeeName: empName });
+    projectAuditContext(req.params.id).then((ctx) =>
+      logAudit(req, { kind: "project.resource.add", desc: `Project ${ctx.code}: ${summary}` }));
   } catch (err) {
     console.error("[POST /api/projects/:id/resources] DB error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });
@@ -755,11 +813,14 @@ router.patch("/:id/resources/:resourceRowId", async (req, res) => {
       [rows[0].employeeId]
     );
     const empName = empRows[0]?.name ?? "—";
+    const summary = `Resource workload changed: ${empName} → ${amount}%`;
     await pool.query(
       `INSERT INTO projectchangelog (projectid, changedat, changedby, summary) VALUES ($1, now(), $2, $3)`,
-      [req.params.id, employeeId || null, `Resource workload changed: ${empName} → ${amount}%`]
+      [req.params.id, employeeId || null, summary]
     );
     res.json({ ...rows[0], employeeName: empName });
+    projectAuditContext(req.params.id).then((ctx) =>
+      logAudit(req, { kind: "project.resource.update", desc: `Project ${ctx.code}: ${summary}` }));
   } catch (err) {
     console.error("[PATCH /api/projects/:id/resources/:resourceRowId] DB error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });
@@ -781,11 +842,14 @@ router.delete("/:id/resources/:resourceRowId", async (req, res) => {
       [rows[0].employeeId]
     );
     const empName = empRows[0]?.name ?? "—";
+    const summary = `Resource removed: ${empName}`;
     await pool.query(
       `INSERT INTO projectchangelog (projectid, changedat, changedby, summary) VALUES ($1, now(), $2, $3)`,
-      [req.params.id, employeeId || null, `Resource removed: ${empName}`]
+      [req.params.id, employeeId || null, summary]
     );
     res.status(204).end();
+    projectAuditContext(req.params.id).then((ctx) =>
+      logAudit(req, { kind: "project.resource.delete", desc: `Project ${ctx.code}: ${summary}` }));
   } catch (err) {
     console.error("[DELETE /api/projects/:id/resources/:resourceRowId] DB error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });
@@ -828,6 +892,8 @@ router.post("/:id/deliverables", async (req, res) => {
       [req.params.id, deliverablename, deliverydate || null, effectivedd || null]
     );
     res.status(201).json(rows[0]);
+    projectAuditContext(req.params.id).then((ctx) =>
+      logAudit(req, { kind: "project.deliverable.add", desc: `Project ${ctx.code}: deliverable added "${deliverablename}"` }));
   } catch (err) {
     console.error("[POST /api/projects/:id/deliverables] DB error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });
@@ -852,6 +918,8 @@ router.patch("/:id/deliverables/:deliverableId", async (req, res) => {
       return res.status(404).json({ error: "not_found", message: "Deliverable not found on this project" });
     }
     res.json(rows[0]);
+    projectAuditContext(req.params.id).then((ctx) =>
+      logAudit(req, { kind: "project.deliverable.update", desc: `Project ${ctx.code}: deliverable updated "${deliverablename}"` }));
   } catch (err) {
     console.error("[PATCH /api/projects/:id/deliverables/:deliverableId] DB error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });
@@ -861,14 +929,16 @@ router.patch("/:id/deliverables/:deliverableId", async (req, res) => {
 // DELETE /api/projects/:id/deliverables/:deliverableId
 router.delete("/:id/deliverables/:deliverableId", async (req, res) => {
   try {
-    const { rowCount } = await pool.query(
-      `DELETE FROM projectdeliverables WHERE id = $1 AND projectid = $2`,
+    const { rows } = await pool.query(
+      `DELETE FROM projectdeliverables WHERE id = $1 AND projectid = $2 RETURNING deliverablename`,
       [req.params.deliverableId, req.params.id]
     );
-    if (!rowCount) {
+    if (!rows.length) {
       return res.status(404).json({ error: "not_found", message: "Deliverable not found on this project" });
     }
     res.status(204).end();
+    projectAuditContext(req.params.id).then((ctx) =>
+      logAudit(req, { kind: "project.deliverable.delete", desc: `Project ${ctx.code}: deliverable deleted "${rows[0].deliverablename || "(unnamed)"}"` }));
   } catch (err) {
     console.error("[DELETE /api/projects/:id/deliverables/:deliverableId] DB error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });
@@ -908,6 +978,9 @@ router.post("/:id/notes", async (req, res) => {
       [req.params.id, notes.trim(), employeeId || null]
     );
     res.status(201).json(rows[0]);
+    const preview = notes.trim().length > 80 ? `${notes.trim().slice(0, 80)}…` : notes.trim();
+    projectAuditContext(req.params.id).then((ctx) =>
+      logAudit(req, { kind: "project.note.add", desc: `Project ${ctx.code}: note added — "${preview}"` }));
   } catch (err) {
     console.error("[POST /api/projects/:id/notes] DB error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });
@@ -957,6 +1030,8 @@ router.post("/:id/quotations", async (req, res) => {
       [req.params.id, employeeId || null, summary]
     );
     res.status(201).json(q);
+    projectAuditContext(req.params.id).then((ctx) =>
+      logAudit(req, { kind: "project.quotation.add", desc: `Project ${ctx.code}: ${summary}` }));
   } catch (err) {
     console.error("[POST /api/projects/:id/quotations] DB error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });
