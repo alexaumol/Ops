@@ -14,7 +14,7 @@
 
   <!-- HITT Ops app header (shared chrome) -->
   <header class="app-header">
-    <a class="app-header__brand" href="../welcome.html"><img class="app-header__logo" src="../assets/fhitt-logo.png" alt="" aria-hidden="true" />HITT<span class="dot">·</span>Ops</a>
+    <a class="app-header__brand" href="../welcome.html"><img class="app-header__logo" src="../assets/fhitt-logo.png?v=2" alt="" aria-hidden="true" />HITT<span class="dot">·</span>Ops</a>
     <nav class="app-header__nav" aria-label="Primary">
       <a href="../welcome.html">Home</a>
       <a href="projects.html" class="active">Projects</a>
@@ -103,7 +103,13 @@
       <div id="board" class="h-full min-w-max grid grid-flow-col auto-cols-[264px] sm:auto-cols-[280px] gap-3"></div>
     </main>
 
+    <button type="button" id="kiPanelReopen" class="ki-panel-reopen" title="Show insights panel" aria-label="Show insights panel">‹ Insights</button>
+
     <aside id="kanbanInsights">
+      <div class="ki-panel-head">
+        <span class="ki-panel-title">Insights</span>
+        <button type="button" id="kiPanelToggle" class="ki-panel-toggle" title="Collapse insights panel" aria-label="Collapse insights panel" aria-expanded="true">›</button>
+      </div>
       <div class="ki-section" data-ki-key="ready">
         <button type="button" class="ki-head" aria-expanded="true">
           <span class="ki-chevron" aria-hidden="true">▾</span>
@@ -304,8 +310,28 @@
           </div>
         </section>
         <section class="bg-white rounded-lg border border-slate-200 shadow-card overflow-hidden">
-          <div class="bg-hitt-teal px-3 py-1.5"><h3 class="text-white text-xs font-bold tracking-wide">EXPENSES RECORDS</h3></div>
-          <div class="p-3 text-xs text-slate-400">Expenses endpoint not wired yet — connect ExpensesRecordsProject table to populate this.</div>
+          <div class="bg-hitt-teal px-3 py-1.5 flex items-center justify-between gap-2">
+            <h3 class="text-white text-xs font-bold tracking-wide">EXPENSES RECORDS</h3>
+            <a id="mExpensesLink" href="expenses.html" target="_blank" rel="noopener"
+               class="text-white/90 text-[11px] font-semibold hover:text-white whitespace-nowrap">Open in Expenses →</a>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-xs">
+              <thead>
+                <tr class="bg-hitt-mist text-hitt-teal text-left">
+                  <th class="px-2.5 py-1.5 font-semibold w-24">Date</th>
+                  <th class="px-2.5 py-1.5 font-semibold">Category</th>
+                  <th class="px-2.5 py-1.5 font-semibold">Description</th>
+                  <th class="px-2.5 py-1.5 font-semibold text-center w-16">Re-inv.</th>
+                  <th class="px-2.5 py-1.5 font-semibold text-right w-24">Amount</th>
+                  <th class="px-2.5 py-1.5 font-semibold text-center w-9" title="Evidence">📎</th>
+                </tr>
+              </thead>
+              <tbody id="mExpenses"></tbody>
+              <tfoot id="mExpensesFoot"></tfoot>
+            </table>
+          </div>
+          <p class="px-3 py-1.5 text-[11px] text-slate-400 border-t border-slate-100">Read-only here — add, edit or delete expenses from the Expenses page.</p>
         </section>
       </div>
 

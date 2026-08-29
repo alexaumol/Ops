@@ -286,6 +286,31 @@ function renderKiList(host, rows, metaFn, countEl){
   });
 })();
 
+// Collapse the whole insights panel (separate from the per-section state
+// above). Persisted best-effort; a thin "‹ Insights" tab reopens it.
+(function initKiPanelCollapse(){
+  const body = document.getElementById('kanbanBody');
+  const toggle = document.getElementById('kiPanelToggle');
+  const reopen = document.getElementById('kiPanelReopen');
+  if (!body || !toggle || !reopen) return;
+  const KEY = 'hitt.kanbanInsights.panelCollapsed';
+  let collapsed = false;
+  try { collapsed = localStorage.getItem(KEY) === '1'; } catch { /* storage blocked */ }
+
+  const apply = () => {
+    body.classList.toggle('ki-panel-collapsed', collapsed);
+    toggle.setAttribute('aria-expanded', String(!collapsed));
+  };
+  const set = (v) => {
+    collapsed = v;
+    apply();
+    try { localStorage.setItem(KEY, v ? '1' : '0'); } catch { /* storage blocked */ }
+  };
+  apply();
+  toggle.addEventListener('click', () => set(true));
+  reopen.addEventListener('click', () => set(false));
+})();
+
 /* ============================== TOASTS ================================= */
 function toast(msg, tone='navy'){
   const host = document.getElementById('toastHost');
@@ -736,6 +761,10 @@ async function openProjectModal(id){
     `<div class="text-xs text-slate-400 text-center py-6">${usingDemoData ? 'Not available in demo data' : 'Loading…'}</div>`;
   document.getElementById('mResources').innerHTML =
     `<tr><td colspan="3" class="px-2.5 py-4 text-center text-slate-400 text-xs">${usingDemoData ? 'Not available in demo data' : 'Loading…'}</td></tr>`;
+  document.getElementById('mExpenses').innerHTML =
+    `<tr><td colspan="6" class="px-2.5 py-4 text-center text-slate-400 text-xs">${usingDemoData ? 'Not available in demo data' : 'Loading…'}</td></tr>`;
+  document.getElementById('mExpensesFoot').innerHTML = '';
+  document.getElementById('mExpensesLink').href = `expenses.html?q=${encodeURIComponent(p.code)}`;
   cancelEditDeliverable(); // clears the deliverable form + edit state from any previous project
   ['mNewQuotationDate', 'mNewQuotationAmount', 'mNewQuotationDiscount', 'mNewQuotationExpenses', 'mNewQuotationFinal']
     .forEach(id2 => document.getElementById(id2).value = '');
@@ -805,6 +834,15 @@ async function openProjectModal(id){
     } catch (err) {
       console.warn(`Could not load resources for project ${id}:`, err);
       document.getElementById('mResources').innerHTML = `<tr><td colspan="3" class="px-2.5 py-4 text-center text-slate-400 text-xs">Could not load resources</td></tr>`;
+    }
+
+    try {
+      const expenses = await HITT_API.getExpenses({ projectId: id, limit: 500 });
+      if (activeProjectId !== id) return;
+      renderProjectExpenses(expenses);
+    } catch (err) {
+      console.warn(`Could not load expenses for project ${id}:`, err);
+      document.getElementById('mExpenses').innerHTML = `<tr><td colspan="6" class="px-2.5 py-4 text-center text-slate-400 text-xs">Could not load expenses</td></tr>`;
     }
   }
 }
@@ -993,6 +1031,61 @@ function renderDeliverables(rows){
     btn.addEventListener('click', () => deleteDeliverable(btn.dataset.deleteDeliverable));
   });
 }
+
+// Read-only view of this project's expenses (see the Expenses module).
+// data is the { rows, sum } payload from GET /api/expenses?projectId=.
+function renderProjectExpenses(data){
+  const tbody = document.getElementById('mExpenses');
+  const tfoot = document.getElementById('mExpensesFoot');
+  if (!tbody) return;
+  const rows = (data && data.rows) || [];
+  const money = (n) => n == null ? '—' : Number(n).toLocaleString(undefined, { style: 'currency', currency: 'EUR' });
+  if (!rows.length) {
+    tbody.innerHTML = `<tr><td colspan="6" class="px-2.5 py-4 text-center text-slate-400 text-xs">No expenses recorded for this project</td></tr>`;
+    if (tfoot) tfoot.innerHTML = '';
+    return;
+  }
+  tbody.innerHTML = rows.map(x => `
+    <tr class="grid-row border-t border-slate-100">
+      <td class="px-2.5 py-1.5 font-mono whitespace-nowrap">${formatDateOnly(x.expenseDate)}</td>
+      <td class="px-2.5 py-1.5">${escapeHtml(x.category || '—')}</td>
+      <td class="px-2.5 py-1.5">${escapeHtml(x.description || '—')}</td>
+      <td class="px-2.5 py-1.5 text-center">${x.invoiceable ? '<span class="text-hitt-green font-bold">✓</span>' : ''}</td>
+      <td class="px-2.5 py-1.5 text-right font-mono">${money(x.amount)}</td>
+      <td class="px-2.5 py-1.5 text-center">${x.hasDocument
+        ? `<button type="button" data-exp-doc="${x.id}" title="View evidence" class="text-hitt-teal hover:text-hitt-ink">📎</button>`
+        : ''}</td>
+    </tr>`).join('');
+  const total = data && data.sum != null ? Number(data.sum) : rows.reduce((s, x) => s + (Number(x.amount) || 0), 0);
+  const billable = rows.filter(x => x.invoiceable).reduce((s, x) => s + (Number(x.amount) || 0), 0);
+  if (tfoot) tfoot.innerHTML = `
+    <tr class="border-t-2 border-slate-200 font-semibold text-hitt-ink">
+      <td class="px-2.5 py-1.5" colspan="3">${rows.length} expense${rows.length === 1 ? '' : 's'} · ${money(billable)} re-invoiceable</td>
+      <td class="px-2.5 py-1.5"></td>
+      <td class="px-2.5 py-1.5 text-right font-mono">${money(total)}</td>
+      <td class="px-2.5 py-1.5"></td>
+    </tr>`;
+}
+
+// Evidence files are behind the auth header, so a plain <a href> can't
+// fetch them — pull the blob and hand it to a new tab (same approach as
+// js/expenses.js viewDocument).
+async function viewExpenseDoc(id){
+  const w = window.open('', '_blank');
+  try {
+    const blob = await HITT_API.fetchExpenseDocument(id);
+    const url = URL.createObjectURL(blob);
+    if (w) w.location = url; else window.open(url, '_blank');
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch (err) {
+    if (w) w.close();
+    toast(err.message || 'Could not open the document.', 'red');
+  }
+}
+document.getElementById('mExpenses')?.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-exp-doc]');
+  if (btn) viewExpenseDoc(btn.dataset.expDoc);
+});
 
 function renderQuotations(rows){
   const tbody = document.getElementById('mQuotations');

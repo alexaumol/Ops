@@ -99,7 +99,7 @@ body { background: #F5F4EE; }
 }
 
 /* ---------- Kanban insights side panel ---------- */
-#kanbanBody { min-height: 0; }
+#kanbanBody { min-height: 0; position: relative; }
 #kanbanBody > main { min-width: 0; }
 #kanbanInsights {
   flex-shrink: 0;
@@ -123,6 +123,40 @@ body { background: #F5F4EE; }
   border-left: none;
   overflow: hidden;
 }
+
+/* ---------- Whole-panel collapse ---------- */
+.ki-panel-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+.ki-panel-title {
+  font-size: 0.66rem; font-weight: 800; text-transform: uppercase;
+  letter-spacing: 0.06em; color: #8A8676;
+}
+.ki-panel-toggle, .ki-panel-reopen {
+  border: 1px solid #E4E0D4; background: #fff; color: #5C757C;
+  border-radius: 6px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  line-height: 1;
+}
+.ki-panel-toggle { width: 22px; height: 22px; font-size: 0.9rem; }
+.ki-panel-toggle:hover, .ki-panel-reopen:hover { border-color: #5C757C; color: #171717; }
+
+.ki-panel-reopen {
+  display: none;
+  position: absolute; top: 0.85rem; right: 0;
+  z-index: 5;
+  gap: 0.25rem;
+  padding: 0.3rem 0.5rem;
+  font-size: 0.66rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em;
+  border-right: none; border-top-right-radius: 0; border-bottom-right-radius: 0;
+  box-shadow: -1px 1px 4px rgba(0,0,0,0.06);
+}
+#kanbanBody.ki-panel-collapsed #kanbanInsights {
+  width: 0; padding: 0; border-left: none; overflow: hidden;
+}
+#kanbanBody.ki-panel-collapsed .ki-panel-reopen { display: flex; }
+@media (max-width: 1180px) { .ki-panel-reopen { display: none !important; } }
 .ki-section { display: flex; flex-direction: column; }
 .ki-head {
   display: flex; align-items: center; gap: 0.4rem;

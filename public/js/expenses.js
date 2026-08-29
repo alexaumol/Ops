@@ -476,6 +476,11 @@ document.getElementById("btnBulkDelete").addEventListener("click", async () => {
 /* ============================== INIT =============================== */
 (async () => {
   setDataSourcePill();
+
+  // Deep link from the project modal's "Open in Expenses →" — pre-fills
+  // the search box with the project code.
+  const q = new URLSearchParams(location.search).get("q");
+  if (q) document.getElementById("expSearch").value = q;
   const [cats, emps, projs] = await Promise.allSettled([
     HITT_API.getExpenseCategories(),
     HITT_API.getEmployees(),
