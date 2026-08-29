@@ -766,6 +766,7 @@ async function openProjectModal(id){
   document.getElementById('mExpensesFoot').innerHTML = '';
   document.getElementById('mExpensesLink').href = `expenses.html?q=${encodeURIComponent(p.code)}`;
   cancelEditDeliverable(); // clears the deliverable form + edit state from any previous project
+  resetProjectSessionAdds();
   ['mNewQuotationDate', 'mNewQuotationAmount', 'mNewQuotationDiscount', 'mNewQuotationExpenses', 'mNewQuotationFinal']
     .forEach(id2 => document.getElementById(id2).value = '');
   document.getElementById('mNewNote').value = '';
@@ -972,6 +973,29 @@ function formatDateTime(iso){
 let DELIVERABLES = [];
 let editingDeliverableId = null;
 
+// Sub-items (notes / deliverables / quotations) added during the current
+// modal session. Each "Add" persists immediately, so if the user then
+// cancels + confirms "discard", these get deleted again. Reset on open,
+// cleared on Save.
+let projectSessionAdds = { notes: [], deliverables: [], quotations: [] };
+function resetProjectSessionAdds(){ projectSessionAdds = { notes: [], deliverables: [], quotations: [] }; }
+function projectHasSessionAdds(){
+  return projectSessionAdds.notes.length || projectSessionAdds.deliverables.length || projectSessionAdds.quotations.length;
+}
+async function discardProjectSessionAdds(){
+  const pid = activeProjectId;
+  if (!pid) return;
+  const jobs = [
+    ...projectSessionAdds.notes.map(nId => HITT_API.deleteProjectNote(pid, nId)),
+    ...projectSessionAdds.deliverables.map(dId => HITT_API.deleteProjectDeliverable(pid, dId)),
+    ...projectSessionAdds.quotations.map(qId => HITT_API.deleteProjectQuotation(pid, qId)),
+  ];
+  resetProjectSessionAdds();
+  const results = await Promise.allSettled(jobs);
+  const failed = results.filter(r => r.status === 'rejected').length;
+  if (failed) toast(`${failed} item${failed === 1 ? '' : 's'} could not be reverted — check the project.`, 'red');
+}
+
 function startEditDeliverable(id){
   const d = DELIVERABLES.find(x => x.id === id);
   if (!d) return;
@@ -996,6 +1020,7 @@ async function deleteDeliverable(id){
   if (!d || !confirm(`Delete deliverable "${d.deliverablename || '(unnamed)'}"? This cannot be undone.`)) return;
   try {
     await HITT_API.deleteProjectDeliverable(activeProjectId, id);
+    projectSessionAdds.deliverables = projectSessionAdds.deliverables.filter(x => String(x) !== String(id));
     if (editingDeliverableId === id) cancelEditDeliverable();
     const deliverables = await HITT_API.getProjectDeliverables(activeProjectId);
     renderDeliverables(deliverables);
@@ -1269,10 +1294,12 @@ const PROJECT_MODAL_TRANSIENT_IDS = [
 ];
 
 // Unsaved work in the modal: an edited main field ("Data has changed"),
-// text sitting in an add row, or a deliverable mid-edit.
+// text sitting in an add row, a deliverable mid-edit, or a sub-item added
+// this session (persisted immediately, reverted on discard).
 function projectModalHasUnsaved(){
   if (!document.getElementById('mChangedBadge').classList.contains('hidden')) return true;
   if (editingDeliverableId) return true;
+  if (projectHasSessionAdds()) return true;
   return PROJECT_MODAL_TRANSIENT_IDS.some(id => String(document.getElementById(id)?.value || '').trim() !== '');
 }
 
@@ -1290,8 +1317,15 @@ function closeProjectModal(){
 }
 
 // Cancel (✕ / click-outside / Esc): confirm before dropping unsaved edits.
-function requestCloseProjectModal(){
-  if (projectModalHasUnsaved() && !confirm('Discard your unsaved changes to this project?')) return;
+// Confirming also deletes any notes / deliverables / quotations added this
+// session (each "Add" persisted immediately).
+async function requestCloseProjectModal(){
+  if (!projectModalHasUnsaved()) { closeProjectModal(); return; }
+  const msg = projectHasSessionAdds()
+    ? 'Discard your changes? Items you added (notes, deliverables, quotations) will be removed.'
+    : 'Discard your unsaved changes to this project?';
+  if (!confirm(msg)) return;
+  if (projectHasSessionAdds()) await discardProjectSessionAdds();
   clearProjectModalTransient();
   closeProjectModal();
 }
@@ -1342,6 +1376,7 @@ document.getElementById('mSave').addEventListener('click', async () => {
   p.notInvoiceable = extraFields.notInvoiceable;
 
   document.getElementById('mChangedBadge').classList.add('hidden');
+  resetProjectSessionAdds(); // Save commits everything added this session
   renderBoard();
   updateTabCounts();
   populateOwnerFilterOptions();
@@ -1380,7 +1415,8 @@ document.getElementById('mAddNote').addEventListener('click', async () => {
     return;
   }
   try {
-    await HITT_API.addProjectNote(activeProjectId, { notes: text, employeeId: currentEmployeeId });
+    const created = await HITT_API.addProjectNote(activeProjectId, { notes: text, employeeId: currentEmployeeId });
+    if (created && created.id != null) projectSessionAdds.notes.push(created.id);
     input.value = '';
     const notes = await HITT_API.getProjectNotes(activeProjectId);
     renderNotes(notes);
@@ -1423,11 +1459,12 @@ document.getElementById('mAddDeliverable').addEventListener('click', async () =>
         effectivedd: effectiveInput.value || null,
       });
     } else {
-      await HITT_API.addProjectDeliverable(activeProjectId, {
+      const created = await HITT_API.addProjectDeliverable(activeProjectId, {
         deliverablename: name,
         deliverydate: dateInput.value || null,
         effectivedd: effectiveInput.value || null,
       });
+      if (created && created.id != null) projectSessionAdds.deliverables.push(created.id);
     }
     cancelEditDeliverable(); // also clears the inputs
     const deliverables = await HITT_API.getProjectDeliverables(activeProjectId);
@@ -1452,7 +1489,7 @@ document.getElementById('mAddQuotation').addEventListener('click', async () => {
     return;
   }
   try {
-    await HITT_API.addProjectQuotation(activeProjectId, {
+    const created = await HITT_API.addProjectQuotation(activeProjectId, {
       quotationdate: date || null,
       amountquoted: amount || null,
       discountnegotiation: document.getElementById('mNewQuotationDiscount').value || null,
@@ -1460,6 +1497,7 @@ document.getElementById('mAddQuotation').addEventListener('click', async () => {
       finalquotation: document.getElementById('mNewQuotationFinal').value || null,
       employeeId: currentEmployeeId,
     });
+    if (created && created.id != null) projectSessionAdds.quotations.push(created.id);
     ['mNewQuotationDate', 'mNewQuotationAmount', 'mNewQuotationDiscount', 'mNewQuotationExpenses', 'mNewQuotationFinal']
       .forEach(id2 => document.getElementById(id2).value = '');
     renderQuotations(await HITT_API.getProjectQuotations(activeProjectId));

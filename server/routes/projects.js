@@ -993,6 +993,25 @@ router.post("/:id/notes", async (req, res) => {
   }
 });
 
+// DELETE /api/projects/:id/notes/:noteId — used by the modal's "discard
+// changes" cleanup (revert notes added during this editing session).
+router.delete("/:id/notes/:noteId", async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `DELETE FROM projectnotes WHERE id = $1 AND projectid = $2 RETURNING notes`,
+      [req.params.noteId, req.params.id]
+    );
+    if (!rows.length) return res.status(404).json({ error: "not_found", message: "Note not found on this project" });
+    res.status(204).end();
+    const preview = (rows[0].notes || "").length > 80 ? `${rows[0].notes.slice(0, 80)}…` : rows[0].notes;
+    projectAuditContext(req.params.id).then((ctx) =>
+      logAudit(req, { kind: "project.note.delete", desc: `Project ${ctx.code}: note deleted — "${preview}"` }));
+  } catch (err) {
+    console.error("[DELETE /api/projects/:id/notes/:noteId] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
 // GET /api/projects/:id/quotations
 router.get("/:id/quotations", async (req, res) => {
   try {
@@ -1040,6 +1059,25 @@ router.post("/:id/quotations", async (req, res) => {
       logAudit(req, { kind: "project.quotation.add", desc: `Project ${ctx.code}: ${summary}` }));
   } catch (err) {
     console.error("[POST /api/projects/:id/quotations] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
+// DELETE /api/projects/:id/quotations/:quotationId — used by the modal's
+// "discard changes" cleanup (revert quotations added this session).
+router.delete("/:id/quotations/:quotationId", async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `DELETE FROM projectquotations WHERE id = $1 AND projectid = $2
+       RETURNING COALESCE(finalquotation, amountquoted) AS amount`,
+      [req.params.quotationId, req.params.id]
+    );
+    if (!rows.length) return res.status(404).json({ error: "not_found", message: "Quotation not found on this project" });
+    res.status(204).end();
+    projectAuditContext(req.params.id).then((ctx) =>
+      logAudit(req, { kind: "project.quotation.delete", desc: `Project ${ctx.code}: quotation deleted${rows[0].amount != null ? ` (€${Number(rows[0].amount).toLocaleString()})` : ""}` }));
+  } catch (err) {
+    console.error("[DELETE /api/projects/:id/quotations/:quotationId] DB error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });
   }
 });

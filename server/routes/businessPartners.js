@@ -489,6 +489,25 @@ router.post("/:id/notes", async (req, res) => {
   }
 });
 
+// DELETE /api/business-partners/:id/notes/:noteId — used by the modal's
+// "discard changes" cleanup (revert notes added during this session).
+router.delete("/:id/notes/:noteId", async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `DELETE FROM businesspartnersnotes WHERE id = $1 AND bpid = $2 RETURNING notes`,
+      [req.params.noteId, req.params.id]
+    );
+    if (!rows.length) return res.status(404).json({ error: "not_found", message: "Note not found on this business partner" });
+    res.status(204).end();
+    const preview = (rows[0].notes || "").length > 80 ? `${rows[0].notes.slice(0, 80)}…` : rows[0].notes;
+    bpAuditLabel(req.params.id).then((bp) =>
+      logAudit(req, { kind: "bp.note.delete", desc: `BP "${bp}": note deleted — "${preview}"` }));
+  } catch (err) {
+    console.error("[DELETE /api/business-partners/:id/notes/:noteId] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
 // Upserts a tax company's single address row. `sameAddress` true → copy the
 // BP's current address and flag sameaddress=true (kept in sync by the BP
 // PATCH handler, and read directly by the invoice-PDF query). false → store

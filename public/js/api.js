@@ -71,9 +71,13 @@ const HITT_API = (() => {
     getProjectNotes: (id) => request(`/api/projects/${id}/notes`),
     addProjectNote: (id, payload) =>
       request(`/api/projects/${id}/notes`, { method: "POST", body: JSON.stringify(payload) }),
+    deleteProjectNote: (id, noteId) =>
+      request(`/api/projects/${id}/notes/${noteId}`, { method: "DELETE" }),
     getProjectQuotations: (id) => request(`/api/projects/${id}/quotations`),
     addProjectQuotation: (id, payload) =>
       request(`/api/projects/${id}/quotations`, { method: "POST", body: JSON.stringify(payload) }),
+    deleteProjectQuotation: (id, quotationId) =>
+      request(`/api/projects/${id}/quotations/${quotationId}`, { method: "DELETE" }),
     getProjectHistory: (id) => request(`/api/projects/${id}/history`),
     getProjectResources: (id) => request(`/api/projects/${id}/resources`),
     addProjectResource: (id, payload) =>
@@ -102,6 +106,8 @@ const HITT_API = (() => {
     getBusinessPartnerProjects: (id) => request(`/api/business-partners/${id}/projects`),
     addBusinessPartnerNote: (id, payload) =>
       request(`/api/business-partners/${id}/notes`, { method: "POST", body: JSON.stringify(payload) }),
+    deleteBusinessPartnerNote: (id, noteId) =>
+      request(`/api/business-partners/${id}/notes/${noteId}`, { method: "DELETE" }),
     getBusinessPartnerTaxCompanies: (id) => request(`/api/business-partners/${id}/tax-companies`),
     addBusinessPartnerTaxCompany: (id, payload) =>
       request(`/api/business-partners/${id}/tax-companies`, { method: "POST", body: JSON.stringify(payload) }),
