@@ -1262,6 +1262,26 @@ historyCollapseBtn.addEventListener('click', () => {
   historyCollapseBtn.title = historyCollapsed ? 'Expand history' : 'Collapse history';
 });
 
+const PROJECT_MODAL_TRANSIENT_IDS = [
+  'mNewNote',
+  'mNewDeliverableName', 'mNewDeliverableExpected', 'mNewDeliverableEffective',
+  'mNewQuotationDate', 'mNewQuotationAmount', 'mNewQuotationDiscount', 'mNewQuotationExpenses', 'mNewQuotationFinal',
+];
+
+// Unsaved work in the modal: an edited main field ("Data has changed"),
+// text sitting in an add row, or a deliverable mid-edit.
+function projectModalHasUnsaved(){
+  if (!document.getElementById('mChangedBadge').classList.contains('hidden')) return true;
+  if (editingDeliverableId) return true;
+  return PROJECT_MODAL_TRANSIENT_IDS.some(id => String(document.getElementById(id)?.value || '').trim() !== '');
+}
+
+function clearProjectModalTransient(){
+  PROJECT_MODAL_TRANSIENT_IDS.forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  document.getElementById('mChangedBadge').classList.add('hidden');
+  cancelEditDeliverable();
+}
+
 function closeProjectModal(){
   modalOverlay.classList.add('hidden');
   document.body.style.overflow = '';
@@ -1269,10 +1289,17 @@ function closeProjectModal(){
   cancelEditDeliverable();
 }
 
-document.getElementById('mClose').addEventListener('click', closeProjectModal);
-modalOverlay.addEventListener('click', (e) => { if (e.target === modalOverlay) closeProjectModal(); });
+// Cancel (✕ / click-outside / Esc): confirm before dropping unsaved edits.
+function requestCloseProjectModal(){
+  if (projectModalHasUnsaved() && !confirm('Discard your unsaved changes to this project?')) return;
+  clearProjectModalTransient();
+  closeProjectModal();
+}
+
+document.getElementById('mClose').addEventListener('click', requestCloseProjectModal);
+modalOverlay.addEventListener('click', (e) => { if (e.target === modalOverlay) requestCloseProjectModal(); });
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && !modalOverlay.classList.contains('hidden')) closeProjectModal();
+  if (e.key === 'Escape' && !modalOverlay.classList.contains('hidden')) requestCloseProjectModal();
   if (e.key === 'Escape' && !newProjectOverlay.classList.contains('hidden')) closeNewProjectModal();
 });
 
@@ -1373,7 +1400,8 @@ document.getElementById('mNotesSearch').addEventListener('input', (e) => {
 });
 document.getElementById('mNewDeliverableName').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') document.getElementById('mAddDeliverable').click();
-  if (e.key === 'Escape' && editingDeliverableId) cancelEditDeliverable();
+  // Esc while editing a deliverable cancels just that edit, not the modal.
+  if (e.key === 'Escape' && editingDeliverableId) { e.stopPropagation(); cancelEditDeliverable(); }
 });
 
 document.getElementById('mAddDeliverable').addEventListener('click', async () => {

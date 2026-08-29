@@ -562,10 +562,39 @@ async function openDetailModal(id){
   }
 }
 
+const BP_MODAL_TRANSIENT_IDS = [
+  'mNewContactName', 'mNewContactPosition', 'mNewContactEmail', 'mNewContactPhone',
+  'mNewNote',
+  'mTcName', 'mTcVat', 'mTcEmail', 'mTcStreet', 'mTcCity', 'mTcState', 'mTcZip', 'mTcPhone1', 'mTcPhone2',
+];
+
+// Unsaved work in the modal: an edited main field ("Data has changed"),
+// text sitting in an add row (contact / note / tax company), or a
+// contact / tax company mid-edit.
+function bpModalHasUnsaved(){
+  if (!document.getElementById('mChangedBadge').classList.contains('hidden')) return true;
+  if (editingContactId || editingTcId) return true;
+  return BP_MODAL_TRANSIENT_IDS.some(id => String(document.getElementById(id)?.value || '').trim() !== '');
+}
+
+function clearBpModalTransient(){
+  BP_MODAL_TRANSIENT_IDS.forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  document.getElementById('mChangedBadge').classList.add('hidden');
+  editingContactId = null;
+  resetTaxCompanyForm();
+}
+
 function closeDetailModal(){
   modalOverlay.classList.add('hidden');
   document.body.style.overflow = '';
   activeBpId = null;
+}
+
+// Cancel (✕ / click-outside / Esc): confirm before dropping unsaved edits.
+function requestCloseDetailModal(){
+  if (bpModalHasUnsaved() && !confirm('Discard your unsaved changes to this business partner?')) return;
+  clearBpModalTransient();
+  closeDetailModal();
 }
 
 const historyPanel = document.getElementById('historyPanel');
@@ -582,10 +611,10 @@ historyCollapseBtn.addEventListener('click', () => {
   historyCollapseBtn.title = historyCollapsed ? 'Expand history' : 'Collapse history';
 });
 
-document.getElementById('mClose').addEventListener('click', closeDetailModal);
-modalOverlay.addEventListener('click', (e) => { if (e.target === modalOverlay) closeDetailModal(); });
+document.getElementById('mClose').addEventListener('click', requestCloseDetailModal);
+modalOverlay.addEventListener('click', (e) => { if (e.target === modalOverlay) requestCloseDetailModal(); });
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && !modalOverlay.classList.contains('hidden')) closeDetailModal();
+  if (e.key === 'Escape' && !modalOverlay.classList.contains('hidden')) requestCloseDetailModal();
   if (e.key === 'Escape' && !newBpOverlay.classList.contains('hidden')) closeNewBpModal();
 });
 
