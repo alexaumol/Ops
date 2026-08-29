@@ -175,6 +175,8 @@ const HITT_API = (() => {
       request("/api/settings/currencies", { method: "POST", body: JSON.stringify(payload) }),
     updateInvoiceCurrency: (id, payload) =>
       request(`/api/settings/currencies/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
+    reorderInvoiceCurrencies: (ids) =>
+      request("/api/settings/currencies/order", { method: "PUT", body: JSON.stringify({ ids }) }),
     deleteInvoiceCurrency: (id) =>
       request(`/api/settings/currencies/${id}`, { method: "DELETE" }),
 

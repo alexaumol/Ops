@@ -60,9 +60,11 @@ router.get("/", requireModuleAccess("time-allocation"), async (req, res) => {
   }
 });
 
-// GET /api/time-tracking/summary?userId=X — hours logged per month, for the
-// side panel. Current + previous calendar year only. Each month splits into
-// PO (project-owner) and RES (resource) hours.
+// GET /api/time-tracking/summary?userId=X — hours logged per week, for the
+// side panel. Current + previous calendar year only. Each row is one
+// tracked week (its Monday), tagged with the month that Monday falls in,
+// split into PO (project-owner) and RES (resource) hours. The frontend
+// rolls these up year -> month -> week.
 router.get("/summary", requireModuleAccess("time-allocation"), async (req, res) => {
   const { userId } = req.query;
   if (!userId) return res.status(400).json({ error: "validation_error", message: "userId is required" });
@@ -70,19 +72,21 @@ router.get("/summary", requireModuleAccess("time-allocation"), async (req, res) 
     const { rows } = await pool.query(
       `SELECT EXTRACT(YEAR FROM t.projtimetrackdate)::int AS year,
               EXTRACT(MONTH FROM t.projtimetrackdate)::int AS month,
+              TO_CHAR(t.projtimetrackdate, 'YYYY-MM-DD') AS "weekStart",
               COALESCE(SUM(t.projtimetrackhours) FILTER (WHERE t.po_res = 'PO'), 0) AS "poHours",
               COALESCE(SUM(t.projtimetrackhours) FILTER (WHERE t.po_res = 'RES'), 0) AS "resHours"
        FROM projectstimetracking t
        WHERE t.userid = $1
          AND t.projtimetrackdate IS NOT NULL
          AND EXTRACT(YEAR FROM t.projtimetrackdate) >= EXTRACT(YEAR FROM CURRENT_DATE) - 1
-       GROUP BY 1, 2
-       ORDER BY 1 DESC, 2 DESC`,
+       GROUP BY 1, 2, 3
+       ORDER BY 1 DESC, 2 DESC, 3 DESC`,
       [userId]
     );
     res.json(rows.map((r) => ({
       year: r.year,
       month: r.month,
+      weekStart: r.weekStart,
       poHours: Number(r.poHours),
       resHours: Number(r.resHours),
     })));

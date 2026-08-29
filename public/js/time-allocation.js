@@ -183,11 +183,11 @@ try { taYearState = JSON.parse(localStorage.getItem(TA_YEARS_KEY) || '{}') || {}
 
 const taNum = (n) => Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 1 });
 
-function taYearRow(tab, year, totalText, bodyHtml){
-  const key = `${tab}:${year}`;
-  const collapsed = !!taYearState[key];
+function taYearRow(year, totalText, bodyHtml){
+  const key = `tracking:${year}`;
+  const collapsed = !!taYearState[key]; // default: expanded
   return `
-    <div class="ta-year ${collapsed ? 'is-collapsed' : ''}" data-year-key="${key}">
+    <div class="ta-year ${collapsed ? 'is-collapsed' : ''}" data-key="${key}">
       <button type="button" class="ta-year-head" aria-expanded="${!collapsed}">
         <span class="ta-year-chevron" aria-hidden="true">▾</span>
         <span class="ta-year-label">${year}</span>
@@ -197,16 +197,42 @@ function taYearRow(tab, year, totalText, bodyHtml){
     </div>`;
 }
 
-function wireYearToggles(){
-  document.querySelectorAll('#taSideBody .ta-year-head').forEach(head => {
+function taMonthBlock(year, month, totalText, weekRows){
+  const key = `tracking:m:${year}-${month}`;
+  const collapsed = key in taYearState ? taYearState[key] : true; // default: collapsed
+  return `
+    <div class="ta-month ${collapsed ? 'is-collapsed' : ''}" data-key="${key}">
+      <button type="button" class="ta-month-head" aria-expanded="${!collapsed}">
+        <span class="ta-month-chevron" aria-hidden="true">▾</span>
+        <span class="ta-month-label">${MONTHS[month - 1] || month}</span>
+        <span class="ta-month-total">${totalText}</span>
+      </button>
+      <div class="ta-month-body">${weekRows}</div>
+    </div>`;
+}
+
+// One handler for both the year and the month collapse rows.
+function wireCollapseToggles(){
+  document.querySelectorAll('#taSideBody .ta-year-head, #taSideBody .ta-month-head').forEach(head => {
     head.addEventListener('click', () => {
-      const wrap = head.closest('.ta-year');
+      const wrap = head.closest('.ta-year, .ta-month');
       const nowCollapsed = wrap.classList.toggle('is-collapsed');
       head.setAttribute('aria-expanded', String(!nowCollapsed));
-      taYearState[wrap.dataset.yearKey] = nowCollapsed;
+      taYearState[wrap.dataset.key] = nowCollapsed;
       try { localStorage.setItem(TA_YEARS_KEY, JSON.stringify(taYearState)); } catch { /* storage blocked */ }
     });
   });
+}
+
+// Monday ISO date -> "5–11 Aug" (or "29 Jul – 4 Aug" across a month boundary).
+function taWeekLabel(iso){
+  const mon = new Date(`${iso}T00:00:00`);
+  const sun = new Date(mon);
+  sun.setDate(mon.getDate() + 6);
+  const dm = (d) => `${d.getDate()} ${MONTHS[d.getMonth()]}`;
+  return mon.getMonth() === sun.getMonth()
+    ? `${mon.getDate()}–${dm(sun)}`
+    : `${dm(mon)} – ${dm(sun)}`;
 }
 
 async function renderSideReport(){
@@ -220,7 +246,7 @@ async function renderSideReport(){
   side.classList.toggle('hidden', !show);
   if (!show) return;
 
-  title.textContent = 'Hours by month';
+  title.textContent = 'Hours logged';
 
   if (usingDemoData || !currentEmployeeId) {
     body.innerHTML = `<p class="ta-side-empty">${usingDemoData
@@ -235,25 +261,35 @@ async function renderSideReport(){
     if (currentPageTab !== 'tracking') return;
     if (!rows.length) { body.innerHTML = `<p class="ta-side-empty">No hours logged in the last two years.</p>`; return; }
 
-    const byYear = new Map();
+    // year -> month -> [week rows]
+    const tree = new Map();
     rows.forEach(r => {
-      if (!byYear.has(r.year)) byYear.set(r.year, []);
-      byYear.get(r.year).push(r);
+      if (!tree.has(r.year)) tree.set(r.year, new Map());
+      const months = tree.get(r.year);
+      if (!months.has(r.month)) months.set(r.month, []);
+      months.get(r.month).push(r);
     });
+    const hrs = (n) => `${taNum(n)}h`;
 
-    body.innerHTML = [...byYear.keys()].sort((a, b) => b - a).map(year => {
-      const months = byYear.get(year).sort((a, b) => b.month - a.month);
-      const po = months.reduce((s, m) => s + m.poHours, 0);
-      const res = months.reduce((s, m) => s + m.resHours, 0);
-      const monthRows = months.map(m => `
-        <div class="ta-month-row">
-          <span class="ta-month-name">${MONTHS[m.month - 1] || m.month}</span>
-          <span class="ta-month-hours"><em>PO</em> ${taNum(m.poHours)}h</span>
-          <span class="ta-month-hours"><em>RES</em> ${taNum(m.resHours)}h</span>
-        </div>`).join('');
-      return taYearRow('tracking', year, `PO ${taNum(po)}h · RES ${taNum(res)}h`, monthRows);
+    body.innerHTML = [...tree.keys()].sort((a, b) => b - a).map(year => {
+      const months = tree.get(year);
+      let yPo = 0, yRes = 0;
+      const monthBlocks = [...months.keys()].sort((a, b) => b - a).map(month => {
+        const weeks = months.get(month).sort((a, b) => (a.weekStart < b.weekStart ? 1 : -1));
+        const mPo = weeks.reduce((s, w) => s + w.poHours, 0);
+        const mRes = weeks.reduce((s, w) => s + w.resHours, 0);
+        yPo += mPo; yRes += mRes;
+        const weekRows = weeks.map(w => `
+          <div class="ta-week-row">
+            <span class="ta-week-label">${taWeekLabel(w.weekStart)}</span>
+            <span class="ta-week-hours"><em>PO</em> ${hrs(w.poHours)}</span>
+            <span class="ta-week-hours"><em>RES</em> ${hrs(w.resHours)}</span>
+          </div>`).join('');
+        return taMonthBlock(year, month, `PO ${hrs(mPo)} · RES ${hrs(mRes)}`, weekRows);
+      }).join('');
+      return taYearRow(year, `PO ${hrs(yPo)} · RES ${hrs(yRes)}`, monthBlocks);
     }).join('');
-    wireYearToggles();
+    wireCollapseToggles();
   } catch (err) {
     console.warn('Could not load the side report:', err);
     body.innerHTML = `<p class="ta-side-empty">Could not load the summary.</p>`;

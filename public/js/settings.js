@@ -482,7 +482,7 @@ let CURRENCIES = [];
 async function loadCurrencies() {
   const tbody = document.getElementById("currencyTableBody");
   const empty = document.getElementById("currencyEmpty");
-  tbody.innerHTML = `<tr><td colspan="5" class="settings-emp-sub" style="padding:1rem;">Loading…</td></tr>`;
+  tbody.innerHTML = `<tr><td colspan="6" class="settings-emp-sub" style="padding:1rem;">Loading…</td></tr>`;
   empty.classList.add("hidden");
   try {
     CURRENCIES = await HITT_API.getInvoiceCurrencies();
@@ -505,11 +505,15 @@ function renderCurrencies() {
     return;
   }
   empty.classList.add("hidden");
-  tbody.innerHTML = CURRENCIES.map((c) => {
+  tbody.innerHTML = CURRENCIES.map((c, i) => {
     const locked = c.code === "EUR";
     const canDelete = !locked && !c.usageCount;
     return `
     <tr data-id="${c.id}">
+      <td style="white-space:nowrap;">
+        <button class="icon-btn" data-cur-up title="Move up" ${i === 0 ? "disabled style='opacity:.35;'" : ""}>▲</button>
+        <button class="icon-btn" data-cur-down title="Move down" ${i === CURRENCIES.length - 1 ? "disabled style='opacity:.35;'" : ""}>▼</button>
+      </td>
       <td style="font-family:ui-monospace,monospace; font-weight:700;">${escapeHtml(c.code)}</td>
       <td><input type="text" class="cal-input" style="width:4rem; text-align:center;" data-cur-symbol value="${escapeHtml(c.symbol || "")}" /></td>
       <td><input type="text" class="cal-input" style="width:12rem; text-align:left;" data-cur-label value="${escapeHtml(c.label || "")}" /></td>
@@ -523,6 +527,22 @@ function renderCurrencies() {
   tbody.querySelectorAll("tr").forEach((tr) => {
     const id = tr.dataset.id;
     const cur = CURRENCIES.find((x) => String(x.id) === String(id));
+
+    const move = async (dir) => {
+      const idx = CURRENCIES.findIndex((x) => String(x.id) === String(id));
+      const swap = idx + dir;
+      if (idx < 0 || swap < 0 || swap >= CURRENCIES.length) return;
+      [CURRENCIES[idx], CURRENCIES[swap]] = [CURRENCIES[swap], CURRENCIES[idx]];
+      renderCurrencies();
+      try {
+        await HITT_API.reorderInvoiceCurrencies(CURRENCIES.map((x) => x.id));
+      } catch (err) {
+        toast(`Couldn't save order: ${err.message}`, "red");
+        loadCurrencies();
+      }
+    };
+    tr.querySelector("[data-cur-up]").addEventListener("click", () => move(-1));
+    tr.querySelector("[data-cur-down]").addEventListener("click", () => move(1));
     const save = async () => {
       const symbol = tr.querySelector("[data-cur-symbol]").value.trim();
       const label = tr.querySelector("[data-cur-label]").value.trim();

@@ -125,5 +125,8 @@ CREATE TABLE IF NOT EXISTS invoicecurrencies (
   symbol varchar(8) NOT NULL DEFAULT '',
   label  varchar(64) NOT NULL DEFAULT ''
 );
-INSERT INTO invoicecurrencies (code, symbol, label) VALUES ('EUR', '€', 'Euro')
+-- sortorder drives the order currencies appear in the invoice dropdown
+-- (Settings → Currencies lets an admin reorder them).
+ALTER TABLE invoicecurrencies ADD COLUMN IF NOT EXISTS sortorder int NOT NULL DEFAULT 0;
+INSERT INTO invoicecurrencies (code, symbol, label, sortorder) VALUES ('EUR', '€', 'Euro', 0)
   ON CONFLICT (code) DO NOTHING;

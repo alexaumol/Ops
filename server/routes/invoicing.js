@@ -96,9 +96,10 @@ function ensureInvoicingSchema() {
           symbol varchar(8) NOT NULL DEFAULT '',
           label  varchar(64) NOT NULL DEFAULT ''
         )`);
+      await pool.query(`ALTER TABLE invoicecurrencies ADD COLUMN IF NOT EXISTS sortorder int NOT NULL DEFAULT 0`);
       await pool.query(
-        `INSERT INTO invoicecurrencies (code, symbol, label)
-         VALUES ('EUR', '€', 'Euro')
+        `INSERT INTO invoicecurrencies (code, symbol, label, sortorder)
+         VALUES ('EUR', '€', 'Euro', 0)
          ON CONFLICT (code) DO NOTHING`
       );
     })().catch((err) => {
@@ -120,7 +121,7 @@ router.get("/lookups", async (req, res) => {
       pool.query(`SELECT id, percentage, vatdescription_short_en AS label FROM invoices_vattypes ORDER BY id`),
       // dipositaccountid on invoicesdetails references bankaccts.acctid, NOT bankaccts.id.
       pool.query(`SELECT acctid AS id, bankname || ' — ' || iban AS label FROM bankaccts ORDER BY acctid`),
-      pool.query(`SELECT code, symbol, label FROM invoicecurrencies ORDER BY (code = 'EUR') DESC, code`),
+      pool.query(`SELECT code, symbol, label FROM invoicecurrencies ORDER BY sortorder, (code = 'EUR') DESC, code`),
     ]);
     res.json({
       statuses: statuses.rows,

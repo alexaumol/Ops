@@ -817,8 +817,9 @@ function ensureCurrencyTable() {
           symbol varchar(8) NOT NULL DEFAULT '',
           label  varchar(64) NOT NULL DEFAULT ''
         )`);
+      await pool.query(`ALTER TABLE invoicecurrencies ADD COLUMN IF NOT EXISTS sortorder int NOT NULL DEFAULT 0`);
       await pool.query(
-        `INSERT INTO invoicecurrencies (code, symbol, label) VALUES ('EUR', '€', 'Euro')
+        `INSERT INTO invoicecurrencies (code, symbol, label, sortorder) VALUES ('EUR', '€', 'Euro', 0)
          ON CONFLICT (code) DO NOTHING`
       );
     })().catch((err) => { currencyTableReady = null; throw err; });
@@ -837,12 +838,36 @@ router.get("/currencies", async (req, res) => {
        FROM invoicecurrencies c
        LEFT JOIN (SELECT currency, COUNT(*) AS n FROM invoicesdetails GROUP BY currency) u
               ON u.currency = c.code
-       ORDER BY (c.code = 'EUR') DESC, c.code`
+       ORDER BY c.sortorder, (c.code = 'EUR') DESC, c.code`
     );
     res.json(rows);
   } catch (err) {
     console.error("[GET /api/settings/currencies] DB error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
+// PUT /api/settings/currencies/order  { ids: [...] }  — full new order.
+// Registered before /currencies/:id so "order" isn't read as an id.
+router.put("/currencies/order", async (req, res) => {
+  const ids = Array.isArray(req.body?.ids) ? req.body.ids : null;
+  if (!ids) return res.status(400).json({ error: "bad_request", message: "ids array is required." });
+  const client = await pool.connect();
+  try {
+    await ensureCurrencyTable();
+    await client.query("BEGIN");
+    for (let i = 0; i < ids.length; i++) {
+      await client.query(`UPDATE invoicecurrencies SET sortorder = $1 WHERE id = $2`, [i, ids[i]]);
+    }
+    await client.query("COMMIT");
+    res.status(204).end();
+    logAudit(req, { kind: "settings.currency", desc: "Reordered invoice currencies" });
+  } catch (err) {
+    await client.query("ROLLBACK");
+    console.error("[PUT /api/settings/currencies/order] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  } finally {
+    client.release();
   }
 });
 
@@ -856,7 +881,9 @@ router.post("/currencies", async (req, res) => {
     const dup = await pool.query(`SELECT 1 FROM invoicecurrencies WHERE code = $1`, [code]);
     if (dup.rows.length) return res.status(409).json({ error: "conflict", message: "That currency already exists." });
     const { rows } = await pool.query(
-      `INSERT INTO invoicecurrencies (code, symbol, label) VALUES ($1, $2, $3) RETURNING id, code, symbol, label`,
+      `INSERT INTO invoicecurrencies (code, symbol, label, sortorder)
+       VALUES ($1, $2, $3, (SELECT COALESCE(MAX(sortorder), 0) + 1 FROM invoicecurrencies))
+       RETURNING id, code, symbol, label`,
       [code, symbol || code, label]
     );
     res.status(201).json({ ...rows[0], usageCount: 0 });

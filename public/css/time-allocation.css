@@ -201,20 +201,34 @@
 .ta-year.is-collapsed .ta-year-body { display: none; }
 .ta-year-label { flex: 1; font-size: 0.82rem; font-weight: 800; color: var(--text-primary); }
 .ta-year-total { font-size: 0.78rem; font-weight: 700; color: var(--hitt-teal); }
-.ta-year-body { padding: 0.4rem 0.55rem 0.5rem; display: flex; flex-direction: column; gap: 0.25rem; }
-.ta-year-stat {
-  display: flex; justify-content: space-between; gap: 0.5rem;
-  font-size: 0.76rem; color: var(--text-secondary);
-}
-.ta-year-stat strong { color: var(--text-primary); font-weight: 700; font-variant-numeric: tabular-nums; }
+.ta-year-body { padding: 0.35rem 0.4rem 0.4rem; display: flex; flex-direction: column; gap: 0.3rem; }
 
-.ta-month-row {
-  display: grid; grid-template-columns: 2.4rem 1fr 1fr; align-items: baseline; gap: 0.35rem;
-  font-size: 0.74rem; color: var(--text-primary);
+/* month block inside a year (collapsible) */
+.ta-month { border: 1px solid var(--border-subtle); border-radius: 6px; overflow: hidden; }
+.ta-month-head {
+  display: flex; align-items: center; gap: 0.35rem;
+  width: 100%; background: none; border: none;
+  padding: 0.35rem 0.45rem; cursor: pointer; text-align: left;
 }
-.ta-month-name { font-weight: 700; color: var(--text-secondary); }
-.ta-month-hours { text-align: right; font-variant-numeric: tabular-nums; }
-.ta-month-hours em {
-  font-style: normal; font-weight: 700; font-size: 0.62rem;
+.ta-month-head:hover { background: var(--bg-surface-alt); }
+.ta-month-chevron { font-size: 0.55rem; color: var(--text-secondary); transition: transform .15s ease; flex-shrink: 0; }
+.ta-month.is-collapsed .ta-month-chevron { transform: rotate(-90deg); }
+.ta-month.is-collapsed .ta-month-body { display: none; }
+.ta-month-label { flex: 1; font-size: 0.76rem; font-weight: 800; color: var(--text-primary); }
+.ta-month-total { font-size: 0.68rem; font-weight: 700; color: var(--text-secondary); white-space: nowrap; }
+.ta-month-body {
+  padding: 0.15rem 0.45rem 0.4rem 1.1rem;
+  display: flex; flex-direction: column; gap: 0.2rem;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.ta-week-row {
+  display: grid; grid-template-columns: 1fr auto auto; align-items: baseline; gap: 0.4rem;
+  font-size: 0.72rem; color: var(--text-primary);
+}
+.ta-week-label { color: var(--text-secondary); font-weight: 600; }
+.ta-week-hours { text-align: right; font-variant-numeric: tabular-nums; min-width: 3.4rem; }
+.ta-week-hours em {
+  font-style: normal; font-weight: 700; font-size: 0.6rem;
   color: var(--text-secondary); margin-right: 0.15rem;
 }
