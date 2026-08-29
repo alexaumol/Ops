@@ -447,6 +447,13 @@ document.getElementById('invViewPdf').addEventListener('click', () => {
 /* ============================== INVOICE MODAL ============================= */
 const invoiceOverlay = document.getElementById('invoiceOverlay');
 
+// Any real edit to a field flips on the "Data has changed" badge (cleared
+// again each time the modal opens). Programmatic .value assignments in
+// openInvoiceModal() don't fire 'input', so only user edits count.
+invoiceOverlay.addEventListener('input', () => {
+  document.getElementById('invChangedBadge').classList.remove('hidden');
+});
+
 function clientSideStatusPreview(){
   const d = document.getElementById('invDate').value;
   const s = document.getElementById('invSentDate').value;
@@ -494,6 +501,17 @@ async function openInvoiceModal(invoiceId){
   document.getElementById('invModalTitle').textContent = inv ? `Edit invoice ${inv.invoicecode || '(draft)'}` : 'New invoice';
   document.getElementById('invDelete').classList.toggle('hidden', !inv);
   document.getElementById('invViewPdf').classList.toggle('hidden', !inv);
+
+  // Reset the unsaved-edits badge; show "last updated by" when we have it.
+  document.getElementById('invChangedBadge').classList.add('hidden');
+  const updatedInfo = document.getElementById('invUpdatedInfo');
+  if (inv && inv.updatedAt) {
+    const who = inv.updatedByName || (inv.updatedById ? `#${inv.updatedById}` : 'someone');
+    updatedInfo.innerHTML = `Last updated by <strong>${escapeHtml(who)}</strong> on ${escapeHtml(new Date(inv.updatedAt).toLocaleString())}`;
+    updatedInfo.classList.remove('hidden');
+  } else {
+    updatedInfo.classList.add('hidden');
+  }
 
   document.getElementById('invIsCorrective').checked = !!inv?.iscorrective;
   document.getElementById('invIsCorrective').disabled = !!inv; // corrective flag is fixed at creation time

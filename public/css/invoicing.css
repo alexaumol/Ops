@@ -8,6 +8,22 @@
   display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem;
   margin-bottom: 1.25rem;
 }
+
+/* Invoice modal: unsaved-edits badge + "last updated by" line */
+.modal-changed-badge {
+  flex-shrink: 0;
+  font-size: 0.68rem; font-weight: 800;
+  background: #fff; color: var(--danger);
+  padding: 0.2rem 0.55rem; border-radius: 999px;
+  white-space: nowrap;
+}
+.modal-changed-badge.hidden { display: none; }
+.modal-updated-info {
+  margin: 0 0 0.85rem;
+  font-size: 0.76rem; color: var(--text-secondary);
+}
+.modal-updated-info strong { color: var(--text-primary); font-weight: 700; }
+.modal-updated-info.hidden { display: none; }
 .inv-filter-btn {
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);

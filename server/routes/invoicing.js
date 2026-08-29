@@ -65,6 +65,23 @@ async function invoiceProjectCode(projectId) {
   }
 }
 
+// "Last updated by / at" for the invoice modal. The Access schema has no
+// such columns on invoicesdetails, so they're added at runtime (mirrored in
+// server/db/schema-changes.sql) the same way audit/appconfig columns are.
+let invoicingSchemaReady = null;
+function ensureInvoicingSchema() {
+  if (!invoicingSchemaReady) {
+    invoicingSchemaReady = (async () => {
+      await pool.query(`ALTER TABLE invoicesdetails ADD COLUMN IF NOT EXISTS updatedat timestamptz`);
+      await pool.query(`ALTER TABLE invoicesdetails ADD COLUMN IF NOT EXISTS updatedby bigint`);
+    })().catch((err) => {
+      invoicingSchemaReady = null; // let a later call retry
+      throw err;
+    });
+  }
+  return invoicingSchemaReady;
+}
+
 // GET /api/invoicing/lookups
 router.get("/lookups", async (req, res) => {
   try {
@@ -185,6 +202,7 @@ router.patch("/projects/:projectId/release", async (req, res) => {
 // GET /api/invoicing/projects/:projectId/invoices
 router.get("/projects/:projectId/invoices", async (req, res) => {
   try {
+    await ensureInvoicingSchema();
     const { rows } = await pool.query(
       `SELECT i.id, i.invoicecode, i.invoicestatusid, ist.statusdesc AS "statusLabel",
               i.invoiceyear, i.invoiceseq, i.iscorrective, i.sourceinvoiceid,
@@ -192,12 +210,15 @@ router.get("/projects/:projectId/invoices", async (req, res) => {
               d.numocclient, d.purchaseorder, d.descriptionservice, d.invoicecomments,
               d.vatid, vt.vatdescription_short_en AS "vatLabel", d.vatamount,
               d.busspartnertoinvoiceid, tc.taxcompanyname AS "invoicingPartnerLabel",
-              d.dipositaccountid
+              d.dipositaccountid,
+              d.updatedat AS "updatedAt", d.updatedby AS "updatedById",
+              NULLIF(TRIM(CONCAT(ue.employeefirstname, ' ', ue.employeelastname)), '') AS "updatedByName"
        FROM invoices i
        LEFT JOIN invoicesdetails d ON d.invoiceid = i.id
        LEFT JOIN invoicesstatus ist ON ist.id = i.invoicestatusid::bigint
        LEFT JOIN invoices_vattypes vt ON vt.id = d.vatid
        LEFT JOIN taxcompanies tc ON tc.id = d.busspartnertoinvoiceid::bigint
+       LEFT JOIN employees ue ON ue.id = d.updatedby
        WHERE i.projectid = $1::double precision
        ORDER BY i.invoiceyear DESC NULLS LAST, i.invoiceseq DESC NULLS LAST, i.id DESC`,
       [req.params.projectId]
@@ -277,6 +298,7 @@ router.post("/projects/:projectId/invoices", async (req, res) => {
 
   const client = await pool.connect();
   try {
+    await ensureInvoicingSchema();
     await client.query("BEGIN");
 
     const proj = await client.query(`SELECT busspartnerid, busspartnertoinvoiceid FROM projects WHERE id = $1`, [projectId]);
@@ -309,13 +331,14 @@ router.post("/projects/:projectId/invoices", async (req, res) => {
       `INSERT INTO invoicesdetails
          (invoiceid, amount, invoicedate, invoiceduedate, invoicesentdate, invoicedipositdate,
           numocclient, purchaseorder, descriptionservice, invoicecomments, vatid, vatamount,
-          busspartnerid, busspartnertoinvoiceid, dipositaccountid)
-       VALUES ($1, $2, $3::date, $4::date, $5::date, $6::date, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
+          busspartnerid, busspartnertoinvoiceid, dipositaccountid, updatedat, updatedby)
+       VALUES ($1, $2, $3::date, $4::date, $5::date, $6::date, $7, $8, $9, $10, $11, $12, $13, $14, $15, now(), $16)`,
       [
         invoiceId, amount || null, invoiceDate || null, invoiceDueDate || null, invoiceSentDate || null, invoiceDipositDate || null,
         numOcClient || null, purchaseOrder || null, descriptionService || null, invoiceComments || null,
         vatId || 4, vatAmount, proj.rows[0].busspartnerid || null,
         taxCompanyId || proj.rows[0].busspartnertoinvoiceid || null, dipositAccountId || null,
+        req.hittUser?.employeeId || null,
       ]
     );
 
@@ -351,6 +374,7 @@ router.patch("/invoices/:id", async (req, res) => {
 
   const client = await pool.connect();
   try {
+    await ensureInvoicingSchema();
     await client.query("BEGIN");
 
     const current = await client.query(`SELECT * FROM invoicesdetails WHERE invoiceid = $1`, [id]);
@@ -383,13 +407,15 @@ router.patch("/invoices/:id", async (req, res) => {
          amount = $1, invoicedate = $2::date, invoiceduedate = $3::date,
          invoicesentdate = $4::date, invoicedipositdate = $5::date,
          numocclient = $6, purchaseorder = $7, descriptionservice = $8, invoicecomments = $9,
-         vatid = $10, vatamount = $11, busspartnertoinvoiceid = $12, dipositaccountid = $13
+         vatid = $10, vatamount = $11, busspartnertoinvoiceid = $12, dipositaccountid = $13,
+         updatedat = now(), updatedby = $15
        WHERE invoiceid = $14`,
       [
         merged.amount || null, merged.invoiceDate || null, merged.invoiceDueDate || null,
         merged.invoiceSentDate || null, merged.invoiceDipositDate || null,
         merged.numOcClient || null, merged.purchaseOrder || null, merged.descriptionService || null, merged.invoiceComments || null,
         merged.vatId || 4, vatAmount, merged.taxCompanyId || null, merged.dipositAccountId || null, id,
+        req.hittUser?.employeeId || null,
       ]
     );
     await client.query(`UPDATE invoices SET invoicestatusid = $1 WHERE id = $2`, [status, id]);

@@ -91,3 +91,11 @@ CREATE INDEX IF NOT EXISTS actionsaudit_actionuserid_idx ON public.actionsaudit 
 -- An earlier build briefly created a separate public.auditlog table; it is
 -- unused now. Drop it if it exists in your database:
 DROP TABLE IF EXISTS public.auditlog;
+
+-- 2026-08 — Invoice modal: "last updated by / at"
+-- --------------------------------------------------------------------------
+-- The Access invoicesdetails table has no modification-tracking columns.
+-- Added at runtime by ensureInvoicingSchema() in server/routes/invoicing.js
+-- and shown in the invoice edit modal's header.
+ALTER TABLE invoicesdetails ADD COLUMN IF NOT EXISTS updatedat timestamptz;
+ALTER TABLE invoicesdetails ADD COLUMN IF NOT EXISTS updatedby bigint;
