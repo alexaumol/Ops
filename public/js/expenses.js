@@ -72,6 +72,42 @@ function updateScopeCounts(counts) {
   });
 }
 
+// Side column: top 10 projects by expense spend, each bar split into the
+// re-invoiceable and not-re-invoiceable share; plus the internal total.
+function renderSidePanel(top, internalTotal) {
+  document.getElementById("expInternalTotal").textContent =
+    internalTotal == null ? "—" : money(internalTotal, "EUR");
+
+  const host = document.getElementById("expTopProjects");
+  if (!top || !top.length) {
+    host.innerHTML = `<p class="exp-side-empty">No project expenses in this range.</p>`;
+    return;
+  }
+  host.innerHTML = top.map((t) => {
+    const total = Number(t.total) || 0;
+    const bill = Number(t.billable) || 0;
+    const non = Number(t.nonBillable) || 0;
+    const billPct = total > 0 ? (bill / total) * 100 : 0;
+    const nonPct = total > 0 ? (non / total) * 100 : 0;
+    return `
+      <a class="exp-top-item" href="projects.html?projectId=${encodeURIComponent(t.projectId)}" title="${escapeHtml(t.projectName || "")}">
+        <div class="exp-top-item-head">
+          <span class="exp-top-code">${escapeHtml(t.projectCode || "#" + t.projectId)}</span>
+          <span class="exp-top-total">${money(total, "EUR")}</span>
+        </div>
+        <div class="exp-top-name">${escapeHtml(t.projectName || "—")}</div>
+        <div class="exp-top-bar">
+          <span class="exp-top-seg billable" style="width:${billPct.toFixed(1)}%"></span>
+          <span class="exp-top-seg nonbillable" style="width:${nonPct.toFixed(1)}%"></span>
+        </div>
+        <div class="exp-top-legend">
+          <span><i class="billable"></i>${money(bill, "EUR")} re-inv.</span>
+          <span><i class="nonbillable"></i>${money(non, "EUR")} not</span>
+        </div>
+      </a>`;
+  }).join("");
+}
+
 function updateSortIndicators() {
   document.querySelectorAll(".exp-table th[data-sort]").forEach((th) => {
     const active = th.dataset.sort === sortCol;
@@ -134,6 +170,7 @@ async function loadExpenses() {
     renderTable();
     updateScopeCounts(data.counts);
     updateSortIndicators();
+    renderSidePanel(data.topProjects, data.internalTotal);
     document.getElementById("expPageInfo").textContent = total
       ? `Page ${page} of ${totalPages()} · ${total} expense${total === 1 ? "" : "s"}`
       : "";
@@ -144,6 +181,7 @@ async function loadExpenses() {
     empty.textContent = "Could not load expenses.";
     empty.classList.remove("hidden");
     updateScopeCounts(null);
+    renderSidePanel(null, null);
   }
   updatePagerButtons();
 }

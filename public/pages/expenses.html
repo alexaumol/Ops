@@ -24,10 +24,12 @@
     </div>
   </header>
 
-  <main class="page-shell">
+  <main class="page-shell page-shell--wide">
     <h1 class="page-title">Expenses</h1>
     <p class="page-subtitle">Every company expense — travel, meals, materials — bound to a project or internal, with its evidence document.</p>
 
+    <div class="exp-layout">
+    <div class="exp-main">
     <div class="exp-filters">
       <input id="expSearch" type="text" placeholder="Search description, category, project…" />
       <div class="exp-scope" role="group" aria-label="Scope">
@@ -82,6 +84,20 @@
       <button class="btn btn-secondary" id="btnExpPrev">&larr; Prev</button>
       <button class="btn btn-secondary" id="btnExpNext">Next &rarr;</button>
     </div>
+    </div><!-- /.exp-main -->
+
+    <aside class="exp-side">
+      <div class="exp-side-card">
+        <h2 class="exp-side-title">Top projects by expense</h2>
+        <p class="exp-side-hint">Top 10 by total spend, each split re-invoiceable vs. not. Follows the filters above (not the scope toggle).</p>
+        <div id="expTopProjects" class="exp-top-list"></div>
+        <div class="exp-side-internal">
+          <span>Internal <small>(no project)</small></span>
+          <strong id="expInternalTotal">—</strong>
+        </div>
+      </div>
+    </aside>
+    </div><!-- /.exp-layout -->
   </main>
 
   <div id="toastHost" class="toast-host"></div>

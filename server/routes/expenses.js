@@ -226,9 +226,37 @@ router.get("/", async (req, res) => {
       : scope === "project" ? Number(a.s_project)
       : Number(a.s_all);
 
+    // Side column: the 10 projects with the most expense spend under the
+    // current (non-scope) filters, each split re-invoiceable vs. not.
+    const topWhere = [...base, "x.projectid IS NOT NULL"];
+    const topRes = await pool.query(
+      `SELECT x.projectid AS "projectId",
+              p.projectnumber AS "projectCode",
+              p.projectname   AS "projectName",
+              COALESCE(SUM(x.amount), 0)                                          AS total,
+              COALESCE(SUM(x.amount) FILTER (WHERE x.invoiceable IS TRUE), 0)     AS billable,
+              COALESCE(SUM(x.amount) FILTER (WHERE x.invoiceable IS NOT TRUE), 0) AS "nonBillable"
+       ${EXPENSE_FROM}
+       WHERE ${topWhere.join(" AND ")}
+       GROUP BY x.projectid, p.projectnumber, p.projectname
+       ORDER BY total DESC, x.projectid
+       LIMIT 10`,
+      fp
+    );
+    const topProjects = topRes.rows.map((r) => ({
+      projectId: r.projectId,
+      projectCode: r.projectCode,
+      projectName: r.projectName,
+      total: Number(r.total),
+      billable: Number(r.billable),
+      nonBillable: Number(r.nonBillable),
+    }));
+
     res.json({
       rows: rows.map(({ totalCount, ...r }) => r),
       total, page, limit, sum, counts,
+      topProjects,
+      internalTotal: Number(a.s_internal),
     });
   } catch (err) {
     console.error("[GET /api/expenses] DB error:", err.message);
