@@ -275,6 +275,7 @@ async function deleteContact(id){
   try {
     await HITT_API.deleteBusinessPartnerContact(activeBpId, id, currentEmployeeId);
     bpSessionAdds.contacts = bpSessionAdds.contacts.filter(x => String(x) !== String(id));
+    bpEditedContacts.delete(String(id));
     const wasEditingThis = String(editingContactId) === String(id);
     CONTACTS = await HITT_API.getBusinessPartnerContacts(activeBpId);
     if (wasEditingThis) cancelEditContact(); // resets the form + re-renders
@@ -434,6 +435,7 @@ async function deleteTaxCompany(id){
   try {
     await HITT_API.deleteBusinessPartnerTaxCompany(activeBpId, id);
     bpSessionAdds.taxCompanies = bpSessionAdds.taxCompanies.filter(x => String(x) !== String(id));
+    bpEditedTaxCompanies.delete(String(id));
     const wasEditingThis = String(editingTcId) === String(id);
     TAX_COMPANIES = await HITT_API.getBusinessPartnerTaxCompanies(activeBpId);
     if (wasEditingThis) resetTaxCompanyForm();
@@ -551,6 +553,7 @@ async function openDetailModal(id){
     renderContacts(contacts);
     renderNotes(notes);
     renderTaxCompanies(taxCompanies);
+    snapshotBpSubitems(contacts, taxCompanies); // baseline for discard-revert
   } catch (err) {
     console.warn(`Could not load contacts/notes/tax companies for business partner ${id}:`, err);
   }
@@ -571,26 +574,78 @@ const BP_MODAL_TRANSIENT_IDS = [
   'mTcName', 'mTcVat', 'mTcEmail', 'mTcStreet', 'mTcCity', 'mTcState', 'mTcZip', 'mTcPhone1', 'mTcPhone2',
 ];
 
-// Sub-items (contacts / notes / tax companies) added during the current
-// modal session. Each "Add" persists immediately; a confirmed discard
-// deletes them again. Reset on open, cleared on Save.
+// Sub-item changes made during the current modal session. Each "Add" /
+// "Save" on a sub-row persists immediately, so a confirmed discard undoes
+// them: session-added rows are deleted, edited pre-existing rows are
+// PATCHed back to how they loaded. Reset on open, cleared on Save.
 let bpSessionAdds = { contacts: [], notes: [], taxCompanies: [] };
-function resetBpSessionAdds(){ bpSessionAdds = { contacts: [], notes: [], taxCompanies: [] }; }
+let bpOrigContacts = new Map();        // String(id) -> row as loaded
+let bpOrigTaxCompanies = new Map();
+let bpEditedContacts = new Set();      // String(id) of pre-existing rows edited this session
+let bpEditedTaxCompanies = new Set();
+
+function resetBpSessionAdds(){
+  bpSessionAdds = { contacts: [], notes: [], taxCompanies: [] };
+  bpEditedContacts = new Set();
+  bpEditedTaxCompanies = new Set();
+  bpOrigContacts = new Map();          // repopulated by snapshotBpSubitems on load
+  bpOrigTaxCompanies = new Map();
+}
+function snapshotBpSubitems(contacts, taxCompanies){
+  bpOrigContacts = new Map((contacts || []).map(c => [String(c.id), { ...c }]));
+  bpOrigTaxCompanies = new Map((taxCompanies || []).map(tc => [String(tc.id), { ...tc }]));
+}
 function bpHasSessionAdds(){
   return bpSessionAdds.contacts.length || bpSessionAdds.notes.length || bpSessionAdds.taxCompanies.length;
 }
-async function discardBpSessionAdds(){
+function bpHasSessionChanges(){
+  return bpHasSessionAdds() || bpEditedContacts.size > 0 || bpEditedTaxCompanies.size > 0;
+}
+function tcRevertPayload(o){
+  return {
+    taxcompanyname: o.taxcompanyname || '',
+    vatnumber: o.vatnumber || null,
+    emailinvoicing: o.emailinvoicing || null,
+    sameAddress: !!o.sameAddress,
+    address: o.sameAddress ? null : {
+      streetname: o.streetname || null,
+      city: o.city || null,
+      state: o.state || null,
+      zipcode: o.zipcode || null,
+      phonenumber: o.phonenumber || null,
+      phonenumber2: o.phonenumber2 || null,
+      countryid: o.countryid != null ? Number(o.countryid) : null,
+    },
+  };
+}
+async function discardBpSessionChanges(){
   const bpId = activeBpId;
   if (!bpId) return;
   const jobs = [
     ...bpSessionAdds.contacts.map(cId => HITT_API.deleteBusinessPartnerContact(bpId, cId, currentEmployeeId)),
     ...bpSessionAdds.notes.map(nId => HITT_API.deleteBusinessPartnerNote(bpId, nId)),
     ...bpSessionAdds.taxCompanies.map(tcId => HITT_API.deleteBusinessPartnerTaxCompany(bpId, tcId)),
+    ...[...bpEditedContacts].map(cId => {
+      const o = bpOrigContacts.get(String(cId));
+      if (!o) return Promise.resolve();
+      return HITT_API.updateBusinessPartnerContact(bpId, cId, {
+        contactname: o.contactname || '',
+        position: o.position || null,
+        emailaddress: o.emailaddress || null,
+        phonenumber: o.phonenumber || null,
+        employeeId: currentEmployeeId,
+      });
+    }),
+    ...[...bpEditedTaxCompanies].map(tcId => {
+      const o = bpOrigTaxCompanies.get(String(tcId));
+      if (!o) return Promise.resolve();
+      return HITT_API.updateBusinessPartnerTaxCompany(bpId, tcId, tcRevertPayload(o));
+    }),
   ];
   resetBpSessionAdds();
   const results = await Promise.allSettled(jobs);
   const failed = results.filter(r => r.status === 'rejected').length;
-  if (failed) toast(`${failed} item${failed === 1 ? '' : 's'} could not be reverted — check the partner.`, 'red');
+  if (failed) toast(`${failed} change${failed === 1 ? '' : 's'} could not be reverted — check the partner.`, 'red');
 }
 
 // Unsaved work in the modal: an edited main field ("Data has changed"),
@@ -599,7 +654,7 @@ async function discardBpSessionAdds(){
 function bpModalHasUnsaved(){
   if (!document.getElementById('mChangedBadge').classList.contains('hidden')) return true;
   if (editingContactId || editingTcId) return true;
-  if (bpHasSessionAdds()) return true;
+  if (bpHasSessionChanges()) return true;
   return BP_MODAL_TRANSIENT_IDS.some(id => String(document.getElementById(id)?.value || '').trim() !== '');
 }
 
@@ -621,11 +676,11 @@ function closeDetailModal(){
 // session (each "Add" persisted immediately).
 async function requestCloseDetailModal(){
   if (!bpModalHasUnsaved()) { closeDetailModal(); return; }
-  const msg = bpHasSessionAdds()
-    ? 'Discard your changes? Items you added (contacts, notes, tax companies) will be removed.'
+  const msg = bpHasSessionChanges()
+    ? 'Discard your changes? Contacts, notes and tax companies you added or edited will be reverted.'
     : 'Discard your unsaved changes to this business partner?';
   if (!confirm(msg)) return;
-  if (bpHasSessionAdds()) await discardBpSessionAdds();
+  if (bpHasSessionChanges()) await discardBpSessionChanges();
   clearBpModalTransient();
   closeDetailModal();
 }
@@ -724,6 +779,10 @@ document.getElementById('mAddContact').addEventListener('click', async () => {
   try {
     if (wasEditing) {
       await HITT_API.updateBusinessPartnerContact(activeBpId, wasEditing, payload);
+      if (bpOrigContacts.has(String(wasEditing)) &&
+          !bpSessionAdds.contacts.some(x => String(x) === String(wasEditing))) {
+        bpEditedContacts.add(String(wasEditing));
+      }
     } else {
       const created = await HITT_API.addBusinessPartnerContact(activeBpId, payload);
       if (created && created.id != null) bpSessionAdds.contacts.push(created.id);
@@ -781,6 +840,10 @@ document.getElementById('mTcSave').addEventListener('click', async () => {
   try {
     if (wasEditing) {
       await HITT_API.updateBusinessPartnerTaxCompany(activeBpId, wasEditing, payload);
+      if (bpOrigTaxCompanies.has(String(wasEditing)) &&
+          !bpSessionAdds.taxCompanies.some(x => String(x) === String(wasEditing))) {
+        bpEditedTaxCompanies.add(String(wasEditing));
+      }
     } else {
       const created = await HITT_API.addBusinessPartnerTaxCompany(activeBpId, payload);
       if (created && created.id != null) bpSessionAdds.taxCompanies.push(created.id);

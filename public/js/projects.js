@@ -813,6 +813,7 @@ async function openProjectModal(id){
       ]);
       if (activeProjectId !== id) return;
       renderDeliverables(deliverables);
+      snapshotProjectDeliverables(deliverables); // baseline for discard-revert
       renderNotes(notes);
       renderQuotations(quotations);
     } catch (err) {
@@ -973,27 +974,49 @@ function formatDateTime(iso){
 let DELIVERABLES = [];
 let editingDeliverableId = null;
 
-// Sub-items (notes / deliverables / quotations) added during the current
-// modal session. Each "Add" persists immediately, so if the user then
-// cancels + confirms "discard", these get deleted again. Reset on open,
-// cleared on Save.
+// Sub-item changes made during the current modal session. Each "Add" /
+// "Save" on a sub-row persists immediately, so a confirmed discard undoes
+// them: session-added rows are deleted, edited pre-existing rows are
+// PATCHed back to how they loaded. Reset on open, cleared on Save.
 let projectSessionAdds = { notes: [], deliverables: [], quotations: [] };
-function resetProjectSessionAdds(){ projectSessionAdds = { notes: [], deliverables: [], quotations: [] }; }
+let projectOrigDeliverables = new Map();   // String(id) -> row as loaded
+let projectEditedDeliverables = new Set(); // String(id) of pre-existing rows edited this session
+
+function resetProjectSessionAdds(){
+  projectSessionAdds = { notes: [], deliverables: [], quotations: [] };
+  projectEditedDeliverables = new Set();
+  projectOrigDeliverables = new Map(); // repopulated by snapshotProjectDeliverables on load
+}
+function snapshotProjectDeliverables(rows){
+  projectOrigDeliverables = new Map((rows || []).map(d => [String(d.id), { ...d }]));
+}
 function projectHasSessionAdds(){
   return projectSessionAdds.notes.length || projectSessionAdds.deliverables.length || projectSessionAdds.quotations.length;
 }
-async function discardProjectSessionAdds(){
+function projectHasSessionChanges(){
+  return projectHasSessionAdds() || projectEditedDeliverables.size > 0;
+}
+async function discardProjectSessionChanges(){
   const pid = activeProjectId;
   if (!pid) return;
   const jobs = [
     ...projectSessionAdds.notes.map(nId => HITT_API.deleteProjectNote(pid, nId)),
     ...projectSessionAdds.deliverables.map(dId => HITT_API.deleteProjectDeliverable(pid, dId)),
     ...projectSessionAdds.quotations.map(qId => HITT_API.deleteProjectQuotation(pid, qId)),
+    ...[...projectEditedDeliverables].map(dId => {
+      const o = projectOrigDeliverables.get(String(dId));
+      if (!o) return Promise.resolve();
+      return HITT_API.updateProjectDeliverable(pid, dId, {
+        deliverablename: o.deliverablename || '',
+        deliverydate: o.deliverydate ? String(o.deliverydate).slice(0, 10) : null,
+        effectivedd: o.effectivedd ? String(o.effectivedd).slice(0, 10) : null,
+      });
+    }),
   ];
   resetProjectSessionAdds();
   const results = await Promise.allSettled(jobs);
   const failed = results.filter(r => r.status === 'rejected').length;
-  if (failed) toast(`${failed} item${failed === 1 ? '' : 's'} could not be reverted — check the project.`, 'red');
+  if (failed) toast(`${failed} change${failed === 1 ? '' : 's'} could not be reverted — check the project.`, 'red');
 }
 
 function startEditDeliverable(id){
@@ -1021,6 +1044,7 @@ async function deleteDeliverable(id){
   try {
     await HITT_API.deleteProjectDeliverable(activeProjectId, id);
     projectSessionAdds.deliverables = projectSessionAdds.deliverables.filter(x => String(x) !== String(id));
+    projectEditedDeliverables.delete(String(id));
     if (editingDeliverableId === id) cancelEditDeliverable();
     const deliverables = await HITT_API.getProjectDeliverables(activeProjectId);
     renderDeliverables(deliverables);
@@ -1299,7 +1323,7 @@ const PROJECT_MODAL_TRANSIENT_IDS = [
 function projectModalHasUnsaved(){
   if (!document.getElementById('mChangedBadge').classList.contains('hidden')) return true;
   if (editingDeliverableId) return true;
-  if (projectHasSessionAdds()) return true;
+  if (projectHasSessionChanges()) return true;
   return PROJECT_MODAL_TRANSIENT_IDS.some(id => String(document.getElementById(id)?.value || '').trim() !== '');
 }
 
@@ -1321,11 +1345,11 @@ function closeProjectModal(){
 // session (each "Add" persisted immediately).
 async function requestCloseProjectModal(){
   if (!projectModalHasUnsaved()) { closeProjectModal(); return; }
-  const msg = projectHasSessionAdds()
-    ? 'Discard your changes? Items you added (notes, deliverables, quotations) will be removed.'
+  const msg = projectHasSessionChanges()
+    ? 'Discard your changes? Notes, deliverables and quotations you added or edited will be reverted.'
     : 'Discard your unsaved changes to this project?';
   if (!confirm(msg)) return;
-  if (projectHasSessionAdds()) await discardProjectSessionAdds();
+  if (projectHasSessionChanges()) await discardProjectSessionChanges();
   clearProjectModalTransient();
   closeProjectModal();
 }
@@ -1458,6 +1482,11 @@ document.getElementById('mAddDeliverable').addEventListener('click', async () =>
         deliverydate: dateInput.value || null,
         effectivedd: effectiveInput.value || null,
       });
+      // Track edits to pre-existing rows so a discard can revert them.
+      if (projectOrigDeliverables.has(String(editingId)) &&
+          !projectSessionAdds.deliverables.some(x => String(x) === String(editingId))) {
+        projectEditedDeliverables.add(String(editingId));
+      }
     } else {
       const created = await HITT_API.addProjectDeliverable(activeProjectId, {
         deliverablename: name,
