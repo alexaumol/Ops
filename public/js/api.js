@@ -56,7 +56,7 @@ const HITT_API = (() => {
   }
 
   return {
-    getProjects: () => request("/api/projects"),
+    getProjects: (opts = {}) => request("/api/projects" + (opts.scope ? `?scope=${encodeURIComponent(opts.scope)}` : "")),
     getProjectStatuses: () => request("/api/projects/statuses"),
     getProjectAttention: () => request("/api/projects/attention"),
     getProjectLookups: () => request("/api/projects/lookups"),
@@ -124,6 +124,8 @@ const HITT_API = (() => {
     getTimeOffBalance: (empId, year) =>
       request(`/api/time-off/balance?empId=${encodeURIComponent(empId)}&year=${encodeURIComponent(year)}`),
     getPendingTimeOffRequests: () => request("/api/time-off/requests/pending"),
+    getTimeOffNotifications: (since) =>
+      request(`/api/time-off/notifications${since ? `?since=${encodeURIComponent(since)}` : ""}`),
     approveTimeOffRequest: (id) => request(`/api/time-off/requests/${id}/approve`, { method: "PATCH" }),
     rejectTimeOffRequest: (id, comment) =>
       request(`/api/time-off/requests/${id}/reject`, { method: "PATCH", body: JSON.stringify({ comment }) }),

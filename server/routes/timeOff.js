@@ -26,7 +26,7 @@
  */
 const express = require("express");
 const { pool } = require("../config/db");
-const { requireModuleAccess, requireTimeOffApprover } = require("../lib/permissions");
+const { requireModuleAccess, requireTimeOffApprover, isTimeOffApprover } = require("../lib/permissions");
 const { logAudit } = require("../lib/audit");
 
 const router = express.Router();
@@ -49,6 +49,50 @@ async function timeOffAuditLabel(requestId) {
     return `request #${requestId}`;
   }
 }
+
+// GET /api/time-off/notifications?since=<ISO>
+// Feeds the red badge on the Time allocation tile / "Time off requests" tab.
+//  - approvers:     pendingApprovals = requests still awaiting a decision
+//  - everyone else: myUpdates = the caller's own requests approved/rejected
+//                   since `since` (the client's "last looked" timestamp;
+//                   absent -> 0, so a fresh browser starts clean)
+router.get("/notifications", requireModuleAccess("time-allocation"), async (req, res) => {
+  try {
+    const empId = req.hittUser?.employeeId || null;
+    const since = req.query.since && !Number.isNaN(Date.parse(req.query.since)) ? req.query.since : null;
+
+    let myUpdates = 0;
+    if (empId && since) {
+      const { rows } = await pool.query(
+        `SELECT COUNT(*)::int AS n
+         FROM timeoffrequests r
+         JOIN timeoffrequeststatus s ON s.timeoffreqid = r.id
+         WHERE r.empid = $1
+           AND s.statusid IN (4, 5)
+           AND (r.approvedat > $2::timestamptz OR r.rejectedat > $2::timestamptz)`,
+        [empId, since]
+      );
+      myUpdates = rows[0].n;
+    }
+
+    let isApprover = false;
+    let pendingApprovals = 0;
+    if (empId) {
+      isApprover = await isTimeOffApprover(empId);
+      if (isApprover) {
+        const { rows } = await pool.query(
+          `SELECT COUNT(*)::int AS n FROM timeoffrequeststatus WHERE statusid IN (2, 3)`
+        );
+        pendingApprovals = rows[0].n;
+      }
+    }
+
+    res.json({ isApprover, pendingApprovals, myUpdates });
+  } catch (err) {
+    console.error("[GET /api/time-off/notifications] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
 
 // GET /api/time-off/requests/pending — cross-employee queue for approvers.
 // Registered before the /:id routes so "pending" doesn't get swallowed as

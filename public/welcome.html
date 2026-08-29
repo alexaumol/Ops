@@ -98,6 +98,16 @@
     box-shadow: none;
     border-color: var(--border-subtle);
   }
+
+  .module-card__badge {
+    position: absolute;
+    top: 0.7rem; right: 0.7rem;
+    z-index: 3;
+  }
+  /* Slide the "Live data" pill left so it clears the badge when one shows. */
+  .module-card:has(.module-card__badge:not(.hidden)) .module-card__status {
+    right: 2.9rem;
+  }
 </style>
 </head>
 <body>
@@ -136,6 +146,7 @@
 
       <a class="module-card" href="pages/time-allocation.html" data-module="time-allocation">
         <span class="module-card__status status-live">Live data</span>
+        <span class="notif-badge module-card__badge hidden" id="timeAllocBadge" title="Time-off notifications"></span>
         <div class="module-card__icon icon-time" aria-hidden="true">🕒</div>
         <h2 class="module-card__title">Time allocation</h2>
         <p class="module-card__desc">Time tracking, allocable/non-allocable hours, holidays and time-off requests.</p>
@@ -182,6 +193,7 @@
   <script src="js/auth.js"></script>
   <script src="js/api.js"></script>
   <script src="js/permissions.js"></script>
+  <script src="js/notifications.js"></script>
   <script>
     const session = HITT_AUTH.requireSession("index.html");
     if (session) {
@@ -197,6 +209,13 @@
     // checking right after sign-in, before it ever navigates here.
     HITT_PERMS.redirectIfDeactivated("index.html").then((blocked) => {
       if (blocked) return;
+
+      // Red badge on the Time allocation tile — pending approvals (for
+      // approvers) or your own just-decided requests (everyone else).
+      HITT_NOTIFY.timeOffCount().then((n) => {
+        HITT_NOTIFY.paint(document.getElementById("timeAllocBadge"), n);
+      });
+
       HITT_PERMS.applyRealName().then((perms) => {
         if (!perms) return;
         // Same upgrade as applyRealName() does for the header, applied to

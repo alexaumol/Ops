@@ -121,11 +121,15 @@ async function statusLabelById(statusId) {
 // recently assigned if more than one ever exists.
 router.get("/", requireModuleAccess("projects"), async (req, res) => {
   try {
+    // ?scope=alive drops Closed/Cancelled projects — used by the time
+    // tracking picker (you can't log hours on a finished project).
+    const aliveOnly = req.query.scope === "alive";
     const { rows } = await pool.query(`
       SELECT p.id,
              p.projectnumber AS code,
              p.projectname   AS name,
              p.projectstatusid AS stage,
+             ps.projectstatusdesc AS "statusLabel",
              COALESCE(pp.progress, 0) AS progress,
              p.lastupdated,
              p.lastupdatedby,
@@ -134,6 +138,7 @@ router.get("/", requireModuleAccess("projects"), async (req, res) => {
              (latestq.finalquotation IS NOT NULL) AS "hasBudget",
              owner."ownerId", owner."ownerName"
       FROM projects p
+      LEFT JOIN projectstatus ps ON ps.id = p.projectstatusid::bigint
       ${LATEST_PROGRESS_SUBQUERY}
       LEFT JOIN LATERAL (
         SELECT finalquotation
@@ -150,6 +155,7 @@ router.get("/", requireModuleAccess("projects"), async (req, res) => {
         ORDER BY po.id DESC
         LIMIT 1
       ) owner ON true
+      ${aliveOnly ? "WHERE LOWER(COALESCE(ps.projectstatusdesc, '')) NOT IN ('closed', 'cancelled')" : ""}
       ORDER BY p.projectnumber DESC
     `);
     res.json(rows);

@@ -131,6 +131,9 @@ document.querySelectorAll('[data-ptab]').forEach(btn => {
     currentPageTab = btn.dataset.ptab;
     document.getElementById('paneTracking').classList.toggle('hidden', currentPageTab !== 'tracking');
     document.getElementById('paneTimeOff').classList.toggle('hidden', currentPageTab !== 'timeoff');
+    // Opening the Time off tab counts as "seen" — clears the status-change
+    // side of the badge (approvers still see their pending count).
+    if (currentPageTab === 'timeoff') HITT_NOTIFY.markTimeOffSeen();
     refreshActiveTab();
   });
 });
@@ -138,6 +141,12 @@ document.querySelectorAll('[data-ptab]').forEach(btn => {
 function refreshActiveTab(){
   if (currentPageTab === 'tracking') loadWeek();
   else loadTimeOff();
+}
+
+async function refreshTimeOffBadge(){
+  const el = document.getElementById('timeoffTabBadge');
+  if (usingDemoData) { HITT_NOTIFY.paint(el, 0); return; }
+  HITT_NOTIFY.paint(el, await HITT_NOTIFY.timeOffCount());
 }
 
 /* ============================== LOAD / RENDER WEEK ========================= */
@@ -278,7 +287,8 @@ const projectPickerOverlay = document.getElementById('projectPickerOverlay');
 async function ensureProjectsLoaded(){
   if (ALL_PROJECTS.length || usingDemoData) return;
   try {
-    ALL_PROJECTS = await HITT_API.getProjects();
+    // Alive projects only — you can't log hours on a Closed/Cancelled one.
+    ALL_PROJECTS = await HITT_API.getProjects({ scope: 'alive' });
   } catch (err) {
     console.warn('Could not load projects for the picker:', err);
   }
@@ -429,6 +439,7 @@ async function loadTimeOff(){
   // Approving others' requests doesn't depend on who you're "logging time
   // as" above, so it loads independently of the early returns below.
   await loadApprovals();
+  refreshTimeOffBadge();
 
   if (!currentEmployeeId) {
     TIME_OFF_REQUESTS = [];
@@ -522,6 +533,7 @@ function renderApprovalsTable(pending){
         await HITT_API.approveTimeOffRequest(pending[i].id);
         toast(`Approved ${pending[i].employeeName}'s request.`, 'green');
         await loadApprovals();
+        refreshTimeOffBadge();
       } catch (err) {
         console.error(err);
         toast('Could not approve that request.', 'red');
@@ -534,6 +546,7 @@ function renderApprovalsTable(pending){
         await HITT_API.rejectTimeOffRequest(pending[i].id);
         toast(`Rejected ${pending[i].employeeName}'s request.`, 'navy');
         await loadApprovals();
+        refreshTimeOffBadge();
       } catch (err) {
         console.error(err);
         toast('Could not reject that request.', 'red');
@@ -599,4 +612,5 @@ document.getElementById('timeOffSubmit').addEventListener('click', async () => {
 (async () => {
   await initEmployee();
   await loadWeek();
+  refreshTimeOffBadge();
 })();
