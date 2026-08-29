@@ -83,7 +83,7 @@ function toISODate(d) { return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${p
 function startOfDay(d) { return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
 
 /* ============================== PAGE TABS ================================= */
-let currentTab = "hours";
+let currentTab = "stats";
 document.querySelectorAll("[data-rtab]").forEach((btn) => {
   btn.addEventListener("click", () => {
     document.querySelectorAll("[data-rtab]").forEach((b) => b.setAttribute("aria-selected", "false"));
@@ -92,11 +92,13 @@ document.querySelectorAll("[data-rtab]").forEach((btn) => {
     document.getElementById("paneHours").classList.toggle("hidden", currentTab !== "hours");
     document.getElementById("paneLeaves").classList.toggle("hidden", currentTab !== "leaves");
     document.getElementById("paneStats").classList.toggle("hidden", currentTab !== "stats");
+    if (currentTab === "hours" && !hoursLoaded) { hoursLoaded = true; loadHours(); }
     if (currentTab === "leaves") loadLeavesMonth();
     if (currentTab === "stats" && !statsLoaded) { statsLoaded = true; loadStats(); }
   });
 });
 let statsLoaded = false;
+let hoursLoaded = false;
 
 /* ============================== HOURS PER PROJECT ========================= */
 const hoursStartInput = document.getElementById("hoursStartDate");
@@ -988,4 +990,5 @@ document.getElementById("btnStaleExport").addEventListener("click", async () => 
 });
 
 /* ============================== INIT ==================================== */
-loadHours();
+statsLoaded = true;
+loadStats();

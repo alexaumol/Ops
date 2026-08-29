@@ -27,13 +27,13 @@
     <p class="page-subtitle">Portfolio-wide views built from live project and time-off data.</p>
 
     <div class="page-tabs">
-      <button data-rtab="hours" class="page-tab" aria-selected="true">Hours per project</button>
+      <button data-rtab="stats" class="page-tab" aria-selected="true">Project stats</button>
+      <button data-rtab="hours" class="page-tab" aria-selected="false">Hours per project</button>
       <button data-rtab="leaves" class="page-tab" aria-selected="false">Resource leaves</button>
-      <button data-rtab="stats" class="page-tab" aria-selected="false">Project stats</button>
     </div>
 
     <!-- ============================ HOURS PER PROJECT ============================ -->
-    <div id="paneHours" class="page-pane">
+    <div id="paneHours" class="page-pane hidden">
       <div class="rpt-toolbar">
         <label class="rpt-field">
           <span>From</span>
@@ -97,7 +97,7 @@
     </div>
 
     <!-- ============================ PROJECT STATS ============================ -->
-    <div id="paneStats" class="page-pane hidden">
+    <div id="paneStats" class="page-pane">
       <!-- Row 1: full width -->
       <div class="rpt-chart-card">
         <div class="rpt-chart-head">
