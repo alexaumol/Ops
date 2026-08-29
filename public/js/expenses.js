@@ -29,6 +29,19 @@ function money(n, cur) {
 function fmtDate(iso) { return iso ? new Date(iso).toLocaleDateString() : "—"; }
 function isoDay(v) { return v ? String(v).slice(0, 10) : ""; }
 
+// Project-status chip colours, kept consistent with the Projects kanban
+// columns and the Invoicing / Reports status chips. Matched on the
+// lower-cased status label.
+const PROJ_STATUS_COLORS = {
+  lead: "#5C757C", oferta: "#BC9A1C", guanyat: "#6E8F5A", wip: "#171717",
+  delivered: "#211916", closed: "#8A8676", cancelled: "#B24A3A",
+};
+function statusChipHtml(label) {
+  if (!label) return "";
+  const color = PROJ_STATUS_COLORS[String(label).trim().toLowerCase()] || "#8A8676";
+  return `<span class="exp-status-chip" style="background:${color}">${escapeHtml(label)}</span>`;
+}
+
 let PROJECTS = [];
 let EMPLOYEES = [];
 let CATEGORIES = [];
@@ -37,6 +50,7 @@ let page = 1;
 let total = 0;
 let sortCol = "date";
 let sortDir = "desc";
+let topScope = ""; // "" = all projects, "alive" = exclude Closed/Cancelled
 const selected = new Set();
 let searchDebounce = null;
 
@@ -60,6 +74,7 @@ function filters() {
     endDate: document.getElementById("expEndDate").value || undefined,
     sort: sortCol,
     dir: sortDir,
+    topScope: topScope || undefined,
     page,
     limit: Number(document.getElementById("expPageSize").value),
   };
@@ -96,6 +111,7 @@ function renderSidePanel(top, internalTotal) {
           <span class="exp-top-total">${money(total, "EUR")}</span>
         </div>
         <div class="exp-top-name">${escapeHtml(t.projectName || "—")}</div>
+        ${t.statusLabel ? `<div class="exp-top-status">${statusChipHtml(t.statusLabel)}</div>` : ""}
         <div class="exp-top-bar">
           <span class="exp-top-seg billable" style="width:${billPct.toFixed(1)}%"></span>
           <span class="exp-top-seg nonbillable" style="width:${nonPct.toFixed(1)}%"></span>
@@ -142,6 +158,16 @@ document.querySelectorAll(".exp-scope-btn").forEach((btn) => {
     document.querySelectorAll(".exp-scope-btn").forEach((b) => b.setAttribute("aria-selected", "false"));
     btn.setAttribute("aria-selected", "true");
     page = 1; loadExpenses();
+  });
+});
+
+// Side-column "All / Alive" toggle — only re-scopes the top-projects list.
+document.querySelectorAll(".exp-side-toggle-btn").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".exp-side-toggle-btn").forEach((b) => b.setAttribute("aria-selected", "false"));
+    btn.setAttribute("aria-selected", "true");
+    topScope = btn.dataset.topscope || "";
+    loadExpenses();
   });
 });
 ["expCategoryFilter", "expStartDate", "expEndDate", "expPageSize"].forEach((id) => {

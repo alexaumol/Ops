@@ -227,18 +227,24 @@ router.get("/", async (req, res) => {
       : Number(a.s_all);
 
     // Side column: the 10 projects with the most expense spend under the
-    // current (non-scope) filters, each split re-invoiceable vs. not.
+    // current (non-scope) filters, each split re-invoiceable vs. not, with
+    // its project status. `topScope=alive` drops Closed/Cancelled projects.
     const topWhere = [...base, "x.projectid IS NOT NULL"];
+    if (req.query.topScope === "alive") {
+      topWhere.push("LOWER(COALESCE(ps.projectstatusdesc, '')) NOT IN ('closed', 'cancelled')");
+    }
     const topRes = await pool.query(
       `SELECT x.projectid AS "projectId",
               p.projectnumber AS "projectCode",
               p.projectname   AS "projectName",
+              ps.projectstatusdesc AS "statusLabel",
               COALESCE(SUM(x.amount), 0)                                          AS total,
               COALESCE(SUM(x.amount) FILTER (WHERE x.invoiceable IS TRUE), 0)     AS billable,
               COALESCE(SUM(x.amount) FILTER (WHERE x.invoiceable IS NOT TRUE), 0) AS "nonBillable"
        ${EXPENSE_FROM}
+       LEFT JOIN projectstatus ps ON ps.id = p.projectstatusid::bigint
        WHERE ${topWhere.join(" AND ")}
-       GROUP BY x.projectid, p.projectnumber, p.projectname
+       GROUP BY x.projectid, p.projectnumber, p.projectname, ps.projectstatusdesc
        ORDER BY total DESC, x.projectid
        LIMIT 10`,
       fp
@@ -247,6 +253,7 @@ router.get("/", async (req, res) => {
       projectId: r.projectId,
       projectCode: r.projectCode,
       projectName: r.projectName,
+      statusLabel: r.statusLabel,
       total: Number(r.total),
       billable: Number(r.billable),
       nonBillable: Number(r.nonBillable),

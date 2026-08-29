@@ -88,7 +88,13 @@
 
     <aside class="exp-side">
       <div class="exp-side-card">
-        <h2 class="exp-side-title">Top projects by expense</h2>
+        <div class="exp-side-head">
+          <h2 class="exp-side-title">Top projects by expense</h2>
+          <div class="exp-side-toggle" role="group" aria-label="Project scope">
+            <button data-topscope="" class="exp-side-toggle-btn" aria-selected="true">All</button>
+            <button data-topscope="alive" class="exp-side-toggle-btn" aria-selected="false">Alive</button>
+          </div>
+        </div>
         <p class="exp-side-hint">Top 10 by total spend, each split re-invoiceable vs. not. Follows the filters above (not the scope toggle).</p>
         <div id="expTopProjects" class="exp-top-list"></div>
         <div class="exp-side-internal">
