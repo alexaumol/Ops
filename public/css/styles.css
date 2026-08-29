@@ -151,11 +151,11 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; }
 }
 .app-header__brand .dot { color: var(--accent); }
 .app-header__logo {
-  height: 26px;
+  height: 34px;
   width: auto;
   background: #fff;
-  border-radius: 3px;
-  padding: 2px 4px;
+  border-radius: 4px;
+  padding: 3px 7px;
 }
 .app-header__nav {
   display: flex;
