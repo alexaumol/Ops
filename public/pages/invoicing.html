@@ -198,17 +198,43 @@
         </div>
 
         <div class="field-section">
+          <h3>Invoiceable items</h3>
+          <div class="inv-items-wrap">
+            <table class="inv-items-table">
+              <thead>
+                <tr>
+                  <th>Item description</th>
+                  <th class="inv-items-num">Nº</th>
+                  <th class="inv-items-price">Price / item</th>
+                  <th class="inv-items-sub">Subtotal</th>
+                  <th class="inv-items-del"></th>
+                </tr>
+              </thead>
+              <tbody id="invItemsBody"></tbody>
+            </table>
+            <div class="inv-items-foot">
+              <button type="button" class="btn btn-secondary" id="invAddItem">+ Add item</button>
+              <span class="inv-items-total">Total <strong id="invItemsTotal">—</strong></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="field-section">
           <h3>Amount &amp; VAT</h3>
           <div class="field-grid">
             <div>
-              <label class="field-label">Amount</label>
-              <input id="invAmount" type="number" step="0.01" class="field-input" />
+              <label class="field-label">Currency</label>
+              <select id="invCurrency" class="field-input"></select>
+            </div>
+            <div>
+              <label class="field-label">Amount (from items)</label>
+              <input id="invAmount" type="number" step="0.01" class="field-input" readonly />
             </div>
             <div>
               <label class="field-label">VAT type</label>
               <select id="invVatType" class="field-input"></select>
             </div>
-            <div class="span-2">
+            <div>
               <span class="field-label">VAT amount (auto-computed)</span>
               <div class="field-static" id="invVatAmountPreview">—</div>
             </div>
@@ -223,20 +249,16 @@
               <select id="invTaxCompany" class="field-input"></select>
             </div>
             <div>
-              <label class="field-label">Deposit account</label>
+              <label class="field-label">Billing account</label>
               <select id="invDepositAccount" class="field-input"></select>
-            </div>
-            <div>
-              <label class="field-label">Num. OC client</label>
-              <input id="invNumOcClient" type="text" class="field-input" />
             </div>
             <div>
               <label class="field-label">Purchase order</label>
               <input id="invPurchaseOrder" type="text" class="field-input" />
             </div>
-            <div class="span-2">
-              <label class="field-label">Description of service</label>
-              <textarea id="invDescription" class="field-input" rows="2"></textarea>
+            <div>
+              <label class="field-label">Other reference</label>
+              <input id="invNumOcClient" type="text" class="field-input" />
             </div>
             <div class="span-2">
               <label class="field-label">Comments</label>

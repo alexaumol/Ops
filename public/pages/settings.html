@@ -38,6 +38,7 @@
         <button data-stab="calendar" class="settings-tab" role="tab" aria-selected="false">Work calendar</button>
         <button data-stab="paths" class="settings-tab" role="tab" aria-selected="false">Paths</button>
         <button data-stab="expcats" class="settings-tab" role="tab" aria-selected="false">Expense categories</button>
+        <button data-stab="currencies" class="settings-tab" role="tab" aria-selected="false">Currencies</button>
         <button data-stab="audit" class="settings-tab" role="tab" aria-selected="false">Auditing</button>
       </div>
 
@@ -137,6 +138,26 @@
           <div class="settings-add-row">
             <input type="text" id="newExpCatName" placeholder="New category name…" />
             <button class="btn btn-primary" id="btnAddExpCat">Add category</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================== CURRENCIES ==================== -->
+      <section id="paneCurrencies" class="settings-pane hidden">
+        <p class="settings-note">Currencies offered in the invoice modal. EUR is the default and can't be removed; a currency can't be deleted while any invoice uses it. The symbol is what shows next to amounts.</p>
+        <div class="settings-table-wrap">
+          <table class="settings-table">
+            <thead>
+              <tr><th>Code</th><th>Symbol</th><th>Name</th><th style="text-align:right;">In use</th><th></th></tr>
+            </thead>
+            <tbody id="currencyTableBody"></tbody>
+          </table>
+          <div id="currencyEmpty" class="settings-pane-empty hidden">No currencies yet.</div>
+          <div class="settings-add-row">
+            <input type="text" id="newCurrencyCode" placeholder="Code (USD)" style="width:6rem;" />
+            <input type="text" id="newCurrencySymbol" placeholder="Symbol ($)" style="width:5rem;" />
+            <input type="text" id="newCurrencyLabel" placeholder="Name (US Dollar)" />
+            <button class="btn btn-primary" id="btnAddCurrency">Add currency</button>
           </div>
         </div>
       </section>

@@ -170,6 +170,14 @@ const HITT_API = (() => {
     deleteExpenseCategory: (id) =>
       request(`/api/settings/expense-categories/${id}`, { method: "DELETE" }),
 
+    getInvoiceCurrencies: () => request("/api/settings/currencies"),
+    createInvoiceCurrency: (payload) =>
+      request("/api/settings/currencies", { method: "POST", body: JSON.stringify(payload) }),
+    updateInvoiceCurrency: (id, payload) =>
+      request(`/api/settings/currencies/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
+    deleteInvoiceCurrency: (id) =>
+      request(`/api/settings/currencies/${id}`, { method: "DELETE" }),
+
     getExpenses: (filters = {}) => {
       const params = new URLSearchParams();
       ["search", "projectId", "categoryId", "scope", "startDate", "endDate", "sort", "dir", "topScope", "page", "limit"].forEach((k) => {

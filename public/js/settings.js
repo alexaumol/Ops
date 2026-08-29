@@ -298,6 +298,7 @@ let calendarLoaded = false;
 let auditLoaded = false;
 let pathsLoaded = false;
 let expCatsLoaded = false;
+let currenciesLoaded = false;
 
 document.querySelectorAll("[data-stab]").forEach((btn) => {
   btn.addEventListener("click", () => {
@@ -309,6 +310,7 @@ document.querySelectorAll("[data-stab]").forEach((btn) => {
     document.getElementById("paneCalendar").classList.toggle("hidden", tab !== "calendar");
     document.getElementById("panePaths").classList.toggle("hidden", tab !== "paths");
     document.getElementById("paneExpCats").classList.toggle("hidden", tab !== "expcats");
+    document.getElementById("paneCurrencies").classList.toggle("hidden", tab !== "currencies");
     document.getElementById("paneAudit").classList.toggle("hidden", tab !== "audit");
     if (tab === "holidays" && !holidaysLoaded) {
       holidaysLoaded = true;
@@ -325,6 +327,10 @@ document.querySelectorAll("[data-stab]").forEach((btn) => {
     if (tab === "expcats" && !expCatsLoaded) {
       expCatsLoaded = true;
       loadExpenseCategories();
+    }
+    if (tab === "currencies" && !currenciesLoaded) {
+      currenciesLoaded = true;
+      loadCurrencies();
     }
     if (tab === "audit" && !auditLoaded) {
       auditLoaded = true;
@@ -465,6 +471,98 @@ document.getElementById("btnAddExpCat").addEventListener("click", async () => {
     input.value = "";
     renderExpenseCategories();
     toast("Category added.", "green");
+  } catch (err) {
+    toast(`Couldn't add: ${err.message}`, "red");
+  }
+});
+
+/* ============================== INVOICE CURRENCIES ================== */
+let CURRENCIES = [];
+
+async function loadCurrencies() {
+  const tbody = document.getElementById("currencyTableBody");
+  const empty = document.getElementById("currencyEmpty");
+  tbody.innerHTML = `<tr><td colspan="5" class="settings-emp-sub" style="padding:1rem;">Loading…</td></tr>`;
+  empty.classList.add("hidden");
+  try {
+    CURRENCIES = await HITT_API.getInvoiceCurrencies();
+    renderCurrencies();
+  } catch (err) {
+    console.error("[settings] currencies:", err.message);
+    tbody.innerHTML = "";
+    empty.textContent = "Could not load currencies.";
+    empty.classList.remove("hidden");
+  }
+}
+
+function renderCurrencies() {
+  const tbody = document.getElementById("currencyTableBody");
+  const empty = document.getElementById("currencyEmpty");
+  if (!CURRENCIES.length) {
+    tbody.innerHTML = "";
+    empty.textContent = "No currencies yet.";
+    empty.classList.remove("hidden");
+    return;
+  }
+  empty.classList.add("hidden");
+  tbody.innerHTML = CURRENCIES.map((c) => {
+    const locked = c.code === "EUR";
+    const canDelete = !locked && !c.usageCount;
+    return `
+    <tr data-id="${c.id}">
+      <td style="font-family:ui-monospace,monospace; font-weight:700;">${escapeHtml(c.code)}</td>
+      <td><input type="text" class="cal-input" style="width:4rem; text-align:center;" data-cur-symbol value="${escapeHtml(c.symbol || "")}" /></td>
+      <td><input type="text" class="cal-input" style="width:12rem; text-align:left;" data-cur-label value="${escapeHtml(c.label || "")}" /></td>
+      <td class="settings-emp-sub" style="text-align:right;">${c.usageCount}</td>
+      <td style="text-align:right;">
+        <button class="icon-btn" data-del-cur title="${locked ? "Default currency" : c.usageCount ? "In use — cannot delete" : "Delete"}" ${canDelete ? "" : "disabled style='opacity:.35;'"}>✕</button>
+      </td>
+    </tr>`;
+  }).join("");
+
+  tbody.querySelectorAll("tr").forEach((tr) => {
+    const id = tr.dataset.id;
+    const cur = CURRENCIES.find((x) => String(x.id) === String(id));
+    const save = async () => {
+      const symbol = tr.querySelector("[data-cur-symbol]").value.trim();
+      const label = tr.querySelector("[data-cur-label]").value.trim();
+      if (cur && symbol === cur.symbol && label === cur.label) return;
+      try {
+        const updated = await HITT_API.updateInvoiceCurrency(id, { symbol, label });
+        if (cur) { cur.symbol = updated.symbol; cur.label = updated.label; }
+        toast("Currency updated.", "green");
+      } catch (err) {
+        toast(`Couldn't update: ${err.message}`, "red");
+        renderCurrencies();
+      }
+    };
+    tr.querySelector("[data-cur-symbol]").addEventListener("change", save);
+    tr.querySelector("[data-cur-label]").addEventListener("change", save);
+    tr.querySelector("[data-del-cur]").addEventListener("click", async () => {
+      if (!cur || !confirm(`Delete the ${cur.code} currency?`)) return;
+      try {
+        await HITT_API.deleteInvoiceCurrency(id);
+        CURRENCIES = CURRENCIES.filter((x) => String(x.id) !== String(id));
+        renderCurrencies();
+        toast("Currency deleted.", "navy");
+      } catch (err) {
+        toast(`Couldn't delete: ${err.message}`, "red");
+      }
+    });
+  });
+}
+
+document.getElementById("btnAddCurrency").addEventListener("click", async () => {
+  const code = document.getElementById("newCurrencyCode").value.trim().toUpperCase();
+  const symbol = document.getElementById("newCurrencySymbol").value.trim();
+  const label = document.getElementById("newCurrencyLabel").value.trim();
+  if (!code) { toast("Enter a currency code.", "red"); return; }
+  try {
+    const created = await HITT_API.createInvoiceCurrency({ code, symbol, label });
+    CURRENCIES.push(created);
+    ["newCurrencyCode", "newCurrencySymbol", "newCurrencyLabel"].forEach((id) => { document.getElementById(id).value = ""; });
+    renderCurrencies();
+    toast("Currency added.", "green");
   } catch (err) {
     toast(`Couldn't add: ${err.message}`, "red");
   }

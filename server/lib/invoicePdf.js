@@ -45,9 +45,9 @@ const ENTITY_LETTERHEAD = {
   "HiTT/OSM": HITT_LETTERHEAD,
 };
 
-function money(n) {
+function money(n, sym = "€") {
   const v = Number(n || 0);
-  return `€${v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return `${sym}${v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 // Access rich-text fields (descriptionservice/invoicecomments) come through
 // as raw HTML (e.g. <div><font face=Arial size=1 color=black>text</font></div>)
@@ -113,7 +113,7 @@ function renderInvoicePdf(doc, data) {
   fieldBox(doc, left, gridY + 34, colW, "INVOICE DATE", dateStr(data.invoicedate));
   fieldBox(doc, left + colW + 12, gridY + 34, colW, "PURCHASE ORDER", data.purchaseorder);
   fieldBox(doc, left, gridY + 68, colW, "INTERNAL PROJECT NUMBER", data.projectCode);
-  fieldBox(doc, left + colW + 12, gridY + 68, colW, "NUM OC CLIENT", data.numocclient);
+  fieldBox(doc, left + colW + 12, gridY + 68, colW, "OTHER REFERENCE", data.numocclient);
 
   // ---------- Invoice To ----------
   const toY = gridY + 112;
@@ -128,6 +128,7 @@ function renderInvoicePdf(doc, data) {
   }
 
   // ---------- Line items ----------
+  const sym = data.currencySymbol || "€";
   const tableY = toY + 100;
   const cols = { desc: left, units: left + 300, price: left + 350, total: left + 440 };
   doc.font("Helvetica-Bold").fontSize(9).fillColor(BRAND.ink)
@@ -137,29 +138,43 @@ function renderInvoicePdf(doc, data) {
     .text("Total", cols.total, tableY);
   doc.moveTo(left, tableY + 14).lineTo(right, tableY + 14).lineWidth(1.2).stroke(BRAND.ink);
 
-  const description = stripHtml(data.descriptionservice);
-  const rowY = tableY + 22;
+  // Real line items when present; otherwise a single synthetic row from the
+  // old free-text description + flat amount (legacy invoices).
+  let items = Array.isArray(data.lineItems) ? data.lineItems : [];
+  if (!items.length) {
+    items = [{ description: stripHtml(data.descriptionservice), quantity: 1, unitPrice: Number(data.amount || 0) }];
+  }
+
+  let y = tableY + 14;
   doc.font("Helvetica").fontSize(9).fillColor(BRAND.ink);
-  doc.text(description, cols.desc, rowY, { width: 290 });
-  doc.text("1", cols.units, rowY);
-  doc.text(money(data.amount), cols.price, rowY);
-  doc.text(money(data.amount), cols.total, rowY);
-  const rowHeight = Math.max(doc.heightOfString(description, { width: 290 }), 12);
-  doc.rect(left, tableY + 14, width, rowHeight + 16).stroke(BRAND.border);
+  for (const li of items) {
+    const desc = stripHtml(li.description) || "";
+    const qty = Number(li.quantity || 0);
+    const unit = Number(li.unitPrice || 0);
+    const rowH = Math.max(doc.heightOfString(desc || " ", { width: 290 }), 12) + 8;
+    doc.text(desc, cols.desc, y + 5, { width: 290 });
+    doc.text(String(qty), cols.units, y + 5);
+    doc.text(money(unit, sym), cols.price, y + 5);
+    doc.text(money(qty * unit, sym), cols.total, y + 5);
+    doc.rect(left, y, width, rowH).stroke(BRAND.border);
+    y += rowH;
+  }
+
+  const subtotal = items.reduce((s, li) => s + Number(li.quantity || 0) * Number(li.unitPrice || 0), 0);
 
   // ---------- Totals ----------
-  const totalsY = tableY + 14 + rowHeight + 16 + 20;
+  const totalsY = y + 20;
   const totalsX = right - 220;
   const vatPct = data.vatPercentage ?? 0;
   doc.font("Helvetica").fontSize(9).fillColor(BRAND.ink);
   doc.text("Total amount", totalsX, totalsY, { width: 120 });
-  doc.text(money(data.amount), totalsX + 120, totalsY, { width: 100, align: "right" });
+  doc.text(money(subtotal, sym), totalsX + 120, totalsY, { width: 100, align: "right" });
   doc.text(`VAT ${vatPct}%`, totalsX, totalsY + 16, { width: 120 });
-  doc.text(money(data.vatamount), totalsX + 120, totalsY + 16, { width: 100, align: "right" });
+  doc.text(money(data.vatamount, sym), totalsX + 120, totalsY + 16, { width: 100, align: "right" });
   doc.rect(totalsX, totalsY + 32, 220, 20).fill(BRAND.cream);
   doc.font("Helvetica-Bold").fontSize(9).fillColor(BRAND.ink);
   doc.text("INVOICE TOTAL", totalsX + 4, totalsY + 38, { width: 116 });
-  doc.text(money(Number(data.amount || 0) + Number(data.vatamount || 0)), totalsX + 120, totalsY + 38, { width: 96, align: "right" });
+  doc.text(money(subtotal + Number(data.vatamount || 0), sym), totalsX + 120, totalsY + 38, { width: 96, align: "right" });
 
   // ---------- Bank details ----------
   const bankY = totalsY + 90;

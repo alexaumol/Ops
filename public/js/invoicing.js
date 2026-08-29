@@ -20,7 +20,8 @@ const DEMO_SEED = [
 ];
 
 let PROJECTS = [];
-let LOOKUPS = { statuses: [], scheduleTypes: [], deliveryMethods: [], vatTypes: [], bankAccounts: [] };
+let LOOKUPS = { statuses: [], scheduleTypes: [], deliveryMethods: [], vatTypes: [], bankAccounts: [], currencies: [] };
+let invLineItems = []; // [{ description, quantity, unitPrice }] for the open invoice modal
 let INVOICES = [];
 let usingDemoData = false;
 let currentBucket = 'all';
@@ -76,10 +77,19 @@ function statusChipHtml(label){
 }
 
 function formatDateOnly(iso){ return iso ? new Date(iso).toLocaleDateString() : '—'; }
-function formatMoney(n){
+function formatMoney(n, currency){
   if (n === null || n === undefined) return '—';
-  return Number(n).toLocaleString(undefined, { style: 'currency', currency: 'EUR' });
+  const code = (currency || 'EUR').toString().toUpperCase();
+  try {
+    return Number(n).toLocaleString(undefined, { style: 'currency', currency: code });
+  } catch {
+    // Non-ISO custom code — fall back to "<symbol><number>".
+    const c = (LOOKUPS.currencies || []).find(x => x.code === code);
+    const sym = (c && c.symbol) || code;
+    return `${sym}${Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
 }
+function invCurCode(){ return document.getElementById('invCurrency').value || 'EUR'; }
 function lookupOptionsHtml(rows, selectedId, includeBlank, blankLabel){
   const opts = (includeBlank ? [`<option value="">${blankLabel || '—'}</option>`] : [])
     .concat((rows || []).map(r => `<option value="${r.id}" ${String(r.id) === String(selectedId) ? 'selected' : ''}>${escapeHtml(r.label)}</option>`));
@@ -396,8 +406,8 @@ function renderInvoicesTable(){
     <tr data-i="${i}" style="cursor:pointer;">
       <td>${escapeHtml(inv.invoicecode || '(draft)')}</td>
       <td><span class="inv-status-pill inv-status-${inv.invoicestatusid}">${escapeHtml(inv.statusLabel || '—')}</span></td>
-      <td style="text-align:right;" class="${Number(inv.amount) < 0 ? 'inv-money inv-money--neg' : 'inv-money'}">${formatMoney(inv.amount)}</td>
-      <td style="text-align:right;">${formatMoney(inv.vatamount)}</td>
+      <td style="text-align:right;" class="${Number(inv.amount) < 0 ? 'inv-money inv-money--neg' : 'inv-money'}">${formatMoney(inv.amount, inv.currency)}</td>
+      <td style="text-align:right;">${formatMoney(inv.vatamount, inv.currency)}</td>
       <td>${formatDateOnly(inv.invoicedate)}</td>
       <td>${escapeHtml(inv.invoicingPartnerLabel || '—')}</td>
       <td><button class="ta-remove-btn" data-pdf title="View PDF">📄</button></td>
@@ -478,10 +488,61 @@ function updateVatPreview(){
   const vt = LOOKUPS.vatTypes.find(v => String(v.id) === String(vatId));
   const pct = vt ? Number(vt.percentage) : 0;
   const vatAmount = Math.round(amount * (pct / 100) * 100) / 100;
-  document.getElementById('invVatAmountPreview').textContent = `${formatMoney(vatAmount)} (${pct}%)`;
+  document.getElementById('invVatAmountPreview').textContent = `${formatMoney(vatAmount, invCurCode())} (${pct}%)`;
 }
-document.getElementById('invAmount').addEventListener('input', updateVatPreview);
 document.getElementById('invVatType').addEventListener('change', updateVatPreview);
+document.getElementById('invCurrency').addEventListener('change', () => { renderInvItems(); });
+
+/* ---------- Invoiceable line items ---------- */
+function invItemSubtotal(li){ return (Number(li.quantity) || 0) * (Number(li.unitPrice) || 0); }
+
+function recalcInvTotal(){
+  const total = invLineItems.reduce((s, li) => s + invItemSubtotal(li), 0);
+  document.getElementById('invItemsTotal').textContent = formatMoney(total, invCurCode());
+  document.getElementById('invAmount').value = total ? total.toFixed(2) : '';
+  updateVatPreview();
+}
+
+function renderInvItems(){
+  const tbody = document.getElementById('invItemsBody');
+  if (!invLineItems.length) {
+    tbody.innerHTML = `<tr class="inv-items-none"><td colspan="5">No items yet — “+ Add item” to start.</td></tr>`;
+  } else {
+    tbody.innerHTML = invLineItems.map((li, i) => `
+      <tr data-i="${i}">
+        <td><input type="text" class="field-input" data-li-desc value="${escapeHtml(li.description || '')}" placeholder="What is being invoiced" /></td>
+        <td><input type="number" class="field-input" step="1" min="0" data-li-qty value="${li.quantity ?? ''}" /></td>
+        <td><input type="number" class="field-input" step="0.01" min="0" data-li-price value="${li.unitPrice ?? ''}" /></td>
+        <td class="inv-items-sub" data-li-sub>${formatMoney(invItemSubtotal(li), invCurCode())}</td>
+        <td><button type="button" class="ta-remove-btn" data-li-del title="Remove item">✕</button></td>
+      </tr>`).join('');
+  }
+  tbody.querySelectorAll('tr[data-i]').forEach(tr => {
+    const i = Number(tr.dataset.i);
+    const sync = () => {
+      invLineItems[i].description = tr.querySelector('[data-li-desc]').value;
+      invLineItems[i].quantity = tr.querySelector('[data-li-qty]').value;
+      invLineItems[i].unitPrice = tr.querySelector('[data-li-price]').value;
+      tr.querySelector('[data-li-sub]').textContent = formatMoney(invItemSubtotal(invLineItems[i]), invCurCode());
+      recalcInvTotal();
+    };
+    tr.querySelector('[data-li-desc]').addEventListener('input', sync);
+    tr.querySelector('[data-li-qty]').addEventListener('input', sync);
+    tr.querySelector('[data-li-price]').addEventListener('input', sync);
+    tr.querySelector('[data-li-del]').addEventListener('click', () => {
+      invLineItems.splice(i, 1);
+      renderInvItems();
+    });
+  });
+  recalcInvTotal();
+}
+
+document.getElementById('invAddItem').addEventListener('click', () => {
+  invLineItems.push({ description: '', quantity: 1, unitPrice: '' });
+  renderInvItems();
+  const inputs = document.querySelectorAll('#invItemsBody [data-li-desc]');
+  inputs[inputs.length - 1]?.focus();
+});
 
 document.getElementById('invIsCorrective').addEventListener('change', (e) => {
   document.getElementById('invSourceRow').classList.toggle('hidden', !e.target.checked);
@@ -523,14 +584,35 @@ async function openInvoiceModal(invoiceId){
   document.getElementById('invDipositDate').value = inv?.invoicedipositdate ? inv.invoicedipositdate.slice(0, 10) : '';
   clientSideStatusPreview();
 
-  document.getElementById('invAmount').value = inv?.amount ?? '';
+  // Currency select from the Settings-managed list; default EUR.
+  const currencies = LOOKUPS.currencies && LOOKUPS.currencies.length
+    ? LOOKUPS.currencies
+    : [{ code: 'EUR', symbol: '€', label: 'Euro' }];
+  document.getElementById('invCurrency').innerHTML = currencies.map(c =>
+    `<option value="${escapeHtml(c.code)}" ${String(c.code) === String(inv?.currency || 'EUR') ? 'selected' : ''}>${escapeHtml(c.code)}${c.symbol && c.symbol !== c.code ? ` (${escapeHtml(c.symbol)})` : ''}</option>`
+  ).join('');
+
+  // Line items: real ones, or a single synthetic row from a legacy invoice's
+  // flat amount + free-text description; one empty row for a brand-new invoice.
+  if (inv && Array.isArray(inv.lineItems) && inv.lineItems.length) {
+    invLineItems = inv.lineItems.map(li => ({
+      description: li.description || '', quantity: li.quantity, unitPrice: li.unitPrice,
+    }));
+  } else if (inv && inv.amount != null) {
+    invLineItems = [{
+      description: (inv.descriptionservice || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(),
+      quantity: 1, unitPrice: Number(inv.amount),
+    }];
+  } else {
+    invLineItems = [{ description: '', quantity: 1, unitPrice: '' }];
+  }
+
   document.getElementById('invVatType').innerHTML = lookupOptionsHtml(LOOKUPS.vatTypes, inv?.vatid ?? 4, false);
-  updateVatPreview();
+  renderInvItems(); // sets #invAmount + VAT preview
 
   document.getElementById('invDepositAccount').innerHTML = lookupOptionsHtml(LOOKUPS.bankAccounts, inv?.dipositaccountid, true);
   document.getElementById('invNumOcClient').value = inv?.numocclient || '';
   document.getElementById('invPurchaseOrder').value = inv?.purchaseorder || '';
-  document.getElementById('invDescription').value = inv?.descriptionservice || '';
   document.getElementById('invComments').value = inv?.invoicecomments || '';
 
   document.getElementById('invTaxCompany').innerHTML = `<option value="">Loading…</option>`;
@@ -564,17 +646,27 @@ document.addEventListener('keydown', (e) => {
   else if (e.key === 'Escape' && !modalOverlay.classList.contains('hidden')) closeProjectModal();
 });
 
+function invoiceLineItemsPayload(){
+  return invLineItems
+    .map(li => ({
+      description: (li.description || '').trim(),
+      quantity: Number(li.quantity) || 0,
+      unitPrice: Number(li.unitPrice) || 0,
+    }))
+    .filter(li => li.description || li.quantity || li.unitPrice);
+}
+
 function invoicePayload(){
   return {
     invoiceDate: document.getElementById('invDate').value || null,
     invoiceDueDate: document.getElementById('invDueDate').value || null,
     invoiceSentDate: document.getElementById('invSentDate').value || null,
     invoiceDipositDate: document.getElementById('invDipositDate').value || null,
-    amount: document.getElementById('invAmount').value ? Number(document.getElementById('invAmount').value) : null,
+    currency: invCurCode(),
+    lineItems: invoiceLineItemsPayload(),
     vatId: document.getElementById('invVatType').value || 4,
     numOcClient: document.getElementById('invNumOcClient').value || null,
     purchaseOrder: document.getElementById('invPurchaseOrder').value || null,
-    descriptionService: document.getElementById('invDescription').value || null,
     invoiceComments: document.getElementById('invComments').value || null,
     taxCompanyId: document.getElementById('invTaxCompany').value || null,
     dipositAccountId: document.getElementById('invDepositAccount').value || null,
@@ -583,6 +675,10 @@ function invoicePayload(){
 
 document.getElementById('invSave').addEventListener('click', async () => {
   if (!activeProjectId) return;
+  if (!invoiceLineItemsPayload().length) {
+    toast('Add at least one invoiceable item.', 'red');
+    return;
+  }
   try {
     if (activeInvoiceId) {
       await HITT_API.updateInvoice(activeInvoiceId, invoicePayload());
