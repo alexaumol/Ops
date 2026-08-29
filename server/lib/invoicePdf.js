@@ -14,8 +14,15 @@
  * for a different legal entity (different address/VAT at minimum) — do
  * not send an FHiTT or HiTT/OSM invoice PDF to a real client until
  * someone supplies their real letterhead details.
+ *
+ * Header logo: HiTT and HiTT/OSM invoices use public/assets/HITT-logo-invoices.png;
+ * anything else (FHiTT) falls back to the plain "HITT" text mark.
  */
+const path = require("path");
+const fs = require("fs");
 const PDFDocument = require("pdfkit");
+
+const HITT_INVOICE_LOGO = path.join(__dirname, "..", "..", "public", "assets", "HITT-logo-invoices.png");
 
 const BRAND = {
   ink: "#171717",
@@ -90,10 +97,25 @@ function renderInvoicePdf(doc, data) {
   const width = right - left;
 
   // ---------- Header: letterhead + contact ----------
-  doc.font("Helvetica-Bold").fontSize(16).fillColor(BRAND.teal).text("HITT", left, 40);
-  doc.font("Helvetica").fontSize(6).fillColor(BRAND.gray)
-    .text("Health Innovation", left, 58)
-    .text("Technology Transfer", left, 66);
+  const usesHittLogo = (() => {
+    const l = String(data.entityLabel || "").trim().toLowerCase().replace(/\s+/g, "");
+    return l === "hitt" || l === "hitt/osm";
+  })();
+  let logoDrawn = false;
+  if (usesHittLogo && fs.existsSync(HITT_INVOICE_LOGO)) {
+    try {
+      doc.image(HITT_INVOICE_LOGO, left, 40, { height: 42 });
+      logoDrawn = true;
+    } catch (err) {
+      console.error("[invoicePdf] could not embed the HITT invoice logo:", err.message);
+    }
+  }
+  if (!logoDrawn) {
+    doc.font("Helvetica-Bold").fontSize(16).fillColor(BRAND.teal).text("HITT", left, 40);
+    doc.font("Helvetica").fontSize(6).fillColor(BRAND.gray)
+      .text("Health Innovation", left, 58)
+      .text("Technology Transfer", left, 66);
+  }
 
   doc.font("Helvetica-Bold").fontSize(10).fillColor(BRAND.ink).text(letter.name, left, 90);
   doc.font("Helvetica").fontSize(9).fillColor(BRAND.ink)
