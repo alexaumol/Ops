@@ -116,6 +116,8 @@ const HITT_API = (() => {
     saveTimeTracking: (payload) =>
       request("/api/time-tracking", { method: "POST", body: JSON.stringify(payload) }),
     deleteTimeTracking: (id) => request(`/api/time-tracking/${id}`, { method: "DELETE" }),
+    getTimeTrackingSummary: (userId) =>
+      request(`/api/time-tracking/summary?userId=${encodeURIComponent(userId)}`),
 
     getTimeOffRequests: (empId) => request(`/api/time-off/requests?empId=${encodeURIComponent(empId)}`),
     createTimeOffRequest: (payload) =>
@@ -126,6 +128,8 @@ const HITT_API = (() => {
     getPendingTimeOffRequests: () => request("/api/time-off/requests/pending"),
     getTimeOffNotifications: (since) =>
       request(`/api/time-off/notifications${since ? `?since=${encodeURIComponent(since)}` : ""}`),
+    getTimeOffSummary: (empId) =>
+      request(`/api/time-off/summary?empId=${encodeURIComponent(empId)}`),
     approveTimeOffRequest: (id) => request(`/api/time-off/requests/${id}/approve`, { method: "PATCH" }),
     rejectTimeOffRequest: (id, comment) =>
       request(`/api/time-off/requests/${id}/reject`, { method: "PATCH", body: JSON.stringify({ comment }) }),

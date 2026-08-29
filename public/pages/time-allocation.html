@@ -23,7 +23,7 @@
     </div>
   </header>
 
-  <main class="page-shell">
+  <main class="page-shell ta-shell">
     <h1 class="page-title">Time allocation</h1>
     <p class="page-subtitle">Log your hours against projects and manage time-off requests.</p>
 
@@ -32,6 +32,8 @@
       <button data-ptab="timeoff" class="page-tab" aria-selected="false">Time off requests <span class="notif-badge hidden" id="timeoffTabBadge"></span></button>
     </div>
 
+    <div class="ta-layout">
+    <div class="ta-main">
     <div id="paneTracking" class="page-pane">
       <div class="ta-banner">
         <div class="ta-week-nav">
@@ -116,6 +118,19 @@
         </div>
       </div>
     </div>
+    </div><!-- /.ta-main -->
+
+    <aside class="ta-side" id="taSide">
+      <button type="button" id="taSideReopen" class="ta-side-reopen" title="Show reports" aria-label="Show reports panel">‹ Reports</button>
+      <div class="ta-side-card">
+        <div class="ta-side-head">
+          <span class="ta-side-title" id="taSideTitle">Yearly summary</span>
+          <button type="button" id="taSideToggle" class="ta-side-toggle" title="Collapse reports panel" aria-label="Collapse reports panel" aria-expanded="true">›</button>
+        </div>
+        <div id="taSideBody" class="ta-side-body"></div>
+      </div>
+    </aside>
+    </div><!-- /.ta-layout -->
   </main>
 
   <div id="toastHost" class="toast-host"></div>

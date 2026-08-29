@@ -139,6 +139,7 @@ document.querySelectorAll('[data-ptab]').forEach(btn => {
 });
 
 function refreshActiveTab(){
+  renderSideReport();
   if (currentPageTab === 'tracking') loadWeek();
   else loadTimeOff();
 }
@@ -147,6 +148,113 @@ async function refreshTimeOffBadge(){
   const el = document.getElementById('timeoffTabBadge');
   if (usingDemoData) { HITT_NOTIFY.paint(el, 0); return; }
   HITT_NOTIFY.paint(el, await HITT_NOTIFY.timeOffCount());
+}
+
+/* ============================== SIDE REPORTS ============================== */
+// Per-year summary in the right-hand panel — hours logged (tracking tab)
+// or time-off days (time-off tab). Whole panel + each year collapse,
+// persisted best-effort in localStorage.
+const TA_SIDE_KEY = 'hitt.taSide.collapsed';
+const TA_YEARS_KEY = 'hitt.taSide.years';
+let taYearState = {};
+try { taYearState = JSON.parse(localStorage.getItem(TA_YEARS_KEY) || '{}') || {}; } catch { taYearState = {}; }
+
+(function initSidePanelCollapse(){
+  const layout = document.querySelector('.ta-layout');
+  const toggle = document.getElementById('taSideToggle');
+  const reopen = document.getElementById('taSideReopen');
+  if (!layout || !toggle || !reopen) return;
+  let collapsed = false;
+  try { collapsed = localStorage.getItem(TA_SIDE_KEY) === '1'; } catch { /* storage blocked */ }
+  const apply = () => {
+    layout.classList.toggle('ta-side-collapsed', collapsed);
+    toggle.setAttribute('aria-expanded', String(!collapsed));
+  };
+  const set = (v) => {
+    collapsed = v; apply();
+    try { localStorage.setItem(TA_SIDE_KEY, v ? '1' : '0'); } catch { /* storage blocked */ }
+  };
+  apply();
+  toggle.addEventListener('click', () => set(true));
+  reopen.addEventListener('click', () => set(false));
+})();
+
+const taNum = (n) => Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 1 });
+
+function taYearRow(tab, year, totalText, stats){
+  const key = `${tab}:${year}`;
+  const collapsed = !!taYearState[key];
+  return `
+    <div class="ta-year ${collapsed ? 'is-collapsed' : ''}" data-year-key="${key}">
+      <button type="button" class="ta-year-head" aria-expanded="${!collapsed}">
+        <span class="ta-year-chevron" aria-hidden="true">▾</span>
+        <span class="ta-year-label">${year}</span>
+        <span class="ta-year-total">${totalText}</span>
+      </button>
+      <div class="ta-year-body">
+        ${stats.map(s => `<div class="ta-year-stat"><span>${escapeHtml(s[0])}</span><strong>${escapeHtml(s[1])}</strong></div>`).join('')}
+      </div>
+    </div>`;
+}
+
+function wireYearToggles(){
+  document.querySelectorAll('#taSideBody .ta-year-head').forEach(head => {
+    head.addEventListener('click', () => {
+      const wrap = head.closest('.ta-year');
+      const nowCollapsed = wrap.classList.toggle('is-collapsed');
+      head.setAttribute('aria-expanded', String(!nowCollapsed));
+      taYearState[wrap.dataset.yearKey] = nowCollapsed;
+      try { localStorage.setItem(TA_YEARS_KEY, JSON.stringify(taYearState)); } catch { /* storage blocked */ }
+    });
+  });
+}
+
+async function renderSideReport(){
+  const body = document.getElementById('taSideBody');
+  const title = document.getElementById('taSideTitle');
+  if (!body) return;
+
+  if (usingDemoData || !currentEmployeeId) {
+    title.textContent = 'Yearly summary';
+    body.innerHTML = `<p class="ta-side-empty">${usingDemoData
+      ? 'Not available in demo data.'
+      : "Your account isn't linked to an employee record."}</p>`;
+    return;
+  }
+
+  const tab = currentPageTab;
+  body.innerHTML = `<p class="ta-side-empty">Loading…</p>`;
+  try {
+    if (tab === 'tracking') {
+      const rows = await HITT_API.getTimeTrackingSummary(currentEmployeeId);
+      if (currentPageTab !== 'tracking') return;
+      title.textContent = 'Hours by year';
+      body.innerHTML = rows.length
+        ? rows.map(r => taYearRow('tracking', r.year, `${taNum(r.totalHours)}h`, [
+            ['PO hours', `${taNum(r.poHours)}h`],
+            ['RES hours', `${taNum(r.resHours)}h`],
+            ['Projects', taNum(r.projectCount)],
+          ])).join('')
+        : `<p class="ta-side-empty">No hours logged yet.</p>`;
+    } else {
+      const rows = await HITT_API.getTimeOffSummary(currentEmployeeId);
+      if (currentPageTab !== 'timeoff') return;
+      title.textContent = 'Time off by year';
+      body.innerHTML = rows.length
+        ? rows.map(r => taYearRow('timeoff', r.year, `${taNum(r.daysApproved)}d approved`, [
+            ['Requests', taNum(r.requestCount)],
+            ['Days requested', taNum(r.daysRequested)],
+            ['Approved', taNum(r.daysApproved)],
+            ['Pending', taNum(r.daysPending)],
+            ['Rejected', taNum(r.daysRejected)],
+          ])).join('')
+        : `<p class="ta-side-empty">No time-off requests yet.</p>`;
+    }
+    wireYearToggles();
+  } catch (err) {
+    console.warn('Could not load the side report:', err);
+    body.innerHTML = `<p class="ta-side-empty">Could not load the summary.</p>`;
+  }
 }
 
 /* ============================== LOAD / RENDER WEEK ========================= */
@@ -251,6 +359,7 @@ function renderTable(){
         flash.classList.remove('hidden');
         setTimeout(() => flash.classList.add('hidden'), 1500);
         updateWeekTotal();
+        renderSideReport();
       } catch (err) {
         console.error(err);
         toast('Could not save that row.', 'red');
@@ -271,6 +380,7 @@ function renderTable(){
         ROWS.splice(i, 1);
         renderTable();
         toast('Removed.', 'navy');
+        renderSideReport();
       } catch (err) {
         console.error(err);
         toast('Could not remove that row.', 'red');
@@ -424,6 +534,7 @@ function renderTimeOffTable(){
         await HITT_API.withdrawTimeOffRequest(req.id);
         toast('Request withdrawn.', 'navy');
         await loadTimeOff();
+        renderSideReport();
       } catch (err) {
         console.error(err);
         toast('Could not withdraw that request.', 'red');
@@ -602,6 +713,7 @@ document.getElementById('timeOffSubmit').addEventListener('click', async () => {
     closeTimeOffModal();
     toast('Request submitted.', 'green');
     await loadTimeOff();
+    renderSideReport();
   } catch (err) {
     console.error(err);
     toast('Could not submit the request.', 'red');
@@ -613,4 +725,5 @@ document.getElementById('timeOffSubmit').addEventListener('click', async () => {
   await initEmployee();
   await loadWeek();
   refreshTimeOffBadge();
+  renderSideReport();
 })();

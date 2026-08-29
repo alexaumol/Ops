@@ -60,6 +60,38 @@ router.get("/", requireModuleAccess("time-allocation"), async (req, res) => {
   }
 });
 
+// GET /api/time-tracking/summary?userId=X — hours logged per year, for the
+// side panel. Registered before nothing tricky, but kept above POST for
+// readability.
+router.get("/summary", requireModuleAccess("time-allocation"), async (req, res) => {
+  const { userId } = req.query;
+  if (!userId) return res.status(400).json({ error: "validation_error", message: "userId is required" });
+  try {
+    const { rows } = await pool.query(
+      `SELECT EXTRACT(YEAR FROM t.projtimetrackdate)::int AS year,
+              COALESCE(SUM(t.projtimetrackhours), 0) AS "totalHours",
+              COALESCE(SUM(t.projtimetrackhours) FILTER (WHERE t.po_res = 'PO'), 0) AS "poHours",
+              COALESCE(SUM(t.projtimetrackhours) FILTER (WHERE t.po_res = 'RES'), 0) AS "resHours",
+              COUNT(DISTINCT t.projectid) AS "projectCount"
+       FROM projectstimetracking t
+       WHERE t.userid = $1 AND t.projtimetrackdate IS NOT NULL
+       GROUP BY 1
+       ORDER BY 1 DESC`,
+      [userId]
+    );
+    res.json(rows.map((r) => ({
+      year: r.year,
+      totalHours: Number(r.totalHours),
+      poHours: Number(r.poHours),
+      resHours: Number(r.resHours),
+      projectCount: Number(r.projectCount),
+    })));
+  } catch (err) {
+    console.error("[GET /api/time-tracking/summary] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
 // POST /api/time-tracking — upsert one project's hours for a week.
 router.post("/", requireModuleAccess("time-allocation"), async (req, res) => {
   const { userId, projectId, week, weekStart, hours, poRes } = req.body || {};

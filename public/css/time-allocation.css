@@ -133,3 +133,77 @@
 }
 .ta-add-row { padding: 0.75rem 0.9rem; border-top: 1px solid var(--border-subtle); }
 .ta-saved-flash { color: var(--success); font-size: 0.72rem; margin-left: 0.4rem; }
+
+/* ---------- Yearly summary side panel (both tabs) ---------- */
+.ta-shell.page-shell { max-width: 1440px; }
+
+.ta-layout { display: flex; align-items: flex-start; gap: 1.5rem; position: relative; }
+.ta-main { flex: 1; min-width: 0; }
+.ta-side { flex-shrink: 0; width: 280px; }
+@media (max-width: 1080px) {
+  .ta-layout { display: block; }
+  .ta-side { width: auto; margin-top: 1.5rem; }
+}
+
+.ta-side-card {
+  position: sticky; top: 1rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: 0.85rem 0.8rem;
+  transition: width .15s ease, padding .15s ease;
+}
+.ta-side-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+.ta-side-title {
+  font-size: 0.7rem; font-weight: 800; text-transform: uppercase;
+  letter-spacing: 0.05em; color: var(--text-secondary);
+}
+.ta-side-toggle, .ta-side-reopen {
+  border: 1px solid var(--border-subtle); background: var(--bg-surface); color: var(--text-secondary);
+  border-radius: 6px; cursor: pointer; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+}
+.ta-side-toggle { width: 22px; height: 22px; font-size: 0.9rem; flex-shrink: 0; }
+.ta-side-toggle:hover, .ta-side-reopen:hover { border-color: var(--hitt-teal); color: var(--text-primary); }
+
+.ta-side-reopen {
+  display: none;
+  position: absolute; top: -2.35rem; right: 0; z-index: 5;
+  gap: 0.25rem; padding: 0.3rem 0.55rem;
+  font-size: 0.66rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em;
+}
+.ta-layout.ta-side-collapsed .ta-side { width: 0; }
+.ta-layout.ta-side-collapsed .ta-side-card {
+  width: 0; min-width: 0; padding: 0; border: none; box-shadow: none; overflow: hidden;
+}
+.ta-layout.ta-side-collapsed .ta-side-reopen { display: flex; }
+@media (max-width: 1080px) {
+  .ta-layout.ta-side-collapsed .ta-side { width: auto; }
+  .ta-layout.ta-side-collapsed .ta-side-card { width: auto; }
+  .ta-side-reopen { display: none !important; }
+}
+
+.ta-side-body { display: flex; flex-direction: column; gap: 0.5rem; }
+.ta-side-empty { font-size: 0.75rem; color: var(--text-secondary); padding: 0.3rem 0; margin: 0; }
+
+.ta-year { border: 1px solid var(--border-subtle); border-radius: 8px; overflow: hidden; }
+.ta-year-head {
+  display: flex; align-items: center; gap: 0.4rem;
+  width: 100%; background: var(--bg-surface-alt); border: none;
+  padding: 0.45rem 0.55rem; cursor: pointer; text-align: left;
+}
+.ta-year-chevron { font-size: 0.6rem; color: var(--text-secondary); transition: transform .15s ease; flex-shrink: 0; }
+.ta-year.is-collapsed .ta-year-chevron { transform: rotate(-90deg); }
+.ta-year.is-collapsed .ta-year-body { display: none; }
+.ta-year-label { flex: 1; font-size: 0.82rem; font-weight: 800; color: var(--text-primary); }
+.ta-year-total { font-size: 0.78rem; font-weight: 700; color: var(--hitt-teal); }
+.ta-year-body { padding: 0.4rem 0.55rem 0.5rem; display: flex; flex-direction: column; gap: 0.25rem; }
+.ta-year-stat {
+  display: flex; justify-content: space-between; gap: 0.5rem;
+  font-size: 0.76rem; color: var(--text-secondary);
+}
+.ta-year-stat strong { color: var(--text-primary); font-weight: 700; font-variant-numeric: tabular-nums; }
