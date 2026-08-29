@@ -60,31 +60,31 @@ router.get("/", requireModuleAccess("time-allocation"), async (req, res) => {
   }
 });
 
-// GET /api/time-tracking/summary?userId=X — hours logged per year, for the
-// side panel. Registered before nothing tricky, but kept above POST for
-// readability.
+// GET /api/time-tracking/summary?userId=X — hours logged per month, for the
+// side panel. Current + previous calendar year only. Each month splits into
+// PO (project-owner) and RES (resource) hours.
 router.get("/summary", requireModuleAccess("time-allocation"), async (req, res) => {
   const { userId } = req.query;
   if (!userId) return res.status(400).json({ error: "validation_error", message: "userId is required" });
   try {
     const { rows } = await pool.query(
       `SELECT EXTRACT(YEAR FROM t.projtimetrackdate)::int AS year,
-              COALESCE(SUM(t.projtimetrackhours), 0) AS "totalHours",
+              EXTRACT(MONTH FROM t.projtimetrackdate)::int AS month,
               COALESCE(SUM(t.projtimetrackhours) FILTER (WHERE t.po_res = 'PO'), 0) AS "poHours",
-              COALESCE(SUM(t.projtimetrackhours) FILTER (WHERE t.po_res = 'RES'), 0) AS "resHours",
-              COUNT(DISTINCT t.projectid) AS "projectCount"
+              COALESCE(SUM(t.projtimetrackhours) FILTER (WHERE t.po_res = 'RES'), 0) AS "resHours"
        FROM projectstimetracking t
-       WHERE t.userid = $1 AND t.projtimetrackdate IS NOT NULL
-       GROUP BY 1
-       ORDER BY 1 DESC`,
+       WHERE t.userid = $1
+         AND t.projtimetrackdate IS NOT NULL
+         AND EXTRACT(YEAR FROM t.projtimetrackdate) >= EXTRACT(YEAR FROM CURRENT_DATE) - 1
+       GROUP BY 1, 2
+       ORDER BY 1 DESC, 2 DESC`,
       [userId]
     );
     res.json(rows.map((r) => ({
       year: r.year,
-      totalHours: Number(r.totalHours),
+      month: r.month,
       poHours: Number(r.poHours),
       resHours: Number(r.resHours),
-      projectCount: Number(r.projectCount),
     })));
   } catch (err) {
     console.error("[GET /api/time-tracking/summary] DB error:", err.message);

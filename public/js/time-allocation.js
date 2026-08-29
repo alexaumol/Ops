@@ -151,9 +151,11 @@ async function refreshTimeOffBadge(){
 }
 
 /* ============================== SIDE REPORTS ============================== */
-// Per-year summary in the right-hand panel — hours logged (tracking tab)
-// or time-off days (time-off tab). Whole panel + each year collapse,
-// persisted best-effort in localStorage.
+// Right-hand panel (Project time tracking tab only): hours logged, broken
+// down year -> month, each month split into PO (project owner) and RES
+// (resource) hours. Current + previous calendar year. Whole panel and each
+// year collapse, persisted best-effort in localStorage.
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const TA_SIDE_KEY = 'hitt.taSide.collapsed';
 const TA_YEARS_KEY = 'hitt.taSide.years';
 let taYearState = {};
@@ -181,7 +183,7 @@ try { taYearState = JSON.parse(localStorage.getItem(TA_YEARS_KEY) || '{}') || {}
 
 const taNum = (n) => Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 1 });
 
-function taYearRow(tab, year, totalText, stats){
+function taYearRow(tab, year, totalText, bodyHtml){
   const key = `${tab}:${year}`;
   const collapsed = !!taYearState[key];
   return `
@@ -191,9 +193,7 @@ function taYearRow(tab, year, totalText, stats){
         <span class="ta-year-label">${year}</span>
         <span class="ta-year-total">${totalText}</span>
       </button>
-      <div class="ta-year-body">
-        ${stats.map(s => `<div class="ta-year-stat"><span>${escapeHtml(s[0])}</span><strong>${escapeHtml(s[1])}</strong></div>`).join('')}
-      </div>
+      <div class="ta-year-body">${bodyHtml}</div>
     </div>`;
 }
 
@@ -210,46 +210,49 @@ function wireYearToggles(){
 }
 
 async function renderSideReport(){
+  const side = document.getElementById('taSide');
   const body = document.getElementById('taSideBody');
   const title = document.getElementById('taSideTitle');
-  if (!body) return;
+  if (!side || !body) return;
+
+  // The panel is Project time tracking only — nothing on the Time off tab.
+  const show = currentPageTab === 'tracking';
+  side.classList.toggle('hidden', !show);
+  if (!show) return;
+
+  title.textContent = 'Hours by month';
 
   if (usingDemoData || !currentEmployeeId) {
-    title.textContent = 'Yearly summary';
     body.innerHTML = `<p class="ta-side-empty">${usingDemoData
       ? 'Not available in demo data.'
       : "Your account isn't linked to an employee record."}</p>`;
     return;
   }
 
-  const tab = currentPageTab;
   body.innerHTML = `<p class="ta-side-empty">Loading…</p>`;
   try {
-    if (tab === 'tracking') {
-      const rows = await HITT_API.getTimeTrackingSummary(currentEmployeeId);
-      if (currentPageTab !== 'tracking') return;
-      title.textContent = 'Hours by year';
-      body.innerHTML = rows.length
-        ? rows.map(r => taYearRow('tracking', r.year, `${taNum(r.totalHours)}h`, [
-            ['PO hours', `${taNum(r.poHours)}h`],
-            ['RES hours', `${taNum(r.resHours)}h`],
-            ['Projects', taNum(r.projectCount)],
-          ])).join('')
-        : `<p class="ta-side-empty">No hours logged yet.</p>`;
-    } else {
-      const rows = await HITT_API.getTimeOffSummary(currentEmployeeId);
-      if (currentPageTab !== 'timeoff') return;
-      title.textContent = 'Time off by year';
-      body.innerHTML = rows.length
-        ? rows.map(r => taYearRow('timeoff', r.year, `${taNum(r.daysApproved)}d approved`, [
-            ['Requests', taNum(r.requestCount)],
-            ['Days requested', taNum(r.daysRequested)],
-            ['Approved', taNum(r.daysApproved)],
-            ['Pending', taNum(r.daysPending)],
-            ['Rejected', taNum(r.daysRejected)],
-          ])).join('')
-        : `<p class="ta-side-empty">No time-off requests yet.</p>`;
-    }
+    const rows = await HITT_API.getTimeTrackingSummary(currentEmployeeId);
+    if (currentPageTab !== 'tracking') return;
+    if (!rows.length) { body.innerHTML = `<p class="ta-side-empty">No hours logged in the last two years.</p>`; return; }
+
+    const byYear = new Map();
+    rows.forEach(r => {
+      if (!byYear.has(r.year)) byYear.set(r.year, []);
+      byYear.get(r.year).push(r);
+    });
+
+    body.innerHTML = [...byYear.keys()].sort((a, b) => b - a).map(year => {
+      const months = byYear.get(year).sort((a, b) => b.month - a.month);
+      const po = months.reduce((s, m) => s + m.poHours, 0);
+      const res = months.reduce((s, m) => s + m.resHours, 0);
+      const monthRows = months.map(m => `
+        <div class="ta-month-row">
+          <span class="ta-month-name">${MONTHS[m.month - 1] || m.month}</span>
+          <span class="ta-month-hours"><em>PO</em> ${taNum(m.poHours)}h</span>
+          <span class="ta-month-hours"><em>RES</em> ${taNum(m.resHours)}h</span>
+        </div>`).join('');
+      return taYearRow('tracking', year, `PO ${taNum(po)}h · RES ${taNum(res)}h`, monthRows);
+    }).join('');
     wireYearToggles();
   } catch (err) {
     console.warn('Could not load the side report:', err);

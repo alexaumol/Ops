@@ -128,8 +128,6 @@ const HITT_API = (() => {
     getPendingTimeOffRequests: () => request("/api/time-off/requests/pending"),
     getTimeOffNotifications: (since) =>
       request(`/api/time-off/notifications${since ? `?since=${encodeURIComponent(since)}` : ""}`),
-    getTimeOffSummary: (empId) =>
-      request(`/api/time-off/summary?empId=${encodeURIComponent(empId)}`),
     approveTimeOffRequest: (id) => request(`/api/time-off/requests/${id}/approve`, { method: "PATCH" }),
     rejectTimeOffRequest: (id, comment) =>
       request(`/api/time-off/requests/${id}/reject`, { method: "PATCH", body: JSON.stringify({ comment }) }),

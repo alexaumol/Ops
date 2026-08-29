@@ -94,39 +94,6 @@ router.get("/notifications", requireModuleAccess("time-allocation"), async (req,
   }
 });
 
-// GET /api/time-off/summary?empId=X — days per year, for the side panel.
-router.get("/summary", requireModuleAccess("time-allocation"), async (req, res) => {
-  const { empId } = req.query;
-  if (!empId) return res.status(400).json({ error: "validation_error", message: "empId is required" });
-  try {
-    const { rows } = await pool.query(
-      `SELECT EXTRACT(YEAR FROM r.startdate)::int AS year,
-              COUNT(*) AS "requestCount",
-              COALESCE(SUM(r.daysrequested), 0) AS "daysRequested",
-              COALESCE(SUM(r.daysrequested) FILTER (WHERE s.statusid = 4), 0) AS "daysApproved",
-              COALESCE(SUM(r.daysrequested) FILTER (WHERE s.statusid IN (2, 3)), 0) AS "daysPending",
-              COALESCE(SUM(r.daysrequested) FILTER (WHERE s.statusid = 5), 0) AS "daysRejected"
-       FROM timeoffrequests r
-       LEFT JOIN timeoffrequeststatus s ON s.timeoffreqid = r.id
-       WHERE r.empid = $1 AND r.startdate IS NOT NULL
-       GROUP BY 1
-       ORDER BY 1 DESC`,
-      [empId]
-    );
-    res.json(rows.map((r) => ({
-      year: r.year,
-      requestCount: Number(r.requestCount),
-      daysRequested: Number(r.daysRequested),
-      daysApproved: Number(r.daysApproved),
-      daysPending: Number(r.daysPending),
-      daysRejected: Number(r.daysRejected),
-    })));
-  } catch (err) {
-    console.error("[GET /api/time-off/summary] DB error:", err.message);
-    res.status(502).json({ error: "database_unreachable", message: err.message });
-  }
-});
-
 // GET /api/time-off/requests/pending — cross-employee queue for approvers.
 // Registered before the /:id routes so "pending" doesn't get swallowed as
 // an :id param.

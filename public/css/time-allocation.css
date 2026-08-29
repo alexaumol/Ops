@@ -207,3 +207,14 @@
   font-size: 0.76rem; color: var(--text-secondary);
 }
 .ta-year-stat strong { color: var(--text-primary); font-weight: 700; font-variant-numeric: tabular-nums; }
+
+.ta-month-row {
+  display: grid; grid-template-columns: 2.4rem 1fr 1fr; align-items: baseline; gap: 0.35rem;
+  font-size: 0.74rem; color: var(--text-primary);
+}
+.ta-month-name { font-weight: 700; color: var(--text-secondary); }
+.ta-month-hours { text-align: right; font-variant-numeric: tabular-nums; }
+.ta-month-hours em {
+  font-style: normal; font-weight: 700; font-size: 0.62rem;
+  color: var(--text-secondary); margin-right: 0.15rem;
+}
