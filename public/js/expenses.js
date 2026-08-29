@@ -35,6 +35,8 @@ let CATEGORIES = [];
 let ROWS = [];
 let page = 1;
 let total = 0;
+let sortCol = "date";
+let sortDir = "desc";
 const selected = new Set();
 let searchDebounce = null;
 
@@ -56,10 +58,43 @@ function filters() {
     categoryId: document.getElementById("expCategoryFilter").value || undefined,
     startDate: document.getElementById("expStartDate").value || undefined,
     endDate: document.getElementById("expEndDate").value || undefined,
+    sort: sortCol,
+    dir: sortDir,
     page,
     limit: Number(document.getElementById("expPageSize").value),
   };
 }
+
+function updateScopeCounts(counts) {
+  document.querySelectorAll(".exp-scope-count").forEach((el) => {
+    const n = counts ? counts[el.dataset.count] : null;
+    el.textContent = n == null ? "" : `(${n})`;
+  });
+}
+
+function updateSortIndicators() {
+  document.querySelectorAll(".exp-table th[data-sort]").forEach((th) => {
+    const active = th.dataset.sort === sortCol;
+    th.classList.toggle("sorted", active);
+    const arrow = th.querySelector(".sort-arrow");
+    if (arrow) arrow.textContent = active ? (sortDir === "asc" ? "▲" : "▼") : "";
+  });
+}
+
+document.querySelectorAll(".exp-table th[data-sort]").forEach((th) => {
+  th.addEventListener("click", () => {
+    const col = th.dataset.sort;
+    if (sortCol === col) {
+      sortDir = sortDir === "asc" ? "desc" : "asc";
+    } else {
+      sortCol = col;
+      sortDir = col === "date" || col === "amount" ? "desc" : "asc";
+    }
+    page = 1;
+    loadExpenses();
+  });
+});
+updateSortIndicators();
 
 function categoryOptions(selectedId, blankLabel) {
   return `<option value="">${blankLabel || "—"}</option>` +
@@ -97,6 +132,8 @@ async function loadExpenses() {
     ROWS = data.rows;
     total = data.total;
     renderTable();
+    updateScopeCounts(data.counts);
+    updateSortIndicators();
     document.getElementById("expPageInfo").textContent = total
       ? `Page ${page} of ${totalPages()} · ${total} expense${total === 1 ? "" : "s"}`
       : "";
@@ -106,6 +143,7 @@ async function loadExpenses() {
     tbody.innerHTML = "";
     empty.textContent = "Could not load expenses.";
     empty.classList.remove("hidden");
+    updateScopeCounts(null);
   }
   updatePagerButtons();
 }

@@ -36,6 +36,7 @@
 }
 .exp-scope-btn:first-child { border-left: none; }
 .exp-scope-btn[aria-selected="true"] { background: var(--hitt-teal); color: #fff; }
+.exp-scope-count { opacity: 0.75; font-weight: 700; font-variant-numeric: tabular-nums; }
 
 .exp-bulk-bar {
   display: flex; align-items: center; gap: 0.5rem;
@@ -60,6 +61,11 @@
   color: var(--text-secondary); background: var(--bg-surface-alt);
   padding: 0.5rem 0.7rem; border-bottom: 1px solid var(--border-subtle); white-space: nowrap;
 }
+.exp-table th[data-sort] { cursor: pointer; user-select: none; }
+.exp-table th[data-sort]:hover { color: var(--text-primary); }
+.exp-table th[data-sort] .sort-arrow { margin-left: 0.15rem; font-size: 0.85em; opacity: 0.45; }
+.exp-table th[data-sort].sorted { color: var(--text-primary); }
+.exp-table th[data-sort].sorted .sort-arrow { opacity: 1; }
 .exp-table tbody td { padding: 0.45rem 0.7rem; border-bottom: 1px solid var(--border-subtle); vertical-align: middle; }
 .exp-table tbody tr:last-child td { border-bottom: none; }
 .exp-table tbody tr:hover { background: var(--bg-surface-alt); }

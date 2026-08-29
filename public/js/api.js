@@ -168,7 +168,7 @@ const HITT_API = (() => {
 
     getExpenses: (filters = {}) => {
       const params = new URLSearchParams();
-      ["search", "projectId", "categoryId", "scope", "startDate", "endDate", "page", "limit"].forEach((k) => {
+      ["search", "projectId", "categoryId", "scope", "startDate", "endDate", "sort", "dir", "page", "limit"].forEach((k) => {
         if (filters[k] != null && filters[k] !== "") params.set(k, filters[k]);
       });
       const qs = params.toString();

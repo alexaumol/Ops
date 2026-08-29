@@ -141,13 +141,24 @@ const EXPENSE_FROM = `
 `;
 const EXPENSE_SELECT = `SELECT ${EXPENSE_COLUMNS} ${EXPENSE_FROM}`;
 
+// Whitelisted sort columns -> SQL expression. Anything else falls back to
+// the expense date. Every sort keeps date DESC, id DESC as a stable tiebreak.
+const EXPENSE_SORT = {
+  date: "x.expensets",
+  category: "c.categorydesc",
+  description: "x.comments",
+  project: "p.projectnumber",
+  paidBy: "NULLIF(TRIM(CONCAT(e.employeefirstname, ' ', e.employeelastname)), '')",
+  amount: "x.amount",
+};
+
 async function expenseRow(id) {
   const { rows } = await pool.query(`${EXPENSE_SELECT} WHERE x.id = $1`, [id]);
   return rows[0] || null;
 }
 
 /* ============================== LIST ================================== */
-// GET /api/expenses?search=&projectId=&categoryId=&scope=&startDate=&endDate=&page=&limit=
+// GET /api/expenses?search=&projectId=&categoryId=&scope=&startDate=&endDate=&sort=&dir=&page=&limit=
 router.get("/", async (req, res) => {
   try {
     const { search, projectId, categoryId, scope, startDate, endDate } = req.query;
@@ -155,44 +166,69 @@ router.get("/", async (req, res) => {
     const page = Math.max(Number(req.query.page) || 1, 1);
     const offset = (page - 1) * limit;
 
-    const where = [];
+    // Filters shared by the row list AND the per-scope counts/totals shown
+    // beside each toggle label — everything except the scope toggle itself.
+    const base = [];
     const fp = [];
     const P = (v) => { fp.push(v); return `$${fp.length}`; };
 
     if (search) {
       const t = P(search);
-      where.push(`(x.comments ILIKE '%'||${t}||'%' OR c.categorydesc ILIKE '%'||${t}||'%'
+      base.push(`(x.comments ILIKE '%'||${t}||'%' OR c.categorydesc ILIKE '%'||${t}||'%'
                    OR p.projectnumber ILIKE '%'||${t}||'%' OR p.projectname ILIKE '%'||${t}||'%')`);
     }
-    if (projectId) where.push(`x.projectid::bigint = ${P(projectId)}::bigint`);
-    if (categoryId) where.push(`x.categoryid::bigint = ${P(categoryId)}::bigint`);
-    if (scope === "internal") where.push("x.projectid IS NULL");
-    if (scope === "project") where.push("x.projectid IS NOT NULL");
-    if (startDate) where.push(`x.expensets::date >= ${P(startDate)}::date`);
-    if (endDate) where.push(`x.expensets::date <= ${P(endDate)}::date`);
+    if (projectId) base.push(`x.projectid::bigint = ${P(projectId)}::bigint`);
+    if (categoryId) base.push(`x.categoryid::bigint = ${P(categoryId)}::bigint`);
+    if (startDate) base.push(`x.expensets::date >= ${P(startDate)}::date`);
+    if (endDate) base.push(`x.expensets::date <= ${P(endDate)}::date`);
+    const baseWhereSql = base.length ? `WHERE ${base.join(" AND ")}` : "";
 
-    const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
+    // The scope toggle narrows the row list and the "Filtered total".
+    const scopeClause = scope === "internal" ? "x.projectid IS NULL"
+      : scope === "project" ? "x.projectid IS NOT NULL"
+      : null;
+    const listWhere = scopeClause ? [...base, scopeClause] : base;
+    const listWhereSql = listWhere.length ? `WHERE ${listWhere.join(" AND ")}` : "";
+
+    const sortExpr = EXPENSE_SORT[req.query.sort] || EXPENSE_SORT.date;
+    const dir = String(req.query.dir).toLowerCase() === "asc" ? "ASC" : "DESC";
+    const orderBy = sortExpr === EXPENSE_SORT.date
+      ? `x.expensets ${dir} NULLS LAST, x.id DESC`
+      : `${sortExpr} ${dir} NULLS LAST, x.expensets DESC, x.id DESC`;
+
     const { rows } = await pool.query(
       `SELECT ${EXPENSE_COLUMNS}, COUNT(*) OVER() AS "totalCount"
        ${EXPENSE_FROM}
-       ${whereSql}
-       ORDER BY x.expensets DESC NULLS LAST, x.id DESC
+       ${listWhereSql}
+       ORDER BY ${orderBy}
        LIMIT $${fp.length + 1} OFFSET $${fp.length + 2}`,
       [...fp, limit, offset]
     );
     const total = rows.length ? Number(rows[0].totalCount) : 0;
-    const sumRes = await pool.query(
-      `SELECT COALESCE(SUM(x.amount), 0) AS total
-       FROM expenses x
-       LEFT JOIN expensescategories c ON c.id = x.categoryid::bigint
-       LEFT JOIN projects p ON p.id = x.projectid::bigint
-       ${whereSql}`,
+
+    // One pass for the toggle counts + each scope's money total. The scope
+    // clauses are literal SQL, so the params array is unchanged.
+    const agg = await pool.query(
+      `SELECT
+         COUNT(*)                                        AS c_all,
+         COUNT(*) FILTER (WHERE x.projectid IS NOT NULL) AS c_project,
+         COUNT(*) FILTER (WHERE x.projectid IS NULL)     AS c_internal,
+         COALESCE(SUM(x.amount), 0)                                        AS s_all,
+         COALESCE(SUM(x.amount) FILTER (WHERE x.projectid IS NOT NULL), 0) AS s_project,
+         COALESCE(SUM(x.amount) FILTER (WHERE x.projectid IS NULL), 0)     AS s_internal
+       ${EXPENSE_FROM}
+       ${baseWhereSql}`,
       fp
     );
+    const a = agg.rows[0];
+    const counts = { all: Number(a.c_all), project: Number(a.c_project), internal: Number(a.c_internal) };
+    const sum = scope === "internal" ? Number(a.s_internal)
+      : scope === "project" ? Number(a.s_project)
+      : Number(a.s_all);
+
     res.json({
       rows: rows.map(({ totalCount, ...r }) => r),
-      total, page, limit,
-      sum: Number(sumRes.rows[0].total),
+      total, page, limit, sum, counts,
     });
   } catch (err) {
     console.error("[GET /api/expenses] DB error:", err.message);
