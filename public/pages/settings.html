@@ -126,51 +126,59 @@
 
       <!-- ==================== CATEGORIES (expense / spectrum / project type) ==================== -->
       <section id="paneExpCats" class="settings-pane hidden">
-        <h3 class="settings-subhead" data-i18n="settings.cats.expenseHead">Expense categories</h3>
-        <p class="settings-note">The category list for the Expenses module. A category can't be deleted while any expense still uses it.</p>
-        <div class="settings-table-wrap">
-          <table class="settings-table">
-            <thead>
-              <tr><th data-i18n="settings.cats.colName">Name</th><th style="text-align:right;" data-i18n="settings.cats.colInUse">In use</th><th></th></tr>
-            </thead>
-            <tbody id="expCatTableBody"></tbody>
-          </table>
-          <div id="expCatEmpty" class="settings-pane-empty hidden">No categories yet.</div>
-          <div class="settings-add-row">
-            <input type="text" id="newExpCatName" placeholder="New expense category…" />
-            <button class="btn btn-primary" id="btnAddExpCat" data-i18n="settings.cats.add">Add</button>
+        <div class="settings-cat-grid">
+          <div class="settings-cat-col">
+            <h3 class="settings-subhead" data-i18n="settings.cats.expenseHead">Expense categories</h3>
+            <p class="settings-note">The category list for the Expenses module. A category can't be deleted while any expense still uses it.</p>
+            <div class="settings-table-wrap">
+              <table class="settings-table">
+                <thead>
+                  <tr><th data-i18n="settings.cats.colName">Name</th><th style="text-align:right;" data-i18n="settings.cats.colInUse">In use</th><th></th></tr>
+                </thead>
+                <tbody id="expCatTableBody"></tbody>
+              </table>
+              <div id="expCatEmpty" class="settings-pane-empty hidden">No categories yet.</div>
+              <div class="settings-add-row">
+                <input type="text" id="newExpCatName" placeholder="New expense category…" />
+                <button class="btn btn-primary" id="btnAddExpCat" data-i18n="settings.cats.add">Add</button>
+              </div>
+            </div>
           </div>
-        </div>
 
-        <h3 class="settings-subhead" style="margin-top:2rem;" data-i18n="settings.cats.spectrumHead">Biotech spectrum</h3>
-        <p class="settings-note">The business-partner / project audience segments. An entry can't be deleted while a project uses it.</p>
-        <div class="settings-table-wrap">
-          <table class="settings-table">
-            <thead>
-              <tr><th data-i18n="settings.cats.colName">Name</th><th style="text-align:right;" data-i18n="settings.cats.colInUse">In use</th><th></th></tr>
-            </thead>
-            <tbody id="bioSpectrumTableBody"></tbody>
-          </table>
-          <div id="bioSpectrumEmpty" class="settings-pane-empty hidden">Nothing here yet.</div>
-          <div class="settings-add-row">
-            <input type="text" id="newBioSpectrumName" placeholder="New biotech spectrum entry…" />
-            <button class="btn btn-primary" id="btnAddBioSpectrum" data-i18n="settings.cats.add">Add</button>
+          <div class="settings-cat-col">
+            <h3 class="settings-subhead" data-i18n="settings.cats.spectrumHead">Biotech spectrum</h3>
+            <p class="settings-note">The business-partner / project audience segments. An entry can't be deleted while a project uses it.</p>
+            <div class="settings-table-wrap">
+              <table class="settings-table">
+                <thead>
+                  <tr><th data-i18n="settings.cats.colName">Name</th><th style="text-align:right;" data-i18n="settings.cats.colInUse">In use</th><th></th></tr>
+                </thead>
+                <tbody id="bioSpectrumTableBody"></tbody>
+              </table>
+              <div id="bioSpectrumEmpty" class="settings-pane-empty hidden">Nothing here yet.</div>
+              <div class="settings-add-row">
+                <input type="text" id="newBioSpectrumName" placeholder="New biotech spectrum entry…" />
+                <button class="btn btn-primary" id="btnAddBioSpectrum" data-i18n="settings.cats.add">Add</button>
+              </div>
+            </div>
           </div>
-        </div>
 
-        <h3 class="settings-subhead" style="margin-top:2rem;" data-i18n="settings.cats.projTypeHead">Project type</h3>
-        <p class="settings-note">The project classification list. An entry can't be deleted while a project uses it.</p>
-        <div class="settings-table-wrap">
-          <table class="settings-table">
-            <thead>
-              <tr><th data-i18n="settings.cats.colName">Name</th><th style="text-align:right;" data-i18n="settings.cats.colInUse">In use</th><th></th></tr>
-            </thead>
-            <tbody id="projTypeTableBody"></tbody>
-          </table>
-          <div id="projTypeEmpty" class="settings-pane-empty hidden">Nothing here yet.</div>
-          <div class="settings-add-row">
-            <input type="text" id="newProjTypeName" placeholder="New project type…" />
-            <button class="btn btn-primary" id="btnAddProjType" data-i18n="settings.cats.add">Add</button>
+          <div class="settings-cat-col">
+            <h3 class="settings-subhead" data-i18n="settings.cats.projTypeHead">Project type</h3>
+            <p class="settings-note">The project classification list. An entry can't be deleted while a project uses it.</p>
+            <div class="settings-table-wrap">
+              <table class="settings-table">
+                <thead>
+                  <tr><th data-i18n="settings.cats.colName">Name</th><th style="text-align:right;" data-i18n="settings.cats.colInUse">In use</th><th></th></tr>
+                </thead>
+                <tbody id="projTypeTableBody"></tbody>
+              </table>
+              <div id="projTypeEmpty" class="settings-pane-empty hidden">Nothing here yet.</div>
+              <div class="settings-add-row">
+                <input type="text" id="newProjTypeName" placeholder="New project type…" />
+                <button class="btn btn-primary" id="btnAddProjType" data-i18n="settings.cats.add">Add</button>
+              </div>
+            </div>
           </div>
         </div>
       </section>

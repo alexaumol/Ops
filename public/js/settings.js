@@ -413,7 +413,7 @@ function makeCatalog({ slug, bodyId, emptyId, inputId, addBtnId }) {
     emptyEl().classList.add("hidden");
     tbody().innerHTML = items.map((c) => `
       <tr data-id="${c.id}">
-        <td><input type="text" class="cal-input" style="width:18rem; text-align:left;" data-cat-name value="${escapeHtml(c.name)}" /></td>
+        <td><input type="text" class="cal-input" style="width:100%; text-align:left;" data-cat-name value="${escapeHtml(c.name)}" /></td>
         <td class="settings-emp-sub" style="text-align:right;">${c.usageCount}</td>
         <td style="text-align:right;">
           <button class="icon-btn" data-del-cat title="${c.usageCount ? "In use — cannot delete" : "Delete"}" ${c.usageCount ? "disabled style='opacity:.35;'" : ""}>✕</button>

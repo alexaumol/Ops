@@ -279,6 +279,20 @@
   color: var(--text-primary);
 }
 
+/* Categories tab: two narrow catalog tables per row */
+.settings-cat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem 2rem;
+  align-items: start;
+}
+.settings-cat-col .settings-note { margin-bottom: 0.75rem; }
+.settings-cat-col .settings-table-wrap { margin-bottom: 0; }
+.settings-cat-col .settings-add-row input[type="text"] { min-width: 8rem; }
+@media (max-width: 900px) {
+  .settings-cat-grid { grid-template-columns: 1fr; }
+}
+
 /* ---------- toggle switch ---------- */
 .switch {
   position: relative;
