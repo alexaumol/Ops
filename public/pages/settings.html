@@ -45,25 +45,25 @@
 
       <!-- ==================== USER PERMISSIONS ==================== -->
       <section id="paneUserPerms" class="settings-pane">
-        <p class="settings-note">Module access defaults to open — everyone can use every module unless restricted here. Admins bypass every module restriction, but Role and Time-off approver are independent — granting one doesn't grant the other.</p>
+        <p class="settings-note" data-i18n="settings.perms.note">Module access defaults to open — everyone can use every module unless restricted here. Admins bypass every module restriction, but Role and Time-off approver are independent — granting one doesn't grant the other.</p>
         <div class="settings-toolbar">
           <label class="settings-toggle-deactivated">
             <input type="checkbox" id="showDeactivated" />
-            Show deactivated users
+            <span data-i18n="settings.perms.showDeactivated">Show deactivated users</span>
             <span id="deactivatedCount" class="settings-emp-sub"></span>
           </label>
           <div style="flex:1;"></div>
-          <button class="btn btn-primary" id="btnAddUser">+ Add new user</button>
+          <button class="btn btn-primary" id="btnAddUser" data-i18n="settings.perms.addUser">+ Add new user</button>
         </div>
         <div class="settings-table-wrap">
           <table class="settings-table">
             <thead>
               <tr>
-                <th>Employee</th>
-                <th>Status</th>
-                <th>Role</th>
-                <th>Time-off approver</th>
-                <th>Module access</th>
+                <th data-i18n="ta.col.employee">Employee</th>
+                <th data-i18n="form.status">Status</th>
+                <th data-i18n="settings.perms.role">Role</th>
+                <th data-i18n="settings.perms.approver">Time-off approver</th>
+                <th data-i18n="settings.perms.moduleAccess">Module access</th>
               </tr>
             </thead>
             <tbody id="empTableBody"></tbody>
@@ -74,53 +74,53 @@
       <!-- ==================== CALENDAR (holidays + work calendar) ============ -->
       <section id="paneCalendar" class="settings-pane hidden">
         <h3 class="settings-subhead" data-i18n="settings.cal.holidaysHead">Holidays</h3>
-        <p class="settings-note">Public holidays (2024 onwards) imported from the Generalitat de Catalunya open-data feed, plus HITT company days and local bank holidays set here by HR. All feed the calendars in Time allocation and Reports.</p>
+        <p class="settings-note" data-i18n="settings.hol.note">Public holidays (2024 onwards) imported from the Generalitat de Catalunya open-data feed, plus HITT company days and local bank holidays set here by HR. All feed the calendars in Time allocation and Reports.</p>
         <div class="settings-toolbar" style="gap:0.75rem; flex-wrap:wrap;">
-          <label class="settings-inline-field">Year
-            <select id="holidayYearFilter"><option value="">All years</option></select>
+          <label class="settings-inline-field"><span data-i18n="rpt.year">Year</span>
+            <select id="holidayYearFilter"><option value="" data-i18n="rpt.allYears">All years</option></select>
           </label>
-          <button class="btn btn-secondary" id="btnImportHolidays">Import public holidays (Catalonia)</button>
+          <button class="btn btn-secondary" id="btnImportHolidays" data-i18n="settings.hol.import">Import public holidays (Catalonia)</button>
           <span id="holidayImportStatus" class="settings-emp-sub"></span>
         </div>
         <div class="settings-table-wrap">
           <table class="settings-table">
             <thead>
-              <tr><th>Date</th><th>Weekday</th><th>Description</th><th>Source</th><th></th></tr>
+              <tr><th data-i18n="form.date">Date</th><th data-i18n="settings.hol.weekday">Weekday</th><th data-i18n="form.description">Description</th><th data-i18n="settings.hol.source">Source</th><th></th></tr>
             </thead>
             <tbody id="holidaysTableBody"></tbody>
           </table>
-          <div id="holidaysEmpty" class="settings-pane-empty hidden">No holidays for this selection.</div>
+          <div id="holidaysEmpty" class="settings-pane-empty hidden" data-i18n="settings.hol.empty">No holidays for this selection.</div>
           <div class="settings-add-row">
             <input type="date" id="newHolidayDate" />
-            <input type="text" id="newHolidayDesc" placeholder="Holiday description…" />
+            <input type="text" id="newHolidayDesc" placeholder="Holiday description…" data-i18n-placeholder="settings.hol.descPlaceholder" />
             <select id="newHolidayType" title="Holiday type">
-              <option value="hitt">HITT holiday</option>
-              <option value="local">Local bank holiday</option>
+              <option value="hitt" data-i18n="settings.hol.typeHitt">HITT holiday</option>
+              <option value="local" data-i18n="settings.hol.typeLocal">Local bank holiday</option>
             </select>
-            <button class="btn btn-primary" id="btnAddHoliday">Add</button>
+            <button class="btn btn-primary" id="btnAddHoliday" data-i18n="form.add">Add</button>
           </div>
         </div>
 
         <h3 class="settings-subhead" style="margin-top:2rem;" data-i18n="settings.cal.workHead">Work calendar</h3>
-        <p class="settings-note">One row per year — the company-wide leave-day allowance and yearly working hours. Used for the time-off balance when an employee has no personal calendar entry of their own.</p>
+        <p class="settings-note" data-i18n="settings.wc.note">One row per year — the company-wide leave-day allowance and yearly working hours. Used for the time-off balance when an employee has no personal calendar entry of their own.</p>
         <div class="settings-table-wrap">
           <table class="settings-table">
             <thead>
-              <tr><th>Year</th><th>Leave days</th><th>Working hours / year</th><th>Last updated</th></tr>
+              <tr><th data-i18n="rpt.year">Year</th><th data-i18n="settings.wc.leaveDays">Leave days</th><th data-i18n="settings.wc.workingHours">Working hours / year</th><th data-i18n="form.lastUpdated">Last updated</th></tr>
             </thead>
             <tbody id="workCalendarTableBody"></tbody>
           </table>
-          <div id="workCalendarEmpty" class="settings-pane-empty hidden">No years configured yet.</div>
+          <div id="workCalendarEmpty" class="settings-pane-empty hidden" data-i18n="settings.wc.empty">No years configured yet.</div>
           <div class="settings-add-row">
-            <input type="number" id="newCalendarYear" min="2000" max="2100" placeholder="Year" style="width:6rem;" />
-            <button class="btn btn-primary" id="btnAddCalendarYear">Add year</button>
+            <input type="number" id="newCalendarYear" min="2000" max="2100" placeholder="Year" style="width:6rem;" data-i18n-placeholder="rpt.year" />
+            <button class="btn btn-primary" id="btnAddCalendarYear" data-i18n="settings.wc.addYear">Add year</button>
           </div>
         </div>
       </section>
 
       <!-- ==================== PATHS ==================== -->
       <section id="panePaths" class="settings-pane hidden">
-        <p class="settings-note">Configurable file paths used elsewhere in the app. Changes take effect on the next add/edit that uses them (existing records aren't rewritten automatically).</p>
+        <p class="settings-note" data-i18n="settings.paths.note">Configurable file paths used elsewhere in the app. Changes take effect on the next add/edit that uses them (existing records aren't rewritten automatically).</p>
         <div id="pathsList" class="paths-list"></div>
       </section>
 
@@ -139,7 +139,7 @@
               </table>
               <div id="expCatEmpty" class="settings-pane-empty hidden">No categories yet.</div>
               <div class="settings-add-row">
-                <input type="text" id="newExpCatName" placeholder="New expense category…" />
+                <input type="text" id="newExpCatName" placeholder="New expense category…" data-i18n-placeholder="settings.cats.newExp" />
                 <button class="btn btn-primary" id="btnAddExpCat" data-i18n="settings.cats.add">Add</button>
               </div>
             </div>
@@ -157,7 +157,7 @@
               </table>
               <div id="bioSpectrumEmpty" class="settings-pane-empty hidden">Nothing here yet.</div>
               <div class="settings-add-row">
-                <input type="text" id="newBioSpectrumName" placeholder="New biotech spectrum entry…" />
+                <input type="text" id="newBioSpectrumName" placeholder="New biotech spectrum entry…" data-i18n-placeholder="settings.cats.newBio" />
                 <button class="btn btn-primary" id="btnAddBioSpectrum" data-i18n="settings.cats.add">Add</button>
               </div>
             </div>
@@ -175,7 +175,7 @@
               </table>
               <div id="projTypeEmpty" class="settings-pane-empty hidden">Nothing here yet.</div>
               <div class="settings-add-row">
-                <input type="text" id="newProjTypeName" placeholder="New project type…" />
+                <input type="text" id="newProjTypeName" placeholder="New project type…" data-i18n-placeholder="settings.cats.newProj" />
                 <button class="btn btn-primary" id="btnAddProjType" data-i18n="settings.cats.add">Add</button>
               </div>
             </div>
@@ -185,20 +185,20 @@
 
       <!-- ==================== CURRENCIES ==================== -->
       <section id="paneCurrencies" class="settings-pane hidden">
-        <p class="settings-note">Currencies offered in the invoice modal. EUR is the default and can't be removed; a currency can't be deleted while any invoice uses it. The symbol is what shows next to amounts.</p>
+        <p class="settings-note" data-i18n="settings.cur.note">Currencies offered in the invoice modal. EUR is the default and can't be removed; a currency can't be deleted while any invoice uses it. The symbol is what shows next to amounts.</p>
         <div class="settings-table-wrap">
           <table class="settings-table">
             <thead>
-              <tr><th>Order</th><th>Code</th><th>Symbol</th><th>Name</th><th style="text-align:right;">In use</th><th></th></tr>
+              <tr><th data-i18n="settings.cur.order">Order</th><th data-i18n="settings.cur.code">Code</th><th data-i18n="settings.cur.symbol">Symbol</th><th data-i18n="form.name">Name</th><th style="text-align:right;" data-i18n="settings.cats.colInUse">In use</th><th></th></tr>
             </thead>
             <tbody id="currencyTableBody"></tbody>
           </table>
-          <div id="currencyEmpty" class="settings-pane-empty hidden">No currencies yet.</div>
+          <div id="currencyEmpty" class="settings-pane-empty hidden" data-i18n="settings.cur.empty">No currencies yet.</div>
           <div class="settings-add-row">
-            <input type="text" id="newCurrencyCode" placeholder="Code (USD)" style="width:6rem;" />
-            <input type="text" id="newCurrencySymbol" placeholder="Symbol ($)" style="width:5rem;" />
-            <input type="text" id="newCurrencyLabel" placeholder="Name (US Dollar)" />
-            <button class="btn btn-primary" id="btnAddCurrency">Add currency</button>
+            <input type="text" id="newCurrencyCode" placeholder="Code (USD)" style="width:6rem;" data-i18n-placeholder="settings.cur.codePlaceholder" />
+            <input type="text" id="newCurrencySymbol" placeholder="Symbol ($)" style="width:5rem;" data-i18n-placeholder="settings.cur.symbolPlaceholder" />
+            <input type="text" id="newCurrencyLabel" placeholder="Name (US Dollar)" data-i18n-placeholder="settings.cur.namePlaceholder" />
+            <button class="btn btn-primary" id="btnAddCurrency" data-i18n="settings.cur.addCurrency">Add currency</button>
           </div>
         </div>
       </section>
@@ -272,45 +272,45 @@
 
       <!-- ==================== AUDITING ==================== -->
       <section id="paneAudit" class="settings-pane hidden">
-        <p class="settings-note">Sign in / out (with client IP and reported device) plus every data change across the app — projects (create, status, edits, deliverables, quotations, notes, resources, partner assignment), time tracking, business partners (create, edits, contacts, notes, tax companies), invoicing, time-off decisions, and these settings. Admins only.</p>
+        <p class="settings-note" data-i18n="settings.audit.note">Sign in / out (with client IP and reported device) plus every data change across the app — projects (create, status, edits, deliverables, quotations, notes, resources, partner assignment), time tracking, business partners (create, edits, contacts, notes, tax companies), invoicing, time-off decisions, and these settings. Admins only.</p>
         <div class="settings-toolbar" style="gap:0.6rem; flex-wrap:wrap;">
-          <label class="settings-inline-field">User
-            <select id="auditUserFilter"><option value="">Everyone</option></select>
+          <label class="settings-inline-field"><span data-i18n="settings.audit.user">User</span>
+            <select id="auditUserFilter"><option value="" data-i18n="settings.audit.everyone">Everyone</option></select>
           </label>
-          <label class="settings-inline-field">Action
-            <select id="auditKindFilter"><option value="">All actions</option></select>
+          <label class="settings-inline-field"><span data-i18n="rpt.col.change">Action</span>
+            <select id="auditKindFilter"><option value="" data-i18n="settings.audit.allActions">All actions</option></select>
           </label>
-          <label class="settings-inline-field">From
+          <label class="settings-inline-field"><span data-i18n="exp.f.from">From</span>
             <input type="date" id="auditStartDate" />
           </label>
-          <label class="settings-inline-field">To
+          <label class="settings-inline-field"><span data-i18n="exp.f.to">To</span>
             <input type="date" id="auditEndDate" />
           </label>
-          <label class="settings-inline-field">Search details
-            <input type="text" id="auditSearch" placeholder="text in Details…" />
+          <label class="settings-inline-field"><span data-i18n="settings.audit.searchDetails">Search details</span>
+            <input type="text" id="auditSearch" placeholder="text in Details…" data-i18n-placeholder="settings.audit.searchPlaceholder" />
           </label>
-          <button class="btn btn-secondary" id="btnAuditClear">Clear</button>
+          <button class="btn btn-secondary" id="btnAuditClear" data-i18n="exp.bulk.clear">Clear</button>
         </div>
         <div class="settings-table-wrap">
           <table class="settings-table audit-table">
             <thead>
               <tr>
-                <th data-sort="at">When<span class="sort-arrow"></span></th>
-                <th data-sort="user">User<span class="sort-arrow"></span></th>
-                <th data-sort="action">Action<span class="sort-arrow"></span></th>
-                <th data-sort="details">Details<span class="sort-arrow"></span></th>
-                <th data-sort="ip">IP<span class="sort-arrow"></span></th>
-                <th data-sort="computer">Computer / device<span class="sort-arrow"></span></th>
+                <th data-sort="at" data-i18n="rpt.col.when">When<span class="sort-arrow"></span></th>
+                <th data-sort="user" data-i18n="settings.audit.user">User<span class="sort-arrow"></span></th>
+                <th data-sort="action" data-i18n="rpt.col.change">Action<span class="sort-arrow"></span></th>
+                <th data-sort="details" data-i18n="settings.audit.details">Details<span class="sort-arrow"></span></th>
+                <th data-sort="ip" data-i18n="settings.audit.ip">IP<span class="sort-arrow"></span></th>
+                <th data-sort="computer" data-i18n="settings.audit.device">Computer / device<span class="sort-arrow"></span></th>
               </tr>
             </thead>
             <tbody id="auditTableBody"></tbody>
           </table>
-          <div id="auditEmpty" class="settings-pane-empty hidden">No audit entries match these filters.</div>
+          <div id="auditEmpty" class="settings-pane-empty hidden" data-i18n="settings.audit.empty">No audit entries match these filters.</div>
         </div>
         <div class="settings-pagination">
           <span id="auditPageInfo" class="settings-emp-sub"></span>
           <div style="flex:1;"></div>
-          <label class="settings-inline-field">Per page
+          <label class="settings-inline-field"><span data-i18n="form.perPage">Per page</span>
             <select id="auditPageSize">
               <option value="25">25</option>
               <option value="50" selected>50</option>
@@ -318,8 +318,8 @@
               <option value="250">250</option>
             </select>
           </label>
-          <button class="btn btn-secondary" id="btnAuditPrev">&larr; Prev</button>
-          <button class="btn btn-secondary" id="btnAuditNext">Next &rarr;</button>
+          <button class="btn btn-secondary" id="btnAuditPrev" data-i18n="form.prev">&larr; Prev</button>
+          <button class="btn btn-secondary" id="btnAuditNext" data-i18n="form.next">Next &rarr;</button>
         </div>
       </section>
     </div>
@@ -329,71 +329,71 @@
   <div id="userModal" class="settings-modal hidden">
     <div class="settings-modal-panel">
       <div class="settings-modal-head">
-        <h2 id="userModalTitle">Add new user</h2>
+        <h2 id="userModalTitle" data-i18n="settings.user.addTitle">Add new user</h2>
         <button id="userModalClose" class="settings-modal-x" title="Close">✕</button>
       </div>
       <div class="settings-modal-body">
         <div class="settings-modal-section">
-          <h3>Profile</h3>
+          <h3 data-i18n="settings.user.profile">Profile</h3>
           <div class="settings-form-grid">
-            <label class="settings-field">First name <span class="req">*</span>
+            <label class="settings-field"><span data-i18n="settings.user.firstName">First name</span> <span class="req">*</span>
               <input type="text" id="userFirstName" autocomplete="off" />
             </label>
-            <label class="settings-field">Last name <span class="req">*</span>
+            <label class="settings-field"><span data-i18n="settings.user.lastName">Last name</span> <span class="req">*</span>
               <input type="text" id="userLastName" autocomplete="off" />
             </label>
-            <label class="settings-field">Username
-              <input type="text" id="userUsername" placeholder="e.g. name.surname" autocomplete="off" />
+            <label class="settings-field"><span data-i18n="settings.user.username">Username</span>
+              <input type="text" id="userUsername" placeholder="e.g. name.surname" autocomplete="off" data-i18n-placeholder="settings.user.usernamePlaceholder" />
             </label>
-            <label class="settings-field">Work email
+            <label class="settings-field"><span data-i18n="settings.user.workEmail">Work email</span>
               <input type="email" id="userEmail" placeholder="name.surname@fhitt.org" autocomplete="off" />
             </label>
           </div>
-          <p class="settings-emp-sub" style="margin:0.35rem 0 0;">Sign-in matches the M365 identity against username / work email — set at least one so the user can log in.</p>
+          <p class="settings-emp-sub" style="margin:0.35rem 0 0;" data-i18n="settings.user.signInHint">Sign-in matches the M365 identity against username / work email — set at least one so the user can log in.</p>
         </div>
 
         <div class="settings-modal-section">
-          <h3>Employment</h3>
+          <h3 data-i18n="settings.user.employment">Employment</h3>
           <div class="settings-form-grid">
-            <label class="settings-field">Onboard date<input type="date" id="userOnboard" /></label>
-            <label class="settings-field">Termination date<input type="date" id="userTermination" /></label>
-            <label class="settings-field">Birthday<input type="date" id="userBirthday" /></label>
+            <label class="settings-field"><span data-i18n="settings.user.onboard">Onboard date</span><input type="date" id="userOnboard" /></label>
+            <label class="settings-field"><span data-i18n="settings.user.termination">Termination date</span><input type="date" id="userTermination" /></label>
+            <label class="settings-field"><span data-i18n="settings.user.birthday">Birthday</span><input type="date" id="userBirthday" /></label>
           </div>
-          <label class="settings-field" style="margin-top:0.6rem;">Documents folder
-            <input type="text" id="userDocPath" readonly placeholder="Set the base folder on the Paths tab" />
+          <label class="settings-field" style="margin-top:0.6rem;"><span data-i18n="settings.user.docsFolder">Documents folder</span>
+            <input type="text" id="userDocPath" readonly placeholder="Set the base folder on the Paths tab" data-i18n-placeholder="settings.user.docsPlaceholder" />
           </label>
           <p class="settings-emp-sub" id="userDocPathHint" style="margin:0.3rem 0 0;"></p>
         </div>
 
         <div class="settings-modal-section">
-          <h3>Personal contact</h3>
+          <h3 data-i18n="settings.user.personalContact">Personal contact</h3>
           <div class="settings-form-grid">
-            <label class="settings-field">Personal phone<input type="text" id="userPhonePersonal" autocomplete="off" /></label>
-            <label class="settings-field">Personal email<input type="text" id="userEmailPersonal" autocomplete="off" /></label>
+            <label class="settings-field"><span data-i18n="settings.user.personalPhone">Personal phone</span><input type="text" id="userPhonePersonal" autocomplete="off" /></label>
+            <label class="settings-field"><span data-i18n="settings.user.personalEmail">Personal email</span><input type="text" id="userEmailPersonal" autocomplete="off" /></label>
           </div>
         </div>
 
         <div class="settings-modal-section">
-          <h3>Emergency contacts</h3>
+          <h3 data-i18n="settings.user.emergency">Emergency contacts</h3>
           <div class="settings-form-grid">
-            <label class="settings-field">Contact 1<input type="text" id="userContact1" autocomplete="off" /></label>
-            <label class="settings-field">Phone 1<input type="text" id="userPhone1" autocomplete="off" /></label>
-            <label class="settings-field">Contact 2<input type="text" id="userContact2" autocomplete="off" /></label>
-            <label class="settings-field">Phone 2<input type="text" id="userPhone2" autocomplete="off" /></label>
+            <label class="settings-field"><span data-i18n="settings.user.contact1">Contact 1</span><input type="text" id="userContact1" autocomplete="off" /></label>
+            <label class="settings-field"><span data-i18n="settings.user.phone1">Phone 1</span><input type="text" id="userPhone1" autocomplete="off" /></label>
+            <label class="settings-field"><span data-i18n="settings.user.contact2">Contact 2</span><input type="text" id="userContact2" autocomplete="off" /></label>
+            <label class="settings-field"><span data-i18n="settings.user.phone2">Phone 2</span><input type="text" id="userPhone2" autocomplete="off" /></label>
           </div>
         </div>
 
         <div class="settings-modal-section">
-          <h3>Bank</h3>
+          <h3 data-i18n="settings.user.bank">Bank</h3>
           <div class="settings-form-grid">
-            <label class="settings-field">Bank name<input type="text" id="userBankName" autocomplete="off" /></label>
-            <label class="settings-field">Account<input type="text" id="userBankAcct" autocomplete="off" /></label>
+            <label class="settings-field"><span data-i18n="settings.user.bankName">Bank name</span><input type="text" id="userBankName" autocomplete="off" /></label>
+            <label class="settings-field"><span data-i18n="settings.user.account">Account</span><input type="text" id="userBankAcct" autocomplete="off" /></label>
           </div>
         </div>
       </div>
       <div class="settings-modal-foot">
-        <button id="userModalCancel" class="btn btn-secondary">Cancel</button>
-        <button id="userModalSave" class="btn btn-primary">Save</button>
+        <button id="userModalCancel" class="btn btn-secondary" data-i18n="form.cancel">Cancel</button>
+        <button id="userModalSave" class="btn btn-primary" data-i18n="form.save">Save</button>
       </div>
     </div>
   </div>

@@ -146,7 +146,8 @@ document.getElementById("userUsername").addEventListener("input", updateDocPathP
 
 function fillUserModal(detail) {
   const emp = detail || {};
-  document.getElementById("userModalTitle").textContent = detail ? "Edit user" : "Add new user";
+  document.getElementById("userModalTitle").textContent =
+    (window.HITT_I18N ? HITT_I18N.t(detail ? "settings.user.editTitle" : "settings.user.addTitle") : (detail ? "Edit user" : "Add new user"));
   document.getElementById("userFirstName").value = emp.firstName || "";
   document.getElementById("userLastName").value = emp.lastName || "";
   document.getElementById("userUsername").value = emp.username || "";
