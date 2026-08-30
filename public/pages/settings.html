@@ -34,8 +34,7 @@
     <div id="settingsContent" class="hidden">
       <div class="settings-tabs" role="tablist">
         <button data-stab="permissions" class="settings-tab" role="tab" aria-selected="true" data-i18n="settings.tab.permissions">User permissions</button>
-        <button data-stab="holidays" class="settings-tab" role="tab" aria-selected="false" data-i18n="settings.tab.holidays">Holidays</button>
-        <button data-stab="calendar" class="settings-tab" role="tab" aria-selected="false" data-i18n="settings.tab.calendar">Work calendar</button>
+        <button data-stab="calendar" class="settings-tab" role="tab" aria-selected="false" data-i18n="settings.tab.calendar">Calendar</button>
         <button data-stab="paths" class="settings-tab" role="tab" aria-selected="false" data-i18n="settings.tab.paths">Paths</button>
         <button data-stab="expcats" class="settings-tab" role="tab" aria-selected="false" data-i18n="settings.tab.expcats">Expense categories</button>
         <button data-stab="currencies" class="settings-tab" role="tab" aria-selected="false" data-i18n="settings.tab.currencies">Currencies</button>
@@ -72,8 +71,9 @@
         </div>
       </section>
 
-      <!-- ==================== HOLIDAYS ==================== -->
-      <section id="paneHolidays" class="settings-pane hidden">
+      <!-- ==================== CALENDAR (holidays + work calendar) ============ -->
+      <section id="paneCalendar" class="settings-pane hidden">
+        <h3 class="settings-subhead" data-i18n="settings.cal.holidaysHead">Holidays</h3>
         <p class="settings-note">Public holidays (2024 onwards) imported from the Generalitat de Catalunya open-data feed, plus HITT company days and local bank holidays set here by HR. All feed the calendars in Time allocation and Reports.</p>
         <div class="settings-toolbar" style="gap:0.75rem; flex-wrap:wrap;">
           <label class="settings-inline-field">Year
@@ -100,10 +100,8 @@
             <button class="btn btn-primary" id="btnAddHoliday">Add</button>
           </div>
         </div>
-      </section>
 
-      <!-- ==================== WORK CALENDAR ==================== -->
-      <section id="paneCalendar" class="settings-pane hidden">
+        <h3 class="settings-subhead" style="margin-top:2rem;" data-i18n="settings.cal.workHead">Work calendar</h3>
         <p class="settings-note">One row per year — the company-wide leave-day allowance and yearly working hours. Used for the time-off balance when an employee has no personal calendar entry of their own.</p>
         <div class="settings-table-wrap">
           <table class="settings-table">

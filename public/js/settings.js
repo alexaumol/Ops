@@ -294,8 +294,7 @@ document.getElementById("empTableBody").addEventListener("change", async (e) => 
 });
 
 /* ============================== TABS ================================== */
-let holidaysLoaded = false;
-let calendarLoaded = false;
+let calendarLoaded = false; // covers both holidays + work calendar
 let auditLoaded = false;
 let pathsLoaded = false;
 let expCatsLoaded = false;
@@ -309,7 +308,6 @@ document.querySelectorAll("[data-stab]").forEach((btn) => {
     btn.setAttribute("aria-selected", "true");
     const tab = btn.dataset.stab;
     document.getElementById("paneUserPerms").classList.toggle("hidden", tab !== "permissions");
-    document.getElementById("paneHolidays").classList.toggle("hidden", tab !== "holidays");
     document.getElementById("paneCalendar").classList.toggle("hidden", tab !== "calendar");
     document.getElementById("panePaths").classList.toggle("hidden", tab !== "paths");
     document.getElementById("paneExpCats").classList.toggle("hidden", tab !== "expcats");
@@ -317,12 +315,9 @@ document.querySelectorAll("[data-stab]").forEach((btn) => {
     document.getElementById("paneEntities").classList.toggle("hidden", tab !== "entities");
     document.getElementById("paneCustomizations").classList.toggle("hidden", tab !== "customizations");
     document.getElementById("paneAudit").classList.toggle("hidden", tab !== "audit");
-    if (tab === "holidays" && !holidaysLoaded) {
-      holidaysLoaded = true;
-      loadHolidayYears().then(loadHolidays);
-    }
     if (tab === "calendar" && !calendarLoaded) {
       calendarLoaded = true;
+      loadHolidayYears().then(loadHolidays);
       loadWorkCalendar();
     }
     if (tab === "paths" && !pathsLoaded) {
