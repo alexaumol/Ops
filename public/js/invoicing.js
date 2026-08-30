@@ -606,21 +606,30 @@ function renderInvoicesTable(){
       <td style="text-align:right;">${formatMoney(inv.vatamount, inv.currency)}</td>
       <td>${formatDateOnly(inv.invoicedate)}</td>
       <td>${escapeHtml(inv.invoicingPartnerLabel || '—')}</td>
-      <td><button class="ta-remove-btn" data-pdf title="View PDF">📄</button></td>
+      <td style="white-space:nowrap;">
+        <button class="ta-remove-btn" data-pdf title="View PDF">📄</button>
+        <button class="ta-remove-btn" data-email title="Email this invoice">📧</button>
+      </td>
       <td><button class="ta-remove-btn" data-delete title="Delete this invoice">✕</button></td>
     </tr>
   `).join('');
 
   tbody.querySelectorAll('tr').forEach((tr, i) => {
     tr.addEventListener('click', (e) => {
-      if (e.target.closest('[data-delete], [data-pdf]')) return;
+      if (e.target.closest('[data-delete], [data-pdf], [data-email]')) return;
       openInvoiceModal(INVOICES[i].id);
     });
   });
   tbody.querySelectorAll('[data-pdf]').forEach((btn, i) => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
-      window.open(invoicePdfUrl(INVOICES[i].id), '_blank');
+      openInvoicePdf(INVOICES[i].id);
+    });
+  });
+  tbody.querySelectorAll('[data-email]').forEach((btn, i) => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openInvoiceEmailModal(INVOICES[i].id);
     });
   });
   tbody.querySelectorAll('[data-delete]').forEach((btn, i) => {
@@ -642,12 +651,104 @@ function renderInvoicesTable(){
 
 document.getElementById('btnNewInvoice').addEventListener('click', () => openInvoiceModal(null));
 
-function invoicePdfUrl(invoiceId){
-  const base = (window.HITT_CONFIG?.API_BASE_URL || '').replace(/\/$/, '');
-  return `${base}/api/invoicing/invoices/${invoiceId}/pdf`;
+// Open the invoice PDF in a new tab. Fetched as a blob so the auth header
+// rides along (a bare window.open(url) can't send it, and the route is guarded).
+async function openInvoicePdf(invoiceId){
+  const w = window.open('', '_blank');
+  try {
+    const blob = await HITT_API.fetchInvoicePdf(invoiceId);
+    const url = URL.createObjectURL(blob);
+    if (w) w.location = url; else window.open(url, '_blank');
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch (err) {
+    console.error(err);
+    if (w) w.close();
+    toast('Could not open the invoice PDF.', 'red');
+  }
 }
 document.getElementById('invViewPdf').addEventListener('click', () => {
-  if (activeInvoiceId) window.open(invoicePdfUrl(activeInvoiceId), '_blank');
+  if (activeInvoiceId) openInvoicePdf(activeInvoiceId);
+});
+document.getElementById('invEmail').addEventListener('click', () => {
+  if (activeInvoiceId) openInvoiceEmailModal(activeInvoiceId);
+});
+
+/* ============================== EMAIL INVOICE MODAL ===================== */
+const invoiceEmailOverlay = document.getElementById('invoiceEmailOverlay');
+let emailInvoiceId = null;
+const LANG_NAME = { 1: 'English', 2: 'Spanish', 3: 'Catalan' };
+
+function closeInvoiceEmailModal(){
+  invoiceEmailOverlay.classList.add('hidden');
+  emailInvoiceId = null;
+}
+
+async function openInvoiceEmailModal(invoiceId){
+  emailInvoiceId = invoiceId;
+  const err = document.getElementById('invEmailError');
+  err.textContent = '';
+  ['invEmailTo', 'invEmailCc', 'invEmailSubject'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('invEmailBody').value = '';
+  document.getElementById('invEmailLangHint').textContent = 'Loading…';
+  document.getElementById('invEmailSend').disabled = true;
+  invoiceEmailOverlay.classList.remove('hidden');
+
+  try {
+    const d = await HITT_API.getInvoiceEmailDefaults(invoiceId);
+    if (emailInvoiceId !== invoiceId) return; // modal changed while loading
+    document.getElementById('invEmailTitle').textContent =
+      d.invoiceCode ? `Email invoice ${d.invoiceCode}` : 'Email invoice';
+    document.getElementById('invEmailTo').value = d.to || '';
+    document.getElementById('invEmailSubject').value = d.subject || '';
+    document.getElementById('invEmailBody').value = d.body || '';
+    const lang = LANG_NAME[d.languageId] || 'English';
+    document.getElementById('invEmailLangHint').textContent =
+      `Text is in the business partner's language (${lang}). Edit anything before sending.`;
+    if (d.mailConfigured === false) {
+      err.textContent = 'Email sending is not configured on the server yet — sending will fail until an admin sets it up.';
+    }
+    document.getElementById('invEmailSend').disabled = false;
+  } catch (e) {
+    console.error(e);
+    document.getElementById('invEmailLangHint').textContent = '';
+    err.textContent = e.message || 'Could not load the email details.';
+  }
+}
+
+document.getElementById('invEmailClose').addEventListener('click', closeInvoiceEmailModal);
+document.getElementById('invEmailCancel').addEventListener('click', closeInvoiceEmailModal);
+invoiceEmailOverlay.addEventListener('click', (e) => {
+  if (e.target === invoiceEmailOverlay) closeInvoiceEmailModal();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !invoiceEmailOverlay.classList.contains('hidden')) closeInvoiceEmailModal();
+});
+
+document.getElementById('invEmailSend').addEventListener('click', async () => {
+  if (!emailInvoiceId) return;
+  const to = document.getElementById('invEmailTo').value.trim();
+  const cc = document.getElementById('invEmailCc').value.trim();
+  const subject = document.getElementById('invEmailSubject').value.trim();
+  const body = document.getElementById('invEmailBody').value.trim();
+  const err = document.getElementById('invEmailError');
+  err.textContent = '';
+  if (!to) { err.textContent = 'Enter at least one recipient.'; return; }
+  if (!confirm(`Send this invoice to:\n${to}${cc ? `\nCc: ${cc}` : ''}`)) return;
+
+  const btn = document.getElementById('invEmailSend');
+  btn.disabled = true;
+  btn.textContent = 'Sending…';
+  try {
+    const r = await HITT_API.sendInvoiceEmail(emailInvoiceId, { to, cc, subject, body });
+    toast(`Invoice emailed to ${r.to.join(', ')}`, 'green');
+    closeInvoiceEmailModal();
+  } catch (e) {
+    console.error(e);
+    err.textContent = e.message || 'The email could not be sent.';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Send email';
+  }
 });
 
 /* ============================== INVOICE MODAL ============================= */
@@ -758,6 +859,7 @@ async function openInvoiceModal(invoiceId){
   document.getElementById('invModalTitle').textContent = inv ? `Edit invoice ${inv.invoicecode || '(draft)'}` : 'New invoice';
   document.getElementById('invDelete').classList.toggle('hidden', !inv);
   document.getElementById('invViewPdf').classList.toggle('hidden', !inv);
+  document.getElementById('invEmail').classList.toggle('hidden', !inv);
 
   // Reset the unsaved-edits badge; show "last updated by" when we have it.
   document.getElementById('invChangedBadge').classList.add('hidden');

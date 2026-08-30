@@ -281,11 +281,51 @@
         <div style="display:flex; gap:0.5rem;">
           <button id="invDelete" class="btn btn-secondary hidden" style="color:var(--danger);">Delete invoice</button>
           <button id="invViewPdf" class="btn btn-secondary hidden">View PDF</button>
+          <button id="invEmail" class="btn btn-secondary hidden">Email invoice</button>
         </div>
         <div style="display:flex; gap:0.5rem; margin-left:auto;">
           <button id="invCancel" class="btn btn-secondary">Cancel</button>
           <button id="invSave" class="btn btn-primary">Save invoice</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================ EMAIL INVOICE MODAL ============================ -->
+  <div id="invoiceEmailOverlay" class="modal-overlay hidden">
+    <div class="modal-panel modal-panel--sm">
+      <div class="modal-head">
+        <h2 id="invEmailTitle" style="flex:1; font-size:1rem; font-weight:700; color:#fff; margin:0;">Email invoice</h2>
+        <button id="invEmailClose" class="modal-head-btn modal-head-btn--close" title="Close">✕</button>
+      </div>
+      <div class="modal-body">
+        <p id="invEmailLangHint" class="inv-taxco-hint" style="margin-top:0;"></p>
+        <div class="field-section">
+          <div class="field-grid">
+            <div class="span-2">
+              <label class="field-label">To <span style="color:var(--danger);">*</span></label>
+              <input id="invEmailTo" type="text" class="field-input" placeholder="name@client.com; second@client.com" />
+            </div>
+            <div class="span-2">
+              <label class="field-label">Cc</label>
+              <input id="invEmailCc" type="text" class="field-input" placeholder="optional" />
+            </div>
+            <div class="span-2">
+              <label class="field-label">Subject</label>
+              <input id="invEmailSubject" type="text" class="field-input" />
+            </div>
+            <div class="span-2">
+              <label class="field-label">Message</label>
+              <textarea id="invEmailBody" class="field-input" rows="5"></textarea>
+            </div>
+          </div>
+        </div>
+        <p class="inv-taxco-hint">The invoice PDF is attached automatically. Sent from the HITT invoicing mailbox.</p>
+        <p id="invEmailError" class="inv-taxco-hint" style="color:var(--danger);"></p>
+      </div>
+      <div style="flex-shrink:0; border-top:1px solid var(--border-subtle); padding:0.75rem 1.1rem; display:flex; justify-content:flex-end; gap:0.5rem;">
+        <button id="invEmailCancel" class="btn btn-secondary">Cancel</button>
+        <button id="invEmailSend" class="btn btn-primary">Send email</button>
       </div>
     </div>
   </div>

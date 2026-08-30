@@ -100,4 +100,68 @@ async function createProjectFolder(folderName) {
   return res.json();
 }
 
-module.exports = { graphConfigured, createProjectFolder };
+/* ========================================================================
+ * Outbound email (Microsoft Graph /sendMail, app-only)
+ * ------------------------------------------------------------------------
+ * Used by the invoicing module's "email this invoice PDF" action. Needs
+ * the SAME confidential app registration as above, plus:
+ *   - Mail.Send  Application permission (admin-consented), and
+ *   - GRAPH_MAIL_SENDER  — the mailbox the invoice goes out from (a UPN or
+ *     shared-mailbox address the app is allowed to send as). Falls back to
+ *     GRAPH_ONEDRIVE_USER when unset.
+ * When Mail.Send isn't granted or GRAPH_MAIL_SENDER is unset the caller
+ * gets a clear 503 — nothing is sent silently.
+ * ===================================================================== */
+const MAIL_SENDER = process.env.GRAPH_MAIL_SENDER || ONEDRIVE_USER;
+
+function graphMailConfigured() {
+  return !!(TENANT_ID && CLIENT_ID && CLIENT_SECRET && MAIL_SENDER);
+}
+
+// Sends one message as MAIL_SENDER.
+//   to / cc     : string or string[] of addresses
+//   subject     : string
+//   text / html : body (text unless html is given)
+//   attachments : [{ filename, contentType, content }] where content is a
+//                 Buffer or a base64 string
+async function sendMail({ to, cc, subject, text, html, attachments = [], replyTo }) {
+  if (!graphMailConfigured()) {
+    throw new Error("Graph mail not configured (missing GRAPH_* env vars or GRAPH_MAIL_SENDER)");
+  }
+  const list = (v) => (Array.isArray(v) ? v : v ? [v] : []).map((s) => String(s).trim()).filter(Boolean);
+  const recip = (a) => ({ emailAddress: { address: a } });
+
+  const message = {
+    subject: subject || "(no subject)",
+    body: { contentType: html ? "HTML" : "Text", content: html || text || "" },
+    toRecipients: list(to).map(recip),
+  };
+  const ccList = list(cc);
+  if (ccList.length) message.ccRecipients = ccList.map(recip);
+  if (replyTo) message.replyTo = [recip(replyTo)];
+  if (attachments.length) {
+    message.attachments = attachments.map((f) => ({
+      "@odata.type": "#microsoft.graph.fileAttachment",
+      name: f.filename || "attachment",
+      contentType: f.contentType || "application/octet-stream",
+      contentBytes: Buffer.isBuffer(f.content) ? f.content.toString("base64") : String(f.content || ""),
+    }));
+  }
+  if (!message.toRecipients.length) throw new Error("sendMail: no recipient");
+
+  const token = await getAccessToken();
+  const res = await fetch(
+    `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(MAIL_SENDER)}/sendMail`,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ message, saveToSentItems: true }),
+    }
+  );
+  if (!res.ok) {
+    throw new Error(`Graph sendMail failed: ${res.status} ${await res.text().catch(() => "")}`);
+  }
+  return { sender: MAIL_SENDER };
+}
+
+module.exports = { graphConfigured, createProjectFolder, graphMailConfigured, sendMail };

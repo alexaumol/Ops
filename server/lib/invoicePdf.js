@@ -4,11 +4,12 @@
  * Built with pdfkit (pure JS, no external binary/headless-browser needed).
  *
  * IMPORTANT: the entity letterhead block (legal name, address, VAT number,
- * email, website) is NOT stored anywhere in the database — confirmed by
- * inspecting invoicedocumentcontrols/invoicedocumenttext, which only hold
- * multi-language FIELD LABELS ("INVOICE NUMBER" / "FACTURA NUM"), not the
- * actual entity data (those rows are all NULL). The Access report must
- * have had this hardcoded in its own design. ENTITY_LETTERHEAD below has
+ * email, website) is NOT stored anywhere in the database — the
+ * invoicedocumentcontrols/invoicedocumenttext tables hold only multi-language
+ * FIELD LABELS ("INVOICE NUMBER" / "FACTURA NUM"), which ARE now used (see
+ * lib/invoiceDocText.js + data.labels), not the entity letterhead data (those
+ * control rows are NULL). The Access report had the letterhead hardcoded in
+ * its own design. ENTITY_LETTERHEAD below has
  * confirmed real data for HiTT only (from the sample PDF); FHiTT and
  * HiTT/OSM fall back to the same block, which is almost certainly WRONG
  * for a different legal entity (different address/VAT at minimum) — do
@@ -96,6 +97,14 @@ function renderInvoicePdf(doc, data) {
   const right = 555;
   const width = right - left;
 
+  // Field labels in the business partner's language (invoicedocumentcontrols
+  // / invoicedocumenttext) — English, then the hardcoded fallback here.
+  const L = (controlname, fallback) =>
+    (data.labels && typeof data.labels.get === "function" ? data.labels.get(controlname, fallback) : fallback);
+  // Access stores the VAT label with the rate baked in ("VAT 21%" / "IVA 21%")
+  // — take just the word so the rate stays dynamic.
+  const vatWord = String(L("lblVATAmount", "VAT")).replace(/[\s\d.,%]+$/, "").trim() || "VAT";
+
   // ---------- Header: letterhead + contact ----------
   const usesHittLogo = (() => {
     const l = String(data.entityLabel || "").trim().toLowerCase().replace(/\s+/g, "");
@@ -130,16 +139,16 @@ function renderInvoicePdf(doc, data) {
   // ---------- Invoice meta grid ----------
   const gridY = 160;
   const colW = width / 2 - 6;
-  fieldBox(doc, left, gridY, colW, "INVOICE NUMBER", data.invoicecode || "(draft)");
-  fieldBox(doc, left + colW + 12, gridY, colW, "DUE DATE", dateStr(data.invoiceduedate));
-  fieldBox(doc, left, gridY + 34, colW, "INVOICE DATE", dateStr(data.invoicedate));
-  fieldBox(doc, left + colW + 12, gridY + 34, colW, "PURCHASE ORDER", data.purchaseorder);
-  fieldBox(doc, left, gridY + 68, colW, "INTERNAL PROJECT NUMBER", data.projectCode);
+  fieldBox(doc, left, gridY, colW, L("lblInvoiceCode", "INVOICE NUMBER"), data.invoicecode || "(draft)");
+  fieldBox(doc, left + colW + 12, gridY, colW, L("lblInvoiceDueDate", "DUE DATE"), dateStr(data.invoiceduedate));
+  fieldBox(doc, left, gridY + 34, colW, L("lblInvoiceDate", "INVOICE DATE"), dateStr(data.invoicedate));
+  fieldBox(doc, left + colW + 12, gridY + 34, colW, L("lblPurchaseOrder", "PURCHASE ORDER"), data.purchaseorder);
+  fieldBox(doc, left, gridY + 68, colW, L("lblProjectCode", "INTERNAL PROJECT NUMBER"), data.projectCode);
   fieldBox(doc, left + colW + 12, gridY + 68, colW, "OTHER REFERENCE", data.numocclient);
 
   // ---------- Invoice To ----------
   const toY = gridY + 112;
-  doc.font("Helvetica-Bold").fontSize(8).fillColor(BRAND.ink).text("INVOICE TO", left, toY);
+  doc.font("Helvetica-Bold").fontSize(8).fillColor(BRAND.ink).text(L("txtInvoiceDataHeader", "INVOICE TO"), left, toY);
   doc.rect(left, toY + 14, width, 64).fillAndStroke(BRAND.cream, BRAND.border);
   doc.font("Helvetica-Bold").fontSize(9).fillColor(BRAND.ink).text(data.taxCompanyName || "—", left + 8, toY + 22);
   doc.font("Helvetica").fontSize(9).fillColor(BRAND.ink);
@@ -154,10 +163,10 @@ function renderInvoicePdf(doc, data) {
   const tableY = toY + 100;
   const cols = { desc: left, units: left + 300, price: left + 350, total: left + 440 };
   doc.font("Helvetica-Bold").fontSize(9).fillColor(BRAND.ink)
-    .text("Item/Services provided/Subject", cols.desc, tableY)
-    .text("Units", cols.units, tableY)
-    .text("Price per unit", cols.price, tableY)
-    .text("Total", cols.total, tableY);
+    .text(L("lblHeaderDescService", "Item/Services provided/Subject"), cols.desc, tableY)
+    .text(L("lblUnitQty", "Units"), cols.units, tableY)
+    .text(L("lblPriceUnit", "Price per unit"), cols.price, tableY)
+    .text(L("lblPriceTotal", "Total"), cols.total, tableY);
   doc.moveTo(left, tableY + 14).lineTo(right, tableY + 14).lineWidth(1.2).stroke(BRAND.ink);
 
   // Real line items when present; otherwise a single synthetic row from the
@@ -189,18 +198,26 @@ function renderInvoicePdf(doc, data) {
   const totalsX = right - 220;
   const vatPct = data.vatPercentage ?? 0;
   doc.font("Helvetica").fontSize(9).fillColor(BRAND.ink);
-  doc.text("Total amount", totalsX, totalsY, { width: 120 });
+  doc.text(L("lblAmount", "Total amount"), totalsX, totalsY, { width: 120 });
   doc.text(money(subtotal, sym), totalsX + 120, totalsY, { width: 100, align: "right" });
-  doc.text(`VAT ${vatPct}%`, totalsX, totalsY + 16, { width: 120 });
+  doc.text(`${vatWord} ${vatPct}%`, totalsX, totalsY + 16, { width: 120 });
   doc.text(money(data.vatamount, sym), totalsX + 120, totalsY + 16, { width: 100, align: "right" });
   doc.rect(totalsX, totalsY + 32, 220, 20).fill(BRAND.cream);
   doc.font("Helvetica-Bold").fontSize(9).fillColor(BRAND.ink);
-  doc.text("INVOICE TOTAL", totalsX + 4, totalsY + 38, { width: 116 });
+  doc.text(L("lblTotal", "INVOICE TOTAL"), totalsX + 4, totalsY + 38, { width: 116 });
   doc.text(money(subtotal + Number(data.vatamount || 0), sym), totalsX + 120, totalsY + 38, { width: 96, align: "right" });
 
   // ---------- Bank details ----------
+  // VAT-exemption note (localised) — only when nothing is being charged.
+  if (!Number(data.vatamount) && Number(vatPct) === 0) {
+    doc.font("Helvetica-Oblique").fontSize(8).fillColor(BRAND.gray)
+      .text(L("txtVATExemption",
+        "Exempt from VAT pursuant to Article 20.1-9 of Law 37/1992 of 28 December 1992 on Value Added Tax"),
+        left, totalsY + 6, { width: totalsX - left - 12 });
+  }
+
   const bankY = totalsY + 90;
-  doc.font("Helvetica-Bold").fontSize(8).fillColor(BRAND.ink).text("BANK ACCOUNT NUMBER", left, bankY);
+  doc.font("Helvetica-Bold").fontSize(8).fillColor(BRAND.ink).text(L("txtBankDetailsHeader", "BANK ACCOUNT NUMBER"), left, bankY);
   doc.font("Helvetica-Bold").fontSize(9).fillColor(BRAND.ink).text(data.bankName || "—", left, bankY + 14);
   doc.font("Helvetica").fontSize(9).fillColor(BRAND.ink);
   let bY = bankY + 26;
@@ -210,7 +227,7 @@ function renderInvoicePdf(doc, data) {
   }
   doc.font("Helvetica-Bold").fontSize(9).text(data.iban || "", left, bY + 2);
   doc.font("Helvetica").fontSize(9).text(data.bicSwift || "", left, bY + 14);
-  doc.text(`When paying by bank transfer, please state invoice number ${data.invoicecode || ""}`, left, bY + 30);
+  doc.text(`${L("txtDipositInfo", "When paying by bank transfer, please state invoice number")} ${data.invoicecode || ""}`, left, bY + 30);
 
   // ---------- Footer ----------
   const footerY = 780;
@@ -228,4 +245,21 @@ function streamInvoicePdf(res, data) {
   doc.end();
 }
 
-module.exports = { streamInvoicePdf };
+// Same render, collected into a Buffer — for attaching the PDF to an email.
+function renderInvoicePdfBuffer(data) {
+  return new Promise((resolve, reject) => {
+    try {
+      const doc = new PDFDocument({ size: "A4", margin: 0 });
+      const chunks = [];
+      doc.on("data", (c) => chunks.push(c));
+      doc.on("end", () => resolve(Buffer.concat(chunks)));
+      doc.on("error", reject);
+      renderInvoicePdf(doc, data);
+      doc.end();
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+module.exports = { streamInvoicePdf, renderInvoicePdfBuffer };

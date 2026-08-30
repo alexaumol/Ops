@@ -279,6 +279,17 @@ const HITT_API = (() => {
     updateInvoice: (id, payload) =>
       request(`/api/invoicing/invoices/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
     deleteInvoice: (id) => request(`/api/invoicing/invoices/${id}`, { method: "DELETE" }),
+    // Invoice PDF as a blob — carries the auth header a plain window.open can't.
+    fetchInvoicePdf: async (id) => {
+      const res = await fetch(`${base()}/api/invoicing/invoices/${id}/pdf`, {
+        headers: { ...(await authHeaders()) },
+      });
+      if (!res.ok) throw new Error("Could not load the invoice PDF.");
+      return res.blob();
+    },
+    getInvoiceEmailDefaults: (id) => request(`/api/invoicing/invoices/${id}/email`),
+    sendInvoiceEmail: (id, payload) =>
+      request(`/api/invoicing/invoices/${id}/email`, { method: "POST", body: JSON.stringify(payload) }),
     createProject: (payload) =>
       request("/api/projects", { method: "POST", body: JSON.stringify(payload) }),
     updateProjectStage: (id, stage, employeeId) =>

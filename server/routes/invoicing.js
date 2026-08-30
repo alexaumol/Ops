@@ -36,22 +36,29 @@
  *
  * PDF generation (GET /invoices/:id/pdf) matches a real sample invoice
  * Alex provided directly. The entity letterhead (legal name/address/VAT/
- * email/web) isn't stored in the DB anywhere — invoicedocumentcontrols/
- * invoicedocumenttext only hold multi-language field LABELS, not entity
- * data (confirmed those rows are NULL) — so it's hardcoded in
+ * email/web) isn't stored in the DB anywhere, so it's hardcoded in
  * lib/invoicePdf.js from the sample, for HiTT only. FHiTT/HiTT-OSM
  * currently fall back to the same HiTT letterhead, which is almost
  * certainly wrong for a different legal entity — see that file's header
- * comment before sending one of those to a real client. Not built: a
- * "send by email" action (Access's cmdSendToEmailPDF) — sending on the
- * user's behalf needs explicit confirmation each time, not something to
- * wire up silently.
+ * comment before sending one of those to a real client.
+ *
+ * The invoice's field labels + email subject/body ARE in the DB, per
+ * language (invoicedocumentcontrols / invoicedocumenttext) — resolved via
+ * lib/invoiceDocText.js from the recipient business partner's
+ * businesspartners.languageid (tax company's BP first, then the project's).
+ *
+ * "Send by email" (Access's cmdSendToEmailPDF): GET/POST /invoices/:id/email.
+ * The PDF is attached and sent via Microsoft Graph (lib/graph.js, app-only,
+ * needs Mail.Send + GRAPH_MAIL_SENDER). The user confirms recipient/subject/
+ * body in a dialog before the POST — nothing is sent without that.
  * ---------------------------------------------------------------------------
  */
 const express = require("express");
 const { pool } = require("../config/db");
 const { requireModuleAccess } = require("../lib/permissions");
-const { streamInvoicePdf } = require("../lib/invoicePdf");
+const { streamInvoicePdf, renderInvoicePdfBuffer } = require("../lib/invoicePdf");
+const { invoiceLabels, fillTemplate } = require("../lib/invoiceDocText");
+const { graphMailConfigured, sendMail } = require("../lib/graph");
 const { logAudit } = require("../lib/audit");
 
 const router = express.Router();
@@ -301,54 +308,171 @@ router.get("/projects/:projectId/invoices", async (req, res) => {
   }
 });
 
+// Loads everything the invoice PDF needs, including the recipient's
+// invoicing email and the language that drives its labels
+// (tax company's business partner first, then the project's). Returns null
+// when the invoice doesn't exist.
+async function loadInvoiceForPdf(invoiceId) {
+  await ensureInvoicingSchema();
+  const { rows } = await pool.query(
+    `SELECT i.id, i.invoicecode,
+            d.amount, d.invoicedate, d.invoiceduedate, d.invoicesentdate, d.invoicedipositdate,
+            d.numocclient, d.purchaseorder, d.descriptionservice, d.invoicecomments,
+            COALESCE(d.currency, 'EUR') AS currency,
+            vt.percentage AS "vatPercentage", d.vatamount,
+            tc.taxcompanyname AS "taxCompanyName", tc.vatnumber AS "taxCompanyVat",
+            tc.emailinvoicing AS "taxCompanyEmail",
+            tca.streetname AS "taxCompanyStreet", tca.zipcode AS "taxCompanyZip",
+            tca.city AS "taxCompanyCity", co.countrydesc AS "taxCompanyCountry",
+            p.projectnumber AS "projectCode", p.projectname AS "projectName",
+            ent.entitydesc AS "entityLabel",
+            COALESCE(tcbp.languageid, pbp.languageid)::int AS "languageId",
+            ba.bankname AS "bankName", ba.bankaddrline1 AS "bankAddressLine1",
+            ba.bankaddrline2 AS "bankAddressLine2", ba.iban, ba.bicswift AS "bicSwift",
+            cur.symbol AS "currencySymbol",
+            COALESCE(li.items, '[]'::json) AS "lineItems"
+     FROM invoices i
+     LEFT JOIN invoicesdetails d ON d.invoiceid = i.id
+     LEFT JOIN projects p ON p.id = i.projectid::bigint
+     LEFT JOIN businesspartners pbp ON pbp.id = p.busspartnerid::bigint
+     LEFT JOIN entity ent ON ent.id = p.entityid::bigint
+     LEFT JOIN invoices_vattypes vt ON vt.id = d.vatid
+     LEFT JOIN taxcompanies tc ON tc.id = d.busspartnertoinvoiceid::bigint
+     LEFT JOIN businesspartners tcbp ON tcbp.id = tc.businesspartnerid::bigint
+     LEFT JOIN taxcompaniesaddresses tca ON tca.taxcompanyid = tc.id
+     LEFT JOIN countries co ON co.id = tca.countryid::bigint
+     LEFT JOIN bankaccts ba ON ba.acctid = d.dipositaccountid::bigint
+     LEFT JOIN invoicecurrencies cur ON cur.code = COALESCE(d.currency, 'EUR')
+     LEFT JOIN LATERAL (
+       SELECT json_agg(json_build_object(
+                'description', l.description, 'quantity', l.quantity, 'unitPrice', l.unitprice
+              ) ORDER BY l.sortorder, l.id) AS items
+       FROM invoicelineitems l WHERE l.invoiceid = i.id
+     ) li ON true
+     WHERE i.id = $1`,
+    [invoiceId]
+  );
+  if (!rows.length) return null;
+  const row = rows[0];
+  const zipCity = [row.taxCompanyZip, row.taxCompanyCity].filter(Boolean).join(" ");
+  row.taxCompanyZipCity = row.taxCompanyCountry ? `${zipCity}, (${row.taxCompanyCountry})` : zipCity;
+  row.labels = await invoiceLabels(row.languageId);
+  return row;
+}
+
 // GET /api/invoicing/invoices/:id/pdf — streams the invoice as a PDF,
 // styled to match the real HITT invoice template. See lib/invoicePdf.js
 // for the letterhead-data caveat (HiTT only, confirmed from a real sample).
 router.get("/invoices/:id/pdf", async (req, res) => {
   try {
-    await ensureInvoicingSchema();
-    const { rows } = await pool.query(
-      `SELECT i.id, i.invoicecode,
-              d.amount, d.invoicedate, d.invoiceduedate, d.invoicesentdate, d.invoicedipositdate,
-              d.numocclient, d.purchaseorder, d.descriptionservice, d.invoicecomments,
-              COALESCE(d.currency, 'EUR') AS currency,
-              vt.percentage AS "vatPercentage", d.vatamount,
-              tc.taxcompanyname AS "taxCompanyName", tc.vatnumber AS "taxCompanyVat",
-              tca.streetname AS "taxCompanyStreet", tca.zipcode AS "taxCompanyZip",
-              tca.city AS "taxCompanyCity", co.countrydesc AS "taxCompanyCountry",
-              p.projectnumber AS "projectCode", ent.entitydesc AS "entityLabel",
-              ba.bankname AS "bankName", ba.bankaddrline1 AS "bankAddressLine1",
-              ba.bankaddrline2 AS "bankAddressLine2", ba.iban, ba.bicswift AS "bicSwift",
-              cur.symbol AS "currencySymbol",
-              COALESCE(li.items, '[]'::json) AS "lineItems"
-       FROM invoices i
-       LEFT JOIN invoicesdetails d ON d.invoiceid = i.id
-       LEFT JOIN projects p ON p.id = i.projectid::bigint
-       LEFT JOIN entity ent ON ent.id = p.entityid::bigint
-       LEFT JOIN invoices_vattypes vt ON vt.id = d.vatid
-       LEFT JOIN taxcompanies tc ON tc.id = d.busspartnertoinvoiceid::bigint
-       LEFT JOIN taxcompaniesaddresses tca ON tca.taxcompanyid = tc.id
-       LEFT JOIN countries co ON co.id = tca.countryid::bigint
-       LEFT JOIN bankaccts ba ON ba.acctid = d.dipositaccountid::bigint
-       LEFT JOIN invoicecurrencies cur ON cur.code = COALESCE(d.currency, 'EUR')
-       LEFT JOIN LATERAL (
-         SELECT json_agg(json_build_object(
-                  'description', l.description, 'quantity', l.quantity, 'unitPrice', l.unitprice
-                ) ORDER BY l.sortorder, l.id) AS items
-         FROM invoicelineitems l WHERE l.invoiceid = i.id
-       ) li ON true
-       WHERE i.id = $1`,
-      [req.params.id]
-    );
-    if (!rows.length) return res.status(404).json({ error: "not_found" });
-    const row = rows[0];
-    const zipCity = [row.taxCompanyZip, row.taxCompanyCity].filter(Boolean).join(" ");
-    streamInvoicePdf(res, {
-      ...row,
-      taxCompanyZipCity: row.taxCompanyCountry ? `${zipCity}, (${row.taxCompanyCountry})` : zipCity,
-    });
+    const data = await loadInvoiceForPdf(req.params.id);
+    if (!data) return res.status(404).json({ error: "not_found" });
+    streamInvoicePdf(res, data);
   } catch (err) {
     console.error("[GET /api/invoicing/invoices/:id/pdf] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
+const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+const splitAddrs = (v) =>
+  String(v || "").split(/[;,]/).map((s) => s.trim()).filter(Boolean);
+
+// GET /api/invoicing/invoices/:id/email — the prefilled recipient / subject /
+// body for the "email this invoice" dialog, in the partner's language.
+router.get("/invoices/:id/email", requireModuleAccess("invoicing"), async (req, res) => {
+  try {
+    const data = await loadInvoiceForPdf(req.params.id);
+    if (!data) return res.status(404).json({ error: "not_found" });
+    const tokens = { InvoiceCode: data.invoicecode || "", Entity: data.entityLabel || "HITT" };
+    res.json({
+      to: data.taxCompanyEmail || "",
+      subject: fillTemplate(data.labels.get("strSubject", "[{Entity}] New invoice"), tokens),
+      body: fillTemplate(
+        data.labels.get("strBody", "Please find attached invoice {InvoiceCode}."),
+        tokens
+      ),
+      invoiceCode: data.invoicecode || null,
+      languageId: data.languageId,
+      mailConfigured: graphMailConfigured(),
+    });
+  } catch (err) {
+    console.error("[GET /api/invoicing/invoices/:id/email] error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
+// POST /api/invoicing/invoices/:id/email  { to, cc, subject, body }
+// Renders the invoice PDF and sends it as an attachment via Microsoft Graph
+// (see lib/graph.js). All four body fields are optional — anything omitted
+// falls back to the language-aware default.
+router.post("/invoices/:id/email", requireModuleAccess("invoicing"), async (req, res) => {
+  if (!graphMailConfigured()) {
+    return res.status(503).json({
+      error: "mail_unavailable",
+      message:
+        "Email sending isn't configured on the server — the Graph app needs the Mail.Send permission and GRAPH_MAIL_SENDER set.",
+    });
+  }
+  try {
+    const data = await loadInvoiceForPdf(req.params.id);
+    if (!data) return res.status(404).json({ error: "not_found" });
+
+    const tokens = { InvoiceCode: data.invoicecode || "", Entity: data.entityLabel || "HITT" };
+    const to = splitAddrs(req.body?.to || data.taxCompanyEmail);
+    const cc = splitAddrs(req.body?.cc);
+    if (!to.length) {
+      return res.status(400).json({
+        error: "no_recipient",
+        message: "No recipient — add an invoicing email to the tax company, or type one in.",
+      });
+    }
+    const bad = [...to, ...cc].find((a) => !EMAIL_RE.test(a));
+    if (bad) {
+      return res.status(400).json({ error: "bad_email", message: `"${bad}" doesn't look like an email address.` });
+    }
+
+    const subject =
+      (typeof req.body?.subject === "string" && req.body.subject.trim()) ||
+      fillTemplate(data.labels.get("strSubject", "[{Entity}] New invoice"), tokens);
+    const body =
+      (typeof req.body?.body === "string" && req.body.body.trim()) ||
+      fillTemplate(data.labels.get("strBody", "Please find attached invoice {InvoiceCode}."), tokens);
+
+    let pdf;
+    try {
+      pdf = await renderInvoicePdfBuffer(data);
+    } catch (err) {
+      console.error("[POST /invoices/:id/email] pdf render failed:", err.message);
+      return res.status(500).json({ error: "pdf_failed", message: "Could not render the invoice PDF." });
+    }
+
+    try {
+      await sendMail({
+        to,
+        cc,
+        subject,
+        text: body,
+        attachments: [
+          { filename: `${data.invoicecode || "invoice"}.pdf`, contentType: "application/pdf", content: pdf },
+        ],
+      });
+    } catch (err) {
+      console.error("[POST /invoices/:id/email] send failed:", err.message);
+      return res.status(502).json({
+        error: "send_failed",
+        message: "The email could not be sent — check the server's mail configuration and logs.",
+      });
+    }
+
+    res.json({ sent: true, to, cc });
+    logAudit(req, {
+      kind: "invoice.email",
+      desc: `Emailed invoice ${data.invoicecode || `#${req.params.id}`} to ${to.join(", ")}`,
+      level: 2,
+    });
+  } catch (err) {
+    console.error("[POST /api/invoicing/invoices/:id/email] error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });
   }
 });
