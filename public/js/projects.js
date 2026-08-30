@@ -13,6 +13,7 @@
  */
 
 const session = HITT_AUTH.requireSession("../index.html");
+const T = (k, v) => (window.HITT_I18N ? HITT_I18N.t(k, v) : k);
 HITT_PERMS.guardModule("projects", "../welcome.html");
 
 // Resolved once and reused for stage-change calls so
@@ -141,11 +142,11 @@ HITT_PERMS.applyRealName();
 function setDataSourcePill() {
   const pill = document.getElementById("dataSourcePill");
   if (usingDemoData) {
-    pill.textContent = "Demo data (API unreachable)";
+    pill.textContent = T('common.demoData');
     pill.style.background = "rgba(188,154,28,0.18)";
     pill.style.color = "#8A6E12";
   } else {
-    pill.textContent = "Live · test environment";
+    pill.textContent = T('common.liveData');
     pill.style.background = "rgba(110,143,90,0.18)";
     pill.style.color = "#4C6B3A";
   }
@@ -183,7 +184,7 @@ async function loadProjects() {
     PROJECTS = data.map(p => ({
       id: p.id,
       code: p.code ?? String(p.projectId ?? p.id),
-      name: p.name ?? p.projectName ?? "(unnamed project)",
+      name: p.name ?? p.projectName ?? T('common.unnamedProject'),
       stage: Number(p.stage ?? p.prjStatusId ?? 0),
       progress: Number(p.progress ?? 0),
       notInvoiceable: !!p.notInvoiceable,
@@ -216,40 +217,40 @@ async function loadKanbanInsights(){
   const staleHost = document.getElementById('kiStale');
   if (!readyHost || !staleHost) return;
   if (usingDemoData) {
-    readyHost.innerHTML = staleHost.innerHTML = `<div class="ki-empty">Not available in demo data</div>`;
+    readyHost.innerHTML = staleHost.innerHTML = `<div class="ki-empty">${T('common.notAvailableDemo')}</div>`;
     return;
   }
-  readyHost.innerHTML = staleHost.innerHTML = `<div class="ki-empty">Loading…</div>`;
+  readyHost.innerHTML = staleHost.innerHTML = `<div class="ki-empty">${T('common.loading')}</div>`;
   let data;
   try {
     data = await HITT_API.getProjectAttention();
   } catch (err) {
     console.warn('Could not load kanban insights:', err);
-    readyHost.innerHTML = staleHost.innerHTML = `<div class="ki-empty">Could not load</div>`;
+    readyHost.innerHTML = staleHost.innerHTML = `<div class="ki-empty">${T('common.couldNotLoad')}</div>`;
     ['kiReadyCount', 'kiStaleCount'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = ''; });
     return;
   }
   renderKiList(readyHost, data.readyToClose, (p) =>
-    `${kiMoney(p.invoicedTotal)} invoiced / ${kiMoney(p.budget)} budget`, document.getElementById('kiReadyCount'));
+    T('proj.ki.invoicedBudget', { invoiced: kiMoney(p.invoicedTotal), budget: kiMoney(p.budget) }), document.getElementById('kiReadyCount'));
   renderKiList(staleHost, data.stale, (p) => {
     const opened = p.entryDate ? new Date(p.entryDate).toLocaleDateString() : '—';
     const changed = p.lastStatusChangeAt
-      ? `last change ${new Date(p.lastStatusChangeAt).toLocaleDateString()}`
-      : 'no status change logged';
-    return `${escapeHtml(p.statusLabel || '')} · opened ${opened} · ${changed}`;
+      ? T('proj.ki.lastChange', { date: new Date(p.lastStatusChangeAt).toLocaleDateString() })
+      : T('proj.ki.noStatusChange');
+    return T('proj.ki.staleMeta', { status: escapeHtml(p.statusLabel || ''), opened, changed });
   }, document.getElementById('kiStaleCount'));
 }
 
 function renderKiList(host, rows, metaFn, countEl){
   if (countEl) countEl.textContent = `(${rows ? rows.length : 0})`;
   if (!rows || !rows.length) {
-    host.innerHTML = `<div class="ki-empty">Nothing right now</div>`;
+    host.innerHTML = `<div class="ki-empty">${T('proj.ki.nothing')}</div>`;
     return;
   }
   host.innerHTML = rows.map(p => `
     <button class="ki-item" data-project-id="${escapeHtml(String(p.id))}">
       <span class="ki-item-code">${escapeHtml(p.code || '')}</span>
-      <span class="ki-item-name">${escapeHtml(p.name || '(unnamed)')}</span>
+      <span class="ki-item-name">${escapeHtml(p.name || T('common.unnamed'))}</span>
       <span class="ki-item-meta">${metaFn(p)}</span>
     </button>
   `).join('');
@@ -382,7 +383,7 @@ function renderBoard(){
 
     const body = col.querySelector('.col-body');
     if (items.length === 0) {
-      body.innerHTML = `<div class="text-xs text-slate-400 text-center py-8 select-none">No projects${searchTerm ? ' match your search' : ' here yet'}</div>`;
+      body.innerHTML = `<div class="text-xs text-slate-400 text-center py-8 select-none">${searchTerm ? T('proj.col.emptySearch') : T('proj.col.empty')}</div>`;
     } else {
       items.forEach(p => body.appendChild(renderCard(p, stage)));
     }
@@ -414,7 +415,7 @@ function renderQuickDrop(){
   col.innerHTML = zones.map(s => `
     <div class="kb-quickdrop-zone" data-stage="${s.id}" style="--qd-color:${s.color}">
       <span class="kb-quickdrop-icon">${s.icon}</span>
-      <span class="kb-quickdrop-label">Move to<br><b>${escapeHtml(s.label)}</b></span>
+      <span class="kb-quickdrop-label">${T('proj.moveTo')}<br><b>${escapeHtml(s.label)}</b></span>
     </div>
   `).join('');
   col.querySelectorAll('.kb-quickdrop-zone').forEach(zone => {
@@ -449,7 +450,7 @@ function renderCard(p, stage){
   card.dataset.stage = stage.id;
   card.tabIndex = 0;
   card.setAttribute('role', 'button');
-  card.setAttribute('aria-label', `${p.code} ${p.name}, stage ${stage.label}. Press arrow keys to move.`);
+  card.setAttribute('aria-label', T('proj.card.aria', { code: p.code, name: p.name, stage: stage.label }));
 
   card.innerHTML = `
     <div class="flex">
@@ -534,7 +535,7 @@ async function moveProject(id, targetStageId){
   if (countEl){ countEl.classList.remove('count-pulse'); void countEl.offsetWidth; countEl.classList.add('count-pulse'); }
 
   updateTabCounts();
-  toast(`<span class="font-mono text-xs opacity-80">${escapeHtml(p.code)}</span> moved ${from.label} → <b>${to.label}</b>`, to.id === 6 ? 'red' : 'green');
+  toast(T('proj.toast.moved', { code: `<span class="font-mono text-xs opacity-80">${escapeHtml(p.code)}</span>`, from: from.label, to: `<b>${to.label}</b>` }), to.id === 6 ? 'red' : 'green');
 
   if (!usingDemoData) {
     try {
@@ -545,7 +546,7 @@ async function moveProject(id, targetStageId){
       p.stage = previousStage; // rollback
       renderBoard();
       updateTabCounts();
-      toast(`Could not save the move for <span class="font-mono text-xs">${escapeHtml(p.code)}</span> — reverted.`, 'red');
+      toast(T('proj.toast.moveFail', { code: `<span class="font-mono text-xs">${escapeHtml(p.code)}</span>` }), 'red');
     }
   }
 }
@@ -584,7 +585,7 @@ function populateOwnerFilterOptions(){
   const owners = new Map();
   PROJECTS.forEach(p => { if (p.ownerId) owners.set(String(p.ownerId), p.ownerName || `#${p.ownerId}`); });
   const sorted = [...owners.entries()].sort((a, b) => a[1].localeCompare(b[1]));
-  sel.innerHTML = `<option value="">Any owner</option>` +
+  sel.innerHTML = `<option value="">${T('proj.f.anyOwner')}</option>` +
     sorted.map(([id, name]) => `<option value="${id}">${escapeHtml(name)}</option>`).join('');
   if ([...owners.keys()].includes(current)) sel.value = current;
 }
@@ -633,13 +634,13 @@ async function refreshInvoicingPartnerOptions(businessPartnerId, selectedTaxComp
     select.innerHTML = '';
     select.disabled = true;
     addBtn.disabled = true;
-    hint.textContent = 'Assign a Contracting Business Partner first to pick who gets invoiced.';
+    hint.textContent = T('proj.inv.assignFirst');
     return;
   }
 
   select.disabled = true;
   addBtn.disabled = false;
-  select.innerHTML = `<option value="">Loading…</option>`;
+  select.innerHTML = `<option value="">${T('common.loading')}</option>`;
   try {
     const taxCompanies = await HITT_API.getBusinessPartnerTaxCompanies(businessPartnerId);
     select.innerHTML = lookupOptionsHtml(
@@ -649,11 +650,11 @@ async function refreshInvoicingPartnerOptions(businessPartnerId, selectedTaxComp
     select.disabled = false;
     hint.textContent = taxCompanies.length
       ? ''
-      : 'No tax companies yet for this business partner — use "+" to add one.';
+      : T('proj.inv.noTc');
   } catch (err) {
     console.warn('Could not load tax companies for invoicing partner:', err);
     select.innerHTML = `<option value="">—</option>`;
-    hint.textContent = 'Could not load tax companies.';
+    hint.textContent = T('proj.inv.tcLoadFail');
   }
 }
 
@@ -663,10 +664,10 @@ document.getElementById('mInvoicingPartner').addEventListener('change', async (e
   if (!taxCompanyId) return;
   try {
     await HITT_API.assignProjectInvoicingPartner(activeProjectId, taxCompanyId);
-    toast('Invoicing partner updated', 'green');
+    toast(T('proj.toast.invPartnerUpdated'), 'green');
   } catch (err) {
     console.error(err);
-    toast('Could not update the invoicing partner.', 'red');
+    toast(T('proj.toast.invPartnerFail'), 'red');
   }
 });
 
@@ -708,10 +709,10 @@ document.getElementById('taxCompanySave').addEventListener('click', async () => 
     await HITT_API.assignProjectInvoicingPartner(activeProjectId, created.id);
     document.getElementById('mInvoicingPartner').value = String(created.id);
     closeTaxCompanyModal();
-    toast(`<span class="font-mono text-xs opacity-80">${escapeHtml(name)}</span> created and assigned`, 'green');
+    toast(T('proj.toast.tcCreated', { name: `<span class="font-mono text-xs opacity-80">${escapeHtml(name)}</span>` }), 'green');
   } catch (err) {
     console.error(err);
-    toast('Could not create the tax company.', 'red');
+    toast(T('proj.toast.tcCreateFail'), 'red');
   }
 });
 
@@ -747,22 +748,22 @@ async function openProjectModal(id){
   document.getElementById('mInvoicingPartner').innerHTML = '';
   document.getElementById('mInvoicingPartner').disabled = true;
   document.getElementById('mInvoicingPartnerAdd').disabled = true;
-  document.getElementById('mInvoicingPartnerHint').textContent = 'Assign a Contracting Business Partner first to pick who gets invoiced.';
+  document.getElementById('mInvoicingPartnerHint').textContent = T('proj.inv.assignFirst');
   document.getElementById('mBPRunningName').value = '';
   document.getElementById('mNotInvoiceable').checked = false;
 
   document.getElementById('mDeliverables').innerHTML =
-    `<tr><td colspan="4" class="px-2.5 py-4 text-center text-slate-400 text-xs">${usingDemoData ? 'Not available in demo data' : 'Loading…'}</td></tr>`;
+    `<tr><td colspan="4" class="px-2.5 py-4 text-center text-slate-400 text-xs">${usingDemoData ? T('common.notAvailableDemo') : T('common.loading')}</td></tr>`;
   document.getElementById('mQuotations').innerHTML =
-    `<tr><td colspan="5" class="px-2.5 py-4 text-center text-slate-400 text-xs">${usingDemoData ? 'Not available in demo data' : 'Loading…'}</td></tr>`;
+    `<tr><td colspan="5" class="px-2.5 py-4 text-center text-slate-400 text-xs">${usingDemoData ? T('common.notAvailableDemo') : T('common.loading')}</td></tr>`;
   document.getElementById('mNotesList').innerHTML =
-    `<div class="text-xs text-slate-400 text-center py-6">${usingDemoData ? 'Not available in demo data' : 'Loading…'}</div>`;
+    `<div class="text-xs text-slate-400 text-center py-6">${usingDemoData ? T('common.notAvailableDemo') : T('common.loading')}</div>`;
   document.getElementById('historyList').innerHTML =
-    `<div class="text-xs text-slate-400 text-center py-6">${usingDemoData ? 'Not available in demo data' : 'Loading…'}</div>`;
+    `<div class="text-xs text-slate-400 text-center py-6">${usingDemoData ? T('common.notAvailableDemo') : T('common.loading')}</div>`;
   document.getElementById('mResources').innerHTML =
-    `<tr><td colspan="3" class="px-2.5 py-4 text-center text-slate-400 text-xs">${usingDemoData ? 'Not available in demo data' : 'Loading…'}</td></tr>`;
+    `<tr><td colspan="3" class="px-2.5 py-4 text-center text-slate-400 text-xs">${usingDemoData ? T('common.notAvailableDemo') : T('common.loading')}</td></tr>`;
   document.getElementById('mExpenses').innerHTML =
-    `<tr><td colspan="6" class="px-2.5 py-4 text-center text-slate-400 text-xs">${usingDemoData ? 'Not available in demo data' : 'Loading…'}</td></tr>`;
+    `<tr><td colspan="6" class="px-2.5 py-4 text-center text-slate-400 text-xs">${usingDemoData ? T('common.notAvailableDemo') : T('common.loading')}</td></tr>`;
   document.getElementById('mExpensesFoot').innerHTML = '';
   document.getElementById('mExpensesLink').href = `expenses.html?q=${encodeURIComponent(p.code)}`;
   cancelEditDeliverable(); // clears the deliverable form + edit state from any previous project
@@ -826,7 +827,7 @@ async function openProjectModal(id){
       renderHistory(history);
     } catch (err) {
       console.warn(`Could not load history for project ${id}:`, err);
-      document.getElementById('historyList').innerHTML = `<div class="text-xs text-slate-400 text-center py-6">Could not load history</div>`;
+      document.getElementById('historyList').innerHTML = `<div class="text-xs text-slate-400 text-center py-6">${T('proj.err.loadHistory')}</div>`;
     }
 
     try {
@@ -835,7 +836,7 @@ async function openProjectModal(id){
       renderResources(resources);
     } catch (err) {
       console.warn(`Could not load resources for project ${id}:`, err);
-      document.getElementById('mResources').innerHTML = `<tr><td colspan="3" class="px-2.5 py-4 text-center text-slate-400 text-xs">Could not load resources</td></tr>`;
+      document.getElementById('mResources').innerHTML = `<tr><td colspan="3" class="px-2.5 py-4 text-center text-slate-400 text-xs">${T('proj.err.loadResources')}</td></tr>`;
     }
 
     try {
@@ -844,7 +845,7 @@ async function openProjectModal(id){
       renderProjectExpenses(expenses);
     } catch (err) {
       console.warn(`Could not load expenses for project ${id}:`, err);
-      document.getElementById('mExpenses').innerHTML = `<tr><td colspan="6" class="px-2.5 py-4 text-center text-slate-400 text-xs">Could not load expenses</td></tr>`;
+      document.getElementById('mExpenses').innerHTML = `<tr><td colspan="6" class="px-2.5 py-4 text-center text-slate-400 text-xs">${T('proj.err.loadExpenses')}</td></tr>`;
     }
   }
 }
@@ -869,7 +870,7 @@ function openBpPicker(target){
   document.getElementById('bpPickerSearch').value = '';
   document.getElementById('bpPickerNewName').value = '';
   document.getElementById('bpPickerResults').innerHTML =
-    `<div class="text-xs text-slate-400 text-center py-6">Type at least two characters to start searching</div>`;
+    `<div class="text-xs text-slate-400 text-center py-6">${T('proj.bpPicker.typeTwo')}</div>`;
   bpPickerOverlay.classList.remove('hidden');
   setTimeout(() => document.getElementById('bpPickerSearch').focus(), 50);
 }
@@ -883,7 +884,7 @@ async function assignBusinessPartner(bpId, bpName){
     npBusinessPartnerId = bpId;
     document.getElementById('npBusinessPartner').textContent = bpName || '—';
     closeBpPicker();
-    toast(`<span class="font-mono text-xs opacity-80">${escapeHtml(bpName || '')}</span> will be assigned once the project is created`, 'green');
+    toast(T('proj.toast.bpWillAssign', { name: `<span class="font-mono text-xs opacity-80">${escapeHtml(bpName || '')}</span>` }), 'green');
     return;
   }
   if (!activeProjectId) return;
@@ -893,17 +894,17 @@ async function assignBusinessPartner(bpId, bpName){
     setBPEditLink(bpId);
     await refreshInvoicingPartnerOptions(bpId, null); // new BP -> old invoicing pick no longer applies
     closeBpPicker();
-    toast(`<span class="font-mono text-xs opacity-80">${escapeHtml(bpName || '')}</span> assigned as the contracting business partner`, 'green');
+    toast(T('proj.toast.bpAssigned', { name: `<span class="font-mono text-xs opacity-80">${escapeHtml(bpName || '')}</span>` }), 'green');
   } catch (err) {
     console.error(err);
-    toast('Could not assign the business partner.', 'red');
+    toast(T('proj.toast.bpAssignFail'), 'red');
   }
 }
 
 function renderBpPickerResults(rows){
   const host = document.getElementById('bpPickerResults');
   if (!rows.length) {
-    host.innerHTML = `<div class="text-xs text-slate-400 text-center py-6">No matches</div>`;
+    host.innerHTML = `<div class="text-xs text-slate-400 text-center py-6">${T('proj.bpPicker.noMatches')}</div>`;
     return;
   }
   host.innerHTML = rows.map((bp, i) => `
@@ -932,19 +933,19 @@ document.getElementById('bpPickerSearch').addEventListener('input', (e) => {
   clearTimeout(bpSearchDebounce);
   if (term.length < 2) {
     document.getElementById('bpPickerResults').innerHTML =
-      `<div class="text-xs text-slate-400 text-center py-6">Type at least two characters to start searching</div>`;
+      `<div class="text-xs text-slate-400 text-center py-6">${T('proj.bpPicker.typeTwo')}</div>`;
     return;
   }
   bpSearchDebounce = setTimeout(async () => {
     document.getElementById('bpPickerResults').innerHTML =
-      `<div class="text-xs text-slate-400 text-center py-6">Searching…</div>`;
+      `<div class="text-xs text-slate-400 text-center py-6">${T('common.searching')}</div>`;
     try {
       const rows = await HITT_API.getBusinessPartners(term);
       renderBpPickerResults(rows);
     } catch (err) {
       console.error(err);
       document.getElementById('bpPickerResults').innerHTML =
-        `<div class="text-xs text-hitt-red text-center py-6">Search failed — is the API reachable?</div>`;
+        `<div class="text-xs text-hitt-red text-center py-6">${T('proj.bpPicker.searchFail')}</div>`;
     }
   }, 300);
 });
@@ -957,7 +958,7 @@ document.getElementById('bpPickerAddNew').addEventListener('click', async () => 
     await assignBusinessPartner(created.id, created.name || name);
   } catch (err) {
     console.error(err);
-    toast('Could not create the business partner.', 'red');
+    toast(T('proj.toast.bpCreateFail'), 'red');
   }
 });
 
@@ -1022,7 +1023,7 @@ async function discardProjectSessionChanges(){
   resetProjectSessionAdds();
   const results = await Promise.allSettled(jobs);
   const failed = results.filter(r => r.status === 'rejected').length;
-  if (failed) toast(`${failed} change${failed === 1 ? '' : 's'} could not be reverted — check the project.`, 'red');
+  if (failed) toast(T('proj.toast.revertFailed', { count: failed }), 'red');
 }
 
 function startEditDeliverable(id){
@@ -1032,7 +1033,7 @@ function startEditDeliverable(id){
   document.getElementById('mNewDeliverableExpected').value = d.deliverydate ? d.deliverydate.slice(0, 10) : '';
   document.getElementById('mNewDeliverableEffective').value = d.effectivedd ? d.effectivedd.slice(0, 10) : '';
   document.getElementById('mNewDeliverableName').value = d.deliverablename || '';
-  document.getElementById('mAddDeliverable').textContent = 'Save';
+  document.getElementById('mAddDeliverable').textContent = T('form.save');
   document.getElementById('mNewDeliverableName').focus();
 }
 
@@ -1041,12 +1042,12 @@ function cancelEditDeliverable(){
   document.getElementById('mNewDeliverableExpected').value = '';
   document.getElementById('mNewDeliverableEffective').value = '';
   document.getElementById('mNewDeliverableName').value = '';
-  document.getElementById('mAddDeliverable').textContent = 'Add';
+  document.getElementById('mAddDeliverable').textContent = T('form.add');
 }
 
 async function deleteDeliverable(id){
   const d = DELIVERABLES.find(x => x.id === id);
-  if (!d || !confirm(`Delete deliverable "${d.deliverablename || '(unnamed)'}"?`)) return;
+  if (!d || !confirm(T('proj.confirm.deleteDeliverable', { name: d.deliverablename || T('common.unnamed') }))) return;
   const wasSessionAdd = projectSessionAdds.deliverables.some(x => String(x) === String(id));
   try {
     await HITT_API.deleteProjectDeliverable(activeProjectId, id);
@@ -1060,10 +1061,10 @@ async function deleteDeliverable(id){
     if (editingDeliverableId === id) cancelEditDeliverable();
     const deliverables = await HITT_API.getProjectDeliverables(activeProjectId);
     renderDeliverables(deliverables);
-    toast('Deliverable deleted', 'navy');
+    toast(T('proj.toast.delDeleted'), 'navy');
   } catch (err) {
     console.error(err);
-    toast('Could not delete the deliverable.', 'red');
+    toast(T('proj.toast.delDeleteFail'), 'red');
   }
 }
 
@@ -1071,17 +1072,17 @@ function renderDeliverables(rows){
   DELIVERABLES = rows || [];
   const tbody = document.getElementById('mDeliverables');
   if (!rows || !rows.length) {
-    tbody.innerHTML = `<tr><td colspan="4" class="px-2.5 py-4 text-center text-slate-400 text-xs">No deliverables yet</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="4" class="px-2.5 py-4 text-center text-slate-400 text-xs">${T('proj.empty.deliverables')}</td></tr>`;
     return;
   }
   tbody.innerHTML = rows.map(d => `
     <tr class="grid-row border-t border-slate-100">
       <td class="px-2.5 py-1.5 font-mono">${formatDateOnly(d.deliverydate)}</td>
       <td class="px-2.5 py-1.5 font-mono">${formatDateOnly(d.effectivedd)}</td>
-      <td class="px-2.5 py-1.5">${escapeHtml(d.deliverablename || '(unnamed)')}</td>
+      <td class="px-2.5 py-1.5">${escapeHtml(d.deliverablename || T('common.unnamed'))}</td>
       <td class="px-2.5 py-1.5 text-right whitespace-nowrap">
-        <button data-edit-deliverable="${d.id}" title="Edit this deliverable" class="w-6 h-6 rounded hover:bg-hitt-mist text-hitt-teal inline-flex items-center justify-center">✎</button>
-        <button data-delete-deliverable="${d.id}" title="Delete this deliverable" class="w-6 h-6 rounded hover:bg-hitt-mist text-hitt-red inline-flex items-center justify-center">✕</button>
+        <button data-edit-deliverable="${d.id}" title="${T('proj.tip.editDeliverable')}" class="w-6 h-6 rounded hover:bg-hitt-mist text-hitt-teal inline-flex items-center justify-center">✎</button>
+        <button data-delete-deliverable="${d.id}" title="${T('proj.tip.deleteDeliverable')}" class="w-6 h-6 rounded hover:bg-hitt-mist text-hitt-red inline-flex items-center justify-center">✕</button>
       </td>
     </tr>
   `).join('');
@@ -1102,7 +1103,7 @@ function renderProjectExpenses(data){
   const rows = (data && data.rows) || [];
   const money = (n) => n == null ? '—' : Number(n).toLocaleString(undefined, { style: 'currency', currency: 'EUR' });
   if (!rows.length) {
-    tbody.innerHTML = `<tr><td colspan="6" class="px-2.5 py-4 text-center text-slate-400 text-xs">No expenses recorded for this project</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6" class="px-2.5 py-4 text-center text-slate-400 text-xs">${T('proj.empty.expenses')}</td></tr>`;
     if (tfoot) tfoot.innerHTML = '';
     return;
   }
@@ -1114,14 +1115,14 @@ function renderProjectExpenses(data){
       <td class="px-2.5 py-1.5 text-center">${x.invoiceable ? '<span class="text-hitt-green font-bold">✓</span>' : ''}</td>
       <td class="px-2.5 py-1.5 text-right font-mono">${money(x.amount)}</td>
       <td class="px-2.5 py-1.5 text-center">${x.hasDocument
-        ? `<button type="button" data-exp-doc="${x.id}" title="View evidence" class="text-hitt-teal hover:text-hitt-ink">📎</button>`
+        ? `<button type="button" data-exp-doc="${x.id}" title="${T('proj.tip.viewEvidence')}" class="text-hitt-teal hover:text-hitt-ink">📎</button>`
         : ''}</td>
     </tr>`).join('');
   const total = data && data.sum != null ? Number(data.sum) : rows.reduce((s, x) => s + (Number(x.amount) || 0), 0);
   const billable = rows.filter(x => x.invoiceable).reduce((s, x) => s + (Number(x.amount) || 0), 0);
   if (tfoot) tfoot.innerHTML = `
     <tr class="border-t-2 border-slate-200 font-semibold text-hitt-ink">
-      <td class="px-2.5 py-1.5" colspan="3">${rows.length} expense${rows.length === 1 ? '' : 's'} · ${money(billable)} re-invoiceable</td>
+      <td class="px-2.5 py-1.5" colspan="3">${T('proj.exp.footer', { count: rows.length, amount: money(billable) })}</td>
       <td class="px-2.5 py-1.5"></td>
       <td class="px-2.5 py-1.5 text-right font-mono">${money(total)}</td>
       <td class="px-2.5 py-1.5"></td>
@@ -1140,7 +1141,7 @@ async function viewExpenseDoc(id){
     setTimeout(() => URL.revokeObjectURL(url), 60000);
   } catch (err) {
     if (w) w.close();
-    toast(err.message || 'Could not open the document.', 'red');
+    toast(err.message || T('proj.toast.docOpenFail'), 'red');
   }
 }
 document.getElementById('mExpenses')?.addEventListener('click', (e) => {
@@ -1151,7 +1152,7 @@ document.getElementById('mExpenses')?.addEventListener('click', (e) => {
 function renderQuotations(rows){
   const tbody = document.getElementById('mQuotations');
   if (!rows || !rows.length) {
-    tbody.innerHTML = `<tr><td colspan="5" class="px-2.5 py-4 text-center text-slate-400 text-xs">No quotations yet</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="5" class="px-2.5 py-4 text-center text-slate-400 text-xs">${T('proj.empty.quotations')}</td></tr>`;
     return;
   }
   const money = (n) => n == null ? '—' : Number(n).toLocaleString(undefined, { style: 'currency', currency: 'EUR' });
@@ -1169,7 +1170,7 @@ function renderQuotations(rows){
 function renderResources(rows){
   const tbody = document.getElementById('mResources');
   if (!rows || !rows.length) {
-    tbody.innerHTML = `<tr><td colspan="3" class="px-2.5 py-4 text-center text-slate-400 text-xs">No resources assigned yet</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="3" class="px-2.5 py-4 text-center text-slate-400 text-xs">${T('proj.empty.resources')}</td></tr>`;
     return;
   }
   tbody.innerHTML = rows.map(r => `
@@ -1180,7 +1181,7 @@ function renderResources(rows){
           class="field-input" style="width:5rem; text-align:right; display:inline-block; padding-top:0.3rem; padding-bottom:0.3rem;" />
       </td>
       <td class="px-2.5 py-1.5 text-right">
-        <button data-delete-resource="${r.id}" title="Remove this resource" class="w-6 h-6 rounded hover:bg-hitt-mist text-hitt-red inline-flex items-center justify-center">✕</button>
+        <button data-delete-resource="${r.id}" title="${T('proj.tip.removeResource')}" class="w-6 h-6 rounded hover:bg-hitt-mist text-hitt-red inline-flex items-center justify-center">✕</button>
       </td>
     </tr>
   `).join('');
@@ -1195,26 +1196,26 @@ function renderResources(rows){
         await HITT_API.updateProjectResource(activeProjectId, rowId, { amount, employeeId: currentEmployeeId });
         original = amount;
         renderHistory(await HITT_API.getProjectHistory(activeProjectId));
-        toast('Workload updated', 'green');
+        toast(T('proj.toast.workloadUpdated'), 'green');
       } catch (err) {
         console.error(err);
         input.value = original;
-        toast('Could not update the workload.', 'red');
+        toast(T('proj.toast.workloadFail'), 'red');
       }
     });
   });
   tbody.querySelectorAll('[data-delete-resource]').forEach(btn => {
     btn.addEventListener('click', async () => {
       const rowId = btn.dataset.deleteResource;
-      if (!confirm('Remove this resource from the project?')) return;
+      if (!confirm(T('proj.confirm.removeResource'))) return;
       try {
         await HITT_API.deleteProjectResource(activeProjectId, rowId, currentEmployeeId);
         renderResources(await HITT_API.getProjectResources(activeProjectId));
         renderHistory(await HITT_API.getProjectHistory(activeProjectId));
-        toast('Resource removed', 'navy');
+        toast(T('proj.toast.resourceRemoved'), 'navy');
       } catch (err) {
         console.error(err);
-        toast('Could not remove the resource.', 'red');
+        toast(T('proj.toast.resourceRemoveFail'), 'red');
       }
     });
   });
@@ -1223,14 +1224,14 @@ function renderResources(rows){
 document.getElementById('mAddResource').addEventListener('click', async () => {
   if (!activeProjectId) return;
   if (usingDemoData) {
-    toast('Resources aren\'t available in demo data.', 'navy');
+    toast(T('proj.demo.noResources'), 'navy');
     return;
   }
   const employeeSel = document.getElementById('mNewResourceEmployee');
   const amountInput = document.getElementById('mNewResourceAmount');
   const resourceId = employeeSel.value;
   if (!resourceId) {
-    toast('Pick an employee first.', 'red');
+    toast(T('proj.toast.pickEmployee'), 'red');
     return;
   }
   try {
@@ -1241,10 +1242,10 @@ document.getElementById('mAddResource').addEventListener('click', async () => {
     amountInput.value = 50;
     renderResources(await HITT_API.getProjectResources(activeProjectId));
     renderHistory(await HITT_API.getProjectHistory(activeProjectId));
-    toast('Resource added', 'green');
+    toast(T('proj.toast.resourceAdded'), 'green');
   } catch (err) {
     console.error(err);
-    toast('Could not add the resource.', 'red');
+    toast(T('proj.toast.resourceAddFail'), 'red');
   }
 });
 
@@ -1265,13 +1266,13 @@ function renderNotes(rows){
   const list = document.getElementById('mNotesList');
   const filtered = NOTES.filter(matchesNotesSearch);
   if (!filtered.length) {
-    list.innerHTML = `<div class="text-xs text-slate-400 text-center py-6">${NOTES.length ? 'No notes match your search' : 'No notes yet'}</div>`;
+    list.innerHTML = `<div class="text-xs text-slate-400 text-center py-6">${NOTES.length ? T('proj.empty.notesSearch') : T('proj.empty.notes')}</div>`;
     return;
   }
   list.innerHTML = filtered.map(n => `
     <div class="border border-slate-100 rounded-md p-2 bg-hitt-canvas">
       <div class="flex items-center justify-between gap-2 mb-1">
-        <span class="text-[11px] font-semibold text-hitt-teal">${escapeHtml(n.authorName || 'Unknown')}</span>
+        <span class="text-[11px] font-semibold text-hitt-teal">${escapeHtml(n.authorName || T('common.unknown'))}</span>
         <span class="text-[10px] text-slate-400 font-mono">${formatDateTime(n.commentsts)}</span>
       </div>
       <div class="text-xs text-hitt-ink whitespace-pre-wrap">${escapeHtml(n.notes)}</div>
@@ -1287,7 +1288,7 @@ function renderNotes(rows){
 function renderHistory(rows){
   const list = document.getElementById('historyList');
   if (!rows || !rows.length) {
-    list.innerHTML = `<div class="text-xs text-slate-400 text-center py-6">No history yet</div>`;
+    list.innerHTML = `<div class="text-xs text-slate-400 text-center py-6">${T('proj.empty.history')}</div>`;
     return;
   }
   list.innerHTML = rows.map(h => `
@@ -1295,12 +1296,12 @@ function renderHistory(rows){
       <div class="text-xs text-hitt-ink">
         ${h.type === 'status'
           ? (h.oldStatusId == null
-              ? `Created${h.newStatusLabel ? ` as <b>${escapeHtml(h.newStatusLabel)}</b>` : ''}`
+              ? (h.newStatusLabel ? T('proj.hist.createdAs', { label: escapeHtml(h.newStatusLabel) }) : T('proj.hist.created'))
               : `<b>${escapeHtml(h.oldStatusLabel || '—')}</b> → <b>${escapeHtml(h.newStatusLabel || '—')}</b>`)
           : escapeHtml(h.summary || '')}
       </div>
       <div class="flex items-center justify-between gap-2 mt-1">
-        <span class="text-[10px] font-semibold text-hitt-teal">${escapeHtml(h.changedByName || 'Unknown')}</span>
+        <span class="text-[10px] font-semibold text-hitt-teal">${escapeHtml(h.changedByName || T('common.unknown'))}</span>
         <span class="text-[10px] text-slate-400 font-mono">${formatDateTime(h.changedAt)}</span>
       </div>
     </div>
@@ -1320,7 +1321,7 @@ historyCollapseBtn.addEventListener('click', () => {
   historyPanel.style.width = historyCollapsed ? '0px' : '300px';
   historyPanel.style.borderLeft = historyCollapsed ? 'none' : '';
   historyCollapseBtn.textContent = historyCollapsed ? '«' : '»';
-  historyCollapseBtn.title = historyCollapsed ? 'Expand history' : 'Collapse history';
+  historyCollapseBtn.title = historyCollapsed ? T('proj.tip.expandHistory') : T('proj.tip.collapseHistory');
 });
 
 const PROJECT_MODAL_TRANSIENT_IDS = [
@@ -1358,8 +1359,8 @@ function closeProjectModal(){
 async function requestCloseProjectModal(){
   if (!projectModalHasUnsaved()) { closeProjectModal(); return; }
   const msg = projectHasSessionChanges()
-    ? 'Discard your changes? Notes, deliverables and quotations you added, edited or deleted will be reverted.'
-    : 'Discard your unsaved changes to this project?';
+    ? T('proj.confirm.discardChanges')
+    : T('proj.confirm.discardUnsaved');
   if (!confirm(msg)) return;
   if (projectHasSessionChanges()) await discardProjectSessionChanges();
   clearProjectModalTransient();
@@ -1378,12 +1379,12 @@ document.getElementById('mSave').addEventListener('click', async () => {
   if (!p) return;
   const newName = document.getElementById('mTitle').value.trim();
   if (!newName) {
-    toast(`Missing required data: <b>Project name</b>`, 'red');
+    toast(T('proj.toast.missingName'), 'red');
     return;
   }
   const entityVal = document.getElementById('mEntity').value;
   if (!entityVal) {
-    toast(`Missing required data: <b>Entity</b>`, 'red');
+    toast(T('proj.toast.missingEntity'), 'red');
     return;
   }
   const newStatus = Number(document.getElementById('mStatus').value);
@@ -1422,13 +1423,13 @@ document.getElementById('mSave').addEventListener('click', async () => {
     try {
       await HITT_API.updateProject(p.id, { stage: newStatus, progress: newProgress, employeeId: currentEmployeeId, ...extraFields });
       loadKanbanInsights();
-      toast(`<span class="font-mono text-xs opacity-80">${escapeHtml(p.code)}</span> saved${statusChanged ? ' · status updated' : ''}`, 'green');
+      toast(statusChanged ? T('proj.toast.savedStatus', { code: `<span class="font-mono text-xs opacity-80">${escapeHtml(p.code)}</span>` }) : T('proj.toast.saved', { code: `<span class="font-mono text-xs opacity-80">${escapeHtml(p.code)}</span>` }), 'green');
     } catch (err) {
       console.error(err);
-      toast(`Could not save changes for <span class="font-mono text-xs">${escapeHtml(p.code)}</span>`, 'red');
+      toast(T('proj.toast.saveFail', { code: `<span class="font-mono text-xs">${escapeHtml(p.code)}</span>` }), 'red');
     }
   } else {
-    toast(`<span class="font-mono text-xs opacity-80">${escapeHtml(p.code)}</span> saved locally (demo data)`, 'green');
+    toast(T('proj.toast.savedDemo', { code: `<span class="font-mono text-xs opacity-80">${escapeHtml(p.code)}</span>` }), 'green');
   }
 });
 
@@ -1447,7 +1448,7 @@ document.getElementById('mAddNote').addEventListener('click', async () => {
   const text = input.value.trim();
   if (!text || !activeProjectId) return;
   if (usingDemoData) {
-    toast('Notes aren\'t available in demo data.', 'navy');
+    toast(T('proj.demo.noNotes'), 'navy');
     return;
   }
   try {
@@ -1456,10 +1457,10 @@ document.getElementById('mAddNote').addEventListener('click', async () => {
     input.value = '';
     const notes = await HITT_API.getProjectNotes(activeProjectId);
     renderNotes(notes);
-    toast('Note added', 'green');
+    toast(T('proj.toast.noteAdded'), 'green');
   } catch (err) {
     console.error(err);
-    toast('Could not save the note.', 'red');
+    toast(T('proj.toast.noteSaveFail'), 'red');
   }
 });
 
@@ -1483,7 +1484,7 @@ document.getElementById('mAddDeliverable').addEventListener('click', async () =>
   const name = nameInput.value.trim();
   if (!name || !activeProjectId) return;
   if (usingDemoData) {
-    toast('Deliverables aren\'t available in demo data.', 'navy');
+    toast(T('proj.demo.noDeliverables'), 'navy');
     return;
   }
   const editingId = editingDeliverableId;
@@ -1510,23 +1511,23 @@ document.getElementById('mAddDeliverable').addEventListener('click', async () =>
     cancelEditDeliverable(); // also clears the inputs
     const deliverables = await HITT_API.getProjectDeliverables(activeProjectId);
     renderDeliverables(deliverables);
-    toast(editingId ? 'Deliverable updated' : 'Deliverable added', 'green');
+    toast(editingId ? T('proj.toast.delUpdated') : T('proj.toast.delAdded'), 'green');
   } catch (err) {
     console.error(err);
-    toast(`Could not ${editingId ? 'update' : 'save'} the deliverable.`, 'red');
+    toast(T('proj.toast.delSaveFail'), 'red');
   }
 });
 
 document.getElementById('mAddQuotation').addEventListener('click', async () => {
   if (!activeProjectId) return;
   if (usingDemoData) {
-    toast('Quotations aren\'t available in demo data.', 'navy');
+    toast(T('proj.demo.noQuotations'), 'navy');
     return;
   }
   const amount = document.getElementById('mNewQuotationAmount').value;
   const date = document.getElementById('mNewQuotationDate').value;
   if (!amount && !date) {
-    toast('Enter at least a date or an amount for the quotation.', 'red');
+    toast(T('proj.toast.quotNeedData'), 'red');
     return;
   }
   try {
@@ -1542,16 +1543,16 @@ document.getElementById('mAddQuotation').addEventListener('click', async () => {
     ['mNewQuotationDate', 'mNewQuotationAmount', 'mNewQuotationDiscount', 'mNewQuotationExpenses', 'mNewQuotationFinal']
       .forEach(id2 => document.getElementById(id2).value = '');
     renderQuotations(await HITT_API.getProjectQuotations(activeProjectId));
-    toast('Quotation added', 'green');
+    toast(T('proj.toast.quotAdded'), 'green');
   } catch (err) {
     console.error(err);
-    toast('Could not save the quotation.', 'red');
+    toast(T('proj.toast.quotSaveFail'), 'red');
   }
 });
 
 /* ============================== NEW PROJECT MODAL ======================= */
 const newProjectOverlay = document.getElementById('newProjectOverlay');
-const NP_PLACEHOLDER = 'Type here the name…';
+const NP_PLACEHOLDER = (window.HITT_I18N ? HITT_I18N.t('proj.np.placeholder') : 'Type here the name…');
 
 function nextProjectNumber(){
   const year = new Date().getFullYear();
@@ -1609,11 +1610,11 @@ document.getElementById('npSave').addEventListener('click', async () => {
   const ownerVal = document.getElementById('npOwner').value;
 
   if (!name || name === NP_PLACEHOLDER) {
-    toast(`Missing required data: <b>Project name</b>`, 'red');
+    toast(T('proj.toast.missingName'), 'red');
     return;
   }
   if (!entityVal) {
-    toast(`Missing required data: <b>Entity</b>`, 'red');
+    toast(T('proj.toast.missingEntity'), 'red');
     return;
   }
 
@@ -1623,7 +1624,7 @@ document.getElementById('npSave').addEventListener('click', async () => {
     PROJECTS.push({ id: idCounter++, code, name, stage: status, progress });
     renderBoard();
     updateTabCounts();
-    toast(`<span class="font-mono text-xs opacity-80">${code}</span> project <b>created</b> (demo data)`, 'green');
+    toast(T('proj.toast.npCreatedDemo', { code: `<span class="font-mono text-xs opacity-80">${code}</span>` }), 'green');
     closeNewProjectModal();
     return;
   }
@@ -1642,7 +1643,7 @@ document.getElementById('npSave').addEventListener('click', async () => {
         await HITT_API.assignProjectBusinessPartner(created.id, npBusinessPartnerId);
       } catch (bpErr) {
         console.error(bpErr);
-        toast('Project created, but could not assign the business partner — assign it from the project card.', 'red');
+        toast(T('proj.toast.npBpFail'), 'red');
       }
     }
     PROJECTS.push({
@@ -1657,16 +1658,16 @@ document.getElementById('npSave').addEventListener('click', async () => {
     renderBoard();
     updateTabCounts();
     populateOwnerFilterOptions();
-    toast(`<span class="font-mono text-xs opacity-80">${code}</span> project <b>created</b>`, 'green');
+    toast(T('proj.toast.npCreated', { code: `<span class="font-mono text-xs opacity-80">${code}</span>` }), 'green');
     if (created.oneDriveFolder?.created === false) {
-      toast('Project created, but the OneDrive folder could not be created — create it by hand.', 'red');
+      toast(T('proj.toast.npNoFolder'), 'red');
     } else if (created.oneDriveFolder === null && entityVal === '') {
-      toast('No entity selected — OneDrive folder not created (folder naming needs it). Set the entity, then create the folder by hand.', 'navy');
+      toast(T('proj.toast.npNoEntity'), 'navy');
     }
     closeNewProjectModal();
   } catch (err) {
     console.error(err);
-    toast('Could not create the project on the server.', 'red');
+    toast(T('proj.toast.npCreateFail'), 'red');
   }
 });
 
@@ -1791,7 +1792,7 @@ document.getElementById('btnClearFilters').addEventListener('click', () => {
 });
 
 document.getElementById('btnRefresh').addEventListener('click', () => {
-  toast('Refreshing…', 'navy');
+  toast(T('common.refreshing'), 'navy');
   loadProjects();
 });
 
@@ -1804,4 +1805,17 @@ loadProjects().then(() => {
   // openProjectModal's PROJECTS.find(x => x.id === id) needs the same type.
   const projectId = new URLSearchParams(window.location.search).get('projectId');
   if (projectId) openProjectModal(projectId);
+});
+
+
+/* Re-render dynamic content when the UI language changes. */
+window.addEventListener('hitt:langchange', () => {
+  if (typeof setDataSourcePill === 'function') setDataSourcePill();
+  if (typeof renderBoard === 'function') renderBoard();
+  if (typeof updateTabCounts === 'function') updateTabCounts();
+  if (typeof loadKanbanInsights === 'function') loadKanbanInsights();
+  const mo = document.getElementById('modalOverlay');
+  if (mo && !mo.classList.contains('hidden') && activeProjectId != null) {
+    renderNotes();
+  }
 });
