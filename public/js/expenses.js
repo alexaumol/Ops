@@ -7,6 +7,7 @@
  */
 const session = HITT_AUTH.requireSession("../index.html");
 HITT_PERMS.guardModule("expenses", "../welcome.html");
+const T = (k, v) => (window.HITT_I18N ? HITT_I18N.t(k, v) : k);
 document.getElementById("userName").textContent = session.displayName;
 document.getElementById("userAvatar").textContent = HITT_AUTH.initials(session);
 document.getElementById("btnSignOut").addEventListener("click", () => HITT_AUTH.signOut("../index.html"));
@@ -56,7 +57,7 @@ let searchDebounce = null;
 
 function setDataSourcePill() {
   const pill = document.getElementById("dataSourcePill");
-  pill.textContent = "Live · test environment";
+  pill.textContent = T("common.liveData");
   pill.style.background = "rgba(110,143,90,0.18)";
   pill.style.color = "#4C6B3A";
 }
@@ -95,7 +96,7 @@ function renderSidePanel(top, internalTotal) {
 
   const host = document.getElementById("expTopProjects");
   if (!top || !top.length) {
-    host.innerHTML = `<p class="exp-side-empty">No project expenses in this range.</p>`;
+    host.innerHTML = `<p class="exp-side-empty">${T("exp.side.empty")}</p>`;
     return;
   }
   host.innerHTML = top.map((t) => {
@@ -117,8 +118,8 @@ function renderSidePanel(top, internalTotal) {
           <span class="exp-top-seg nonbillable" style="width:${nonPct.toFixed(1)}%"></span>
         </div>
         <div class="exp-top-legend">
-          <span><i class="billable"></i>${money(bill, "EUR")} re-inv.</span>
-          <span><i class="nonbillable"></i>${money(non, "EUR")} not</span>
+          <span><i class="billable"></i>${T("exp.side.reinvShort", { amount: money(bill, "EUR") })}</span>
+          <span><i class="nonbillable"></i>${T("exp.side.notShort", { amount: money(non, "EUR") })}</span>
         </div>
       </a>`;
   }).join("");
@@ -187,7 +188,7 @@ function totalPages() { return Math.max(1, Math.ceil(total / Number(document.get
 async function loadExpenses() {
   const tbody = document.getElementById("expTableBody");
   const empty = document.getElementById("expEmpty");
-  tbody.innerHTML = `<tr><td colspan="9" class="sub-empty" style="padding:1.5rem;">Loading…</td></tr>`;
+  tbody.innerHTML = `<tr><td colspan="9" class="sub-empty" style="padding:1.5rem;">${T("common.loading")}</td></tr>`;
   empty.classList.add("hidden");
   try {
     const data = await HITT_API.getExpenses(filters());
@@ -198,13 +199,13 @@ async function loadExpenses() {
     updateSortIndicators();
     renderSidePanel(data.topProjects, data.internalTotal);
     document.getElementById("expPageInfo").textContent = total
-      ? `Page ${page} of ${totalPages()} · ${total} expense${total === 1 ? "" : "s"}`
+      ? T("exp.pageInfo", { page, pages: totalPages(), total })
       : "";
-    document.getElementById("expSum").textContent = total ? `Filtered total: ${money(data.sum, "EUR")}` : "";
+    document.getElementById("expSum").textContent = total ? T("exp.filteredTotal", { amount: money(data.sum, "EUR") }) : "";
   } catch (err) {
     console.error("[expenses] load failed:", err.message);
     tbody.innerHTML = "";
-    empty.textContent = "Could not load expenses.";
+    empty.textContent = T("exp.loadFail");
     empty.classList.remove("hidden");
     updateScopeCounts(null);
     renderSidePanel(null, null);
@@ -224,7 +225,7 @@ function renderTable() {
 
   if (!ROWS.length) {
     tbody.innerHTML = "";
-    empty.textContent = "No expenses match these filters.";
+    empty.textContent = T("exp.empty");
     empty.classList.remove("hidden");
     syncBulkBar();
     return;
@@ -232,7 +233,7 @@ function renderTable() {
   empty.classList.add("hidden");
   tbody.innerHTML = ROWS.map((r) => {
     const projCell = r.isInternal
-      ? `<span class="exp-internal-tag">Internal</span>`
+      ? `<span class="exp-internal-tag">${T("exp.internalTag")}</span>`
       : (r.projectCode
         ? `<a href="projects.html?projectId=${encodeURIComponent(r.projectId)}" title="${escapeHtml(r.projectName || "")}">${escapeHtml(r.projectCode)}</a>`
         : "—");
@@ -245,8 +246,8 @@ function renderTable() {
         <td>${projCell}</td>
         <td>${escapeHtml(r.paidByName || "—")}</td>
         <td class="exp-amount">${money(r.amount, r.currency)}</td>
-        <td class="exp-doc-col">${r.hasDocument ? `<a href="#" class="exp-doc-link" data-doc title="View evidence">📎</a>` : ""}</td>
-        <td style="text-align:right;"><button class="exp-row-btn" data-edit title="Edit">✎</button></td>
+        <td class="exp-doc-col">${r.hasDocument ? `<a href="#" class="exp-doc-link" data-doc title="${T("exp.tip.viewEvidence")}">📎</a>` : ""}</td>
+        <td style="text-align:right;"><button class="exp-row-btn" data-edit title="${T("exp.tip.edit")}">✎</button></td>
       </tr>`;
   }).join("");
 
@@ -275,7 +276,7 @@ document.getElementById("expCheckAll").addEventListener("change", (e) => {
 function syncBulkBar() {
   const bar = document.getElementById("expBulkBar");
   bar.classList.toggle("hidden", selected.size === 0);
-  document.getElementById("expBulkCount").textContent = `${selected.size} selected`;
+  document.getElementById("expBulkCount").textContent = T("exp.nSelected", { n: selected.size });
 }
 document.getElementById("btnBulkClear").addEventListener("click", () => { selected.clear(); renderTable(); });
 
@@ -290,7 +291,7 @@ async function viewDocument(id) {
     setTimeout(() => URL.revokeObjectURL(url), 60000);
   } catch (err) {
     if (w) w.close();
-    toast(err.message || "Could not open the document.", "red");
+    toast(err.message || T("exp.docOpenFail"), "red");
   }
 }
 
@@ -300,7 +301,7 @@ let editingId = null;
 let editingHasDoc = false;
 
 function projectOptions(selectedId) {
-  return `<option value="">— pick a project —</option>` +
+  return `<option value="">${T("exp.pickProject")}</option>` +
     PROJECTS.map((p) => `<option value="${p.id}" ${String(p.id) === String(selectedId) ? "selected" : ""}>${escapeHtml(p.code)} — ${escapeHtml(p.name)}</option>`).join("");
 }
 function employeeOptions(selectedId) {
@@ -319,12 +320,11 @@ document.getElementById("expInternal").addEventListener("change", syncProjectRow
 function openExpenseModal(row) {
   editingId = row ? row.id : null;
   editingHasDoc = !!row?.hasDocument;
-  document.getElementById("expModalTitle").textContent =
-    (window.HITT_I18N ? HITT_I18N.t(row ? "exp.modal.edit" : "exp.modal.new") : (row ? "Edit expense" : "New expense"));
+  document.getElementById("expModalTitle").textContent = T(row ? "exp.modal.edit" : "exp.modal.new");
   document.getElementById("expDelete").classList.toggle("hidden", !row);
 
   document.getElementById("expDate").value = isoDay(row?.expenseDate) || new Date().toISOString().slice(0, 10);
-  document.getElementById("expCategory").innerHTML = categoryOptions(row?.categoryId, "— none —");
+  document.getElementById("expCategory").innerHTML = categoryOptions(row?.categoryId, T("exp.noneOption"));
   document.getElementById("expDescription").value = row?.description || "";
   document.getElementById("expAmount").value = row?.amount ?? "";
   document.getElementById("expPaidBy").innerHTML = employeeOptions(row?.paidById);
@@ -336,7 +336,7 @@ function openExpenseModal(row) {
   document.getElementById("expDocFile").value = "";
   const cur = document.getElementById("expDocCurrent");
   if (editingHasDoc) {
-    document.getElementById("expDocName").textContent = row.documentName || "Evidence file";
+    document.getElementById("expDocName").textContent = row.documentName || T("exp.evidenceFile");
     cur.classList.remove("hidden");
   } else {
     cur.classList.add("hidden");
@@ -360,19 +360,19 @@ document.addEventListener("keydown", (e) => {
 
 document.getElementById("expDocView").addEventListener("click", () => { if (editingId) viewDocument(editingId); });
 document.getElementById("expDocRemove").addEventListener("click", async () => {
-  if (!editingId || !confirm("Remove the evidence document from this expense?")) return;
+  if (!editingId || !confirm(T("exp.confirm.removeDoc"))) return;
   try {
     await HITT_API.deleteExpenseDocument(editingId);
     editingHasDoc = false;
     document.getElementById("expDocCurrent").classList.add("hidden");
-    toast("Evidence removed.", "navy");
+    toast(T("exp.toast.evidenceRemoved"), "navy");
     loadExpenses();
-  } catch (err) { toast(err.message || "Could not remove the document.", "red"); }
+  } catch (err) { toast(err.message || T("exp.toast.docRemoveFail"), "red"); }
 });
 
 document.getElementById("expSave").addEventListener("click", async () => {
   const amount = document.getElementById("expAmount").value;
-  if (amount === "" || Number.isNaN(Number(amount))) { toast("Enter an amount.", "red"); return; }
+  if (amount === "" || Number.isNaN(Number(amount))) { toast(T("exp.toast.enterAmount"), "red"); return; }
   const internal = document.getElementById("expInternal").checked;
 
   const fields = {
@@ -402,24 +402,24 @@ document.getElementById("expSave").addEventListener("click", async () => {
   try {
     if (editingId) await HITT_API.updateExpense(editingId, payload);
     else await HITT_API.createExpense(payload);
-    toast(editingId ? "Expense saved." : "Expense added.", "green");
+    toast(editingId ? T("exp.toast.saved") : T("exp.toast.added"), "green");
     closeExpenseModal();
     loadExpenses();
   } catch (err) {
-    toast(err.message || "Could not save the expense.", "red");
+    toast(err.message || T("exp.toast.saveFail"), "red");
   } finally {
     btn.disabled = false;
   }
 });
 
 document.getElementById("expDelete").addEventListener("click", async () => {
-  if (!editingId || !confirm("Delete this expense? This cannot be undone.")) return;
+  if (!editingId || !confirm(T("exp.confirm.delete"))) return;
   try {
     await HITT_API.deleteExpense(editingId);
-    toast("Expense deleted.", "navy");
+    toast(T("exp.toast.deleted"), "navy");
     closeExpenseModal();
     loadExpenses();
-  } catch (err) { toast(err.message || "Could not delete the expense.", "red"); }
+  } catch (err) { toast(err.message || T("exp.toast.deleteFail"), "red"); }
 });
 
 /* ============================== BULK ================================= */
@@ -453,25 +453,25 @@ document.getElementById("bulkApply").addEventListener("click", async () => {
     patch.isInternal = internal;
     if (!internal) patch.projectId = document.getElementById("bulkProject").value || null;
   }
-  if (!Object.keys(patch).length) { toast("Nothing to change.", "navy"); return; }
+  if (!Object.keys(patch).length) { toast(T("exp.toast.nothingToChange"), "navy"); return; }
   try {
     const r = await HITT_API.bulkExpenses({ action: "update", ids: [...selected], patch });
-    toast(`Updated ${r.affected} expense${r.affected === 1 ? "" : "s"}.`, "green");
+    toast(T("exp.toast.bulkUpdated", { n: r.affected }), "green");
     closeBulk();
     selected.clear();
     loadExpenses();
-  } catch (err) { toast(err.message || "Bulk update failed.", "red"); }
+  } catch (err) { toast(err.message || T("exp.toast.bulkUpdateFail"), "red"); }
 });
 
 document.getElementById("btnBulkDelete").addEventListener("click", async () => {
   if (!selected.size) return;
-  if (!confirm(`Delete ${selected.size} selected expense${selected.size === 1 ? "" : "s"}? This cannot be undone.`)) return;
+  if (!confirm(T("exp.confirm.bulkDelete", { n: selected.size }))) return;
   try {
     const r = await HITT_API.bulkExpenses({ action: "delete", ids: [...selected] });
-    toast(`Deleted ${r.affected} expense${r.affected === 1 ? "" : "s"}.`, "navy");
+    toast(T("exp.toast.bulkDeleted", { n: r.affected }), "navy");
     selected.clear();
     loadExpenses();
-  } catch (err) { toast(err.message || "Bulk delete failed.", "red"); }
+  } catch (err) { toast(err.message || T("exp.toast.bulkDeleteFail"), "red"); }
 });
 
 /* ============================== INIT =============================== */
@@ -490,7 +490,7 @@ document.getElementById("btnBulkDelete").addEventListener("click", async () => {
   if (cats.status === "fulfilled") {
     CATEGORIES = cats.value || [];
     document.getElementById("expCategoryFilter").innerHTML =
-      `<option value="">Any category</option>` +
+      `<option value="">${T("exp.anyCategory")}</option>` +
       CATEGORIES.map((c) => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join("");
   }
   if (emps.status === "fulfilled") EMPLOYEES = emps.value;
@@ -500,3 +500,10 @@ document.getElementById("btnBulkDelete").addEventListener("click", async () => {
   }
   loadExpenses();
 })();
+
+
+/* Re-render dynamic content when the UI language changes. */
+window.addEventListener("hitt:langchange", () => {
+  if (typeof setDataSourcePill === "function") setDataSourcePill();
+  if (typeof loadExpenses === "function") loadExpenses();
+});
