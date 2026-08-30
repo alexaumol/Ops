@@ -51,6 +51,16 @@ window.HITT_CONFIG = {
     clientId: "841556ac-d3af-47ee-a399-403de65c139c",
     redirectUri: window.location.origin + "/index.html",
     authority: null, // computed at runtime from tenantId (see auth.js)
+
+    // Scope(s) the frontend requests when calling this app's own API. The
+    // API (server/lib/entraToken.js) validates the resulting access token's
+    // signature, issuer, audience, expiry, tenant and scope server-side.
+    //
+    // Leave null to derive ["api://<clientId>/access_as_user"] at runtime —
+    // that scope must exist on the app registration (Expose an API → Add a
+    // scope). Override here only if you named the scope differently or the
+    // API is a separate app registration.
+    apiScopes: null,
   },
 
   // Feature flags for progressive delivery — flip these on as each module

@@ -21,8 +21,33 @@ const HITT_API = (() => {
     }
   };
 
-  async function request(path, options = {}) {
+  // Verified Entra ID access token when MSAL is live; null in stub mode, in
+  // which case we fall back to the X-HITT-User header (the server must be
+  // in AUTH_MODE=header for that to be accepted).
+  async function authHeaders() {
     const session = HITT_AUTH?.getSession?.();
+    let token = null;
+    try {
+      token = await HITT_AUTH?.getApiToken?.();
+    } catch (err) {
+      console.warn("[api] could not get an access token:", err?.message || err);
+    }
+    return token
+      ? { Authorization: `Bearer ${token}` }
+      : { "X-HITT-User": session?.username || "unknown" };
+  }
+
+  // Bounces the tab to the sign-in page after the server rejects our token
+  // (expired mid-session, or the server was reconfigured). Guarded so it
+  // can't loop on the sign-in page itself.
+  function handleUnauthorized() {
+    try { sessionStorage.removeItem("hitt.session"); } catch {}
+    const path = window.location.pathname;
+    if (/(?:^|\/)index\.html$/.test(path) || path.endsWith("/")) return;
+    window.location.href = (path.includes("/pages/") ? "../index.html" : "index.html") + "?expired=1";
+  }
+
+  async function request(path, options = {}) {
     const isForm = typeof FormData !== "undefined" && options.body instanceof FormData;
     const res = await fetch(`${base()}${path}`, {
       ...options,
@@ -30,14 +55,15 @@ const HITT_API = (() => {
         // FormData sets its own multipart Content-Type (with boundary) —
         // don't override it.
         ...(isForm ? {} : { "Content-Type": "application/json" }),
-        // Prototype: identify the caller by their M365 username. Once real
-        // MSAL auth is wired in, replace this with a Bearer ID token and
-        // verify it server-side instead of trusting a plain header.
-        "X-HITT-User": session?.username || "unknown",
+        ...(await authHeaders()),
         "X-HITT-Client": clientPlatform(),
         ...(options.headers || {}),
       },
     });
+    if (res.status === 401) {
+      handleUnauthorized();
+      throw new Error("Your session has expired. Please sign in again.");
+    }
     if (!res.ok) {
       const text = await res.text().catch(() => "");
       // Every route here responds with { error, message } on failure —
@@ -209,13 +235,16 @@ const HITT_API = (() => {
     bulkExpenses: (body) => request("/api/expenses/bulk", { method: "POST", body: JSON.stringify(body) }),
     deleteExpenseDocument: (id) => request(`/api/expenses/${id}/document`, { method: "DELETE" }),
     expenseDocumentUrl: (id) => `${base()}/api/expenses/${id}/document`,
-    // Fetches the evidence file as a blob (keeps the X-HITT-User header —
-    // a plain <a>/window.open can't send it and the route is guarded).
+    // Fetches the evidence file as a blob (carries the auth header — a plain
+    // <a>/window.open can't, and the route is guarded).
     fetchExpenseDocument: async (id) => {
-      const session = HITT_AUTH?.getSession?.();
       const res = await fetch(`${base()}/api/expenses/${id}/document`, {
-        headers: { "X-HITT-User": session?.username || "unknown" },
+        headers: { ...(await authHeaders()) },
       });
+      if (res.status === 401) {
+        handleUnauthorized();
+        throw new Error("Your session has expired. Please sign in again.");
+      }
       if (!res.ok) throw new Error("Could not load the document.");
       return res.blob();
     },

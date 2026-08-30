@@ -7,7 +7,10 @@ independently while the rest keeps working as static placeholder pages.
 
 ## Features
 
-- **Microsoft 365 sign-in** — real Entra ID (Azure AD) sign-in via MSAL.js.
+- **Microsoft 365 sign-in** — real Entra ID (Azure AD) sign-in via MSAL.js,
+  with the access token it issues verified server-side (signature, issuer,
+  audience, expiry, tenant, scope) on every API request. See
+  [Authentication](#authentication).
 - **Project portfolio kanban** — drag-and-drop board across pipeline
   stages, search, project detail modal (deliverables, notes, quotations),
   business-partner and invoicing-partner pickers.
@@ -105,16 +108,55 @@ ID sign-in popup. The exact origin serving the files must also be
 registered as a redirect URI on the Entra app registration (Authentication
 → Single-page application).
 
+## Authentication
+
+The frontend acquires an Entra ID **access token** for this app's own API
+scope and sends it as `Authorization: Bearer …` on every request. The API
+verifies each token's signature (against the tenant's published JWKS),
+issuer, audience, expiry, tenant and delegated scope before trusting the
+caller — see [`server/lib/entraToken.js`](server/lib/entraToken.js). The
+identity then resolves to an `employees` row exactly as before, and the
+existing per-module permission layer applies on top.
+
+**`AUTH_MODE`** (server env, see `server/.env.example`):
+
+| value    | behaviour |
+|----------|-----------|
+| `bearer` | Every request needs a valid verified token. `X-HITT-User` is ignored. Missing/invalid → 401. **Use for real deployments.** Default when `AAD_TENANT_ID` + `AAD_CLIENT_ID` are set. |
+| `hybrid` | A valid token wins; if none is sent, fall back to trusting `X-HITT-User`. A token that *is* sent but invalid still → 401 (no silent downgrade). Rollout only. |
+| `header` | Legacy — trust the `X-HITT-User` header. Not secure. Local / offline / stub-login only. Default when AAD is not configured. |
+
+**One-time Entra setup for `bearer`** (same SPA app registration employees
+sign in with):
+
+1. **Expose an API** → set Application ID URI to `api://<AAD_CLIENT_ID>`.
+2. **Add a scope** → `access_as_user` (admins + users can consent).
+3. **Authorized client applications** → add `<AAD_CLIENT_ID>` itself and
+   check the `access_as_user` scope, so users get no consent prompt.
+
+Then set `AAD_TENANT_ID`, `AAD_CLIENT_ID`, `AUTH_MODE=bearer` in
+`server/.env` and restart. `public/js/config.js` needs no change — it
+derives the scope as `api://<clientId>/access_as_user` (override via
+`MSAL.apiScopes` if you named things differently).
+
+**Cutover / rollback.** Deploy the new frontend and set `AUTH_MODE=hybrid`
+first: existing tabs keep working, new page loads start sending tokens.
+Once the audit log shows everyone on `bearer`-method requests, switch to
+`AUTH_MODE=bearer`. To roll back instantly, set `AUTH_MODE=header` and
+restart — `/api/health` stays open in every mode.
+
+**Offline / `file://` testing** still works: set `FEATURES.msalLoginEnabled`
+to `false` in `config.js` and run the server with `AUTH_MODE=header`.
+
 ## Status
 
 Early-stage prototype. Projects, Business partners, Time allocation,
 Invoicing, and Reports are all wired to a real PostgreSQL test database.
-Microsoft 365 sign-in is real (Entra ID via MSAL.js). A permissions layer
-controls module
+Microsoft 365 sign-in is real (Entra ID via MSAL.js), and the API verifies
+the access token server-side on every request (see
+[Authentication](#authentication)). A permissions layer controls module
 access, admin rights, and time-off approve/reject rights (see Settings,
-admin-only). Not yet built: invoice-PDF emailing, and server-side
-validation of the MSAL ID token (the API currently trusts a plain header,
-not a verified bearer token).
+admin-only). Not yet built: invoice-PDF emailing.
 
 ## License
 

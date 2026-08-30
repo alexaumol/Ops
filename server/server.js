@@ -5,7 +5,9 @@
  *   1. Hold the PostgreSQL credentials (via .env — see .env.example) so
  *      they never reach the static frontend or any employee's machine.
  *   2. Expose a small REST surface the static pages call over HTTPS.
- *   3. (Later) validate Microsoft Entra ID tokens before trusting a caller.
+ *   3. Verify the Microsoft Entra ID access token every request carries
+ *      before trusting the caller's identity (see lib/entraToken.js and
+ *      AUTH_MODE in lib/permissions.js).
  *
  * Run with:  npm install && npm start
  * ---------------------------------------------------------------------------
@@ -42,7 +44,8 @@ const brandingRouter = loadRouter("branding");
 const reportsRouter = loadRouter("reports");
 const auditRouter = loadRouter("audit");
 const expensesRouter = loadRouter("expenses");
-const { attachHittUser } = require("./lib/permissions");
+const { attachHittUser, requireAuth, AUTH_MODE } = require("./lib/permissions");
+const { entraConfigured } = require("./lib/entraToken");
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -77,9 +80,19 @@ app.get("/api/health", (req, res) => {
   res.json({ status: "ok", time: new Date().toISOString() });
 });
 
-// Resolves X-HITT-User into req.hittUser = { raw, employeeId, isAdmin } for
-// every request that follows — see lib/permissions.js for the caveats.
+// Establishes req.hittUser (verified Bearer token, or X-HITT-User in the
+// legacy dev modes) for every request that follows — see lib/permissions.js.
 app.use(attachHittUser);
+
+// Public, pre-auth endpoints — mounted BEFORE requireAuth. The sign-in page
+// (index.html) shows the company logo before anyone has a token; branding's
+// own PUT/DELETE are still admin-gated inside the router.
+app.use("/api/branding", brandingRouter);
+
+// Rejects a bad/expired token, and — in bearer mode — any unauthenticated
+// request, before it reaches a route below. /api/health (above
+// attachHittUser) and /api/branding (above this line) stay open.
+app.use("/api", requireAuth);
 
 app.use("/api/projects", projectsRouter);
 app.use("/api/business-partners", businessPartnersRouter);
@@ -90,7 +103,6 @@ app.use("/api/expenses", expensesRouter);
 app.use("/api/employees", employeesRouter);
 app.use("/api/permissions", permissionsRouter);
 app.use("/api/settings", settingsRouter);
-app.use("/api/branding", brandingRouter);
 app.use("/api/reports", reportsRouter);
 app.use("/api/audit", auditRouter);
 
@@ -101,4 +113,11 @@ app.use("/api", (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`HITT Ops API listening on port ${PORT}`);
+  console.log(`[auth] AUTH_MODE=${AUTH_MODE}  (Entra token validation ${entraConfigured() ? "configured" : "NOT configured — AAD_TENANT_ID / AAD_CLIENT_ID missing"})`);
+  if (AUTH_MODE === "bearer" && !entraConfigured()) {
+    console.error("[auth] AUTH_MODE=bearer but Entra is not configured — every request will 401. Set AAD_* env vars or AUTH_MODE=header.");
+  }
+  if (AUTH_MODE === "header") {
+    console.warn("[auth] AUTH_MODE=header — the API trusts the client-supplied X-HITT-User header. Use only for local/offline development.");
+  }
 });

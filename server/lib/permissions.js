@@ -29,12 +29,21 @@
  * the one case that fails CLOSED rather than open, since it's a known
  * identity being explicitly cut off, not an unrecognized one.
  *
- * IMPORTANT — same caveat as everywhere else auth-related in this app: the
- * caller's identity comes from the client-supplied X-HITT-User header
- * (api.js), not a verified bearer token. This raises the bar over zero
- * enforcement but is NOT cryptographically secure — someone could still
- * forge the header directly against the API. Real security needs the
- * deferred server-side MSAL ID-token validation (see js/auth.js).
+ * IDENTITY — how the caller is identified, controlled by AUTH_MODE (env):
+ *
+ *   bearer  (default when AAD_TENANT_ID + AAD_CLIENT_ID are set)
+ *           Every request must carry a valid, signature-verified Entra ID
+ *           access token as `Authorization: Bearer <jwt>` (see
+ *           lib/entraToken.js). The X-HITT-User header is ignored. A
+ *           missing/invalid token is a 401 (see requireAuth).
+ *   hybrid  A valid Bearer token wins. If none is present, fall back to
+ *           trusting X-HITT-User (a warning is logged). A Bearer token
+ *           that IS present but invalid is still a 401 — no silent
+ *           downgrade. Use during rollout, then switch to bearer.
+ *   header  (default when AAD is not configured) Legacy behaviour: trust
+ *           the client-supplied X-HITT-User header. NOT cryptographically
+ *           secure — anyone who can reach the API can forge it. Dev /
+ *           offline / stub-login / rollback only.
  *
  * MODULE_KEYS: 'projects' | 'business-partners' | 'time-allocation' |
  * 'invoicing' | 'reports'. 'time-allocation' covers both
@@ -43,6 +52,17 @@
  * ---------------------------------------------------------------------------
  */
 const { pool } = require("../config/db");
+const { entraConfigured, verifyEntraToken, identityFromClaims } = require("./entraToken");
+
+const AUTH_MODE = (
+  process.env.AUTH_MODE ||
+  (process.env.AAD_TENANT_ID && process.env.AAD_CLIENT_ID ? "bearer" : "header")
+).toLowerCase();
+
+if (!["bearer", "hybrid", "header"].includes(AUTH_MODE)) {
+  console.error(`[permissions] invalid AUTH_MODE="${AUTH_MODE}" — falling back to "header". Valid: bearer | hybrid | header.`);
+}
+const RESOLVED_AUTH_MODE = ["bearer", "hybrid", "header"].includes(AUTH_MODE) ? AUTH_MODE : "header";
 
 const MODULE_KEYS = ["projects", "business-partners", "time-allocation", "invoicing", "expenses", "reports"];
 
@@ -90,24 +110,76 @@ async function canAccessModule(employeeId, moduleKey) {
   return rows.length === 0;
 }
 
-// Express middleware: resolves req.header('X-HITT-User') once per request
-// into req.hittUser = { raw, employeeId, isAdmin, isDeactivated }. Never
-// rejects by itself — individual routes decide what to do via
-// requireModuleAccess/requireAdmin/requireTimeOffApprover below, all of
-// which deny a deactivated employee regardless of their roles (mirrors
-// Access's chkDeactivateUser: "won't be able to login ... until
-// reactivation").
+// Express middleware: establishes req.hittUser once per request:
+//   { raw, employeeId, isAdmin, isDeactivated, authMethod, authError, claims }
+// where authMethod is 'bearer' | 'header' | 'none' and authError is a
+// string when a Bearer token was supplied but failed verification.
+//
+// This never rejects on its own — requireAuth (mounted globally in
+// server.js) turns authError / a missing token in bearer mode into a 401,
+// and the per-route gates below decide the rest. All the gates deny a
+// deactivated employee regardless of their roles (mirrors Access's
+// chkDeactivateUser: "won't be able to login ... until reactivation").
 async function attachHittUser(req, res, next) {
-  const raw = req.header("X-HITT-User") || null;
+  const rawHeader = req.header("X-HITT-User") || null;
+  const authz = req.header("Authorization") || "";
+  const bearer = authz.startsWith("Bearer ") ? authz.slice(7).trim() : null;
+
+  let identity = null;
+  let authMethod = "none";
+  let authError = null;
+  let claims = null;
+
+  // 1. Try the Bearer token (unless AUTH_MODE forces legacy header-only).
+  if (bearer && RESOLVED_AUTH_MODE !== "header" && entraConfigured()) {
+    try {
+      claims = await verifyEntraToken(bearer);
+      identity = identityFromClaims(claims);
+      authMethod = "bearer";
+    } catch (err) {
+      authError = err.message || "token verification failed";
+      console.warn(`[attachHittUser] Bearer token rejected: ${authError}`);
+    }
+  }
+
+  // 2. Fall back to the X-HITT-User header — but only in header/hybrid mode,
+  //    and only when no Bearer token was offered at all (a present-but-bad
+  //    token must not silently downgrade to a forgeable header).
+  if (!identity && !authError && RESOLVED_AUTH_MODE !== "bearer") {
+    identity = rawHeader;
+    if (identity) authMethod = "header";
+  }
+
   try {
-    const emp = await resolveEmployee(raw);
+    const emp = identity ? await resolveEmployee(identity) : null;
     const employeeId = emp?.id ?? null;
     const isDeactivated = emp?.deactivated ?? false;
     const admin = isDeactivated ? false : await isAdmin(employeeId);
-    req.hittUser = { raw, employeeId, isAdmin: admin, isDeactivated };
+    req.hittUser = { raw: identity, employeeId, isAdmin: admin, isDeactivated, authMethod, authError, claims };
   } catch (err) {
     console.error("[attachHittUser] DB error:", err.message);
-    req.hittUser = { raw, employeeId: null, isAdmin: false, isDeactivated: false };
+    req.hittUser = { raw: identity, employeeId: null, isAdmin: false, isDeactivated: false, authMethod, authError, claims };
+  }
+  next();
+}
+
+// Global gate (server.js mounts it right after attachHittUser): rejects a
+// request whose Bearer token failed verification, and — in bearer mode —
+// any request that isn't carrying a verified token at all. Everything
+// downstream can then assume identity is either trustworthy or absent by
+// choice (header/hybrid dev modes), never forged past a broken token.
+function requireAuth(req, res, next) {
+  if (req.hittUser?.authError) {
+    return res.status(401).json({
+      error: "invalid_token",
+      message: "Your session token is invalid or has expired. Please sign in again.",
+    });
+  }
+  if (RESOLVED_AUTH_MODE === "bearer" && req.hittUser?.authMethod !== "bearer") {
+    return res.status(401).json({
+      error: "auth_required",
+      message: "Authentication required. Please sign in again.",
+    });
   }
   next();
 }
@@ -160,11 +232,13 @@ function requireTimeOffApprover() {
 
 module.exports = {
   MODULE_KEYS,
+  AUTH_MODE: RESOLVED_AUTH_MODE,
   resolveEmployee,
   isAdmin,
   isTimeOffApprover,
   canAccessModule,
   attachHittUser,
+  requireAuth,
   requireModuleAccess,
   requireAdmin,
   requireTimeOffApprover,

@@ -179,6 +179,13 @@
       Your HITT Ops account has been deactivated. Contact an admin if you think this is a mistake.
     </p>
 
+    <!-- Shown when a page bounced back here with ?expired=1 — the API
+         rejected the session token (expired mid-session, or the server's
+         auth config changed). See js/api.js handleUnauthorized(). -->
+    <p id="expiredNotice" class="field-hint hidden" style="margin:-0.5rem 0 1.25rem;">
+      Your session has expired. Please sign in again.
+    </p>
+
     <!-- Real sign-in: Entra ID via MSAL.js. Shown when FEATURES.msalLoginEnabled. -->
     <section id="stepMsal" class="login-step">
       <h1 class="login-heading">Sign in</h1>
@@ -252,8 +259,13 @@
   <script>
     document.getElementById("year").textContent = new Date().getFullYear();
 
-    if (new URLSearchParams(window.location.search).get("deactivated") === "1") {
+    const _q = new URLSearchParams(window.location.search);
+    if (_q.get("deactivated") === "1") {
       document.getElementById("deactivatedNotice").classList.remove("hidden");
+      history.replaceState(null, "", window.location.pathname);
+    }
+    if (_q.get("expired") === "1") {
+      document.getElementById("expiredNotice").classList.remove("hidden");
       history.replaceState(null, "", window.location.pathname);
     }
 

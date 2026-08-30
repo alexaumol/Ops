@@ -3,23 +3,28 @@
  * ---------------------------------------------------------------------------
  * Real Microsoft Entra ID (Azure AD) sign-in via MSAL.js, vendored locally
  * at vendor/msal-browser.min.js (no CDN — see README on why: this app needs
- * to work from a locked-down corporate network / shared folder). Only
- * index.html loads that library and calls signInWithMicrosoft() — every
- * other page just reads the session this writes to sessionStorage, exactly
- * like the old stub did, so nothing else in the app needed to change.
+ * to work from a locked-down corporate network / shared folder). The
+ * library is now loaded on EVERY page, not just index.html, because
+ * getApiToken() below needs MSAL on each page to silently renew the access
+ * token that js/api.js sends to the backend.
  *
- * IMPORTANT — file:// deployment stops working once real MSAL is live.
+ *   index.html          calls signInWithMicrosoft() / completeMsalRedirect()
+ *   every other page     calls getApiToken() (via js/api.js) — reads the
+ *                        MSAL account from the shared sessionStorage cache
+ *                        and calls acquireTokenSilent()
+ *
+ * getApiToken() returns an Entra ID ACCESS TOKEN for this app's own API
+ * scope (config.js MSAL.apiScopes — default api://<clientId>/access_as_user).
+ * The backend verifies it on every request (server/lib/entraToken.js);
+ * the plain X-HITT-User header is only a fallback for the stub / legacy
+ * "header" auth modes.
+ *
+ * IMPORTANT — file:// deployment does not work once real MSAL is live.
  * Microsoft Entra only accepts http/https redirect URIs for SPA app
- * registrations, so loginRedirect() cannot complete when this is opened as
- * a local file. Serve public/ over http(s) (a shared-folder web server, the
- * VPS, or the local dev preview) for sign-in to work. fakeSignIn() is kept
- * below and still used automatically when FEATURES.msalLoginEnabled is
- * false, so file:// / offline testing still has a path — see index.html.
- *
- * The ID token MSAL returns is NOT currently sent to or checked by the
- * backend — server/routes still trust the plain X-HITT-User header (see
- * js/api.js). Validating a real bearer token server-side is a separate
- * follow-up, deliberately not bundled into "wire up sign-in".
+ * registrations. Serve public/ over http(s) (a shared-folder web server,
+ * the VPS, or the local dev preview). fakeSignIn() is still used
+ * automatically when FEATURES.msalLoginEnabled is false, so file:// /
+ * offline testing has a path — pair it with AUTH_MODE=header server-side.
  * ---------------------------------------------------------------------------
  */
 
@@ -47,7 +52,7 @@ const HITT_AUTH = (() => {
 
   async function ensureMsal() {
     if (typeof msal === "undefined") {
-      throw new Error("MSAL library not loaded on this page (vendor/msal-browser.min.js) — signInWithMicrosoft() can only be called from index.html.");
+      throw new Error("MSAL library not loaded on this page — every page must include vendor/msal-browser.min.js before js/auth.js.");
     }
     if (!msalInstance) {
       msalInstance = new msal.PublicClientApplication(msalConfig());
@@ -55,6 +60,67 @@ const HITT_AUTH = (() => {
     }
     await msalReady;
     return msalInstance;
+  }
+
+  // Scope(s) requested for calling this app's own backend API. Defaults to
+  // the custom scope exposed on this same app registration.
+  function apiScopes() {
+    const cfg = window.HITT_CONFIG?.MSAL || {};
+    if (Array.isArray(cfg.apiScopes) && cfg.apiScopes.length) return cfg.apiScopes;
+    return [`api://${cfg.clientId}/access_as_user`];
+  }
+
+  // Sends the tab back to the sign-in page (relative path depends on
+  // whether we're in /pages/ or at the site root). No-op if we're already
+  // on the sign-in page, so this can't loop.
+  function redirectToSignIn(reason) {
+    const path = window.location.pathname;
+    if (/(?:^|\/)index\.html$/.test(path) || path.endsWith("/")) return;
+    const to = path.includes("/pages/") ? "../index.html" : "index.html";
+    window.location.href = to + (reason ? `?${reason}=1` : "");
+  }
+
+  // Returns a fresh Entra ID access token for the API, or null when the app
+  // is in stub mode (no MSAL). On an expired MSAL session it redirects to
+  // sign-in and returns null (the caller's request is abandoned — the page
+  // is navigating away anyway).
+  //
+  // acquireTokenSilent() serves the token straight from the MSAL cache when
+  // it's still valid, and uses the refresh token (auth-code + PKCE, stored
+  // in sessionStorage) to renew it silently when it isn't — no iframe, no
+  // third-party-cookie dependency.
+  async function getApiToken() {
+    if (!window.HITT_CONFIG?.FEATURES?.msalLoginEnabled) return null; // stub mode
+
+    let instance;
+    try {
+      instance = await ensureMsal();
+    } catch (err) {
+      console.error("[auth] MSAL unavailable on this page:", err.message);
+      return null;
+    }
+
+    const session = getSession();
+    const accounts = instance.getAllAccounts() || [];
+    const account =
+      (session?.homeAccountId && accounts.find((a) => a.homeAccountId === session.homeAccountId)) ||
+      (session?.username && accounts.find((a) => a.username?.toLowerCase() === session.username.toLowerCase())) ||
+      accounts[0] ||
+      null;
+
+    if (!account) {
+      redirectToSignIn("expired");
+      return null;
+    }
+
+    try {
+      const result = await instance.acquireTokenSilent({ scopes: apiScopes(), account });
+      return result.accessToken || null;
+    } catch (err) {
+      console.warn("[auth] silent token acquisition failed:", err?.errorCode || err?.message || err);
+      redirectToSignIn("expired");
+      return null;
+    }
   }
 
   // Real sign-in: navigates this whole tab to Microsoft's hosted login,
@@ -76,7 +142,10 @@ const HITT_AUTH = (() => {
   // loginRedirect() sidesteps the whole popup/opener relationship.
   async function signInWithMicrosoft() {
     const instance = await ensureMsal();
-    await instance.loginRedirect({ scopes: ["openid", "profile", "email"] });
+    // Include the API scope in the sign-in request so the user consents to
+    // it once, here — otherwise the first acquireTokenSilent() on a module
+    // page would throw consent_required and bounce them straight back.
+    await instance.loginRedirect({ scopes: ["openid", "profile", "email", ...apiScopes()] });
   }
 
   // Call once, early, on every page load that has the MSAL library loaded
@@ -94,11 +163,14 @@ const HITT_AUTH = (() => {
     const session = {
       username: account.username, // the signed-in UPN, typically their email
       displayName: account.name || deriveDisplayName(account.username),
+      // Lets every other page pick this exact identity out of the shared
+      // MSAL sessionStorage cache when renewing the API token.
+      homeAccountId: account.homeAccountId,
       signedInAt: new Date().toISOString(),
       mode: "msal",
     };
     sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
-    auditSessionEvent("login");
+    await auditSessionEvent("login");
     return session;
   }
 
@@ -122,20 +194,32 @@ const HITT_AUTH = (() => {
     return local.replace(/\b\w/g, (c) => c.toUpperCase());
   }
 
-  // Fire-and-forget audit ping for sign in / sign out. Best-effort: never
-  // blocks or fails the auth flow. A browser can't read the OS hostname, so
-  // `platform` is the closest a web page can report ("computer name" in the
-  // audit UI). `keepalive` lets the logout ping survive the page unload.
-  function auditSessionEvent(type, keepalive) {
+  // Best-effort audit ping for sign in / sign out — never blocks or fails
+  // the auth flow. Sends the verified Bearer token when one is available
+  // (so the entry is attributable in bearer mode), falling back to the
+  // X-HITT-User header for stub / legacy modes. A browser can't read the OS
+  // hostname, so `platform` is the closest a web page can report ("computer
+  // name" in the audit UI). `keepalive` lets the logout ping survive the
+  // page unload.
+  async function auditSessionEvent(type, keepalive) {
     try {
       const base = (window.HITT_CONFIG?.API_BASE_URL || "").replace(/\/$/, "");
       const session = getSession();
+      let authHeader;
+      try {
+        const token = await getApiToken();
+        authHeader = token
+          ? { Authorization: `Bearer ${token}` }
+          : { "X-HITT-User": session?.username || "unknown" };
+      } catch {
+        authHeader = { "X-HITT-User": session?.username || "unknown" };
+      }
       fetch(`${base}/api/audit/session-event`, {
         method: "POST",
         keepalive: !!keepalive,
         headers: {
           "Content-Type": "application/json",
-          "X-HITT-User": session?.username || "unknown",
+          ...authHeader,
         },
         body: JSON.stringify({
           type,
@@ -168,8 +252,10 @@ const HITT_AUTH = (() => {
   // full logoutPopup/logoutRedirect — that would end the user's whole
   // Microsoft 365 session (Outlook, Teams, ...) across the browser, which
   // would be a surprising side effect for an internal line-of-business app.
-  function signOut(redirectTo = "index.html") {
-    auditSessionEvent("logout", true); // keepalive — must outlive the redirect
+  async function signOut(redirectTo = "index.html") {
+    // Await so the token is attached before we tear the session down;
+    // keepalive lets the request itself outlive the navigation below.
+    try { await auditSessionEvent("logout", true); } catch { /* ignore */ }
     sessionStorage.removeItem(SESSION_KEY);
     window.location.href = redirectTo;
   }
@@ -180,5 +266,5 @@ const HITT_AUTH = (() => {
     return parts.slice(0, 2).map((p) => p[0]?.toUpperCase() ?? "").join("");
   }
 
-  return { signInWithMicrosoft, completeMsalRedirect, fakeSignIn, getSession, requireSession, signOut, initials };
+  return { signInWithMicrosoft, completeMsalRedirect, fakeSignIn, getApiToken, getSession, requireSession, signOut, initials };
 })();
