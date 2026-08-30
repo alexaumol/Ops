@@ -162,6 +162,7 @@ function sortValue(row, col){
   if (col === 'bucket') return BUCKET_ORDER.indexOf(computeBucket(row));
   if (col === 'code') return String(row.code);
   if (col === 'entityLabel') return String(row.entityLabel || '');
+  if (col === 'bpName') return String(row.bpName || '');
   if (col === 'projectStatusLabel') return String(row.projectStatusLabel || '');
   return Number(row[col]) || 0;
 }
@@ -185,7 +186,8 @@ function matchesFilters(row){
   if (currentBucket !== 'all' && computeBucket(row) !== currentBucket) return false;
   if (searchTerm) {
     const t = searchTerm.toLowerCase();
-    if (!String(row.code).toLowerCase().includes(t) && !String(row.name).toLowerCase().includes(t)) return false;
+    const hay = `${row.code} ${row.name} ${row.bpName || ''}`.toLowerCase();
+    if (!hay.includes(t)) return false;
   }
   return true;
 }
@@ -250,6 +252,7 @@ function renderTable(){
         <td class="inv-proceed-col">${p.proceedtoinvoice ? `<span class="inv-proceed-icon" title="Proceed to invoice">✔</span>` : ''}</td>
         <td><span style="font-weight:600;">${escapeHtml(p.code)}</span> — ${escapeHtml(p.name)}</td>
         <td>${escapeHtml(p.entityLabel || '—')}</td>
+        <td>${p.bpName ? escapeHtml(p.bpName) : '—'}</td>
         <td>${statusChipHtml(p.projectStatusLabel)}</td>
         <td style="text-align:right;">${formatMoney(p.budget)}</td>
         <td style="text-align:right;" class="${invoicedAlert ? 'inv-invoiced-alert' : ''}">
@@ -260,6 +263,9 @@ function renderTable(){
         <td class="inv-actions-col">
           <div class="inv-row-actions">
             <a class="inv-row-btn" href="projects.html?projectId=${encodeURIComponent(p.id)}" data-row-action title="Open project page" aria-label="Open project page">↗</a>
+            ${p.bpId
+              ? `<a class="inv-row-btn" href="business-partners.html?open=${encodeURIComponent(p.bpId)}" data-row-action title="Open business partner page" aria-label="Open business partner page">🤝</a>`
+              : `<span class="inv-row-btn" data-row-action aria-disabled="true" title="No business partner assigned" style="opacity:0.3; cursor:default;">🤝</span>`}
             <button type="button" class="inv-row-btn inv-row-btn--danger" data-close-project data-row-action
               title="${alreadyClosed ? 'Project is already closed' : 'Close project (set status to Closed)'}"
               aria-label="Close project" ${alreadyClosed ? 'disabled' : ''}>⊘</button>

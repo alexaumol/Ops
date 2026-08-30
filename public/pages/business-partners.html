@@ -45,6 +45,7 @@
             <th data-sort="countryLabel">Country<span class="sort-arrow"></span></th>
             <th data-sort="webpage">Website<span class="sort-arrow"></span></th>
             <th data-sort="projectsTotal" title="Alive / Dead (Total)">Projects<span class="sort-arrow"></span></th>
+            <th data-sort="taxCompanyCount" title="Number of tax companies">Tax companies<span class="sort-arrow"></span></th>
           </tr>
         </thead>
         <tbody id="bpTableBody"></tbody>
@@ -309,6 +310,28 @@
             </tr>
           </thead>
           <tbody id="bpProjectsList"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================ BP TAX COMPANIES DRILL-DOWN ============================ -->
+  <div id="bpTaxCompaniesOverlay" class="modal-overlay hidden">
+    <div class="modal-panel modal-panel--sm">
+      <div class="modal-head">
+        <h2 id="bpTaxCompaniesTitle" style="flex:1; font-size:1rem; font-weight:700; color:#fff; margin:0;">Tax companies</h2>
+        <button id="bpTaxCompaniesClose" class="modal-head-btn modal-head-btn--close" title="Close">✕</button>
+      </div>
+      <div class="modal-body">
+        <table class="mini-table">
+          <thead>
+            <tr>
+              <th>Tax company</th>
+              <th>VAT number</th>
+              <th>Invoicing email</th>
+            </tr>
+          </thead>
+          <tbody id="bpTaxCompaniesList"></tbody>
         </table>
       </div>
     </div>

@@ -270,3 +270,13 @@
   font-size: 0.78rem; font-weight: 700; cursor: pointer;
 }
 .btn-icon-add:hover { background: var(--brand-hover); }
+
+/* Tax-companies count cell on the BP list */
+.bp-count-btn {
+  background: rgba(92,117,124,0.14); color: var(--hitt-teal);
+  border: 1px solid var(--border-subtle); border-radius: 999px;
+  min-width: 1.9rem; padding: 0.1rem 0.55rem;
+  font-size: 0.8rem; font-weight: 800; cursor: pointer; font-variant-numeric: tabular-nums;
+}
+.bp-count-btn:hover { background: var(--hitt-teal); color: #fff; border-color: var(--hitt-teal); }
+.bp-count-zero { color: var(--text-secondary); font-variant-numeric: tabular-nums; }

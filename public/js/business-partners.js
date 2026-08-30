@@ -23,8 +23,8 @@ let currentEmployeeId = null;
 HITT_PERMS.get().then((perms) => { currentEmployeeId = perms.employeeId; }).catch(() => {});
 
 const DEMO_SEED = [
-  { id: 1, name: "Demo Pharma Inc", companyTypeLabel: "Pharmaceutical", countryLabel: "United States", webpage: "https://example.com", projectsAlive: 2, projectsDead: 1, projectsTotal: 3 },
-  { id: 2, name: "Demo Biotech Spain", companyTypeLabel: "Start Up", countryLabel: "Spain", webpage: "", projectsAlive: 0, projectsDead: 0, projectsTotal: 0 },
+  { id: 1, name: "Demo Pharma Inc", companyTypeLabel: "Pharmaceutical", countryLabel: "United States", webpage: "https://example.com", projectsAlive: 2, projectsDead: 1, projectsTotal: 3, taxCompanyCount: 2 },
+  { id: 2, name: "Demo Biotech Spain", companyTypeLabel: "Start Up", countryLabel: "Spain", webpage: "", projectsAlive: 0, projectsDead: 0, projectsTotal: 0, taxCompanyCount: 0 },
 ];
 
 let PARTNERS = [];
@@ -89,6 +89,7 @@ async function loadPartners(){
       projectsAlive: Number(p.projectsAlive ?? 0),
       projectsDead: Number(p.projectsDead ?? 0),
       projectsTotal: Number(p.projectsTotal ?? 0),
+      taxCompanyCount: Number(p.taxCompanyCount ?? 0),
     }));
     usingDemoData = false;
   } catch (err) {
@@ -148,6 +149,11 @@ function renderTable(){
         <span title="Alive / Dead (Total)">${p.projectsAlive ?? 0} / ${p.projectsDead ?? 0} (${p.projectsTotal ?? 0})</span>
         ${p.projectsTotal ? `<button data-bp-projects="${p.id}" class="btn-icon-add" style="margin-left:0.4rem; padding:0.1rem 0.5rem; font-size:0.72rem;" title="View projects">⋯</button>` : ''}
       </td>
+      <td>
+        ${p.taxCompanyCount
+          ? `<button data-bp-taxcos="${p.id}" class="bp-count-btn" title="View tax companies">${p.taxCompanyCount}</button>`
+          : `<span class="bp-count-zero">0</span>`}
+      </td>
     </tr>
   `).join('');
 
@@ -158,6 +164,12 @@ function renderTable(){
     btn.addEventListener('click', (e) => {
       e.stopPropagation(); // don't also trigger the row's own openDetailModal
       openBpProjectsModal(btn.dataset.bpProjects);
+    });
+  });
+  tbody.querySelectorAll('[data-bp-taxcos]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openBpTaxCompaniesModal(btn.dataset.bpTaxcos);
     });
   });
 }
@@ -1087,6 +1099,42 @@ document.getElementById('bpProjectsClose').addEventListener('click', closeBpProj
 bpProjectsOverlay.addEventListener('click', (e) => { if (e.target === bpProjectsOverlay) closeBpProjectsModal(); });
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && !bpProjectsOverlay.classList.contains('hidden')) closeBpProjectsModal();
+});
+
+/* ============================== BP TAX COMPANIES DRILL-DOWN ============= */
+const bpTaxCompaniesOverlay = document.getElementById('bpTaxCompaniesOverlay');
+
+async function openBpTaxCompaniesModal(bpId){
+  const bp = PARTNERS.find(p => p.id === bpId);
+  document.getElementById('bpTaxCompaniesTitle').textContent = bp ? `Tax companies — ${bp.name}` : 'Tax companies';
+  document.getElementById('bpTaxCompaniesList').innerHTML = `<tr><td colspan="3" class="sub-empty">Loading…</td></tr>`;
+  bpTaxCompaniesOverlay.classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+  try {
+    const rows = await HITT_API.getBusinessPartnerTaxCompanies(bpId);
+    document.getElementById('bpTaxCompaniesList').innerHTML = rows.length
+      ? rows.map(tc => `
+        <tr>
+          <td>${escapeHtml(tc.taxcompanyname || '(unnamed)')}</td>
+          <td>${escapeHtml(tc.vatnumber || '—')}</td>
+          <td>${escapeHtml(tc.emailinvoicing || '—')}</td>
+        </tr>`).join('')
+      : `<tr><td colspan="3" class="sub-empty">No tax companies</td></tr>`;
+  } catch (err) {
+    console.error(err);
+    document.getElementById('bpTaxCompaniesList').innerHTML = `<tr><td colspan="3" class="sub-empty">Could not load tax companies</td></tr>`;
+  }
+}
+
+function closeBpTaxCompaniesModal(){
+  bpTaxCompaniesOverlay.classList.add('hidden');
+  document.body.style.overflow = '';
+}
+
+document.getElementById('bpTaxCompaniesClose').addEventListener('click', closeBpTaxCompaniesModal);
+bpTaxCompaniesOverlay.addEventListener('click', (e) => { if (e.target === bpTaxCompaniesOverlay) closeBpTaxCompaniesModal(); });
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !bpTaxCompaniesOverlay.classList.contains('hidden')) closeBpTaxCompaniesModal();
 });
 
 /* ============================== INIT ==================================== */

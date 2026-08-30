@@ -77,12 +77,16 @@ router.get("/", requireModuleAccess("business-partners"), async (req, res) => {
               c.countrydesc AS "countryLabel",
               COALESCE(proj.alive, 0) AS "projectsAlive",
               COALESCE(proj.dead, 0) AS "projectsDead",
-              COALESCE(proj.total, 0) AS "projectsTotal"
+              COALESCE(proj.total, 0) AS "projectsTotal",
+              COALESCE(tc.n, 0)::int AS "taxCompanyCount"
        FROM businesspartners bp
        LEFT JOIN entity ent ON ent.id = bp.entityid::bigint
        LEFT JOIN companytypes ct ON ct.id = bp.companytypeid
        LEFT JOIN addresses a ON a.businesspartnerid = bp.id
        LEFT JOIN countries c ON c.id = a.countryid::bigint
+       LEFT JOIN LATERAL (
+         SELECT COUNT(*) AS n FROM taxcompanies WHERE businesspartnerid::bigint = bp.id
+       ) tc ON true
        LEFT JOIN LATERAL (
          SELECT
            COUNT(*) FILTER (WHERE ps.projectstatusdesc NOT IN ('Closed', 'Cancelled')) AS alive,

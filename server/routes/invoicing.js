@@ -175,6 +175,7 @@ router.get("/projects", requireModuleAccess("invoicing"), async (req, res) => {
     const { rows } = await pool.query(`
       SELECT p.id, p.projectnumber AS code, p.projectname AS name,
              ent.entitydesc AS "entityLabel", ps.projectstatusdesc AS "projectStatusLabel",
+             p.busspartnerid AS "bpId", bp.bpname AS "bpName",
              q.finalquotation AS budget,
              r.proceedtoinvoice, r.scheduletypeid, r.numberofinvoices,
              r.firstdate, r.lastdate, r.invpaymethodid,
@@ -183,6 +184,7 @@ router.get("/projects", requireModuleAccess("invoicing"), async (req, res) => {
       FROM projects p
       LEFT JOIN entity ent ON ent.id = p.entityid::bigint
       LEFT JOIN projectstatus ps ON ps.id = p.projectstatusid::bigint
+      LEFT JOIN businesspartners bp ON bp.id = p.busspartnerid::bigint
       LEFT JOIN LATERAL (
         SELECT finalquotation FROM projectquotations
         WHERE projectid = p.id ORDER BY quotationdate DESC NULLS LAST, id DESC LIMIT 1
@@ -191,7 +193,7 @@ router.get("/projects", requireModuleAccess("invoicing"), async (req, res) => {
       LEFT JOIN invoices i ON i.projectid = p.id::double precision
       LEFT JOIN invoicesdetails d ON d.invoiceid = i.id
       WHERE p.notinvoiceable IS NOT TRUE
-      GROUP BY p.id, ent.entitydesc, ps.projectstatusdesc, q.finalquotation,
+      GROUP BY p.id, ent.entitydesc, ps.projectstatusdesc, bp.bpname, q.finalquotation,
                r.proceedtoinvoice, r.scheduletypeid, r.numberofinvoices,
                r.firstdate, r.lastdate, r.invpaymethodid
       ORDER BY p.projectnumber DESC

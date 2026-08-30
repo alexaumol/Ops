@@ -152,7 +152,7 @@
   overflow-x: auto;
   box-shadow: var(--shadow-sm);
 }
-.inv-table { width: 100%; border-collapse: collapse; font-size: 0.86rem; min-width: 62rem; }
+.inv-table { width: 100%; border-collapse: collapse; font-size: 0.86rem; min-width: 72rem; }
 .inv-table thead th {
   text-align: left; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.03em;
   color: var(--text-secondary); background: var(--bg-surface-alt);
