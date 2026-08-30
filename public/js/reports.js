@@ -22,6 +22,7 @@ document.getElementById("userName").textContent = session.displayName;
 document.getElementById("userAvatar").textContent = HITT_AUTH.initials(session);
 document.getElementById("btnSignOut").addEventListener("click", () => HITT_AUTH.signOut("../index.html"));
 HITT_PERMS.guardModule("reports", "../welcome.html");
+const T = (k, v) => (window.HITT_I18N ? HITT_I18N.t(k, v) : k);
 HITT_PERMS.applyRealName();
 
 function escapeHtml(s) {
@@ -116,7 +117,7 @@ let lastHoursRows = [];
 async function loadHours() {
   const tbody = document.getElementById("hoursTableBody");
   const empty = document.getElementById("hoursEmpty");
-  tbody.innerHTML = `<tr><td colspan="8" class="sub-empty">Loading…</td></tr>`;
+  tbody.innerHTML = `<tr><td colspan="8" class="sub-empty">${T('common.loading')}</td></tr>`;
   empty.classList.add("hidden");
   try {
     const rows = await HITT_API.getHoursPerProject(hoursStartInput.value || null, hoursEndInput.value || null);
@@ -128,7 +129,7 @@ async function loadHours() {
       return;
     }
     tbody.innerHTML = rows.map((r) => `
-      <tr data-project-id="${r.projectId}" data-project-name="${escapeHtml(r.name)}" title="Click for a per-employee breakdown">
+      <tr data-project-id="${r.projectId}" data-project-name="${escapeHtml(r.name)}" title="${T('rpt.tip.drillRow')}">
         <td>
           <div><a href="projects.html?projectId=${encodeURIComponent(r.projectId)}">${escapeHtml(r.name)}</a></div>
           <div class="rpt-proj-code">${escapeHtml(r.code)}</div>
@@ -143,14 +144,14 @@ async function loadHours() {
       </tr>
     `).join("");
     const total = rows.reduce((sum, r) => sum + Number(r.totalHours), 0);
-    document.getElementById("hoursTotal").textContent = `${total.toLocaleString()} hours total across ${rows.length} projects`;
+    document.getElementById("hoursTotal").textContent = T('rpt.hours.total', { hours: total.toLocaleString(), projects: rows.length });
   } catch (err) {
     console.error("[reports] failed to load hours-per-project:", err.message);
     lastHoursRows = [];
     tbody.innerHTML = "";
-    empty.textContent = "Could not load this report.";
+    empty.textContent = T('rpt.err.report');
     empty.classList.remove("hidden");
-    toast("Could not load the hours-per-project report.", "red");
+    toast(T('rpt.toast.hoursFail'), "red");
   }
 }
 
@@ -163,13 +164,13 @@ document.getElementById("btnHoursAllTime").addEventListener("click", () => {
   loadHours();
 });
 document.getElementById("btnHoursExport").addEventListener("click", () => {
-  if (!lastHoursRows.length) { toast("Nothing to export.", "navy"); return; }
+  if (!lastHoursRows.length) { toast(T('rpt.nothingToExport'), "navy"); return; }
   const range = hoursStartInput.value || hoursEndInput.value
     ? `${hoursStartInput.value || "start"}_to_${hoursEndInput.value || "end"}`
     : "all-time";
   downloadCsv(
     `hours-per-project_${range}.csv`,
-    ["Project code", "Project name", "Project owner", "Entity", "Status", "Total hours", "PO hours", "RES hours", "Resources"],
+    [T('rpt.csv.projectCode'), T('rpt.csv.projectName'), T('rpt.csv.projectOwner'), T('rpt.csv.entity'), T('rpt.csv.status'), T('rpt.csv.totalHours'), T('rpt.csv.poHours'), T('rpt.csv.resHours'), T('rpt.csv.resources')],
     lastHoursRows.map((r) => [r.code, r.name, r.ownerName || "", r.entityLabel || "", r.statusLabel || "", r.totalHours, r.poHours, r.resHours, r.employeeCount])
   );
 });
@@ -189,7 +190,7 @@ let lastDrillProjectName = "";
 async function openDrillDown(projectId, projectName) {
   lastDrillProjectName = projectName;
   document.getElementById("drillTitle").textContent = projectName;
-  document.getElementById("drillTableBody").innerHTML = `<tr><td colspan="4" class="sub-empty">Loading…</td></tr>`;
+  document.getElementById("drillTableBody").innerHTML = `<tr><td colspan="4" class="sub-empty">${T('common.loading')}</td></tr>`;
   document.getElementById("drillEmpty").classList.add("hidden");
   drillOverlay.classList.remove("hidden");
   try {
@@ -213,7 +214,7 @@ async function openDrillDown(projectId, projectName) {
     console.error("[reports] failed to load project drill-down:", err.message);
     lastDrillRows = [];
     document.getElementById("drillTableBody").innerHTML = "";
-    document.getElementById("drillEmpty").textContent = "Could not load this breakdown.";
+    document.getElementById("drillEmpty").textContent = T('rpt.err.breakdown');
     document.getElementById("drillEmpty").classList.remove("hidden");
   }
 }
@@ -225,10 +226,10 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && !drillOverlay.classList.contains("hidden")) closeDrillDown();
 });
 document.getElementById("drillExport").addEventListener("click", () => {
-  if (!lastDrillRows.length) { toast("Nothing to export.", "navy"); return; }
+  if (!lastDrillRows.length) { toast(T('rpt.nothingToExport'), "navy"); return; }
   downloadCsv(
     `hours_${lastDrillProjectName.replace(/[^\w-]+/g, "_")}.csv`,
-    ["Employee", "Total hours", "PO hours", "RES hours"],
+    [T('rpt.csv.employee'), T('rpt.csv.totalHours'), T('rpt.csv.poHours'), T('rpt.csv.resHours')],
     lastDrillRows.map((r) => [r.employeeName, r.totalHours, r.poHours, r.resHours])
   );
 });
@@ -237,7 +238,7 @@ document.getElementById("drillExport").addEventListener("click", () => {
 let calendarMonth = startOfDay(new Date());
 calendarMonth.setDate(1);
 
-const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const WEEKDAY_LABELS = () => T('common.weekdaysShort').split('|');
 
 function computeGridRange(monthStart) {
   const year = monthStart.getFullYear();
@@ -260,9 +261,9 @@ async function loadLeavesMonth() {
 
   const { gridStart, gridEnd } = computeGridRange(calendarMonth);
   const cal = document.getElementById("leavesCalendar");
-  cal.innerHTML = `<div class="rpt-cal-weekdays">${WEEKDAY_LABELS.map((d) => `<div>${d}</div>`).join("")}</div><div class="sub-empty" style="padding:2rem; text-align:center; color:var(--text-secondary);">Loading…</div>`;
+  cal.innerHTML = `<div class="rpt-cal-weekdays">${WEEKDAY_LABELS().map((d) => `<div>${d}</div>`).join("")}</div><div class="sub-empty" style="padding:2rem; text-align:center; color:var(--text-secondary);">${T('common.loading')}</div>`;
 
-  document.getElementById("leavesMonthList").innerHTML = `<div class="rpt-leaves-empty">Loading…</div>`;
+  document.getElementById("leavesMonthList").innerHTML = `<div class="rpt-leaves-empty">${T('common.loading')}</div>`;
 
   let data;
   try {
@@ -271,9 +272,9 @@ async function loadLeavesMonth() {
   } catch (err) {
     console.error("[reports] failed to load resource-leaves:", err.message);
     lastLeavesData = null;
-    toast("Could not load the resource leaves calendar.", "red");
-    cal.innerHTML = `<div class="rpt-cal-weekdays">${WEEKDAY_LABELS.map((d) => `<div>${d}</div>`).join("")}</div><div style="padding:2rem; text-align:center; color:var(--text-secondary);">Could not load this report.</div>`;
-    document.getElementById("leavesMonthList").innerHTML = `<div class="rpt-leaves-empty">Could not load.</div>`;
+    toast(T('rpt.toast.leavesFail'), "red");
+    cal.innerHTML = `<div class="rpt-cal-weekdays">${WEEKDAY_LABELS().map((d) => `<div>${d}</div>`).join("")}</div><div style="padding:2rem; text-align:center; color:var(--text-secondary);">${T('rpt.err.report')}</div>`;
+    document.getElementById("leavesMonthList").innerHTML = `<div class="rpt-leaves-empty">${T('rpt.err.short')}</div>`;
     return;
   }
   renderCalendar(gridStart, gridEnd, data);
@@ -295,13 +296,13 @@ function renderMonthLeavesList(data) {
   });
 
   if (!inMonth.length) {
-    host.innerHTML = `<div class="rpt-leaves-empty">No leaves this month.</div>`;
+    host.innerHTML = `<div class="rpt-leaves-empty">${T('rpt.leaves.noneThisMonth')}</div>`;
     return;
   }
 
   const byEmp = new Map();
   inMonth.forEach((t) => {
-    const name = t.employeeName || `Employee #${t.empId}`;
+    const name = t.employeeName || T('rpt.employeeNum', { n: t.empId });
     if (!byEmp.has(name)) byEmp.set(name, []);
     byEmp.get(name).push(t);
   });
@@ -313,7 +314,7 @@ function renderMonthLeavesList(data) {
       <div class="rpt-leaves-emp">
         <div class="rpt-leaves-emp-head">
           <span>${escapeHtml(name)}</span>
-          <span class="rpt-leaves-emp-days">${totalDays} day${totalDays === 1 ? "" : "s"}</span>
+          <span class="rpt-leaves-emp-days">${T('rpt.leaves.dayCount', { n: totalDays })}</span>
         </div>
         ${rows.map((r) => `
           <div class="rpt-leaves-row">
@@ -339,14 +340,14 @@ function renderCalendar(gridStart, gridEnd, data) {
     while (cur <= end) {
       const key = toISODate(cur);
       if (!leavesByDate.has(key)) leavesByDate.set(key, []);
-      leavesByDate.get(key).push({ name: t.employeeName || `Employee #${t.empId}`, isApproved });
+      leavesByDate.get(key).push({ name: t.employeeName || T('rpt.employeeNum', { n: t.empId }), isApproved });
       cur.setDate(cur.getDate() + 1);
     }
   });
 
   const today = toISODate(startOfDay(new Date()));
   const cal = document.getElementById("leavesCalendar");
-  let html = `<div class="rpt-cal-weekdays">${WEEKDAY_LABELS.map((d) => `<div>${d}</div>`).join("")}</div>`;
+  let html = `<div class="rpt-cal-weekdays">${WEEKDAY_LABELS().map((d) => `<div>${d}</div>`).join("")}</div>`;
 
   let day = new Date(gridStart);
   while (day <= gridEnd) {
@@ -364,8 +365,8 @@ function renderCalendar(gridStart, gridEnd, data) {
         <div class="rpt-cal-day ${isOutside ? "is-outside" : ""} ${isToday ? "is-today" : ""}">
           <div class="rpt-cal-daynum">${day.getDate()}</div>
           ${holidayDesc ? `<div class="rpt-cal-holiday" title="${escapeHtml(holidayDesc)}">${escapeHtml(holidayDesc)}</div>` : ""}
-          ${shown.map((l) => `<div class="rpt-cal-leave ${l.isApproved ? "is-approved" : "is-pending"}" title="${escapeHtml(l.name)}${l.isApproved ? "" : " (pending)"}">${escapeHtml(l.name)}</div>`).join("")}
-          ${more > 0 ? `<div class="rpt-cal-more">+${more} more</div>` : ""}
+          ${shown.map((l) => `<div class="rpt-cal-leave ${l.isApproved ? "is-approved" : "is-pending"}" title="${escapeHtml(l.name)}${l.isApproved ? "" : escapeHtml(T('rpt.pendingSuffix'))}">${escapeHtml(l.name)}</div>`).join("")}
+          ${more > 0 ? `<div class="rpt-cal-more">${T('rpt.moreCount', { n: more })}</div>` : ""}
         </div>`;
       day.setDate(day.getDate() + 1);
     }
@@ -390,25 +391,25 @@ document.getElementById("btnThisMonth").addEventListener("click", () => {
 });
 document.getElementById("btnLeavesExport").addEventListener("click", () => {
   if (!lastLeavesData || (!lastLeavesData.holidays.length && !lastLeavesData.timeOff.length)) {
-    toast("Nothing to export.", "navy");
+    toast(T('rpt.nothingToExport'), "navy");
     return;
   }
   const rows = [
     ...lastLeavesData.holidays.map((h) => {
       const d = toISODate(new Date(h.date));
-      return ["Holiday", d, d, h.description, ""];
+      return [T('rpt.csv.holiday'), d, d, h.description, ""];
     }),
     ...lastLeavesData.timeOff.map((t) => [
-      "Leave",
+      T('rpt.csv.leave'),
       toISODate(new Date(t.startDate)),
       toISODate(new Date(t.endDate)),
-      t.employeeName || `Employee #${t.empId}`,
+      t.employeeName || T('rpt.employeeNum', { n: t.empId }),
       t.statusLabel || "",
     ]),
   ];
   downloadCsv(
     `resource-leaves_${lastLeavesMonthLabel.replace(/\s+/g, "-")}.csv`,
-    ["Type", "Start date", "End date", "Description", "Status"],
+    [T('rpt.csv.type'), T('rpt.csv.startDate'), T('rpt.csv.endDate'), T('rpt.csv.description'), T('rpt.csv.status')],
     rows
   );
 });
@@ -421,7 +422,7 @@ const ENTITY_COLORS = {
   "Unassigned": "#ABAF96", // --hitt-sage
 };
 const ENTITY_ORDER = ["HiTT", "FHiTT", "HiTT/OSM", "Unassigned"];
-const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const MONTH_LABELS = () => T('common.monthsShort').split('|');
 
 // Rounds a max value up to a "nice" chart ceiling divisible by 5, so the
 // gridline labels (0/25/50/75/100%) come out as clean integers instead of
@@ -500,7 +501,7 @@ async function loadYearsThenCharts() {
 /* ---------- Bar chart: projects by status x entity ---------- */
 async function loadStatusChart() {
   const el = document.getElementById("statusChart");
-  el.innerHTML = `<div class="rpt-chart-empty">Loading…</div>`;
+  el.innerHTML = `<div class="rpt-chart-empty">${T('common.loading')}</div>`;
   try {
     const rows = await HITT_API.getProjectsByStatusEntity(statusYearSelect.value || undefined);
     lastStatusEntityRows = rows;
@@ -508,8 +509,8 @@ async function loadStatusChart() {
   } catch (err) {
     console.error("[reports] failed to load projects-by-status-entity:", err.message);
     lastStatusEntityRows = [];
-    el.innerHTML = `<div class="rpt-chart-empty">Could not load this chart.</div>`;
-    toast("Could not load the projects-by-status chart.", "red");
+    el.innerHTML = `<div class="rpt-chart-empty">${T('rpt.err.chart')}</div>`;
+    toast(T('rpt.toast.statusChartFail'), "red");
   }
 }
 
@@ -520,7 +521,7 @@ statusMetricSelect.addEventListener("change", () => renderStatusChart(lastStatus
 
 function renderStatusChart(rows) {
   const el = document.getElementById("statusChart");
-  if (!rows.length) { el.innerHTML = `<div class="rpt-chart-empty">No data.</div>`; return; }
+  if (!rows.length) { el.innerHTML = `<div class="rpt-chart-empty">${T('rpt.noData')}</div>`; return; }
 
   // "Total" = project count; "Budgeted" = sum of each project's latest
   // projectquotations.finalquotation (see routes/reports.js — both come
@@ -594,8 +595,8 @@ function renderStatusChart(rows) {
       const y = MT + plotH - barH;
       tallestBarTopY = Math.min(tallestBarTopY, y);
       const tooltip = isBudget
-        ? `${escapeHtml(group.label)} · ${escapeHtml(entityLabel)}: ${fmtFull(value)} (${group.counts.get(entityLabel) || 0} projects)`
-        : `${escapeHtml(group.label)} · ${escapeHtml(entityLabel)}: ${value}`;
+        ? T('rpt.chart.tooltipBudget', { status: escapeHtml(group.label), entity: escapeHtml(entityLabel), value: fmtFull(value), n: group.counts.get(entityLabel) || 0 })
+        : T('rpt.chart.tooltip', { status: escapeHtml(group.label), entity: escapeHtml(entityLabel), value });
       svg += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${(barW * 0.82).toFixed(1)}" height="${barH.toFixed(1)}" fill="${ENTITY_COLORS[entityLabel] || "#999"}" rx="2">
         <title>${tooltip}</title>
       </rect>`;
@@ -617,14 +618,14 @@ function renderStatusChart(rows) {
   });
   svg += `<polyline class="rpt-chart-line rpt-chart-line--total" points="${totalPoints.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ")}" />`;
   totalPoints.forEach((p, si) => {
-    svg += `<circle class="rpt-chart-dot rpt-chart-dot--total" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3.5"><title>${escapeHtml(byStatus.get(statuses[si]).label)} total: ${fmtFull(p.total)}</title></circle>`;
+    svg += `<circle class="rpt-chart-dot rpt-chart-dot--total" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3.5"><title>${T('rpt.chart.groupTotal', { status: escapeHtml(byStatus.get(statuses[si]).label), value: fmtFull(p.total) })}</title></circle>`;
     svg += `<text class="rpt-chart-value" style="font-weight:700;" x="${p.x.toFixed(1)}" y="${(p.y - 8).toFixed(1)}" text-anchor="middle">${fmtAxis(p.total)}</text>`;
   });
 
   const legend = entities.map((e) => `
     <span class="rpt-legend-item"><span class="rpt-swatch" style="background:${ENTITY_COLORS[e] || "#999"}"></span>${escapeHtml(e)}</span>
   `).join("") + `
-    <span class="rpt-legend-item"><span class="rpt-swatch" style="width:14px; height:3px; border-radius:2px; background:var(--text-primary);"></span>Total</span>
+    <span class="rpt-legend-item"><span class="rpt-swatch" style="width:14px; height:3px; border-radius:2px; background:var(--text-primary);"></span>${T('rpt.legend.total')}</span>
   `;
 
   el.innerHTML = `
@@ -634,10 +635,10 @@ function renderStatusChart(rows) {
 }
 
 document.getElementById("btnStatusExport").addEventListener("click", () => {
-  if (!lastStatusEntityRows.length) { toast("Nothing to export.", "navy"); return; }
+  if (!lastStatusEntityRows.length) { toast(T('rpt.nothingToExport'), "navy"); return; }
   downloadCsv(
     "projects-by-status-entity.csv",
-    ["Status", "Entity", "Count", "Budget (EUR)"],
+    [T('rpt.csv.status'), T('rpt.csv.entity'), T('rpt.csv.count'), T('rpt.csv.budgetEur')],
     lastStatusEntityRows.map((r) => [r.statusLabel, r.entityLabel, r.count, r.budget])
   );
 });
@@ -647,7 +648,7 @@ const openedYearSelect = document.getElementById("openedYearSelect");
 
 async function loadOpenedChart() {
   const el = document.getElementById("openedChart");
-  el.innerHTML = `<div class="rpt-chart-empty">Loading…</div>`;
+  el.innerHTML = `<div class="rpt-chart-empty">${T('common.loading')}</div>`;
   try {
     const rows = await HITT_API.getProjectsOpenedByMonth(openedYearSelect.value);
     lastOpenedRows = rows;
@@ -655,8 +656,8 @@ async function loadOpenedChart() {
   } catch (err) {
     console.error("[reports] failed to load projects-opened-by-month:", err.message);
     lastOpenedRows = [];
-    el.innerHTML = `<div class="rpt-chart-empty">Could not load this chart.</div>`;
-    toast("Could not load the projects-opened-by-month chart.", "red");
+    el.innerHTML = `<div class="rpt-chart-empty">${T('rpt.err.chart')}</div>`;
+    toast(T('rpt.toast.openedChartFail'), "red");
   }
 }
 
@@ -696,13 +697,13 @@ function renderOpenedChart(rows) {
     const pts = seriesPoints(values);
     svg += `<polyline class="${lineClass}" points="${pts.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ")}" />`;
     pts.forEach((p, i) => {
-      svg += `<circle class="${dotClass} rpt-chart-dot--clickable" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="4.5" data-month="${i + 1}" data-type="${type}"><title>${MONTH_LABELS[i]} ${label}: ${p.v} — click for details</title></circle>`;
+      svg += `<circle class="${dotClass} rpt-chart-dot--clickable" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="4.5" data-month="${i + 1}" data-type="${type}"><title>${T('rpt.chart.dotTooltip', { month: MONTH_LABELS()[i], series: label, value: p.v })}</title></circle>`;
     });
   }
-  drawSeries(opened, "rpt-chart-line", "rpt-chart-dot", "opened", "opened");
-  drawSeries(closed, "rpt-chart-line rpt-chart-line--closed", "rpt-chart-dot rpt-chart-dot--closed", "closed", "closed");
+  drawSeries(opened, "rpt-chart-line", "rpt-chart-dot", "opened", T('rpt.series.opened'));
+  drawSeries(closed, "rpt-chart-line rpt-chart-line--closed", "rpt-chart-dot rpt-chart-dot--closed", "closed", T('rpt.series.closed'));
 
-  MONTH_LABELS.forEach((label, i) => {
+  MONTH_LABELS().forEach((label, i) => {
     const x = ML + i * stepX;
     svg += `<text class="rpt-chart-label" x="${x.toFixed(1)}" y="${MT + plotH + 20}" text-anchor="middle">${label}</text>`;
   });
@@ -710,8 +711,8 @@ function renderOpenedChart(rows) {
   el.innerHTML = `
     <svg class="rpt-chart-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Projects opened and closed by month">${svg}</svg>
     <div class="rpt-legend" style="margin-top:0.5rem;">
-      <span class="rpt-legend-item"><span class="rpt-swatch" style="width:14px; height:3px; border-radius:2px; background:var(--brand);"></span>Opened</span>
-      <span class="rpt-legend-item"><span class="rpt-swatch" style="width:14px; height:3px; border-radius:2px; background:var(--hitt-amber);"></span>Closed</span>
+      <span class="rpt-legend-item"><span class="rpt-swatch" style="width:14px; height:3px; border-radius:2px; background:var(--brand);"></span>${T('rpt.series.opened')}</span>
+      <span class="rpt-legend-item"><span class="rpt-swatch" style="width:14px; height:3px; border-radius:2px; background:var(--hitt-amber);"></span>${T('rpt.series.closed')}</span>
     </div>
   `;
 }
@@ -719,11 +720,11 @@ function renderOpenedChart(rows) {
 openedYearSelect.addEventListener("change", loadOpenedChart);
 
 document.getElementById("btnOpenedExport").addEventListener("click", () => {
-  if (!lastOpenedRows.length) { toast("Nothing to export.", "navy"); return; }
+  if (!lastOpenedRows.length) { toast(T('rpt.nothingToExport'), "navy"); return; }
   downloadCsv(
     `projects-opened-closed_${openedYearSelect.value || "all-years"}.csv`,
-    ["Month", "Opened", "Closed"],
-    lastOpenedRows.map((r) => [MONTH_LABELS[r.month - 1], r.openedCount, r.closedCount])
+    [T('rpt.csv.month'), T('rpt.series.opened'), T('rpt.series.closed')],
+    lastOpenedRows.map((r) => [MONTH_LABELS()[r.month - 1], r.openedCount, r.closedCount])
   );
 });
 
@@ -743,9 +744,9 @@ document.getElementById("openedChart").addEventListener("click", (e) => {
 const monthDetailOverlay = document.getElementById("monthDetailOverlay");
 
 async function openMonthDetail(type, year, month) {
-  const label = `${type === "closed" ? "Closed" : "Opened"} — ${MONTH_LABELS[month - 1]} ${year || "All years"}`;
+  const label = T('rpt.monthDetail.title', { series: type === "closed" ? T('rpt.series.closed') : T('rpt.series.opened'), month: MONTH_LABELS()[month - 1], year: year || T('rpt.allYears') });
   document.getElementById("monthDetailTitle").textContent = label;
-  document.getElementById("monthDetailTableBody").innerHTML = `<tr><td colspan="3" class="sub-empty">Loading…</td></tr>`;
+  document.getElementById("monthDetailTableBody").innerHTML = `<tr><td colspan="3" class="sub-empty">${T('common.loading')}</td></tr>`;
   document.getElementById("monthDetailEmpty").classList.add("hidden");
   monthDetailOverlay.classList.remove("hidden");
   try {
@@ -769,9 +770,9 @@ async function openMonthDetail(type, year, month) {
   } catch (err) {
     console.error("[reports] failed to load month detail:", err.message);
     document.getElementById("monthDetailTableBody").innerHTML = "";
-    document.getElementById("monthDetailEmpty").textContent = "Could not load this list.";
+    document.getElementById("monthDetailEmpty").textContent = T('rpt.err.list');
     document.getElementById("monthDetailEmpty").classList.remove("hidden");
-    toast("Could not load the project list.", "red");
+    toast(T('rpt.toast.listFail'), "red");
   }
 }
 
@@ -792,7 +793,7 @@ let timelineSearchDebounce = null;
 async function loadTimeline() {
   const tbody = document.getElementById("timelineTableBody");
   const empty = document.getElementById("timelineEmpty");
-  tbody.innerHTML = `<tr><td colspan="4" class="sub-empty">Loading…</td></tr>`;
+  tbody.innerHTML = `<tr><td colspan="4" class="sub-empty">${T('common.loading')}</td></tr>`;
   empty.classList.add("hidden");
   try {
     const { rows, total } = await HITT_API.getProjectTimeline({
@@ -808,9 +809,9 @@ async function loadTimeline() {
     lastTimelineRows = [];
     timelineTotal = 0;
     tbody.innerHTML = "";
-    empty.textContent = "Could not load the project timeline.";
+    empty.textContent = T('rpt.err.timeline');
     empty.classList.remove("hidden");
-    toast("Could not load the project timeline.", "red");
+    toast(T('rpt.toast.timelineFail'), "red");
   }
   updateTimelinePagination();
 }
@@ -820,7 +821,7 @@ function renderTimeline() {
   const empty = document.getElementById("timelineEmpty");
   if (!lastTimelineRows.length) {
     tbody.innerHTML = "";
-    empty.textContent = timelineFilterInput.value.trim() ? "No changes match that filter." : "No status changes logged yet.";
+    empty.textContent = timelineFilterInput.value.trim() ? T('rpt.timeline.noMatch') : T('rpt.timeline.empty');
     empty.classList.remove("hidden");
     return;
   }
@@ -833,7 +834,7 @@ function renderTimeline() {
       </td>
       <td>${escapeHtml(r.oldStatusLabel || "—")}<span class="rpt-change-arrow">&rarr;</span><b>${escapeHtml(r.newStatusLabel || "—")}</b></td>
       <td style="font-size:0.82rem; color:var(--text-secondary);">${new Date(r.changedAt).toLocaleString()}</td>
-      <td>${escapeHtml(r.changedByName || (r.changedBy ? `Employee #${r.changedBy}` : "—"))}</td>
+      <td>${escapeHtml(r.changedByName || (r.changedBy ? T('rpt.employeeNum', { n: r.changedBy }) : "—"))}</td>
     </tr>
   `).join("");
 }
@@ -845,7 +846,7 @@ function timelineTotalPages() {
 function updateTimelinePagination() {
   const totalPages = timelineTotalPages();
   document.getElementById("timelinePageInfo").textContent = timelineTotal
-    ? `Page ${timelinePage} of ${totalPages} · ${timelineTotal} change${timelineTotal === 1 ? "" : "s"}`
+    ? T('rpt.pageInfo.changes', { page: timelinePage, pages: totalPages, n: timelineTotal })
     : "";
   document.getElementById("btnTimelinePrev").disabled = timelinePage <= 1;
   document.getElementById("btnTimelineNext").disabled = timelinePage >= totalPages;
@@ -883,18 +884,18 @@ document.getElementById("btnTimelineExport").addEventListener("click", async () 
       search: timelineFilterInput.value.trim() || undefined,
       limit: 1000,
     });
-    if (!rows.length) { toast("Nothing to export.", "navy"); return; }
+    if (!rows.length) { toast(T('rpt.nothingToExport'), "navy"); return; }
     downloadCsv(
       "project-timeline.csv",
-      ["Project code", "Project name", "Old status", "New status", "Changed at", "Changed by"],
+      [T('rpt.csv.projectCode'), T('rpt.csv.projectName'), T('rpt.csv.oldStatus'), T('rpt.csv.newStatus'), T('rpt.csv.changedAt'), T('rpt.csv.changedBy')],
       rows.map((r) => [
         r.projectCode, r.projectName, r.oldStatusLabel, r.newStatusLabel,
-        new Date(r.changedAt).toLocaleString(), r.changedByName || (r.changedBy ? `Employee #${r.changedBy}` : ""),
+        new Date(r.changedAt).toLocaleString(), r.changedByName || (r.changedBy ? T('rpt.employeeNum', { n: r.changedBy }) : ""),
       ])
     );
   } catch (err) {
     console.error("[reports] failed to export project-timeline:", err.message);
-    toast("Could not export the project timeline.", "red");
+    toast(T('rpt.toast.timelineExportFail'), "red");
   }
 });
 
@@ -907,7 +908,7 @@ let staleTotal = 0;
 async function loadStaleProjects() {
   const tbody = document.getElementById("staleTableBody");
   const empty = document.getElementById("staleEmpty");
-  tbody.innerHTML = `<tr><td colspan="3" class="sub-empty">Loading…</td></tr>`;
+  tbody.innerHTML = `<tr><td colspan="3" class="sub-empty">${T('common.loading')}</td></tr>`;
   empty.classList.add("hidden");
   try {
     const { rows, total } = await HITT_API.getStaleProjects(stalePage, STALE_PAGE_SIZE);
@@ -919,9 +920,9 @@ async function loadStaleProjects() {
     lastStaleRows = [];
     staleTotal = 0;
     tbody.innerHTML = "";
-    empty.textContent = "Could not load stale projects.";
+    empty.textContent = T('rpt.err.stale');
     empty.classList.remove("hidden");
-    toast("Could not load stale projects.", "red");
+    toast(T('rpt.toast.staleFail'), "red");
   }
   updateStalePagination();
 }
@@ -954,7 +955,7 @@ function staleTotalPages() {
 function updateStalePagination() {
   const totalPages = staleTotalPages();
   document.getElementById("stalePageInfo").textContent = staleTotal
-    ? `Page ${stalePage} of ${totalPages} · ${staleTotal} open`
+    ? T('rpt.pageInfo.open', { page: stalePage, pages: totalPages, n: staleTotal })
     : "";
   document.getElementById("btnStalePrev").disabled = stalePage <= 1;
   document.getElementById("btnStaleNext").disabled = stalePage >= totalPages;
@@ -973,10 +974,10 @@ document.getElementById("btnStaleNext").addEventListener("click", () => {
 document.getElementById("btnStaleExport").addEventListener("click", async () => {
   try {
     const { rows } = await HITT_API.getStaleProjects(1, 200);
-    if (!rows.length) { toast("Nothing to export.", "navy"); return; }
+    if (!rows.length) { toast(T('rpt.nothingToExport'), "navy"); return; }
     downloadCsv(
       "stale-projects.csv",
-      ["Project code", "Project name", "Entry date", "Last status change"],
+      [T('rpt.csv.projectCode'), T('rpt.csv.projectName'), T('rpt.csv.entryDate'), T('rpt.csv.lastStatusChange')],
       rows.map((r) => [
         r.code, r.name,
         r.entryDate ? new Date(r.entryDate).toLocaleDateString() : "",
@@ -985,10 +986,18 @@ document.getElementById("btnStaleExport").addEventListener("click", async () => 
     );
   } catch (err) {
     console.error("[reports] failed to export stale-projects:", err.message);
-    toast("Could not export stale projects.", "red");
+    toast(T('rpt.toast.staleExportFail'), "red");
   }
 });
 
 /* ============================== INIT ==================================== */
 statsLoaded = true;
 loadStats();
+
+
+/* Re-render dynamic content when the UI language changes. */
+window.addEventListener("hitt:langchange", () => {
+  if (currentTab === "hours" && hoursLoaded) loadHours();
+  else if (currentTab === "leaves") loadLeavesMonth();
+  else if (currentTab === "stats" && statsLoaded) loadStats();
+});
