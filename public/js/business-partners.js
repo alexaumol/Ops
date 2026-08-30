@@ -10,6 +10,7 @@
  */
 
 const session = HITT_AUTH.requireSession("../index.html");
+const T = (k, v) => (window.HITT_I18N ? HITT_I18N.t(k, v) : k);
 HITT_PERMS.guardModule("business-partners", "../welcome.html");
 document.getElementById("userName").textContent = session.displayName;
 document.getElementById("userAvatar").textContent = HITT_AUTH.initials(session);
@@ -54,11 +55,11 @@ function toast(msg, tone = 'navy'){
 function setDataSourcePill(){
   const pill = document.getElementById("dataSourcePill");
   if (usingDemoData) {
-    pill.textContent = "Demo data (API unreachable)";
+    pill.textContent = T("common.demoData");
     pill.style.background = "rgba(188,154,28,0.18)";
     pill.style.color = "#8A6E12";
   } else {
-    pill.textContent = "Live · test environment";
+    pill.textContent = T("common.liveData");
     pill.style.background = "rgba(110,143,90,0.18)";
     pill.style.color = "#4C6B3A";
   }
@@ -124,7 +125,7 @@ function renderTable(){
     }
     return String(av ?? '').localeCompare(String(bv ?? '')) * dir;
   });
-  document.getElementById('bpCount').textContent = `${rows.length} of ${PARTNERS.length}`;
+  document.getElementById('bpCount').textContent = T('common.countOf', { shown: rows.length, total: PARTNERS.length });
 
   document.querySelectorAll('.bp-table th[data-sort]').forEach(th => {
     const active = th.dataset.sort === sortColumn;
@@ -146,12 +147,12 @@ function renderTable(){
       <td>${escapeHtml(p.countryLabel || '—')}</td>
       <td>${p.webpage ? `<a href="${escapeHtml(p.webpage)}" target="_blank" rel="noopener">${escapeHtml(p.webpage.replace(/^https?:\/\//, ''))}</a>` : '—'}</td>
       <td>
-        <span title="Alive / Dead (Total)">${p.projectsAlive ?? 0} / ${p.projectsDead ?? 0} (${p.projectsTotal ?? 0})</span>
-        ${p.projectsTotal ? `<button data-bp-projects="${p.id}" class="btn-icon-add" style="margin-left:0.4rem; padding:0.1rem 0.5rem; font-size:0.72rem;" title="View projects">⋯</button>` : ''}
+        <span title="${T('bp.tip.aliveDeadTotal')}">${p.projectsAlive ?? 0} / ${p.projectsDead ?? 0} (${p.projectsTotal ?? 0})</span>
+        ${p.projectsTotal ? `<button data-bp-projects="${p.id}" class="btn-icon-add" style="margin-left:0.4rem; padding:0.1rem 0.5rem; font-size:0.72rem;" title="${T("bp.tip.viewProjects")}">⋯</button>` : ''}
       </td>
       <td>
         ${p.taxCompanyCount
-          ? `<button data-bp-taxcos="${p.id}" class="bp-count-btn" title="View tax companies">${p.taxCompanyCount}</button>`
+          ? `<button data-bp-taxcos="${p.id}" class="bp-count-btn" title="${T("bp.tip.viewTaxCompanies")}">${p.taxCompanyCount}</button>`
           : `<span class="bp-count-zero">0</span>`}
       </td>
     </tr>
@@ -224,7 +225,7 @@ function renderContacts(rows){
   if (rows) CONTACTS = rows;
   const list = document.getElementById('mContactsList');
   if (!CONTACTS.length) {
-    list.innerHTML = `<div class="sub-empty">No contacts yet</div>`;
+    list.innerHTML = `<div class="sub-empty">${T("bp.empty.contacts")}</div>`;
     return;
   }
   list.innerHTML = CONTACTS.map(c => `
@@ -233,8 +234,8 @@ function renderContacts(rows){
         <span class="sub-item-title">${escapeHtml(c.contactname)}</span>
         <span style="display:flex; align-items:center; gap:0.35rem;">
           <span class="sub-item-meta">${escapeHtml(c.position || '')}</span>
-          <button type="button" data-edit-contact="${c.id}" class="sub-item-btn" title="Edit contact">✎</button>
-          <button type="button" data-delete-contact="${c.id}" class="sub-item-btn sub-item-btn--danger" title="Delete contact">✕</button>
+          <button type="button" data-edit-contact="${c.id}" class="sub-item-btn" title="${T("bp.tip.editContact")}">✎</button>
+          <button type="button" data-delete-contact="${c.id}" class="sub-item-btn sub-item-btn--danger" title="${T("bp.tip.deleteContact")}">✕</button>
         </span>
       </div>
       <div class="sub-item-meta">${escapeHtml(c.emailaddress || '—')}${c.phonenumber ? ' · ' + escapeHtml(c.phonenumber) : ''}</div>
@@ -266,7 +267,7 @@ function startEditContact(id){
   f.position.value = c.position || '';
   f.email.value = c.emailaddress || '';
   f.phone.value = c.phonenumber || '';
-  document.getElementById('mAddContact').textContent = 'Save';
+  document.getElementById('mAddContact').textContent = T('form.save');
   document.getElementById('mCancelEditContact').style.display = '';
   renderContacts();
   f.name.focus();
@@ -276,14 +277,14 @@ function cancelEditContact(){
   editingContactId = null;
   const f = contactFormInputs();
   [f.name, f.position, f.email, f.phone].forEach(el => { el.value = ''; });
-  document.getElementById('mAddContact').textContent = 'Add';
+  document.getElementById('mAddContact').textContent = T('form.add');
   document.getElementById('mCancelEditContact').style.display = 'none';
   renderContacts();
 }
 
 async function deleteContact(id){
   const c = CONTACTS.find(x => String(x.id) === String(id));
-  if (!c || !confirm(`Delete contact "${c.contactname || ''}"?`)) return;
+  if (!c || !confirm(T("bp.confirm.deleteContact", { name: c.contactname || "" }))) return;
   const wasSessionAdd = bpSessionAdds.contacts.some(x => String(x) === String(id));
   try {
     await HITT_API.deleteBusinessPartnerContact(activeBpId, id, currentEmployeeId);
@@ -296,10 +297,10 @@ async function deleteContact(id){
     CONTACTS = await HITT_API.getBusinessPartnerContacts(activeBpId);
     if (wasEditingThis) cancelEditContact(); // resets the form + re-renders
     else renderContacts();
-    toast('Contact deleted', 'navy');
+    toast(T('toast.contactDeleted'), 'navy');
   } catch (err) {
     console.error(err);
-    toast('Could not delete the contact.', 'red');
+    toast(T('toast.contactDeleteFail'), 'red');
   }
 }
 
@@ -319,13 +320,13 @@ function renderNotes(rows){
   const list = document.getElementById('mNotesList');
   const filtered = NOTES.filter(matchesNotesSearch);
   if (!filtered.length) {
-    list.innerHTML = `<div class="sub-empty">${NOTES.length ? 'No notes match your search' : 'No notes yet'}</div>`;
+    list.innerHTML = `<div class="sub-empty">${NOTES.length ? T('bp.empty.notesSearch') : T('bp.empty.notes')}</div>`;
     return;
   }
   list.innerHTML = filtered.map(n => `
     <div class="sub-item">
       <div class="sub-item-row">
-        <span class="sub-item-title">${escapeHtml(n.authorName || 'Unknown')}</span>
+        <span class="sub-item-title">${escapeHtml(n.authorName || T('common.unknown'))}</span>
         <span class="sub-item-meta">${formatDateTime(n.commentsts)}</span>
       </div>
       <div style="font-size:0.82rem; white-space:pre-wrap;">${escapeHtml(n.notes)}</div>
@@ -340,7 +341,7 @@ function renderTaxCompanies(rows){
   if (rows) TAX_COMPANIES = rows;
   const list = document.getElementById('mTaxCompanyList');
   if (!TAX_COMPANIES.length) {
-    list.innerHTML = `<div class="sub-empty">No tax companies yet</div>`;
+    list.innerHTML = `<div class="sub-empty">${T("bp.empty.taxCompanies")}</div>`;
     return;
   }
   list.innerHTML = TAX_COMPANIES.map(tc => {
@@ -353,8 +354,8 @@ function renderTaxCompanies(rows){
           <span class="sub-item-title">${escapeHtml(tc.taxcompanyname || '—')}</span>
           <span style="display:flex; align-items:center; gap:0.35rem;">
             <span class="sub-item-meta">${escapeHtml(tc.vatnumber || '')}</span>
-            <button type="button" data-edit-tc="${tc.id}" class="sub-item-btn" title="Edit tax company">✎</button>
-            <button type="button" data-delete-tc="${tc.id}" class="sub-item-btn sub-item-btn--danger" title="Delete tax company">✕</button>
+            <button type="button" data-edit-tc="${tc.id}" class="sub-item-btn" title="${T("bp.tip.editTc")}">✎</button>
+            <button type="button" data-delete-tc="${tc.id}" class="sub-item-btn sub-item-btn--danger" title="${T("bp.tip.deleteTc")}">✕</button>
           </span>
         </div>
         <div class="sub-item-meta">${escapeHtml(tc.emailinvoicing || '—')}</div>
@@ -397,7 +398,7 @@ function resetTaxCompanyForm(){
   [f.name, f.vat, f.email, f.street, f.city, f.state, f.zip, f.phone1, f.phone2].forEach(el => { el.value = ''; });
   f.same.checked = true;
   f.country.innerHTML = lookupOptionsHtml(LOOKUPS.countries, null, true);
-  document.getElementById('mTcSave').textContent = 'Add';
+  document.getElementById('mTcSave').textContent = T('form.add');
   document.getElementById('mTcCancel').style.display = 'none';
   syncTcAddressVisibility();
 }
@@ -418,7 +419,7 @@ function startEditTaxCompany(id){
   f.phone1.value = tc.phonenumber || '';
   f.phone2.value = tc.phonenumber2 || '';
   f.country.innerHTML = lookupOptionsHtml(LOOKUPS.countries, tc.countryid, true);
-  document.getElementById('mTcSave').textContent = 'Save';
+  document.getElementById('mTcSave').textContent = T('form.save');
   document.getElementById('mTcCancel').style.display = '';
   syncTcAddressVisibility();
   renderTaxCompanies();
@@ -447,7 +448,7 @@ function taxCompanyPayload(){
 
 async function deleteTaxCompany(id){
   const tc = TAX_COMPANIES.find(x => String(x.id) === String(id));
-  if (!tc || !confirm(`Delete tax company "${tc.taxcompanyname || ''}"?`)) return;
+  if (!tc || !confirm(T("bp.confirm.deleteTc", { name: tc.taxcompanyname || "" }))) return;
   const wasSessionAdd = bpSessionAdds.taxCompanies.some(x => String(x) === String(id));
   try {
     await HITT_API.deleteBusinessPartnerTaxCompany(activeBpId, id);
@@ -460,10 +461,10 @@ async function deleteTaxCompany(id){
     TAX_COMPANIES = await HITT_API.getBusinessPartnerTaxCompanies(activeBpId);
     if (wasEditingThis) resetTaxCompanyForm();
     renderTaxCompanies();
-    toast('Tax company deleted', 'navy');
+    toast(T('toast.tcDeleted'), 'navy');
   } catch (err) {
     console.error(err);
-    toast(err.message || 'Could not delete the tax company.', 'red');
+    toast(err.message || T('toast.tcDeleteFail'), 'red');
   }
 }
 
@@ -473,14 +474,14 @@ async function deleteTaxCompany(id){
 function renderHistory(rows){
   const list = document.getElementById('historyList');
   if (!rows || !rows.length) {
-    list.innerHTML = `<div class="sub-empty">No history yet</div>`;
+    list.innerHTML = `<div class="sub-empty">${T("bp.empty.history")}</div>`;
     return;
   }
   list.innerHTML = rows.map(h => `
     <div class="history-entry">
       <div class="summary">${escapeHtml(h.summary || '')}</div>
       <div class="meta">
-        <span class="who">${escapeHtml(h.changedByName || 'Unknown')}</span>
+        <span class="who">${escapeHtml(h.changedByName || T('common.unknown'))}</span>
         <span class="when">${formatDateTime(h.changedAt)}</span>
       </div>
     </div>
@@ -505,7 +506,7 @@ async function openDetailModal(id){
   document.getElementById('mNewContactPosition').value = '';
   document.getElementById('mNewContactEmail').value = '';
   document.getElementById('mNewContactPhone').value = '';
-  document.getElementById('mAddContact').textContent = 'Add';
+  document.getElementById('mAddContact').textContent = T('form.add');
   document.getElementById('mCancelEditContact').style.display = 'none';
   document.getElementById('mNewNote').value = '';
   document.getElementById('mNotesSearch').value = '';
@@ -515,7 +516,7 @@ async function openDetailModal(id){
   document.getElementById('mLastUpdatedBy').textContent = '—';
   document.getElementById('mChangedBadge').classList.add('hidden');
 
-  const loadingMsg = usingDemoData ? 'Not available in demo data' : 'Loading…';
+  const loadingMsg = usingDemoData ? T('bp.demo.notAvailable') : T('common.loading');
   document.getElementById('mContactsList').innerHTML = `<div class="sub-empty">${loadingMsg}</div>`;
   document.getElementById('mNotesList').innerHTML = `<div class="sub-empty">${loadingMsg}</div>`;
   document.getElementById('mTaxCompanyList').innerHTML = `<div class="sub-empty">${loadingMsg}</div>`;
@@ -584,7 +585,7 @@ async function openDetailModal(id){
     renderHistory(history);
   } catch (err) {
     console.warn(`Could not load history for business partner ${id}:`, err);
-    document.getElementById('historyList').innerHTML = `<div class="sub-empty">Could not load history</div>`;
+    document.getElementById('historyList').innerHTML = `<div class="sub-empty">${T("common.couldNotLoad")}</div>`;
   }
 }
 
@@ -675,7 +676,7 @@ async function discardBpSessionChanges(){
   resetBpSessionAdds();
   const results = await Promise.allSettled(jobs);
   const failed = results.filter(r => r.status === 'rejected').length;
-  if (failed) toast(`${failed} change${failed === 1 ? '' : 's'} could not be reverted — check the partner.`, 'red');
+  if (failed) toast(T('bp.revertFailed', { count: failed }), 'red');
 }
 
 // Unsaved work in the modal: an edited main field ("Data has changed"),
@@ -748,9 +749,9 @@ document.querySelectorAll('[data-mtab]').forEach(btn => {
 document.getElementById('mSave').addEventListener('click', async () => {
   if (!activeBpId) return;
   const name = document.getElementById('mName').value.trim();
-  if (!name) { toast('Name is required', 'red'); return; }
+  if (!name) { toast(T('common.nameRequired'), 'red'); return; }
   const languageId = document.getElementById('mLanguage').value;
-  if (!languageId) { toast('Language is required', 'red'); return; }
+  if (!languageId) { toast(T('bp.langRequired'), 'red'); return; }
   document.getElementById('mChangedBadge').classList.add('hidden');
   resetBpSessionAdds(); // Save commits everything added this session
 
@@ -776,7 +777,7 @@ document.getElementById('mSave').addEventListener('click', async () => {
     if (p) p.name = name;
     renderTable();
     closeDetailModal();
-    toast('Saved locally (demo data)', 'green');
+    toast(T('bp.demo.saved'), 'green');
     return;
   }
 
@@ -786,10 +787,10 @@ document.getElementById('mSave').addEventListener('click', async () => {
     if (p) p.name = name;
     renderTable();
     closeDetailModal();
-    toast('Business partner saved', 'green');
+    toast(T('toast.bpSaved'), 'green');
   } catch (err) {
     console.error(err);
-    toast('Could not save changes', 'red');
+    toast(T('common.couldNotSave'), 'red');
   }
 });
 
@@ -797,7 +798,7 @@ document.getElementById('mAddContact').addEventListener('click', async () => {
   const f = contactFormInputs();
   const name = f.name.value.trim();
   if (!name || !activeBpId) return;
-  if (usingDemoData) { toast("Contacts aren't available in demo data.", 'navy'); return; }
+  if (usingDemoData) { toast(T('bp.demo.noContacts'), 'navy'); return; }
   const payload = {
     contactname: name,
     position: f.position.value.trim() || null,
@@ -819,10 +820,10 @@ document.getElementById('mAddContact').addEventListener('click', async () => {
     }
     CONTACTS = await HITT_API.getBusinessPartnerContacts(activeBpId);
     cancelEditContact(); // clears inputs, resets the button, re-renders
-    toast(wasEditing ? 'Contact updated' : 'Contact added', 'green');
+    toast(T(wasEditing ? 'toast.contactUpdated' : 'toast.contactAdded'), 'green');
   } catch (err) {
     console.error(err);
-    toast('Could not save the contact.', 'red');
+    toast(T('toast.contactSaveFail'), 'red');
   }
 });
 
@@ -831,16 +832,16 @@ document.getElementById('mCancelEditContact').addEventListener('click', cancelEd
 document.getElementById('mAddNote').addEventListener('click', async () => {
   const text = document.getElementById('mNewNote').value.trim();
   if (!text || !activeBpId) return;
-  if (usingDemoData) { toast("Notes aren't available in demo data.", 'navy'); return; }
+  if (usingDemoData) { toast(T('bp.demo.noNotes'), 'navy'); return; }
   try {
     const created = await HITT_API.addBusinessPartnerNote(activeBpId, { notes: text, employeeId: currentEmployeeId });
     if (created && created.id != null) bpSessionAdds.notes.push(created.id);
     document.getElementById('mNewNote').value = '';
     renderNotes(await HITT_API.getBusinessPartnerNotes(activeBpId));
-    toast('Note added', 'green');
+    toast(T('toast.noteAdded'), 'green');
   } catch (err) {
     console.error(err);
-    toast('Could not save the note.', 'red');
+    toast(T('toast.noteSaveFail'), 'red');
   }
 });
 
@@ -861,9 +862,9 @@ document.getElementById('mTcCancel').addEventListener('click', () => { resetTaxC
 
 document.getElementById('mTcSave').addEventListener('click', async () => {
   if (!activeBpId) return;
-  if (usingDemoData) { toast("Tax companies aren't available in demo data.", 'navy'); return; }
+  if (usingDemoData) { toast(T('bp.demo.noTaxCompanies'), 'navy'); return; }
   const payload = taxCompanyPayload();
-  if (!payload.taxcompanyname) { toast('Tax company name is required.', 'red'); return; }
+  if (!payload.taxcompanyname) { toast(T('bp.tcNameRequired'), 'red'); return; }
   const wasEditing = editingTcId;
   const btn = document.getElementById('mTcSave');
   btn.disabled = true;
@@ -881,10 +882,10 @@ document.getElementById('mTcSave').addEventListener('click', async () => {
     TAX_COMPANIES = await HITT_API.getBusinessPartnerTaxCompanies(activeBpId);
     resetTaxCompanyForm();
     renderTaxCompanies();
-    toast(wasEditing ? 'Tax company updated' : 'Tax company added', 'green');
+    toast(T(wasEditing ? 'toast.tcUpdated' : 'toast.tcAdded'), 'green');
   } catch (err) {
     console.error(err);
-    toast(err.message || 'Could not save the tax company.', 'red');
+    toast(err.message || T('toast.tcSaveFail'), 'red');
   } finally {
     btn.disabled = false;
   }
@@ -911,7 +912,7 @@ function npContactFormInputs(){
 function renderNpContacts(){
   const list = document.getElementById('npContactsList');
   if (!npContacts.length) {
-    list.innerHTML = `<div class="sub-empty">No contacts added yet</div>`;
+    list.innerHTML = `<div class="sub-empty">${T("bp.empty.contactsNew")}</div>`;
     return;
   }
   list.innerHTML = npContacts.map((c, i) => `
@@ -949,7 +950,7 @@ function startEditNpContact(i){
   f.position.value = c.position || '';
   f.email.value = c.emailaddress || '';
   f.phone.value = c.phonenumber || '';
-  document.getElementById('npAddContact').textContent = 'Save';
+  document.getElementById('npAddContact').textContent = T('form.save');
   document.getElementById('npCancelEditContact').style.display = '';
   renderNpContacts();
   f.name.focus();
@@ -959,7 +960,7 @@ function cancelEditNpContact(){
   npEditingContactIndex = null;
   const f = npContactFormInputs();
   [f.name, f.position, f.email, f.phone].forEach(el => { el.value = ''; });
-  document.getElementById('npAddContact').textContent = 'Add';
+  document.getElementById('npAddContact').textContent = T('form.add');
   document.getElementById('npCancelEditContact').style.display = 'none';
   renderNpContacts();
 }
@@ -967,7 +968,7 @@ function cancelEditNpContact(){
 document.getElementById('npAddContact').addEventListener('click', () => {
   const f = npContactFormInputs();
   const name = f.name.value.trim();
-  if (!name) { toast('Contact name is required', 'red'); return; }
+  if (!name) { toast(T('bp.contactNameRequired'), 'red'); return; }
   const contact = {
     contactname: name,
     position: f.position.value.trim() || null,
@@ -1011,9 +1012,9 @@ newBpOverlay.addEventListener('click', (e) => { if (e.target === newBpOverlay) c
 
 document.getElementById('npSave').addEventListener('click', async () => {
   const name = document.getElementById('npName').value.trim();
-  if (!name) { toast('Name is required', 'red'); return; }
+  if (!name) { toast(T('common.nameRequired'), 'red'); return; }
   const languageId = document.getElementById('npLanguage').value;
-  if (!languageId) { toast('Language is required', 'red'); return; }
+  if (!languageId) { toast(T('bp.langRequired'), 'red'); return; }
   const companyTypeId = document.getElementById('npCompanyType').value ? Number(document.getElementById('npCompanyType').value) : null;
   const payload = {
     name,
@@ -1037,7 +1038,7 @@ document.getElementById('npSave').addEventListener('click', async () => {
     PARTNERS.push({ id, name, companyTypeLabel: '—', countryLabel: '—', webpage: payload.webpage || '' });
     renderTable();
     closeNewBpModal();
-    toast('Created locally (demo data)', 'green');
+    toast(T('bp.demo.created'), 'green');
     return;
   }
 
@@ -1049,16 +1050,16 @@ document.getElementById('npSave').addEventListener('click', async () => {
       );
       const failed = results.filter(r => r.status === 'rejected').length;
       if (failed) {
-        toast(`Business partner created, but ${failed} contact${failed === 1 ? '' : 's'} could not be saved — add them from the partner.`, 'red');
+        toast(T('bp.createdContactsFailed', { count: failed }), 'red');
       }
     }
     await loadPartners();
     closeNewBpModal();
-    toast('Business partner created', 'green');
+    toast(T('toast.bpCreated'), 'green');
     openDetailModal(created.id);
   } catch (err) {
     console.error(err);
-    toast('Could not create the business partner.', 'red');
+    toast(T('toast.bpCreateFail'), 'red');
   }
 });
 
@@ -1068,13 +1069,13 @@ const bpProjectsOverlay = document.getElementById('bpProjectsOverlay');
 async function openBpProjectsModal(bpId){
   const bp = PARTNERS.find(p => p.id === bpId);
   document.getElementById('bpProjectsTitle').textContent = bp ? `Projects — ${bp.name}` : 'Projects';
-  document.getElementById('bpProjectsList').innerHTML = `<tr><td colspan="3" class="sub-empty">Loading…</td></tr>`;
+  document.getElementById('bpProjectsList').innerHTML = `<tr><td colspan="3" class="sub-empty">${T("common.loading")}</td></tr>`;
   bpProjectsOverlay.classList.remove('hidden');
   document.body.style.overflow = 'hidden';
   try {
     const rows = await HITT_API.getBusinessPartnerProjects(bpId);
     if (!rows.length) {
-      document.getElementById('bpProjectsList').innerHTML = `<tr><td colspan="3" class="sub-empty">No projects</td></tr>`;
+      document.getElementById('bpProjectsList').innerHTML = `<tr><td colspan="3" class="sub-empty">${T("bp.drill.noProjects")}</td></tr>`;
       return;
     }
     document.getElementById('bpProjectsList').innerHTML = rows.map(p => `
@@ -1086,7 +1087,7 @@ async function openBpProjectsModal(bpId){
     `).join('');
   } catch (err) {
     console.error(err);
-    document.getElementById('bpProjectsList').innerHTML = `<tr><td colspan="3" class="sub-empty">Could not load projects</td></tr>`;
+    document.getElementById('bpProjectsList').innerHTML = `<tr><td colspan="3" class="sub-empty">${T("common.couldNotLoad")}</td></tr>`;
   }
 }
 
@@ -1107,7 +1108,7 @@ const bpTaxCompaniesOverlay = document.getElementById('bpTaxCompaniesOverlay');
 async function openBpTaxCompaniesModal(bpId){
   const bp = PARTNERS.find(p => p.id === bpId);
   document.getElementById('bpTaxCompaniesTitle').textContent = bp ? `Tax companies — ${bp.name}` : 'Tax companies';
-  document.getElementById('bpTaxCompaniesList').innerHTML = `<tr><td colspan="3" class="sub-empty">Loading…</td></tr>`;
+  document.getElementById('bpTaxCompaniesList').innerHTML = `<tr><td colspan="3" class="sub-empty">${T("common.loading")}</td></tr>`;
   bpTaxCompaniesOverlay.classList.remove('hidden');
   document.body.style.overflow = 'hidden';
   try {
@@ -1119,10 +1120,10 @@ async function openBpTaxCompaniesModal(bpId){
           <td>${escapeHtml(tc.vatnumber || '—')}</td>
           <td>${escapeHtml(tc.emailinvoicing || '—')}</td>
         </tr>`).join('')
-      : `<tr><td colspan="3" class="sub-empty">No tax companies</td></tr>`;
+      : `<tr><td colspan="3" class="sub-empty">${T("bp.drill.noTaxCompanies")}</td></tr>`;
   } catch (err) {
     console.error(err);
-    document.getElementById('bpTaxCompaniesList').innerHTML = `<tr><td colspan="3" class="sub-empty">Could not load tax companies</td></tr>`;
+    document.getElementById('bpTaxCompaniesList').innerHTML = `<tr><td colspan="3" class="sub-empty">${T("common.couldNotLoad")}</td></tr>`;
   }
 }
 
@@ -1145,5 +1146,16 @@ loadPartners().then(() => {
   if (openId) {
     const target = PARTNERS.find(p => String(p.id) === openId);
     if (target) openDetailModal(target.id);
+  }
+});
+
+/* Re-render dynamic content when the UI language changes. */
+window.addEventListener('hitt:langchange', () => {
+  if (typeof renderTable === 'function') renderTable();
+  const detailOpen = !document.getElementById('modalOverlay').classList.contains('hidden');
+  if (detailOpen) {
+    renderContacts();
+    renderNotes();
+    renderTaxCompanies();
   }
 });
