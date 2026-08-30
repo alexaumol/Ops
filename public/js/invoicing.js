@@ -722,7 +722,9 @@ async function openInvoiceEmailModal(invoiceId){
     }
     document.getElementById('invEmailLangHint').textContent = hint;
     if (d.mailConfigured === false) {
-      err.textContent = 'Email sending is not configured on the server yet — sending will fail until an admin sets it up.';
+      err.textContent = d.channel === 'smtp'
+        ? 'SMTP for FHiTT invoices is not configured on the server yet — sending will fail until an admin sets it up.'
+        : 'Email sending is not configured on the server yet — sending will fail until an admin sets it up.';
     }
     document.getElementById('invEmailSend').disabled = false;
   } catch (e) {

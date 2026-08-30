@@ -108,9 +108,10 @@ async function createProjectFolder(folderName) {
  * Application permission (admin-consented) — ideally scoped with an
  * application access policy to just the invoice mailboxes.
  *
- * The sender mailbox is passed per-call (`from`) — the invoicing route
- * picks it from the billing entity (invoices@hittbcn.com for HiTT / HiTT-OSM,
- * invoices@fhitt.org for FHiTT). GRAPH_MAIL_SENDER is only the last-resort
+ * The sender mailbox is passed per-call (`from`). Only HiTT / HiTT-OSM
+ * invoices go through Graph (from invoices@hittbcn.com, a mailbox in the
+ * M365 tenant); FHiTT's invoices@fhitt.org is hosted at IONOS and goes over
+ * SMTP instead (lib/mailer.js). GRAPH_MAIL_SENDER is only the last-resort
  * fallback when a caller passes no `from`.
  *
  * When Mail.Send isn't granted / the app can't send as that mailbox, the

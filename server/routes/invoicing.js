@@ -48,12 +48,14 @@
  * businesspartners.languageid (tax company's BP first, then the project's).
  *
  * "Send by email" (Access's cmdSendToEmailPDF): GET/POST /invoices/:id/email.
- * The PDF is attached and sent via Microsoft Graph (lib/graph.js, app-only,
- * needs Mail.Send). The sender mailbox is chosen from the billing entity —
- * invoices@hittbcn.com for HiTT / HiTT-OSM, invoices@fhitt.org for FHiTT
- * (invoiceSenderFor(); override with GRAPH_MAIL_SENDER_HITT / _FHITT). The
- * user confirms From/recipient/subject/body in a dialog before the POST —
- * nothing is sent without that.
+ * The PDF is attached; the sender mailbox + transport are chosen from the
+ * billing entity (invoiceSenderFor / invoiceMailChannel):
+ *   HiTT / HiTT-OSM -> invoices@hittbcn.com via Microsoft Graph (lib/graph.js)
+ *   FHiTT           -> invoices@fhitt.org via SMTP (lib/mailer.js) — that
+ *                      mailbox is at IONOS, not the M365 tenant, so Graph
+ *                      can't send as it.
+ * The user confirms From/recipient/subject/body in a dialog before the POST
+ * — nothing is sent without that.
  * ---------------------------------------------------------------------------
  */
 const express = require("express");
@@ -62,6 +64,7 @@ const { requireModuleAccess } = require("../lib/permissions");
 const { streamInvoicePdf, renderInvoicePdfBuffer } = require("../lib/invoicePdf");
 const { invoiceLabels, fillTemplate } = require("../lib/invoiceDocText");
 const { graphMailConfigured, sendMail } = require("../lib/graph");
+const { smtpConfigured, sendSmtpMail } = require("../lib/mailer");
 const { logAudit } = require("../lib/audit");
 
 const router = express.Router();
@@ -395,13 +398,28 @@ const splitAddrs = (v) =>
 // The mailbox an invoice email is sent from, by billing entity. Defaults
 // match the entity letterhead (lib/invoicePdf.js); overridable via env.
 const INVOICE_SENDER_HITT = process.env.GRAPH_MAIL_SENDER_HITT || "invoices@hittbcn.com";
-const INVOICE_SENDER_FHITT = process.env.GRAPH_MAIL_SENDER_FHITT || "invoices@fhitt.org";
+const INVOICE_SENDER_FHITT = process.env.GRAPH_MAIL_SENDER_FHITT || process.env.SMTP_FROM || "invoices@fhitt.org";
 function invoiceSenderFor(entityLabel) {
   const key = String(entityLabel || "").trim().toLowerCase().replace(/\s+/g, "");
-  if (key === "hitt" || key === "hitt/osm") return INVOICE_SENDER_HITT;
   if (key === "fhitt") return INVOICE_SENDER_FHITT;
+  if (key === "hitt" || key === "hitt/osm") return INVOICE_SENDER_HITT;
   return process.env.GRAPH_MAIL_SENDER || INVOICE_SENDER_HITT;
 }
+
+// Which transport carries an invoice email. FHiTT's sender mailbox lives at
+// IONOS (not the M365 tenant), so it goes over SMTP (lib/mailer.js);
+// everything else goes through Microsoft Graph (lib/graph.js).
+function invoiceMailChannel(entityLabel) {
+  const key = String(entityLabel || "").trim().toLowerCase().replace(/\s+/g, "");
+  return key === "fhitt" ? "smtp" : "graph";
+}
+function invoiceMailReady(channel) {
+  return channel === "smtp" ? smtpConfigured() : graphMailConfigured();
+}
+const MAIL_UNAVAILABLE_MSG = {
+  smtp: "Email for FHiTT invoices isn't configured on the server — set SMTP_HOST / SMTP_PORT / SMTP_USER / SMTP_PASS (the invoices@fhitt.org mailbox at IONOS).",
+  graph: "Email for HiTT invoices isn't configured on the server — the Graph app registration and its Mail.Send permission are required.",
+};
 
 // GET /api/invoicing/invoices/:id/email — the prefilled recipient / subject /
 // body for the "email this invoice" dialog, in the partner's language.
@@ -410,6 +428,7 @@ router.get("/invoices/:id/email", requireModuleAccess("invoicing"), async (req, 
     const data = await loadInvoiceForPdf(req.params.id);
     if (!data) return res.status(404).json({ error: "not_found" });
     const tokens = { InvoiceCode: data.invoicecode || "", Entity: data.entityLabel || "HITT" };
+    const channel = invoiceMailChannel(data.entityLabel);
     res.json({
       from: invoiceSenderFor(data.entityLabel),
       to: data.taxCompanyEmail || "",
@@ -420,7 +439,8 @@ router.get("/invoices/:id/email", requireModuleAccess("invoicing"), async (req, 
       ),
       invoiceCode: data.invoicecode || null,
       languageId: data.languageId,
-      mailConfigured: graphMailConfigured(),
+      channel,
+      mailConfigured: invoiceMailReady(channel),
       emailedAt: data.emailedAt || null,
       emailedCount: Number(data.emailedCount) || 0,
       emailedTo: data.emailedTo || null,
@@ -432,21 +452,26 @@ router.get("/invoices/:id/email", requireModuleAccess("invoicing"), async (req, 
 });
 
 // POST /api/invoicing/invoices/:id/email  { to, cc, subject, body }
-// Renders the invoice PDF and sends it as an attachment via Microsoft Graph
-// (see lib/graph.js). All four body fields are optional — anything omitted
+// Renders the invoice PDF and sends it as an attachment. FHiTT invoices go
+// over SMTP (lib/mailer.js), everything else through Microsoft Graph
+// (lib/graph.js). All four body fields are optional — anything omitted
 // falls back to the language-aware default.
 router.post("/invoices/:id/email", requireModuleAccess("invoicing"), async (req, res) => {
-  if (!graphMailConfigured()) {
-    return res.status(503).json({
-      error: "mail_unavailable",
-      message:
-        "Email sending isn't configured on the server — the Graph app registration (GRAPH_TENANT_ID / GRAPH_CLIENT_ID / GRAPH_CLIENT_SECRET) and the Mail.Send permission are required.",
-    });
-  }
+  let data;
   try {
-    const data = await loadInvoiceForPdf(req.params.id);
-    if (!data) return res.status(404).json({ error: "not_found" });
+    data = await loadInvoiceForPdf(req.params.id);
+  } catch (err) {
+    console.error("[POST /api/invoicing/invoices/:id/email] load error:", err.message);
+    return res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+  if (!data) return res.status(404).json({ error: "not_found" });
 
+  const channel = invoiceMailChannel(data.entityLabel);
+  if (!invoiceMailReady(channel)) {
+    return res.status(503).json({ error: "mail_unavailable", message: MAIL_UNAVAILABLE_MSG[channel] });
+  }
+
+  try {
     const tokens = { InvoiceCode: data.invoicecode || "", Entity: data.entityLabel || "HITT" };
     const to = splitAddrs(req.body?.to || data.taxCompanyEmail);
     const cc = splitAddrs(req.body?.cc);
@@ -477,19 +502,21 @@ router.post("/invoices/:id/email", requireModuleAccess("invoicing"), async (req,
     }
 
     const from = invoiceSenderFor(data.entityLabel);
+    const mailArgs = {
+      from,
+      to,
+      cc,
+      subject,
+      text: body,
+      attachments: [
+        { filename: `${data.invoicecode || "invoice"}.pdf`, contentType: "application/pdf", content: pdf },
+      ],
+    };
     try {
-      await sendMail({
-        from,
-        to,
-        cc,
-        subject,
-        text: body,
-        attachments: [
-          { filename: `${data.invoicecode || "invoice"}.pdf`, contentType: "application/pdf", content: pdf },
-        ],
-      });
+      if (channel === "smtp") await sendSmtpMail(mailArgs);
+      else await sendMail(mailArgs);
     } catch (err) {
-      console.error("[POST /invoices/:id/email] send failed:", err.message);
+      console.error(`[POST /invoices/:id/email] send failed (${channel}):`, err.message);
       return res.status(502).json({
         error: "send_failed",
         message: "The email could not be sent — check the server's mail configuration and logs.",
@@ -514,7 +541,7 @@ router.post("/invoices/:id/email", requireModuleAccess("invoicing"), async (req,
     res.json({ sent: true, from, to, cc, emailedAt: sentAt });
     logAudit(req, {
       kind: "invoice.email",
-      desc: `Emailed invoice ${data.invoicecode || `#${req.params.id}`} from ${from} to ${recipients}`,
+      desc: `Emailed invoice ${data.invoicecode || `#${req.params.id}`} from ${from} to ${recipients} (${channel})`,
       level: 2,
     });
   } catch (err) {
