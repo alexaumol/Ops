@@ -326,7 +326,7 @@ document.querySelectorAll("[data-stab]").forEach((btn) => {
     }
     if (tab === "expcats" && !expCatsLoaded) {
       expCatsLoaded = true;
-      loadExpenseCategories();
+      loadCategoriesTab();
     }
     if (tab === "currencies" && !currenciesLoaded) {
       currenciesLoaded = true;
@@ -395,95 +395,111 @@ async function loadPaths() {
   });
 }
 
-/* ============================== EXPENSE CATEGORIES =================== */
-let EXP_CATS = [];
+/* ===================== CATEGORIES TAB (id/name catalogs) ============== */
+// One factory drives all three lists on the Categories tab: expense
+// categories, biotech spectrum, project type. Same table markup + CRUD.
+function makeCatalog({ slug, bodyId, emptyId, inputId, addBtnId }) {
+  const api = () => HITT_API.settingsCatalog(slug);
+  let items = [];
+  const tbody = () => document.getElementById(bodyId);
+  const emptyEl = () => document.getElementById(emptyId);
 
-async function loadExpenseCategories() {
-  const tbody = document.getElementById("expCatTableBody");
-  const empty = document.getElementById("expCatEmpty");
-  tbody.innerHTML = `<tr><td colspan="3" class="settings-emp-sub" style="padding:1rem;">Loading…</td></tr>`;
-  empty.classList.add("hidden");
-  try {
-    EXP_CATS = await HITT_API.getExpenseCategoriesAdmin();
-    renderExpenseCategories();
-  } catch (err) {
-    console.error("[settings] expense categories:", err.message);
-    tbody.innerHTML = "";
-    empty.textContent = "Could not load expense categories.";
-    empty.classList.remove("hidden");
+  function render() {
+    if (!items.length) {
+      tbody().innerHTML = "";
+      emptyEl().classList.remove("hidden");
+      return;
+    }
+    emptyEl().classList.add("hidden");
+    tbody().innerHTML = items.map((c) => `
+      <tr data-id="${c.id}">
+        <td><input type="text" class="cal-input" style="width:18rem; text-align:left;" data-cat-name value="${escapeHtml(c.name)}" /></td>
+        <td class="settings-emp-sub" style="text-align:right;">${c.usageCount}</td>
+        <td style="text-align:right;">
+          <button class="icon-btn" data-del-cat title="${c.usageCount ? "In use — cannot delete" : "Delete"}" ${c.usageCount ? "disabled style='opacity:.35;'" : ""}>✕</button>
+        </td>
+      </tr>`).join("");
+    tbody().querySelectorAll("input[data-cat-name]").forEach((input) => {
+      let original = input.value;
+      input.addEventListener("focus", () => { original = input.value; });
+      input.addEventListener("change", async () => {
+        const name = input.value.trim();
+        const id = input.closest("tr").dataset.id;
+        if (!name || name === original) { input.value = original; return; }
+        try {
+          await api().rename(id, name);
+          original = name;
+          const it = items.find((x) => String(x.id) === String(id));
+          if (it) it.name = name;
+          toast("Renamed.", "green");
+        } catch (err) {
+          input.value = original;
+          toast(`Couldn't rename: ${err.message}`, "red");
+        }
+      });
+    });
+    tbody().querySelectorAll("[data-del-cat]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const id = btn.closest("tr").dataset.id;
+        const it = items.find((x) => String(x.id) === String(id));
+        if (!it || !confirm(`Delete "${it.name}"?`)) return;
+        try {
+          await api().remove(id);
+          items = items.filter((x) => String(x.id) !== String(id));
+          render();
+          toast("Deleted.", "navy");
+        } catch (err) {
+          toast(`Couldn't delete: ${err.message}`, "red");
+        }
+      });
+    });
   }
-}
 
-function renderExpenseCategories() {
-  const tbody = document.getElementById("expCatTableBody");
-  const empty = document.getElementById("expCatEmpty");
-  if (!EXP_CATS.length) {
-    tbody.innerHTML = "";
-    empty.textContent = "No categories yet.";
-    empty.classList.remove("hidden");
-    return;
+  async function load() {
+    tbody().innerHTML = `<tr><td colspan="3" class="settings-emp-sub" style="padding:1rem;">Loading…</td></tr>`;
+    emptyEl().classList.add("hidden");
+    try {
+      items = await api().list();
+      render();
+    } catch (err) {
+      console.error(`[settings] ${slug}:`, err.message);
+      tbody().innerHTML = "";
+      emptyEl().textContent = "Could not load the list.";
+      emptyEl().classList.remove("hidden");
+    }
   }
-  empty.classList.add("hidden");
-  tbody.innerHTML = EXP_CATS.map((c) => `
-    <tr data-id="${c.id}">
-      <td><input type="text" class="cal-input" style="width:16rem; text-align:left;" data-cat-name value="${escapeHtml(c.name)}" /></td>
-      <td class="settings-emp-sub" style="text-align:right;">${c.usageCount}</td>
-      <td style="text-align:right;">
-        <button class="icon-btn" data-del-cat title="${c.usageCount ? "In use — cannot delete" : "Delete"}" ${c.usageCount ? "disabled style='opacity:.35;'" : ""}>✕</button>
-      </td>
-    </tr>
-  `).join("");
-  tbody.querySelectorAll("input[data-cat-name]").forEach((input) => {
-    let original = input.value;
-    input.addEventListener("focus", () => { original = input.value; });
-    input.addEventListener("change", async () => {
+
+  const addBtn = document.getElementById(addBtnId);
+  if (addBtn) {
+    addBtn.addEventListener("click", async () => {
+      const input = document.getElementById(inputId);
       const name = input.value.trim();
-      const id = input.closest("tr").dataset.id;
-      if (!name || name === original) { input.value = original; return; }
+      if (!name) { toast("Enter a name.", "red"); return; }
       try {
-        await HITT_API.renameExpenseCategory(id, name);
-        original = name;
-        const cat = EXP_CATS.find((x) => String(x.id) === String(id));
-        if (cat) cat.name = name;
-        toast("Category renamed.", "green");
+        const created = await api().create(name);
+        items.push(created);
+        items.sort((a, b) => a.name.localeCompare(b.name));
+        input.value = "";
+        render();
+        toast("Added.", "green");
       } catch (err) {
-        input.value = original;
-        toast(`Couldn't rename: ${err.message}`, "red");
+        toast(`Couldn't add: ${err.message}`, "red");
       }
     });
-  });
-  tbody.querySelectorAll("[data-del-cat]").forEach((btn) => {
-    btn.addEventListener("click", async () => {
-      const id = btn.closest("tr").dataset.id;
-      const cat = EXP_CATS.find((x) => String(x.id) === String(id));
-      if (!cat || !confirm(`Delete the "${cat.name}" expense category?`)) return;
-      try {
-        await HITT_API.deleteExpenseCategory(id);
-        EXP_CATS = EXP_CATS.filter((x) => String(x.id) !== String(id));
-        renderExpenseCategories();
-        toast("Category deleted.", "navy");
-      } catch (err) {
-        toast(`Couldn't delete: ${err.message}`, "red");
-      }
-    });
-  });
+  }
+
+  return { load };
 }
 
-document.getElementById("btnAddExpCat").addEventListener("click", async () => {
-  const input = document.getElementById("newExpCatName");
-  const name = input.value.trim();
-  if (!name) { toast("Enter a category name.", "red"); return; }
-  try {
-    const created = await HITT_API.createExpenseCategory(name);
-    EXP_CATS.push(created);
-    EXP_CATS.sort((a, b) => a.name.localeCompare(b.name));
-    input.value = "";
-    renderExpenseCategories();
-    toast("Category added.", "green");
-  } catch (err) {
-    toast(`Couldn't add: ${err.message}`, "red");
-  }
-});
+const CATALOGS_UI = [
+  makeCatalog({ slug: "expense-categories", bodyId: "expCatTableBody", emptyId: "expCatEmpty", inputId: "newExpCatName", addBtnId: "btnAddExpCat" }),
+  makeCatalog({ slug: "biotech-spectrums", bodyId: "bioSpectrumTableBody", emptyId: "bioSpectrumEmpty", inputId: "newBioSpectrumName", addBtnId: "btnAddBioSpectrum" }),
+  makeCatalog({ slug: "project-types", bodyId: "projTypeTableBody", emptyId: "projTypeEmpty", inputId: "newProjTypeName", addBtnId: "btnAddProjType" }),
+];
+
+function loadCategoriesTab() {
+  CATALOGS_UI.forEach((c) => c.load());
+}
 
 /* ============================== INVOICE CURRENCIES ================== */
 let CURRENCIES = [];

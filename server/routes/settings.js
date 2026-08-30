@@ -726,82 +726,105 @@ router.put("/work-calendar/:year", async (req, res) => {
   }
 });
 
-/* ============================== EXPENSE CATEGORIES =================== */
-// The controlled vocabulary for the Expenses module (expensescategories).
+/* ===================== SETTINGS CATALOGS (Categories tab) ============= */
+// Small id/name controlled vocabularies edited on Settings → Categories.
+// Table / column names below are HARDCODED (never client input), so the
+// string interpolation into SQL is safe. Each row reports how many records
+// reference it (`usageCount`) and can't be deleted while in use.
+const CATALOGS = {
+  "expense-categories": {
+    table: "expensescategories", descCol: "categorydesc",
+    usageTable: "expenses", usageCol: "categoryid",
+    auditKind: "settings.expense-category", label: "expense category",
+  },
+  "biotech-spectrums": {
+    table: "biotechspectrums", descCol: "spectrumdesc",
+    usageTable: "projects", usageCol: "biospectrumid",
+    auditKind: "settings.biotech-spectrum", label: "biotech spectrum",
+  },
+  "project-types": {
+    table: "projecttypes", descCol: "projecttypedesc",
+    usageTable: "projects", usageCol: "projecttypeid",
+    auditKind: "settings.project-type", label: "project type",
+  },
+};
 
-router.get("/expense-categories", async (req, res) => {
-  try {
-    const { rows } = await pool.query(
-      `SELECT ec.id, ec.categorydesc AS name, COALESCE(u.n, 0)::int AS "usageCount"
-       FROM expensescategories ec
-       LEFT JOIN (
-         SELECT categoryid::bigint AS cid, COUNT(*) AS n FROM expenses GROUP BY categoryid::bigint
-       ) u ON u.cid = ec.id
-       ORDER BY ec.categorydesc`
-    );
-    res.json(rows);
-  } catch (err) {
-    console.error("[GET /api/settings/expense-categories] DB error:", err.message);
-    res.status(502).json({ error: "database_unreachable", message: err.message });
-  }
-});
-
-router.post("/expense-categories", async (req, res) => {
-  const name = (req.body?.name || "").trim();
-  if (!name) return res.status(400).json({ error: "bad_request", message: "A category name is required." });
-  try {
-    const dup = await pool.query(`SELECT 1 FROM expensescategories WHERE LOWER(categorydesc) = LOWER($1)`, [name]);
-    if (dup.rows.length) return res.status(409).json({ error: "conflict", message: "That category already exists." });
-    const { rows } = await pool.query(
-      `INSERT INTO expensescategories (categorydesc) VALUES ($1) RETURNING id, categorydesc AS name`, [name]
-    );
-    res.status(201).json({ ...rows[0], usageCount: 0 });
-    logAudit(req, { kind: "settings.expense-category", desc: `Added expense category "${name}"` });
-  } catch (err) {
-    console.error("[POST /api/settings/expense-categories] DB error:", err.message);
-    res.status(502).json({ error: "database_unreachable", message: err.message });
-  }
-});
-
-router.patch("/expense-categories/:id", async (req, res) => {
-  const name = (req.body?.name || "").trim();
-  if (!name) return res.status(400).json({ error: "bad_request", message: "A category name is required." });
-  try {
-    const dup = await pool.query(
-      `SELECT 1 FROM expensescategories WHERE LOWER(categorydesc) = LOWER($1) AND id <> $2`, [name, req.params.id]
-    );
-    if (dup.rows.length) return res.status(409).json({ error: "conflict", message: "Another category already has that name." });
-    const { rowCount } = await pool.query(
-      `UPDATE expensescategories SET categorydesc = $1 WHERE id = $2`, [name, req.params.id]
-    );
-    if (!rowCount) return res.status(404).json({ error: "not_found", message: "Category not found." });
-    res.json({ id: Number(req.params.id), name });
-    logAudit(req, { kind: "settings.expense-category", desc: `Renamed expense category #${req.params.id} to "${name}"` });
-  } catch (err) {
-    console.error("[PATCH /api/settings/expense-categories/:id] DB error:", err.message);
-    res.status(502).json({ error: "database_unreachable", message: err.message });
-  }
-});
-
-router.delete("/expense-categories/:id", async (req, res) => {
-  try {
-    const used = await pool.query(
-      `SELECT 1 FROM expenses WHERE categoryid::bigint = $1::bigint LIMIT 1`, [req.params.id]
-    );
-    if (used.rows.length) {
-      return res.status(409).json({ error: "conflict", message: "This category is used by at least one expense and can't be deleted." });
+for (const [slug, c] of Object.entries(CATALOGS)) {
+  router.get(`/${slug}`, async (req, res) => {
+    try {
+      const { rows } = await pool.query(
+        `SELECT t.id, t.${c.descCol} AS name, COALESCE(u.n, 0)::int AS "usageCount"
+           FROM ${c.table} t
+           LEFT JOIN (
+             SELECT ${c.usageCol}::bigint AS ref, COUNT(*) AS n
+               FROM ${c.usageTable} WHERE ${c.usageCol} IS NOT NULL GROUP BY 1
+           ) u ON u.ref = t.id
+          ORDER BY t.${c.descCol}`
+      );
+      res.json(rows);
+    } catch (err) {
+      console.error(`[GET /api/settings/${slug}] DB error:`, err.message);
+      res.status(502).json({ error: "database_unreachable", message: err.message });
     }
-    const { rows } = await pool.query(
-      `DELETE FROM expensescategories WHERE id = $1 RETURNING categorydesc`, [req.params.id]
-    );
-    if (!rows.length) return res.status(404).json({ error: "not_found", message: "Category not found." });
-    res.status(204).end();
-    logAudit(req, { kind: "settings.expense-category", desc: `Deleted expense category "${rows[0].categorydesc}"` });
-  } catch (err) {
-    console.error("[DELETE /api/settings/expense-categories/:id] DB error:", err.message);
-    res.status(502).json({ error: "database_unreachable", message: err.message });
-  }
-});
+  });
+
+  router.post(`/${slug}`, async (req, res) => {
+    const name = (req.body?.name || "").trim();
+    if (!name) return res.status(400).json({ error: "bad_request", message: `A ${c.label} name is required.` });
+    try {
+      const dup = await pool.query(`SELECT 1 FROM ${c.table} WHERE LOWER(${c.descCol}) = LOWER($1)`, [name]);
+      if (dup.rows.length) return res.status(409).json({ error: "conflict", message: `That ${c.label} already exists.` });
+      const { rows } = await pool.query(
+        `INSERT INTO ${c.table} (${c.descCol}) VALUES ($1) RETURNING id, ${c.descCol} AS name`, [name]
+      );
+      res.status(201).json({ ...rows[0], usageCount: 0 });
+      logAudit(req, { kind: c.auditKind, desc: `Added ${c.label} "${name}"` });
+    } catch (err) {
+      console.error(`[POST /api/settings/${slug}] DB error:`, err.message);
+      res.status(502).json({ error: "database_unreachable", message: err.message });
+    }
+  });
+
+  router.patch(`/${slug}/:id`, async (req, res) => {
+    const name = (req.body?.name || "").trim();
+    if (!name) return res.status(400).json({ error: "bad_request", message: `A ${c.label} name is required.` });
+    try {
+      const dup = await pool.query(
+        `SELECT 1 FROM ${c.table} WHERE LOWER(${c.descCol}) = LOWER($1) AND id <> $2`, [name, req.params.id]
+      );
+      if (dup.rows.length) return res.status(409).json({ error: "conflict", message: `Another ${c.label} already has that name.` });
+      const { rowCount } = await pool.query(
+        `UPDATE ${c.table} SET ${c.descCol} = $1 WHERE id = $2`, [name, req.params.id]
+      );
+      if (!rowCount) return res.status(404).json({ error: "not_found", message: `${c.label} not found.` });
+      res.json({ id: Number(req.params.id), name });
+      logAudit(req, { kind: c.auditKind, desc: `Renamed ${c.label} #${req.params.id} to "${name}"` });
+    } catch (err) {
+      console.error(`[PATCH /api/settings/${slug}/:id] DB error:`, err.message);
+      res.status(502).json({ error: "database_unreachable", message: err.message });
+    }
+  });
+
+  router.delete(`/${slug}/:id`, async (req, res) => {
+    try {
+      const used = await pool.query(
+        `SELECT 1 FROM ${c.usageTable} WHERE ${c.usageCol}::bigint = $1::bigint LIMIT 1`, [req.params.id]
+      );
+      if (used.rows.length) {
+        return res.status(409).json({ error: "conflict", message: `This ${c.label} is in use and can't be deleted.` });
+      }
+      const { rows } = await pool.query(
+        `DELETE FROM ${c.table} WHERE id = $1 RETURNING ${c.descCol} AS name`, [req.params.id]
+      );
+      if (!rows.length) return res.status(404).json({ error: "not_found", message: `${c.label} not found.` });
+      res.status(204).end();
+      logAudit(req, { kind: c.auditKind, desc: `Deleted ${c.label} "${rows[0].name}"` });
+    } catch (err) {
+      console.error(`[DELETE /api/settings/${slug}/:id] DB error:`, err.message);
+      res.status(502).json({ error: "database_unreachable", message: err.message });
+    }
+  });
+}
 
 /* ============================== INVOICE CURRENCIES ================== */
 // The currency list offered in the invoice modal (invoicecurrencies).

@@ -194,13 +194,15 @@ const HITT_API = (() => {
     getWorkCalendar: () => request("/api/settings/work-calendar"),
     setWorkCalendarYear: (year, payload) =>
       request(`/api/settings/work-calendar/${year}`, { method: "PUT", body: JSON.stringify(payload) }),
-    getExpenseCategoriesAdmin: () => request("/api/settings/expense-categories"),
-    createExpenseCategory: (name) =>
-      request("/api/settings/expense-categories", { method: "POST", body: JSON.stringify({ name }) }),
-    renameExpenseCategory: (id, name) =>
-      request(`/api/settings/expense-categories/${id}`, { method: "PATCH", body: JSON.stringify({ name }) }),
-    deleteExpenseCategory: (id) =>
-      request(`/api/settings/expense-categories/${id}`, { method: "DELETE" }),
+    // Settings → Categories: id/name lists (expense-categories,
+    // biotech-spectrums, project-types). Same CRUD shape for each.
+    settingsCatalog: (slug) => ({
+      list: () => request(`/api/settings/${slug}`),
+      create: (name) => request(`/api/settings/${slug}`, { method: "POST", body: JSON.stringify({ name }) }),
+      rename: (id, name) =>
+        request(`/api/settings/${slug}/${id}`, { method: "PATCH", body: JSON.stringify({ name }) }),
+      remove: (id) => request(`/api/settings/${slug}/${id}`, { method: "DELETE" }),
+    }),
 
     getBrandingLogo: () => request("/api/branding/logo"),
     setBrandingLogo: (dataUrl) =>
