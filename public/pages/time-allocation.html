@@ -12,20 +12,20 @@
   <header class="app-header">
     <a class="app-header__brand" href="../welcome.html"><img class="app-header__logo" src="../assets/fhitt-logo.png?v=2" alt="" aria-hidden="true" />HITT<span class="dot">·</span>Ops</a>
     <nav class="app-header__nav" aria-label="Primary">
-      <a href="../welcome.html">Home</a>
-      <a href="time-allocation.html" class="active">Time allocation</a>
+      <a href="../welcome.html" data-i18n="nav.home">Home</a>
+      <a href="time-allocation.html" class="active" data-i18n="nav.timeAllocation">Time allocation</a>
     </nav>
     <div class="app-header__user">
       <span id="dataSourcePill" class="data-pill" style="font-size:10px; font-weight:700; padding:2px 8px; border-radius:999px;">…</span>
       <div class="avatar" id="userAvatar">?</div>
       <span id="userName">Signed in</span>
-      <button class="btn btn-secondary" id="btnSignOut" style="padding:0.35rem 0.75rem; font-size:0.8rem;">Sign out</button>
+      <button class="btn btn-secondary" id="btnSignOut" style="padding:0.35rem 0.75rem; font-size:0.8rem;" data-i18n="action.signOut">Sign out</button>
     </div>
   </header>
 
   <main class="page-shell ta-shell">
-    <h1 class="page-title">Time allocation</h1>
-    <p class="page-subtitle">Log your hours against projects and manage time-off requests.</p>
+    <h1 class="page-title" data-i18n="page.timeAllocation.title">Time allocation</h1>
+    <p class="page-subtitle" data-i18n="page.timeAllocation.sub">Log your hours against projects and manage time-off requests.</p>
 
     <div class="page-tabs">
       <button data-ptab="tracking" class="page-tab" aria-selected="true">Project time tracking</button>
@@ -99,8 +99,8 @@
       </div>
 
       <div id="approvalsSection" class="hidden">
-        <h2 class="page-title" style="font-size:1.15rem; margin-top:2rem;">Pending approvals</h2>
-        <p class="page-subtitle" style="margin-bottom:1rem;">Requests awaiting a decision, across all employees.</p>
+        <h2 class="page-title" style="font-size:1.15rem; margin-top:2rem;" data-i18n="page.timeAllocation.approvalsTitle">Pending approvals</h2>
+        <p class="page-subtitle" style="margin-bottom:1rem;" data-i18n="page.timeAllocation.approvalsSub">Requests awaiting a decision, across all employees.</p>
         <div class="ta-table-wrap">
           <table class="ta-table">
             <thead>
@@ -183,6 +183,8 @@
 
   <script src="../js/config.js"></script>
   <script src="../js/branding.js"></script>
+  <script src="../js/i18n-dict.js"></script>
+  <script src="../js/i18n.js"></script>
   <script src="../vendor/msal-browser.min.js"></script>
   <script src="../js/auth.js"></script>
   <script src="../js/api.js"></script>

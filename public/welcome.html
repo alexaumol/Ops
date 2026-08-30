@@ -114,95 +114,112 @@
   <header class="app-header">
     <a class="app-header__brand" href="welcome.html"><img class="app-header__logo" src="assets/fhitt-logo.png?v=2" alt="" aria-hidden="true" />HITT<span class="dot">·</span>Ops</a>
     <nav class="app-header__nav" aria-label="Primary">
-      <a href="welcome.html" class="active">Home</a>
+      <a href="welcome.html" class="active" data-i18n="nav.home">Home</a>
     </nav>
     <div class="app-header__user">
       <div class="avatar" id="userAvatar">?</div>
       <span id="userName">Signed in</span>
-      <button class="btn btn-secondary" id="btnSignOut" style="padding:0.35rem 0.75rem; font-size:0.8rem;">Sign out</button>
+      <button class="btn btn-secondary" id="btnSignOut" style="padding:0.35rem 0.75rem; font-size:0.8rem;" data-i18n="action.signOut">Sign out</button>
     </div>
   </header>
 
   <main class="page-shell">
     <section class="welcome-hero">
       <h1 id="heroGreeting">Welcome back</h1>
-      <p>Pick a module below. Projects, Business partners, Time allocation and Invoicing all read live from the HITT test environment as each one comes online.</p>
+      <p data-i18n="welcome.hero.sub">Pick a module below. Projects, Business partners, Time allocation and Invoicing all read live from the HITT test environment as each one comes online.</p>
     </section>
 
     <div class="card-grid" id="moduleGrid">
       <a class="module-card" href="pages/projects.html" data-module="projects">
-        <span class="module-card__status status-live">Live data</span>
+        <span class="module-card__status status-live" data-i18n="welcome.status.live">Live data</span>
         <div class="module-card__icon icon-projects" aria-hidden="true">📁</div>
-        <h2 class="module-card__title">Projects</h2>
-        <p class="module-card__desc">Portfolio kanban, project lifecycle stages, quotations and deliverables.</p>
+        <h2 class="module-card__title" data-i18n="module.projects.title">Projects</h2>
+        <p class="module-card__desc" data-i18n="module.projects.desc">Portfolio kanban, project lifecycle stages, quotations and deliverables.</p>
       </a>
 
       <a class="module-card" href="pages/business-partners.html" data-module="business-partners">
-        <span class="module-card__status status-live">Live data</span>
+        <span class="module-card__status status-live" data-i18n="welcome.status.live">Live data</span>
         <div class="module-card__icon icon-partners" aria-hidden="true">🤝</div>
-        <h2 class="module-card__title">Business partners</h2>
-        <p class="module-card__desc">Search and manage clients, suppliers, contacts and tax entities.</p>
+        <h2 class="module-card__title" data-i18n="module.businessPartners.title">Business partners</h2>
+        <p class="module-card__desc" data-i18n="module.businessPartners.desc">Search and manage clients, suppliers, contacts and tax entities.</p>
       </a>
 
       <a class="module-card" href="pages/time-allocation.html" data-module="time-allocation">
-        <span class="module-card__status status-live">Live data</span>
+        <span class="module-card__status status-live" data-i18n="welcome.status.live">Live data</span>
         <span class="notif-badge module-card__badge hidden" id="timeAllocBadge" title="Time-off notifications"></span>
         <div class="module-card__icon icon-time" aria-hidden="true">🕒</div>
-        <h2 class="module-card__title">Time allocation</h2>
-        <p class="module-card__desc">Time tracking, allocable/non-allocable hours, holidays and time-off requests.</p>
+        <h2 class="module-card__title" data-i18n="module.timeAllocation.title">Time allocation</h2>
+        <p class="module-card__desc" data-i18n="module.timeAllocation.desc">Time tracking, allocable/non-allocable hours, holidays and time-off requests.</p>
       </a>
 
       <a class="module-card" href="pages/invoicing.html" data-module="invoicing">
-        <span class="module-card__status status-live">Live data</span>
+        <span class="module-card__status status-live" data-i18n="welcome.status.live">Live data</span>
         <div class="module-card__icon icon-invoicing" aria-hidden="true">🧾</div>
-        <h2 class="module-card__title">Invoicing</h2>
-        <p class="module-card__desc">Invoice creation, follow-up, previews and proceed-to-invoice workflow.</p>
+        <h2 class="module-card__title" data-i18n="module.invoicing.title">Invoicing</h2>
+        <p class="module-card__desc" data-i18n="module.invoicing.desc">Invoice creation, follow-up, previews and proceed-to-invoice workflow.</p>
       </a>
 
       <a class="module-card" href="pages/expenses.html" data-module="expenses">
-        <span class="module-card__status status-live">Live data</span>
+        <span class="module-card__status status-live" data-i18n="welcome.status.live">Live data</span>
         <div class="module-card__icon icon-expenses" aria-hidden="true">💳</div>
-        <h2 class="module-card__title">Expenses</h2>
-        <p class="module-card__desc">Company expenses — travel, meals, materials — with evidence documents, per project or internal.</p>
+        <h2 class="module-card__title" data-i18n="module.expenses.title">Expenses</h2>
+        <p class="module-card__desc" data-i18n="module.expenses.desc">Company expenses — travel, meals, materials — with evidence documents, per project or internal.</p>
       </a>
 
       <a class="module-card" href="pages/reports.html" data-module="reports">
-        <span class="module-card__status status-live">Live data</span>
+        <span class="module-card__status status-live" data-i18n="welcome.status.live">Live data</span>
         <div class="module-card__icon icon-reports" aria-hidden="true">📊</div>
-        <h2 class="module-card__title">Reports</h2>
-        <p class="module-card__desc">Hours spent per project, and a calendar of resource leaves and holidays.</p>
+        <h2 class="module-card__title" data-i18n="module.reports.title">Reports</h2>
+        <p class="module-card__desc" data-i18n="module.reports.desc">Hours spent per project, and a calendar of resource leaves and holidays.</p>
       </a>
 
       <div class="module-card is-soon" data-module="patient-crm" aria-disabled="true">
-        <span class="module-card__status status-soon">Coming soon</span>
+        <span class="module-card__status status-soon" data-i18n="welcome.status.soon">Coming soon</span>
         <div class="module-card__icon icon-crm" aria-hidden="true">🩺</div>
-        <h2 class="module-card__title">Patient programme CRM</h2>
-        <p class="module-card__desc">Patient-support programmes: enrolment, follow-up and outcomes tracking.</p>
+        <h2 class="module-card__title" data-i18n="module.patientCrm.title">Patient programme CRM</h2>
+        <p class="module-card__desc" data-i18n="module.patientCrm.desc">Patient-support programmes: enrolment, follow-up and outcomes tracking.</p>
       </div>
 
       <a class="module-card" href="pages/settings.html" id="settingsTile" style="display:none;">
-        <span class="module-card__status status-live">Admin</span>
+        <span class="module-card__status status-live" data-i18n="welcome.status.admin">Admin</span>
         <div class="module-card__icon icon-settings" aria-hidden="true">⚙️</div>
-        <h2 class="module-card__title">Settings</h2>
-        <p class="module-card__desc">Manage admin/user roles, module access and time-off approvers.</p>
+        <h2 class="module-card__title" data-i18n="module.settings.title">Settings</h2>
+        <p class="module-card__desc" data-i18n="module.settings.desc">Manage admin/user roles, module access and time-off approvers.</p>
       </a>
     </div>
   </main>
 
   <script src="js/config.js"></script>
   <script src="js/branding.js"></script>
+  <script src="js/i18n-dict.js"></script>
+  <script src="js/i18n.js"></script>
   <script src="vendor/msal-browser.min.js"></script>
   <script src="js/auth.js"></script>
   <script src="js/api.js"></script>
   <script src="js/permissions.js"></script>
   <script src="js/notifications.js"></script>
   <script>
+    const T = (k, v) => (window.HITT_I18N ? HITT_I18N.t(k, v) : k);
+    let heroName = null; // first name once we know it
+
+    function paintGreeting() {
+      const el = document.getElementById("heroGreeting");
+      el.textContent = heroName ? T("welcome.hero.titleNamed", { name: heroName }) : T("welcome.hero.title");
+    }
+
     const session = HITT_AUTH.requireSession("index.html");
     if (session) {
       document.getElementById("userName").textContent = session.displayName;
       document.getElementById("userAvatar").textContent = HITT_AUTH.initials(session);
-      document.getElementById("heroGreeting").textContent = `Welcome back, ${session.displayName.split(" ")[0]}`;
+      heroName = session.displayName.split(" ")[0];
     }
+    paintGreeting();
+    // re-localise the greeting + restricted labels when the language changes
+    window.addEventListener("hitt:langchange", () => {
+      paintGreeting();
+      document.querySelectorAll(".module-card.is-restricted .module-card__status")
+        .forEach((s) => { s.textContent = T("welcome.status.restricted"); });
+    });
     document.getElementById("btnSignOut").addEventListener("click", () => HITT_AUTH.signOut());
 
     // A deactivated employee should never actually see this page — bounced
@@ -224,7 +241,8 @@
         // the hero greeting too (it isn't part of that shared helper since
         // no other page has one).
         if (perms.firstName) {
-          document.getElementById("heroGreeting").textContent = `Welcome back, ${perms.firstName}`;
+          heroName = perms.firstName;
+          paintGreeting();
         }
         if (perms.isAdmin) {
           document.getElementById("settingsTile").style.display = "";
@@ -236,7 +254,7 @@
             tile.classList.add("is-restricted");
             const status = tile.querySelector(".module-card__status");
             if (status) {
-              status.textContent = "Restricted";
+              status.textContent = T("welcome.status.restricted");
               status.className = "module-card__status status-restricted";
             }
           });

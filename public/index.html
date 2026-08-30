@@ -169,27 +169,27 @@
         <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>
         <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
       </svg>
-      Sign in with your Microsoft 365 account
+      <span data-i18n="login.badge">Sign in with your Microsoft 365 account</span>
     </span>
 
     <!-- Shown when redirected back here with ?deactivated=1 — see
          js/permissions.js redirectIfDeactivated(), called right after
          sign-in resolves credentials, before ever routing to welcome.html. -->
-    <p id="deactivatedNotice" class="field-hint hidden" style="color:var(--danger); margin:-0.5rem 0 1.25rem;">
+    <p id="deactivatedNotice" class="field-hint hidden" style="color:var(--danger); margin:-0.5rem 0 1.25rem;" data-i18n="login.deactivated">
       Your HITT Ops account has been deactivated. Contact an admin if you think this is a mistake.
     </p>
 
     <!-- Shown when a page bounced back here with ?expired=1 — the API
          rejected the session token (expired mid-session, or the server's
          auth config changed). See js/api.js handleUnauthorized(). -->
-    <p id="expiredNotice" class="field-hint hidden" style="margin:-0.5rem 0 1.25rem;">
+    <p id="expiredNotice" class="field-hint hidden" style="margin:-0.5rem 0 1.25rem;" data-i18n="login.expired">
       Your session has expired. Please sign in again.
     </p>
 
     <!-- Real sign-in: Entra ID via MSAL.js. Shown when FEATURES.msalLoginEnabled. -->
     <section id="stepMsal" class="login-step">
-      <h1 class="login-heading">Sign in</h1>
-      <p class="login-sub">You'll be asked for your HITT Microsoft 365 credentials in a secure Microsoft window.</p>
+      <h1 class="login-heading" data-i18n="login.heading">Sign in</h1>
+      <p class="login-sub" data-i18n="login.sub.msal">You'll be asked for your HITT Microsoft 365 credentials in a secure Microsoft window.</p>
 
       <div class="login-actions">
         <button type="button" class="btn btn-primary btn-block" id="btnMsalSignIn">
@@ -199,7 +199,7 @@
             <rect x="1" y="11" width="9" height="9" fill="#fff" opacity="0.85"/>
             <rect x="11" y="11" width="9" height="9" fill="#fff" opacity="0.7"/>
           </svg>
-          Sign in with Microsoft
+          <span data-i18n="login.btn.microsoft">Sign in with Microsoft</span>
         </button>
       </div>
       <p id="msalError" class="field-hint hidden" style="color:var(--danger);"></p>
@@ -207,17 +207,17 @@
 
     <!-- Stub sign-in (no real auth): Step 1, identify -->
     <section id="stepEmail" class="login-step">
-      <h1 class="login-heading">Sign in</h1>
-      <p class="login-sub">Use your HITT email and Microsoft 365 password.</p>
+      <h1 class="login-heading" data-i18n="login.heading">Sign in</h1>
+      <p class="login-sub" data-i18n="login.sub.stub">Use your HITT email and Microsoft 365 password.</p>
 
       <form id="formEmail" novalidate>
         <div class="field">
-          <label for="username">Email address</label>
+          <label for="username" data-i18n="login.field.email">Email address</label>
           <input type="email" id="username" name="username" placeholder="name.surname@fhitt.org" autocomplete="username" required />
-          <p class="field-hint">This is the same account you use for Outlook and Teams.</p>
+          <p class="field-hint" data-i18n="login.hint.email">This is the same account you use for Outlook and Teams.</p>
         </div>
         <div class="login-actions">
-          <button type="submit" class="btn btn-primary btn-block">Next</button>
+          <button type="submit" class="btn btn-primary btn-block" data-i18n="login.btn.next">Next</button>
         </div>
       </form>
     </section>
@@ -226,25 +226,25 @@
     <section id="stepPassword" class="login-step">
       <div class="login-user-chip">
         <span id="chipEmail">name.surname@fhitt.org</span>
-        <button type="button" id="btnChangeUser">Change</button>
+        <button type="button" id="btnChangeUser" data-i18n="login.btn.change">Change</button>
       </div>
-      <h1 class="login-heading">Enter password</h1>
-      <p class="login-sub">Prototype mode — password is not validated yet.</p>
+      <h1 class="login-heading" data-i18n="login.heading.password">Enter password</h1>
+      <p class="login-sub" data-i18n="login.sub.password">Prototype mode — password is not validated yet.</p>
 
       <form id="formPassword" novalidate>
         <div class="field">
-          <label for="password">Password</label>
+          <label for="password" data-i18n="login.field.password">Password</label>
           <input type="password" id="password" name="password" autocomplete="current-password" placeholder="••••••••" />
         </div>
         <div class="login-actions">
-          <button type="submit" class="btn btn-primary btn-block">Sign in</button>
-          <button type="button" class="btn btn-secondary btn-block" id="btnBack">Back</button>
+          <button type="submit" class="btn btn-primary btn-block" data-i18n="login.btn.signin">Sign in</button>
+          <button type="button" class="btn btn-secondary btn-block" id="btnBack" data-i18n="login.btn.back">Back</button>
         </div>
       </form>
     </section>
 
     <p id="prototypeNote" class="prototype-note hidden">
-      ⚠️ <span>Prototype build: credentials are not verified against Microsoft Entra ID yet.</span>
+      ⚠️ <span data-i18n="login.prototypeNote">Prototype build: credentials are not verified against Microsoft Entra ID yet.</span>
     </p>
   </main>
 
@@ -252,6 +252,8 @@
 
   <script src="js/config.js"></script>
   <script src="js/branding.js"></script>
+  <script src="js/i18n-dict.js"></script>
+  <script src="js/i18n.js"></script>
   <script src="vendor/msal-browser.min.js"></script>
   <script src="js/auth.js"></script>
   <script src="js/api.js"></script>

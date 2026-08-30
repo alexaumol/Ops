@@ -16,14 +16,14 @@
   <header class="app-header">
     <a class="app-header__brand" href="../welcome.html"><img class="app-header__logo" src="../assets/fhitt-logo.png?v=2" alt="" aria-hidden="true" />HITT<span class="dot">·</span>Ops</a>
     <nav class="app-header__nav" aria-label="Primary">
-      <a href="../welcome.html">Home</a>
-      <a href="projects.html" class="active">Projects</a>
+      <a href="../welcome.html" data-i18n="nav.home">Home</a>
+      <a href="projects.html" class="active" data-i18n="nav.projects">Projects</a>
     </nav>
     <div class="app-header__user">
       <span id="dataSourcePill" class="data-pill">…</span>
       <div class="avatar" id="userAvatar">?</div>
       <span id="userName">Signed in</span>
-      <button class="btn btn-secondary" id="btnSignOut" style="padding:0.35rem 0.75rem; font-size:0.8rem;">Sign out</button>
+      <button class="btn btn-secondary" id="btnSignOut" style="padding:0.35rem 0.75rem; font-size:0.8rem;" data-i18n="action.signOut">Sign out</button>
     </div>
   </header>
 
@@ -32,8 +32,8 @@
     <div class="flex items-center gap-3">
       <div class="w-9 h-9 rounded-lg bg-hitt-ink text-white flex items-center justify-center font-extrabold shrink-0">H</div>
       <div class="leading-tight">
-        <h1 class="text-base sm:text-lg font-bold text-hitt-ink">Project portfolio</h1>
-        <p class="text-[11px] text-hitt-teel text-hitt-teal">Drag a card to move it through the pipeline</p>
+        <h1 class="text-base sm:text-lg font-bold text-hitt-ink" data-i18n="page.projects.title">Project portfolio</h1>
+        <p class="text-[11px] text-hitt-teel text-hitt-teal" data-i18n="page.projects.sub">Drag a card to move it through the pipeline</p>
       </div>
     </div>
 
@@ -498,6 +498,8 @@
 
 <script src="../js/config.js"></script>
 <script src="../js/branding.js"></script>
+<script src="../js/i18n-dict.js"></script>
+<script src="../js/i18n.js"></script>
 <script src="../vendor/msal-browser.min.js"></script>
 <script src="../js/auth.js"></script>
 <script src="../js/api.js"></script>

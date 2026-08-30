@@ -206,6 +206,9 @@ const HITT_API = (() => {
     setBrandingLogo: (dataUrl) =>
       request("/api/branding/logo", { method: "PUT", body: JSON.stringify({ dataUrl }) }),
     clearBrandingLogo: () => request("/api/branding/logo", { method: "DELETE" }),
+    getAppLanguage: () => request("/api/branding/language"),
+    setAppLanguage: (language) =>
+      request("/api/branding/language", { method: "PUT", body: JSON.stringify({ language }) }),
 
     getInvoiceCurrencies: () => request("/api/settings/currencies"),
     createInvoiceCurrency: (payload) =>

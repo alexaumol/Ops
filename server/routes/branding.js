@@ -1,13 +1,14 @@
 /**
- * /api/branding — company logo customization (Settings → Customizations).
+ * /api/branding — app customization (Settings → Customizations).
  * ---------------------------------------------------------------------------
- * The uploaded logo is stored as a base64 data URL in the shared `appconfig`
- * table (key "branding.logo") — same table the Settings "Paths" tab uses.
- * Keeping it in the DB (rather than a file under public/) means it survives
- * a `git pull` deploy and needs no writable uploads directory.
+ * Values live in the shared `appconfig` table (same one the Settings "Paths"
+ * tab uses). Keeping them in the DB (rather than files under public/) means
+ * they survive a `git pull` deploy and need no writable directory.
+ *   branding.logo    — base64 data URL of the company logo
+ *   app.language     — default UI language code ('en' | 'es' | 'ca')
  *
- * GET /logo is deliberately PUBLIC — the sign-in page (index.html, pre-auth)
- * shows the logo too. PUT/DELETE require an admin.
+ * GET /logo and GET /language are deliberately PUBLIC — the sign-in page
+ * (index.html, pre-auth) needs both. The mutating routes require an admin.
  * ---------------------------------------------------------------------------
  */
 const express = require("express");
@@ -18,6 +19,8 @@ const { logAudit } = require("../lib/audit");
 const router = express.Router();
 
 const KEY = "branding.logo";
+const LANG_KEY = "app.language";
+const LANGUAGES = ["en", "es", "ca"];
 // Generous ceiling for the base64 string. The client crops/resizes to a
 // small square before upload, so real payloads are tens of KB.
 const MAX_CHARS = 3 * 1024 * 1024;
@@ -78,6 +81,44 @@ router.put("/logo", requireAdmin, async (req, res) => {
     logAudit(req, { kind: "settings.branding", desc: "Updated the company logo" });
   } catch (err) {
     console.error("[PUT /api/branding/logo] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
+// GET /api/branding/language — { language: 'en'|'es'|'ca' }. Public
+// (the sign-in page localises itself before anyone has a token).
+router.get("/language", async (req, res) => {
+  try {
+    await ensureConfigTable();
+    const { rows } = await pool.query(`SELECT configvalue FROM appconfig WHERE configkey = $1`, [LANG_KEY]);
+    res.set("Cache-Control", "no-cache");
+    const v = rows[0]?.configvalue;
+    res.json({ language: LANGUAGES.includes(v) ? v : "en" });
+  } catch (err) {
+    console.error("[GET /api/branding/language] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
+// PUT /api/branding/language   { language }
+router.put("/language", requireAdmin, async (req, res) => {
+  const language = typeof req.body?.language === "string" ? req.body.language.trim().toLowerCase() : "";
+  if (!LANGUAGES.includes(language)) {
+    return res.status(400).json({ error: "bad_request", message: `language must be one of ${LANGUAGES.join(", ")}.` });
+  }
+  try {
+    await ensureConfigTable();
+    await pool.query(
+      `INSERT INTO appconfig (configkey, configvalue, updatedat, updatedby)
+       VALUES ($1, $2, now(), $3)
+       ON CONFLICT (configkey)
+       DO UPDATE SET configvalue = EXCLUDED.configvalue, updatedat = now(), updatedby = EXCLUDED.updatedby`,
+      [LANG_KEY, language, req.hittUser.employeeId || null]
+    );
+    res.json({ language });
+    logAudit(req, { kind: "settings.branding", desc: `Set the default UI language to ${language}` });
+  } catch (err) {
+    console.error("[PUT /api/branding/language] DB error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });
   }
 });

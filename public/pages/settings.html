@@ -11,36 +11,36 @@
   <header class="app-header">
     <a class="app-header__brand" href="../welcome.html"><img class="app-header__logo" src="../assets/fhitt-logo.png?v=2" alt="" aria-hidden="true" />HITT<span class="dot">·</span>Ops</a>
     <nav class="app-header__nav" aria-label="Primary">
-      <a href="../welcome.html">Home</a>
-      <a href="settings.html" class="active">Settings</a>
+      <a href="../welcome.html" data-i18n="nav.home">Home</a>
+      <a href="settings.html" class="active" data-i18n="nav.settings">Settings</a>
     </nav>
     <div class="app-header__user">
       <div class="avatar" id="userAvatar">?</div>
       <span id="userName">Signed in</span>
-      <button class="btn btn-secondary" id="btnSignOut" style="padding:0.35rem 0.75rem; font-size:0.8rem;">Sign out</button>
+      <button class="btn btn-secondary" id="btnSignOut" style="padding:0.35rem 0.75rem; font-size:0.8rem;" data-i18n="action.signOut">Sign out</button>
     </div>
   </header>
 
   <main class="page-shell">
-    <h1 class="page-title">Settings</h1>
-    <p class="page-subtitle">Permissions, public/company holidays, and the yearly work calendar.</p>
+    <h1 class="page-title" data-i18n="settings.title">Settings</h1>
+    <p class="page-subtitle" data-i18n="settings.sub">Permissions, public/company holidays, and the yearly work calendar.</p>
 
     <div id="settingsBlocked" class="hidden">
-      <div class="settings-table-wrap" style="padding:2rem; text-align:center; color:var(--text-secondary);">
+      <div class="settings-table-wrap" style="padding:2rem; text-align:center; color:var(--text-secondary);" data-i18n="settings.blocked">
         You don't have access to Settings. This page is admin-only.
       </div>
     </div>
 
     <div id="settingsContent" class="hidden">
       <div class="settings-tabs" role="tablist">
-        <button data-stab="permissions" class="settings-tab" role="tab" aria-selected="true">User permissions</button>
-        <button data-stab="holidays" class="settings-tab" role="tab" aria-selected="false">Holidays</button>
-        <button data-stab="calendar" class="settings-tab" role="tab" aria-selected="false">Work calendar</button>
-        <button data-stab="paths" class="settings-tab" role="tab" aria-selected="false">Paths</button>
-        <button data-stab="expcats" class="settings-tab" role="tab" aria-selected="false">Expense categories</button>
-        <button data-stab="currencies" class="settings-tab" role="tab" aria-selected="false">Currencies</button>
-        <button data-stab="customizations" class="settings-tab" role="tab" aria-selected="false">Customizations</button>
-        <button data-stab="audit" class="settings-tab" role="tab" aria-selected="false">Auditing</button>
+        <button data-stab="permissions" class="settings-tab" role="tab" aria-selected="true" data-i18n="settings.tab.permissions">User permissions</button>
+        <button data-stab="holidays" class="settings-tab" role="tab" aria-selected="false" data-i18n="settings.tab.holidays">Holidays</button>
+        <button data-stab="calendar" class="settings-tab" role="tab" aria-selected="false" data-i18n="settings.tab.calendar">Work calendar</button>
+        <button data-stab="paths" class="settings-tab" role="tab" aria-selected="false" data-i18n="settings.tab.paths">Paths</button>
+        <button data-stab="expcats" class="settings-tab" role="tab" aria-selected="false" data-i18n="settings.tab.expcats">Expense categories</button>
+        <button data-stab="currencies" class="settings-tab" role="tab" aria-selected="false" data-i18n="settings.tab.currencies">Currencies</button>
+        <button data-stab="customizations" class="settings-tab" role="tab" aria-selected="false" data-i18n="settings.tab.customizations">Customizations</button>
+        <button data-stab="audit" class="settings-tab" role="tab" aria-selected="false" data-i18n="settings.tab.audit">Auditing</button>
       </div>
 
       <!-- ==================== USER PERMISSIONS ==================== -->
@@ -165,22 +165,22 @@
 
       <!-- ==================== CUSTOMIZATIONS ==================== -->
       <section id="paneCustomizations" class="settings-pane hidden">
-        <p class="settings-note">Your organisation's logo. It replaces the default mark on the sign-in screen and in every page header. A square-ish image works best — after choosing a file you can zoom and drag it to frame the part you want.</p>
+        <p class="settings-note" data-i18n="cust.logo.note">Your organisation's logo. It replaces the default mark on the sign-in screen and in every page header. A square-ish image works best — after choosing a file you can zoom and drag it to frame the part you want.</p>
 
         <div class="brand-editor">
           <div class="brand-editor__col">
-            <h3 class="brand-editor__h">Current logo</h3>
+            <h3 class="brand-editor__h" data-i18n="cust.logo.current">Current logo</h3>
             <div class="brand-logo-frame">
               <img id="brandCurrentLogo" src="../assets/fhitt-logo.png" alt="Current company logo" />
             </div>
-            <button class="btn btn-secondary" id="btnBrandReset" disabled>Reset to default</button>
+            <button class="btn btn-secondary" id="btnBrandReset" disabled data-i18n="cust.logo.reset">Reset to default</button>
             <p class="settings-emp-sub" id="brandUpdatedInfo" style="margin:0.5rem 0 0;"></p>
           </div>
 
           <div class="brand-editor__col">
-            <h3 class="brand-editor__h">Upload a new logo</h3>
+            <h3 class="brand-editor__h" data-i18n="cust.logo.uploadHead">Upload a new logo</h3>
             <label class="btn btn-primary brand-file-btn">
-              Choose image…
+              <span data-i18n="cust.logo.choose">Choose image…</span>
               <input type="file" id="brandFile" accept="image/png,image/jpeg,image/webp" hidden />
             </label>
 
@@ -190,17 +190,28 @@
                 <div class="brand-crop__mask" aria-hidden="true"></div>
               </div>
               <label class="brand-crop__zoom">
-                <span>Zoom</span>
+                <span data-i18n="cust.logo.zoom">Zoom</span>
                 <input type="range" id="brandZoom" min="1" max="5" step="0.01" value="1" />
               </label>
-              <p class="settings-emp-sub">Drag the image to reposition. The framed square is what gets saved (as a transparent PNG).</p>
+              <p class="settings-emp-sub" data-i18n="cust.logo.dragHint">Drag the image to reposition. The framed square is what gets saved (as a transparent PNG).</p>
               <div class="brand-crop__actions">
-                <button class="btn btn-secondary" id="btnBrandCancel">Cancel</button>
-                <button class="btn btn-primary" id="btnBrandSave">Save logo</button>
+                <button class="btn btn-secondary" id="btnBrandCancel" data-i18n="cust.logo.cancel">Cancel</button>
+                <button class="btn btn-primary" id="btnBrandSave" data-i18n="cust.logo.save">Save logo</button>
               </div>
             </div>
           </div>
         </div>
+
+        <hr style="border:none; border-top:1px solid var(--border-subtle); margin:1.75rem 0;" />
+
+        <h3 class="brand-editor__h" data-i18n="cust.lang.head">Interface language</h3>
+        <p class="settings-note" data-i18n="cust.lang.note">The default language for everyone. Each person can override it for themselves with the language switcher in the top bar — their choice wins.</p>
+        <div class="settings-add-row" style="align-items:center;">
+          <label for="defaultLangSelect" class="settings-emp-sub" data-i18n="cust.lang.defaultLabel">Default language</label>
+          <select id="defaultLangSelect" class="field-input" style="max-width:12rem;"></select>
+          <button class="btn btn-primary" id="btnSaveDefaultLang" data-i18n="cust.lang.save">Save default</button>
+        </div>
+        <p class="settings-emp-sub" id="langOverrideNote" style="margin:0.6rem 0 0;"></p>
       </section>
 
       <!-- ==================== AUDITING ==================== -->
@@ -335,6 +346,8 @@
 
   <script src="../js/config.js"></script>
   <script src="../js/branding.js"></script>
+  <script src="../js/i18n-dict.js"></script>
+  <script src="../js/i18n.js"></script>
   <script src="../vendor/msal-browser.min.js"></script>
   <script src="../js/auth.js"></script>
   <script src="../js/api.js"></script>

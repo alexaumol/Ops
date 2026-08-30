@@ -337,6 +337,7 @@ document.querySelectorAll("[data-stab]").forEach((btn) => {
     if (tab === "customizations" && !customizationsLoaded) {
       customizationsLoaded = true;
       loadBranding();
+      loadDefaultLanguage();
     }
     if (tab === "audit" && !auditLoaded) {
       auditLoaded = true;
@@ -1002,23 +1003,91 @@ const brandEls = {
 const brandCrop = { img: null, baseScale: 1, zoom: 1, offsetX: 0, offsetY: 0, drag: null };
 const DEFAULT_LOGO_SRC = "../assets/fhitt-logo.png";
 
+const TI = (k, v) => (window.HITT_I18N ? HITT_I18N.t(k, v) : k);
+
 async function loadBranding() {
   try {
     const { dataUrl } = await HITT_API.getBrandingLogo();
     if (dataUrl) {
       brandEls.current.src = dataUrl;
       brandEls.reset.disabled = false;
-      brandEls.updated.textContent = "A custom logo is in use.";
+      brandEls.updated.textContent = TI("cust.logo.inUse");
     } else {
       brandEls.current.src = DEFAULT_LOGO_SRC;
       brandEls.reset.disabled = true;
-      brandEls.updated.textContent = "Using the default Fundació HiTT mark.";
+      brandEls.updated.textContent = TI("cust.logo.default");
     }
   } catch (err) {
     console.error("[settings] branding:", err.message);
     brandEls.updated.textContent = "Could not load the current logo.";
   }
 }
+
+/* ---- default UI language --------------------------------------------- */
+const langEls = {
+  select: document.getElementById("defaultLangSelect"),
+  save: document.getElementById("btnSaveDefaultLang"),
+  note: document.getElementById("langOverrideNote"),
+};
+let savedDefaultLang = "en";
+
+function fillLangSelect() {
+  const codes = (window.HITT_I18N && HITT_I18N.supported) || ["en", "es", "ca"];
+  langEls.select.innerHTML = codes
+    .map((c) => `<option value="${c}">${TI("lang." + c)}</option>`)
+    .join("");
+  langEls.select.value = savedDefaultLang;
+}
+
+function paintLangOverrideNote() {
+  const uw = window.HITT_I18N && HITT_I18N.userLang;
+  if (uw) {
+    langEls.note.innerHTML =
+      escapeHtml(TI("cust.lang.yourChoice", { lang: TI("lang." + uw) })) +
+      ` <button type="button" class="linklike" id="btnClearLangOverride">${escapeHtml(TI("cust.lang.clearOverride"))}</button>`;
+    const btn = document.getElementById("btnClearLangOverride");
+    if (btn) btn.addEventListener("click", () => { HITT_I18N.clearUserLang(); paintLangOverrideNote(); });
+  } else {
+    langEls.note.textContent = "";
+  }
+}
+
+async function loadDefaultLanguage() {
+  fillLangSelect();
+  paintLangOverrideNote();
+  try {
+    const { language } = await HITT_API.getAppLanguage();
+    savedDefaultLang = language || "en";
+    langEls.select.value = savedDefaultLang;
+  } catch (err) {
+    console.error("[settings] default language:", err.message);
+  }
+}
+
+langEls.save.addEventListener("click", async () => {
+  const code = langEls.select.value;
+  langEls.save.disabled = true;
+  try {
+    await HITT_API.setAppLanguage(code);
+    savedDefaultLang = code;
+    // Updates the remembered default; if this admin has no personal
+    // override the UI switches to it right away.
+    if (window.HITT_I18N) HITT_I18N.setDefaultLang(code);
+    toast(TI("cust.lang.saved"), "green");
+  } catch (err) {
+    toast(err.message || TI("cust.lang.savedError"), "red");
+  } finally {
+    langEls.save.disabled = false;
+  }
+});
+
+window.addEventListener("hitt:langchange", () => {
+  if (customizationsLoaded) {
+    fillLangSelect();
+    paintLangOverrideNote();
+    loadBranding();
+  }
+});
 
 function brandClampOffsets() {
   if (!brandCrop.img) return;
@@ -1132,7 +1201,7 @@ brandEls.save.addEventListener("click", async () => {
     await HITT_API.setBrandingLogo(dataUrl);
     brandEls.current.src = dataUrl;
     brandEls.reset.disabled = false;
-    brandEls.updated.textContent = "A custom logo is in use.";
+    brandEls.updated.textContent = TI("cust.logo.inUse");
     if (window.HITT_BRANDING) {
       window.HITT_BRANDING.cache(dataUrl);
       window.HITT_BRANDING.apply(dataUrl);
@@ -1152,7 +1221,7 @@ brandEls.reset.addEventListener("click", async () => {
   try {
     await HITT_API.clearBrandingLogo();
     brandEls.current.src = DEFAULT_LOGO_SRC;
-    brandEls.updated.textContent = "Using the default Fundació HiTT mark.";
+    brandEls.updated.textContent = TI("cust.logo.default");
     if (window.HITT_BRANDING) window.HITT_BRANDING.cache(null);
     toast("Logo reset. Other pages revert on their next load.", "green");
   } catch (err) {

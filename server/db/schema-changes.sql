@@ -156,3 +156,12 @@ ALTER TABLE invoicesdetails ADD COLUMN IF NOT EXISTS emailedat timestamptz;
 ALTER TABLE invoicesdetails ADD COLUMN IF NOT EXISTS emailedby bigint;
 ALTER TABLE invoicesdetails ADD COLUMN IF NOT EXISTS emailedto text;
 ALTER TABLE invoicesdetails ADD COLUMN IF NOT EXISTS emailedcount int NOT NULL DEFAULT 0;
+
+-- 2026-08 — Default UI language (Settings → Customizations)
+-- --------------------------------------------------------------------------
+-- appconfig key 'app.language' holds the app-wide default UI language code
+-- ('en' | 'es' | 'ca'), served publicly by GET /api/branding/language (the
+-- sign-in page localises itself pre-auth). Each viewer can override it for
+-- themselves; that choice lives in their browser (localStorage "hitt.lang"),
+-- not the DB. appconfig table created by ensureConfigTable() in
+-- server/routes/branding.js.
