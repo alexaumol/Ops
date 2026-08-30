@@ -149,10 +149,10 @@
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
-  overflow: hidden;
+  overflow-x: auto;
   box-shadow: var(--shadow-sm);
 }
-.inv-table { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
+.inv-table { width: 100%; border-collapse: collapse; font-size: 0.86rem; min-width: 62rem; }
 .inv-table thead th {
   text-align: left; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.03em;
   color: var(--text-secondary); background: var(--bg-surface-alt);
@@ -170,6 +170,29 @@
 
 .inv-proceed-col { width: 1.75rem; text-align: center; padding-left: 0.4rem !important; padding-right: 0.4rem !important; }
 .inv-proceed-icon { color: var(--success); font-weight: 700; }
+
+/* Invoiced amount + % of budget; red flag when partial-but-nothing-invoiced */
+.inv-invoiced-pct { color: var(--text-secondary); font-size: 0.85em; }
+.inv-table tbody td.inv-invoiced-alert {
+  background: rgba(178,74,58,0.14);
+  color: var(--danger);
+  font-weight: 700;
+}
+.inv-table tbody td.inv-invoiced-alert .inv-invoiced-pct { color: var(--danger); opacity: 0.8; }
+
+/* Per-row action buttons (open project / close project) */
+.inv-actions-col { width: 1px; white-space: nowrap; text-align: right; }
+.inv-row-actions { display: inline-flex; gap: 0.3rem; align-items: center; }
+.inv-row-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle); background: var(--bg-surface);
+  color: var(--text-secondary); font-size: 0.9rem; line-height: 1;
+  text-decoration: none; cursor: pointer;
+}
+.inv-row-btn:hover { border-color: var(--hitt-teal); color: var(--text-primary); }
+.inv-row-btn--danger:hover:not(:disabled) { border-color: var(--danger); color: var(--danger); }
+.inv-row-btn:disabled { opacity: 0.3; cursor: default; }
 
 .inv-filter-count { opacity: 0.7; font-weight: 700; }
 .inv-filter-btn[aria-selected="true"] .inv-filter-count { opacity: 0.85; }

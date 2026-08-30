@@ -15,6 +15,10 @@ document.getElementById("userAvatar").textContent = HITT_AUTH.initials(session);
 document.getElementById("btnSignOut").addEventListener("click", () => HITT_AUTH.signOut("../index.html"));
 HITT_PERMS.applyRealName();
 
+let currentEmployeeId = null;
+HITT_PERMS.get().then((perms) => { currentEmployeeId = perms.employeeId; }).catch(() => {});
+let CLOSED_STATUS_ID = null; // resolved from GET /api/projects/statuses
+
 const DEMO_SEED = [
   { id: 1, code: '26018', name: 'Demo Project', entityLabel: 'HiTT', projectStatusLabel: 'WIP', budget: 5000, proceedtoinvoice: true, invoiceCount: 1, invoicedTotal: 2000 },
 ];
@@ -110,6 +114,10 @@ async function loadProjects(){
     LOOKUPS = await HITT_API.getInvoicingLookups();
     PROJECTS = await HITT_API.getInvoicingProjects();
     usingDemoData = false;
+    try {
+      const statuses = await HITT_API.getProjectStatuses();
+      CLOSED_STATUS_ID = statuses.find(s => String(s.label).trim().toLowerCase() === 'closed')?.id ?? null;
+    } catch { /* Close-project button just won't work until this resolves */ }
   } catch (err) {
     console.warn('Falling back to demo data — could not reach API:', err);
     PROJECTS = structuredClone(DEMO_SEED);
@@ -227,6 +235,12 @@ function renderTable(){
   empty.classList.add('hidden');
   tbody.innerHTML = rows.map((p, i) => {
     const bucket = computeBucket(p);
+    const invoiced = Number(p.invoicedTotal) || 0;
+    const budget = Number(p.budget) || 0;
+    const pct = budget > 0 ? Math.round((invoiced / budget) * 100) : null;
+    // Partially invoiced but nothing actually invoiced → something's off.
+    const invoicedAlert = bucket === 'partial' && invoiced === 0;
+    const alreadyClosed = isClosedStatus(p.projectStatusLabel);
     return `
       <tr data-i="${i}">
         <td class="inv-proceed-col">${p.proceedtoinvoice ? `<span class="inv-proceed-icon" title="Proceed to invoice">✔</span>` : ''}</td>
@@ -234,16 +248,48 @@ function renderTable(){
         <td>${escapeHtml(p.entityLabel || '—')}</td>
         <td>${statusChipHtml(p.projectStatusLabel)}</td>
         <td style="text-align:right;">${formatMoney(p.budget)}</td>
-        <td style="text-align:right;">${formatMoney(p.invoicedTotal)}</td>
+        <td style="text-align:right;" class="${invoicedAlert ? 'inv-invoiced-alert' : ''}">
+          ${formatMoney(p.invoicedTotal)}${pct !== null ? ` <span class="inv-invoiced-pct">(${pct}%)</span>` : ''}
+        </td>
         <td style="text-align:right;">${Number(p.invoiceCount) || 0}</td>
         <td><span class="inv-bucket-pill inv-bucket-${bucket}">${BUCKET_LABEL[bucket]}</span></td>
+        <td class="inv-actions-col">
+          <div class="inv-row-actions">
+            <a class="inv-row-btn" href="projects.html?projectId=${encodeURIComponent(p.id)}" target="_blank" rel="noopener" data-row-action title="Open project page" aria-label="Open project page">↗</a>
+            <button type="button" class="inv-row-btn inv-row-btn--danger" data-close-project data-row-action
+              title="${alreadyClosed ? 'Project is already closed' : 'Close project (set status to Closed)'}"
+              aria-label="Close project" ${alreadyClosed ? 'disabled' : ''}>⊘</button>
+          </div>
+        </td>
       </tr>
     `;
   }).join('');
 
   tbody.querySelectorAll('tr').forEach((tr, i) => {
-    tr.addEventListener('click', () => openProjectModal(rows[i].id));
+    tr.addEventListener('click', (e) => {
+      if (e.target.closest('[data-row-action]')) return; // let the button/link handle it
+      openProjectModal(rows[i].id);
+    });
+    tr.querySelector('[data-close-project]')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      closeProjectFromList(rows[i]);
+    });
   });
+}
+
+async function closeProjectFromList(p){
+  if (!p || isClosedStatus(p.projectStatusLabel)) return;
+  if (usingDemoData) { toast("Closing a project isn't available in demo data.", 'navy'); return; }
+  if (CLOSED_STATUS_ID == null) { toast("Couldn't resolve the \"Closed\" status — try reloading.", 'red'); return; }
+  if (!confirm(`Close project ${p.code} — ${p.name}?\nIts status will be set to "Closed".`)) return;
+  try {
+    await HITT_API.updateProjectStage(p.id, CLOSED_STATUS_ID, currentEmployeeId);
+    toast(`${p.code} closed`, 'green');
+    await loadProjects();
+  } catch (err) {
+    console.error(err);
+    toast('Could not close the project.', 'red');
+  }
 }
 
 function updateSortIndicators(){
