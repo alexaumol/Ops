@@ -124,6 +124,10 @@
         </div>
 
         <div id="paneInvoices" class="modal-pane hidden">
+          <div class="inv-default-tc">
+            <label class="field-label" for="invoicesDefaultTaxCompany">Default tax company for this project's invoices</label>
+            <select id="invoicesDefaultTaxCompany" class="field-input"></select>
+          </div>
           <div style="display:flex; justify-content:flex-end; margin-bottom:0.75rem;">
             <button id="btnNewInvoice" class="btn btn-primary">+ New invoice</button>
           </div>
@@ -247,7 +251,11 @@
           <div class="field-grid">
             <div>
               <label class="field-label">Tax company (business partner to invoice)</label>
-              <select id="invTaxCompany" class="field-input"></select>
+              <div class="inv-taxco-row">
+                <select id="invTaxCompany" class="field-input" disabled></select>
+                <button type="button" id="invTaxCompanyChange" class="btn btn-secondary">Change</button>
+              </div>
+              <p id="invTaxCompanyHint" class="inv-taxco-hint">Defaults to the project's tax company. “Change” overrides it for this invoice only.</p>
             </div>
             <div>
               <label class="field-label">Billing account</label>
@@ -277,6 +285,33 @@
           <button id="invCancel" class="btn btn-secondary">Cancel</button>
           <button id="invSave" class="btn btn-primary">Save invoice</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================ TAX COMPANY PICKER ============================ -->
+  <div id="tcPickerOverlay" class="modal-overlay hidden">
+    <div class="modal-panel" style="max-width:760px;">
+      <div class="modal-head">
+        <h2 style="flex:1; font-size:1rem; font-weight:700; color:#fff; margin:0;">Choose a tax company</h2>
+        <button id="tcPickerClose" class="modal-head-btn modal-head-btn--close" title="Close">✕</button>
+      </div>
+      <div style="padding:0.75rem 1.1rem; border-bottom:1px solid var(--border-subtle);">
+        <input id="tcPickerSearch" type="text" class="field-input" placeholder="Search name, VAT, business partner, or invoicing email…" autocomplete="off" />
+      </div>
+      <div class="modal-body" style="padding:0;">
+        <table class="mini-table tc-picker-table">
+          <thead>
+            <tr>
+              <th>Tax company</th>
+              <th>VAT number</th>
+              <th>Business partner</th>
+              <th>Invoicing email</th>
+            </tr>
+          </thead>
+          <tbody id="tcPickerBody"></tbody>
+        </table>
+        <div id="tcPickerEmpty" class="sub-empty hidden">No tax companies match.</div>
       </div>
     </div>
   </div>

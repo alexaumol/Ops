@@ -233,6 +233,8 @@ const HITT_API = (() => {
     },
 
     getInvoicingLookups: () => request("/api/invoicing/lookups"),
+    getAllTaxCompanies: (search) =>
+      request(`/api/invoicing/tax-companies${search ? `?search=${encodeURIComponent(search)}` : ""}`),
     getInvoicingProjects: () => request("/api/invoicing/projects"),
     getProjectRelease: (projectId) => request(`/api/invoicing/projects/${projectId}/release`),
     saveProjectRelease: (projectId, payload) =>
@@ -255,10 +257,10 @@ const HITT_API = (() => {
         method: "PATCH",
         body: JSON.stringify({ businessPartnerId }),
       }),
-    assignProjectInvoicingPartner: (id, taxCompanyId) =>
+    assignProjectInvoicingPartner: (id, taxCompanyId, employeeId) =>
       request(`/api/projects/${id}/invoicing-partner`, {
         method: "PATCH",
-        body: JSON.stringify({ taxCompanyId }),
+        body: JSON.stringify({ taxCompanyId, employeeId }),
       }),
     updateProject: (id, payload) =>
       request(`/api/projects/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),

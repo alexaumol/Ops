@@ -137,6 +137,35 @@ router.get("/lookups", async (req, res) => {
   }
 });
 
+// GET /api/invoicing/tax-companies?search= — every tax company across all
+// business partners, for the invoice modal's "choose another" picker.
+router.get("/tax-companies", requireModuleAccess("invoicing"), async (req, res) => {
+  const search = (req.query.search || "").trim();
+  try {
+    const params = [];
+    let where = "";
+    if (search) {
+      params.push(`%${search}%`);
+      where = `WHERE tc.taxcompanyname ILIKE $1 OR tc.vatnumber ILIKE $1
+                 OR bp.bpname ILIKE $1 OR tc.emailinvoicing ILIKE $1`;
+    }
+    const { rows } = await pool.query(
+      `SELECT tc.id, tc.taxcompanyname, tc.vatnumber, tc.emailinvoicing,
+              tc.businesspartnerid AS "bpId", bp.bpname AS "bpName"
+       FROM taxcompanies tc
+       LEFT JOIN businesspartners bp ON bp.id = tc.businesspartnerid::bigint
+       ${where}
+       ORDER BY tc.taxcompanyname
+       LIMIT 300`,
+      params
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error("[GET /api/invoicing/tax-companies] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
 // GET /api/invoicing/projects — dashboard list: every invoiceable project
 // with its release settings (if any), latest quotation budget, and
 // invoiced-to-date total so the frontend can bucket by

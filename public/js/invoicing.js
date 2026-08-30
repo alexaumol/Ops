@@ -37,6 +37,10 @@ const projectStatusSel = new Set(); // selected project-status labels; empty = a
 let activeProjectId = null;
 let activeProjectBpId = null;
 let activeInvoiceId = null;
+let activeProjectBpTaxCompanies = [];         // the contracting BP's own tax companies
+let activeProjectDefaultTc = null;            // { id, taxcompanyname } — project default for new invoices
+let invTaxCompanyPrev = '';                   // last real value of the invoice-modal select
+let invoicesDefaultTcPrev = '';               // last real value of the Invoices-tab default select
 
 function escapeHtml(s){
   const d = document.createElement('div');
@@ -255,7 +259,7 @@ function renderTable(){
         <td><span class="inv-bucket-pill inv-bucket-${bucket}">${BUCKET_LABEL[bucket]}</span></td>
         <td class="inv-actions-col">
           <div class="inv-row-actions">
-            <a class="inv-row-btn" href="projects.html?projectId=${encodeURIComponent(p.id)}" target="_blank" rel="noopener" data-row-action title="Open project page" aria-label="Open project page">↗</a>
+            <a class="inv-row-btn" href="projects.html?projectId=${encodeURIComponent(p.id)}" data-row-action title="Open project page" aria-label="Open project page">↗</a>
             <button type="button" class="inv-row-btn inv-row-btn--danger" data-close-project data-row-action
               title="${alreadyClosed ? 'Project is already closed' : 'Close project (set status to Closed)'}"
               aria-label="Close project" ${alreadyClosed ? 'disabled' : ''}>⊘</button>
@@ -351,6 +355,90 @@ document.addEventListener('click', () => {
   projectStatusBtn.setAttribute('aria-expanded', 'false');
 });
 
+/* ============================== TAX COMPANY SELECT + PICKER ============== */
+function taxCompanyOptionLabel(tc){
+  const name = tc.taxcompanyname || '(unnamed)';
+  return tc.bpName ? `${name} — ${tc.bpName}` : name;
+}
+
+// Fills a tax-company <select>: the project BP's own tax companies first,
+// then any extras (e.g. the current pick from another BP), then a
+// "＋ Choose another tax company…" sentinel that opens the picker.
+function fillTaxCompanySelect(sel, { bpTaxCompanies = [], extras = [], selectedId, blankLabel } = {}){
+  const seen = new Set();
+  const opts = [];
+  if (blankLabel !== undefined) opts.push(`<option value="">${escapeHtml(blankLabel)}</option>`);
+  const add = (tc) => {
+    if (!tc || tc.id == null || seen.has(String(tc.id))) return;
+    seen.add(String(tc.id));
+    opts.push(`<option value="${escapeHtml(String(tc.id))}"${String(tc.id) === String(selectedId) ? ' selected' : ''}>${escapeHtml(taxCompanyOptionLabel(tc))}</option>`);
+  };
+  bpTaxCompanies.forEach(add);
+  extras.forEach(add);
+  opts.push(`<option value="__more__">＋ Choose another tax company…</option>`);
+  sel.innerHTML = opts.join('');
+}
+
+function addTaxCompanyOption(sel, tc){
+  if ([...sel.options].some(o => o.value === String(tc.id))) return;
+  const opt = document.createElement('option');
+  opt.value = String(tc.id);
+  opt.textContent = taxCompanyOptionLabel(tc);
+  const moreOpt = [...sel.options].find(o => o.value === '__more__');
+  sel.insertBefore(opt, moreOpt || null);
+}
+
+const tcPickerOverlay = document.getElementById('tcPickerOverlay');
+let tcPickerOnPick = null;
+let tcPickerDebounce = null;
+
+function openTaxCompanyPicker(onPick){
+  tcPickerOnPick = onPick;
+  document.getElementById('tcPickerSearch').value = '';
+  document.getElementById('tcPickerBody').innerHTML = `<tr><td colspan="4" class="sub-empty">Loading…</td></tr>`;
+  document.getElementById('tcPickerEmpty').classList.add('hidden');
+  tcPickerOverlay.classList.remove('hidden');
+  loadTcPicker('');
+  setTimeout(() => document.getElementById('tcPickerSearch').focus(), 50);
+}
+function closeTaxCompanyPicker(){
+  tcPickerOverlay.classList.add('hidden');
+  tcPickerOnPick = null;
+}
+async function loadTcPicker(search){
+  const tbody = document.getElementById('tcPickerBody');
+  const empty = document.getElementById('tcPickerEmpty');
+  try {
+    const rows = await HITT_API.getAllTaxCompanies(search);
+    if (!rows.length) { tbody.innerHTML = ''; empty.classList.remove('hidden'); return; }
+    empty.classList.add('hidden');
+    tbody.innerHTML = rows.map((tc, i) => `
+      <tr data-i="${i}" style="cursor:pointer;">
+        <td>${escapeHtml(tc.taxcompanyname || '(unnamed)')}</td>
+        <td>${escapeHtml(tc.vatnumber || '—')}</td>
+        <td>${escapeHtml(tc.bpName || '—')}</td>
+        <td>${escapeHtml(tc.emailinvoicing || '—')}</td>
+      </tr>`).join('');
+    tbody.querySelectorAll('tr').forEach((tr, i) => {
+      tr.addEventListener('click', () => {
+        const cb = tcPickerOnPick;
+        closeTaxCompanyPicker();
+        if (cb) cb(rows[i]);
+      });
+    });
+  } catch (err) {
+    console.warn('Could not load tax companies:', err);
+    tbody.innerHTML = `<tr><td colspan="4" class="sub-empty">Could not load tax companies.</td></tr>`;
+  }
+}
+document.getElementById('tcPickerClose').addEventListener('click', closeTaxCompanyPicker);
+tcPickerOverlay.addEventListener('click', (e) => { if (e.target === tcPickerOverlay) closeTaxCompanyPicker(); });
+document.getElementById('tcPickerSearch').addEventListener('input', (e) => {
+  clearTimeout(tcPickerDebounce);
+  const v = e.target.value.trim();
+  tcPickerDebounce = setTimeout(() => loadTcPicker(v), 250);
+});
+
 /* ============================== PROJECT MODAL ============================= */
 const modalOverlay = document.getElementById('modalOverlay');
 
@@ -359,6 +447,9 @@ async function openProjectModal(projectId){
   if (!p) return;
   activeProjectId = projectId;
   activeProjectBpId = null;
+  activeProjectBpTaxCompanies = [];
+  activeProjectDefaultTc = null;
+  document.getElementById('invoicesDefaultTaxCompany').innerHTML = `<option value="">Loading…</option>`;
 
   document.getElementById('mTitle').value = `${p.code} — ${p.name}`;
   document.getElementById('relSchedule').innerHTML = lookupOptionsHtml(LOOKUPS.scheduleTypes, null, true);
@@ -382,12 +473,65 @@ async function openProjectModal(projectId){
   try {
     const detail = await HITT_API.getProject(projectId);
     activeProjectBpId = detail.busspartnerid || null;
+    if (detail.busspartnertoinvoiceid) {
+      activeProjectDefaultTc = { id: detail.busspartnertoinvoiceid, taxcompanyname: detail.invoicingPartnerLabel || '(tax company)' };
+    }
   } catch (err) {
     console.warn('Could not load project detail for tax-company context:', err);
   }
 
+  if (activeProjectBpId) {
+    try { activeProjectBpTaxCompanies = await HITT_API.getBusinessPartnerTaxCompanies(activeProjectBpId); }
+    catch { activeProjectBpTaxCompanies = []; }
+  }
+  populateInvoicesDefaultTcSelect();
+
   await loadInvoices();
 }
+
+function populateInvoicesDefaultTcSelect(){
+  const sel = document.getElementById('invoicesDefaultTaxCompany');
+  fillTaxCompanySelect(sel, {
+    bpTaxCompanies: activeProjectBpTaxCompanies,
+    extras: activeProjectDefaultTc ? [activeProjectDefaultTc] : [],
+    selectedId: activeProjectDefaultTc?.id,
+    blankLabel: '— none set —',
+  });
+  invoicesDefaultTcPrev = sel.value;
+}
+
+async function saveProjectDefaultTaxCompany(tcId){
+  if (usingDemoData) { toast("Not available in demo data.", 'navy'); return; }
+  try {
+    await HITT_API.assignProjectInvoicingPartner(activeProjectId, tcId, currentEmployeeId);
+    invoicesDefaultTcPrev = String(tcId);
+    const sel = document.getElementById('invoicesDefaultTaxCompany');
+    const label = [...sel.options].find(o => o.value === String(tcId))?.textContent || '(tax company)';
+    activeProjectDefaultTc = { id: tcId, taxcompanyname: label };
+    const proj = PROJECTS.find(x => x.id === activeProjectId);
+    if (proj) proj.busspartnertoinvoiceid = tcId;
+    toast('Default tax company saved', 'green');
+  } catch (err) {
+    console.error(err);
+    toast('Could not save the default tax company.', 'red');
+    populateInvoicesDefaultTcSelect();
+  }
+}
+
+document.getElementById('invoicesDefaultTaxCompany').addEventListener('change', (e) => {
+  const el = e.target;
+  if (el.value === '__more__') {
+    el.value = invoicesDefaultTcPrev || '';
+    openTaxCompanyPicker((tc) => {
+      addTaxCompanyOption(el, tc);
+      el.value = String(tc.id);
+      saveProjectDefaultTaxCompany(String(tc.id));
+    });
+    return;
+  }
+  if (!el.value) return; // don't unset via "— none set —"
+  saveProjectDefaultTaxCompany(el.value);
+});
 
 function closeProjectModal(){
   modalOverlay.classList.add('hidden');
@@ -661,24 +805,50 @@ async function openInvoiceModal(invoiceId){
   document.getElementById('invPurchaseOrder').value = inv?.purchaseorder || '';
   document.getElementById('invComments').value = inv?.invoicecomments || '';
 
-  document.getElementById('invTaxCompany').innerHTML = `<option value="">Loading…</option>`;
-  invoiceOverlay.classList.remove('hidden');
-
-  if (activeProjectBpId) {
-    try {
-      const taxCompanies = await HITT_API.getBusinessPartnerTaxCompanies(activeProjectBpId);
-      document.getElementById('invTaxCompany').innerHTML = lookupOptionsHtml(
-        taxCompanies.map(tc => ({ id: tc.id, label: tc.taxcompanyname })),
-        inv?.busspartnertoinvoiceid, true
-      );
-    } catch (err) {
-      console.warn('Could not load tax companies:', err);
-      document.getElementById('invTaxCompany').innerHTML = `<option value="">—</option>`;
-    }
-  } else {
-    document.getElementById('invTaxCompany').innerHTML = `<option value="">No Contracting Business Partner assigned to this project</option>`;
+  // Tax company: locked to the invoice's own value (edit) or the project
+  // default (new) until the user clicks "Change".
+  const taxSel = document.getElementById('invTaxCompany');
+  taxSel.disabled = true;
+  document.getElementById('invTaxCompanyChange').style.display = '';
+  document.getElementById('invTaxCompanyHint').textContent =
+    'Defaults to the project’s tax company. “Change” overrides it for this invoice only.';
+  const currentTcId = inv?.busspartnertoinvoiceid || activeProjectDefaultTc?.id || null;
+  const extras = [];
+  if (inv?.busspartnertoinvoiceid) {
+    extras.push({ id: inv.busspartnertoinvoiceid, taxcompanyname: inv.invoicingPartnerLabel || '(tax company)' });
+  } else if (activeProjectDefaultTc) {
+    extras.push(activeProjectDefaultTc);
   }
+  fillTaxCompanySelect(taxSel, {
+    bpTaxCompanies: activeProjectBpTaxCompanies,
+    extras,
+    selectedId: currentTcId,
+    blankLabel: '— none —',
+  });
+  invTaxCompanyPrev = taxSel.value;
+
+  invoiceOverlay.classList.remove('hidden');
 }
+
+document.getElementById('invTaxCompanyChange').addEventListener('click', () => {
+  const sel = document.getElementById('invTaxCompany');
+  sel.disabled = false;
+  document.getElementById('invTaxCompanyChange').style.display = 'none';
+  document.getElementById('invTaxCompanyHint').textContent = 'Overriding for this invoice only.';
+  sel.focus();
+});
+document.getElementById('invTaxCompany').addEventListener('change', (e) => {
+  if (e.target.value === '__more__') {
+    e.target.value = invTaxCompanyPrev || '';
+    openTaxCompanyPicker((tc) => {
+      addTaxCompanyOption(e.target, tc);
+      e.target.value = String(tc.id);
+      invTaxCompanyPrev = String(tc.id);
+    });
+  } else {
+    invTaxCompanyPrev = e.target.value;
+  }
+});
 
 function closeInvoiceModal(){
   invoiceOverlay.classList.add('hidden');
@@ -688,8 +858,10 @@ document.getElementById('invClose').addEventListener('click', closeInvoiceModal)
 document.getElementById('invCancel').addEventListener('click', closeInvoiceModal);
 invoiceOverlay.addEventListener('click', (e) => { if (e.target === invoiceOverlay) closeInvoiceModal(); });
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && !invoiceOverlay.classList.contains('hidden')) closeInvoiceModal();
-  else if (e.key === 'Escape' && !modalOverlay.classList.contains('hidden')) closeProjectModal();
+  if (e.key !== 'Escape') return;
+  if (!tcPickerOverlay.classList.contains('hidden')) { closeTaxCompanyPicker(); return; }
+  if (!invoiceOverlay.classList.contains('hidden')) { closeInvoiceModal(); return; }
+  if (!modalOverlay.classList.contains('hidden')) { closeProjectModal(); return; }
 });
 
 function invoiceLineItemsPayload(){
@@ -714,7 +886,7 @@ function invoicePayload(){
     numOcClient: document.getElementById('invNumOcClient').value || null,
     purchaseOrder: document.getElementById('invPurchaseOrder').value || null,
     invoiceComments: document.getElementById('invComments').value || null,
-    taxCompanyId: document.getElementById('invTaxCompany').value || null,
+    taxCompanyId: (() => { const v = document.getElementById('invTaxCompany').value; return v && v !== '__more__' ? v : null; })(),
     dipositAccountId: document.getElementById('invDepositAccount').value || null,
   };
 }
