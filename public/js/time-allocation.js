@@ -15,6 +15,7 @@
 
 const session = HITT_AUTH.requireSession("../index.html");
 HITT_PERMS.guardModule("time-allocation", "../welcome.html");
+const T = (k, v) => (window.HITT_I18N ? HITT_I18N.t(k, v) : k);
 document.getElementById("userName").textContent = session.displayName;
 document.getElementById("userAvatar").textContent = HITT_AUTH.initials(session);
 document.getElementById("btnSignOut").addEventListener("click", () => HITT_AUTH.signOut("../index.html"));
@@ -43,11 +44,11 @@ function toast(msg, tone = 'navy'){
 function setDataSourcePill(){
   const pill = document.getElementById("dataSourcePill");
   if (usingDemoData) {
-    pill.textContent = "Demo data (API unreachable)";
+    pill.textContent = T("common.demoData");
     pill.style.background = "rgba(188,154,28,0.18)";
     pill.style.color = "#8A6E12";
   } else {
-    pill.textContent = "Live · test environment";
+    pill.textContent = T("common.liveData");
     pill.style.background = "rgba(110,143,90,0.18)";
     pill.style.color = "#4C6B3A";
   }
@@ -110,7 +111,7 @@ async function initEmployee(){
       currentEmployeeId = perms.employeeId ? String(perms.employeeId) : '';
       usingDemoData = false;
       if (!currentEmployeeId) {
-        toast("Your sign-in isn't linked to an employee record — contact an admin.", 'red');
+        toast(T("ta.noSignInEmployee"), 'red');
       }
     } catch (err) {
       console.warn('Could not resolve your employee identity — falling back to demo mode:', err);
@@ -155,7 +156,7 @@ async function refreshTimeOffBadge(){
 // down year -> month, each month split into PO (project owner) and RES
 // (resource) hours. Current + previous calendar year. Whole panel and each
 // year collapse, persisted best-effort in localStorage.
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const MONTHS = () => T('common.monthsShort').split('|');
 const TA_SIDE_KEY = 'hitt.taSide.collapsed';
 const TA_YEARS_KEY = 'hitt.taSide.years';
 let taYearState = {};
@@ -204,7 +205,7 @@ function taMonthBlock(year, month, totalText, weekRows){
     <div class="ta-month ${collapsed ? 'is-collapsed' : ''}" data-key="${key}">
       <button type="button" class="ta-month-head" aria-expanded="${!collapsed}">
         <span class="ta-month-chevron" aria-hidden="true">▾</span>
-        <span class="ta-month-label">${MONTHS[month - 1] || month}</span>
+        <span class="ta-month-label">${MONTHS()[month - 1] || month}</span>
         <span class="ta-month-total">${totalText}</span>
       </button>
       <div class="ta-month-body">${weekRows}</div>
@@ -229,7 +230,7 @@ function taWeekLabel(iso){
   const mon = new Date(`${iso}T00:00:00`);
   const sun = new Date(mon);
   sun.setDate(mon.getDate() + 6);
-  const dm = (d) => `${d.getDate()} ${MONTHS[d.getMonth()]}`;
+  const dm = (d) => `${d.getDate()} ${MONTHS()[d.getMonth()]}`;
   return mon.getMonth() === sun.getMonth()
     ? `${mon.getDate()}–${dm(sun)}`
     : `${dm(mon)} – ${dm(sun)}`;
@@ -246,20 +247,20 @@ async function renderSideReport(){
   side.classList.toggle('hidden', !show);
   if (!show) return;
 
-  title.textContent = 'Hours logged';
+  title.textContent = T('ta.side.hoursLogged');
 
   if (usingDemoData || !currentEmployeeId) {
     body.innerHTML = `<p class="ta-side-empty">${usingDemoData
-      ? 'Not available in demo data.'
-      : "Your account isn't linked to an employee record."}</p>`;
+      ? T('common.notAvailableDemo')
+      : T('ta.noEmployeeShort')}</p>`;
     return;
   }
 
-  body.innerHTML = `<p class="ta-side-empty">Loading…</p>`;
+  body.innerHTML = `<p class="ta-side-empty">${T('common.loading')}</p>`;
   try {
     const rows = await HITT_API.getTimeTrackingSummary(currentEmployeeId);
     if (currentPageTab !== 'tracking') return;
-    if (!rows.length) { body.innerHTML = `<p class="ta-side-empty">No hours logged in the last two years.</p>`; return; }
+    if (!rows.length) { body.innerHTML = `<p class="ta-side-empty">${T('ta.side.noHours')}</p>`; return; }
 
     // year -> month -> [week rows]
     const tree = new Map();
@@ -292,7 +293,7 @@ async function renderSideReport(){
     wireCollapseToggles();
   } catch (err) {
     console.warn('Could not load the side report:', err);
-    body.innerHTML = `<p class="ta-side-empty">Could not load the summary.</p>`;
+    body.innerHTML = `<p class="ta-side-empty">${T('ta.side.loadFail')}</p>`;
   }
 }
 
@@ -305,8 +306,8 @@ async function loadWeek(){
     ROWS = [];
     tbody.innerHTML = '';
     empty.textContent = usingDemoData
-      ? 'Not available in demo data.'
-      : "Your account isn't linked to an employee record — contact an admin.";
+      ? T('common.notAvailableDemo')
+      : T('ta.noEmployeeContact');
     empty.classList.remove('hidden');
     updateWeekTotal();
     return;
@@ -318,14 +319,14 @@ async function loadWeek(){
     return;
   }
 
-  tbody.innerHTML = `<tr><td colspan="6" class="sub-empty">Loading…</td></tr>`;
+  tbody.innerHTML = `<tr><td colspan="6" class="sub-empty">${T('common.loading')}</td></tr>`;
   empty.classList.add('hidden');
   try {
     ROWS = await HITT_API.getTimeTracking(currentEmployeeId, weekStartDateString(weekPicker.value));
   } catch (err) {
     console.warn('Could not load time tracking rows:', err);
     ROWS = [];
-    toast('Could not load time tracking for this week.', 'red');
+    toast(T('ta.toast.weekLoadFail'), 'red');
   }
   renderTable();
 }
@@ -336,7 +337,7 @@ function formatDateTime(iso){
 
 function updateWeekTotal(){
   const total = ROWS.reduce((sum, r) => sum + (Number(r.hours) || 0), 0);
-  document.getElementById('weekTotal').textContent = `${total}h logged`;
+  document.getElementById('weekTotal').textContent = T('ta.weekTotal', { hours: total });
 }
 
 function renderTable(){
@@ -345,7 +346,7 @@ function renderTable(){
 
   if (!ROWS.length) {
     tbody.innerHTML = '';
-    empty.textContent = 'No projects logged for this week yet.';
+    empty.textContent = T('ta.empty.tracking');
     empty.classList.remove('hidden');
     updateWeekTotal();
     return;
@@ -354,7 +355,7 @@ function renderTable(){
 
   tbody.innerHTML = ROWS.map((r, i) => `
     <tr data-i="${i}">
-      <td><span class="font-mono" style="font-family:inherit; font-weight:600;">${escapeHtml(r.code || '')}</span> — ${escapeHtml(r.name || '(unknown project)')}</td>
+      <td><span class="font-mono" style="font-family:inherit; font-weight:600;">${escapeHtml(r.code || '')}</span> — ${escapeHtml(r.name || T('ta.unknownProject'))}</td>
       <td>${r.statusLabel ? `<span class="ta-status-pill">${escapeHtml(r.statusLabel)}</span>` : '—'}</td>
       <td>
         <select class="ta-res-select" data-field="poRes">
@@ -365,8 +366,8 @@ function renderTable(){
       <td style="text-align:right;">
         <input type="number" min="0" max="80" step="0.5" class="ta-hours-input" data-field="hours" value="${r.hours ?? 0}" />
       </td>
-      <td style="font-size:0.78rem; color:var(--text-secondary);"><span data-lastupdated>${formatDateTime(r.lastUpdated)}</span><span class="ta-saved-flash hidden" data-flash>Saved</span></td>
-      <td><button class="ta-remove-btn" title="Remove this project from the week">✕</button></td>
+      <td style="font-size:0.78rem; color:var(--text-secondary);"><span data-lastupdated>${formatDateTime(r.lastUpdated)}</span><span class="ta-saved-flash hidden" data-flash>${T('ta.saved')}</span></td>
+      <td><button class="ta-remove-btn" title="${T('ta.tip.removeProject')}">✕</button></td>
     </tr>
   `).join('');
 
@@ -401,7 +402,7 @@ function renderTable(){
         renderSideReport();
       } catch (err) {
         console.error(err);
-        toast('Could not save that row.', 'red');
+        toast(T('ta.toast.rowSaveFail'), 'red');
       }
     };
 
@@ -418,11 +419,11 @@ function renderTable(){
         await HITT_API.deleteTimeTracking(row.id);
         ROWS.splice(i, 1);
         renderTable();
-        toast('Removed.', 'navy');
+        toast(T('ta.toast.removed'), 'navy');
         renderSideReport();
       } catch (err) {
         console.error(err);
-        toast('Could not remove that row.', 'red');
+        toast(T('ta.toast.rowRemoveFail'), 'red');
       }
     });
   });
@@ -453,11 +454,11 @@ function renderProjectPickerResults(term){
   )).slice(0, 30);
 
   if (t.length < 2) {
-    host.innerHTML = `<div class="sub-empty">Type at least two characters to search</div>`;
+    host.innerHTML = `<div class="sub-empty">${T('ta.picker.typeTwo')}</div>`;
     return;
   }
   if (!matches.length) {
-    host.innerHTML = `<div class="sub-empty">No matches</div>`;
+    host.innerHTML = `<div class="sub-empty">${T('ta.picker.noMatches')}</div>`;
     return;
   }
   host.innerHTML = matches.map((p, i) => `
@@ -476,8 +477,8 @@ function renderProjectPickerResults(term){
 }
 
 async function openProjectPicker(){
-  if (!currentEmployeeId) { toast("Your account isn't linked to an employee record — contact an admin.", 'red'); return; }
-  if (usingDemoData) { toast("Adding projects isn't available in demo data.", 'navy'); return; }
+  if (!currentEmployeeId) { toast(T("ta.noEmployeeContact"), 'red'); return; }
+  if (usingDemoData) { toast(T("ta.demo.noAddProject"), 'navy'); return; }
   await ensureProjectsLoaded();
   document.getElementById('projectPickerSearch').value = '';
   renderProjectPickerResults('');
@@ -530,7 +531,7 @@ async function loadBalance(){
     document.getElementById('statPending').textContent = balance.pendingDays;
     document.getElementById('statAvailable').textContent = balance.availableDays ?? '—';
     if (balance.totalDays === null) {
-      hint.textContent = `No annual quota configured for ${balanceYearSelect.value} yet — approved/pending days are still shown above.`;
+      hint.textContent = T('ta.balanceHint', { year: balanceYearSelect.value });
       hint.classList.remove('hidden');
     }
   } catch (err) {
@@ -560,9 +561,9 @@ function renderTimeOffTable(){
     <tr data-i="${i}">
       <td>${formatDateOnly(r.startdate)} – ${formatDateOnly(r.enddate)}</td>
       <td style="text-align:right;">${r.daysrequested}</td>
-      <td><span class="${statusPillClass(r.statusLabel)}">${r.statusLabel || 'Unknown'}</span></td>
+      <td><span class="${statusPillClass(r.statusLabel)}">${r.statusLabel || T('common.unknown')}</span></td>
       <td style="font-size:0.78rem; color:var(--text-secondary);">${formatDateOnly(r.submittedat)}</td>
-      <td>${canWithdraw(r) ? `<button class="ta-remove-btn" data-withdraw title="Withdraw this request">Withdraw</button>` : ''}</td>
+      <td>${canWithdraw(r) ? `<button class="ta-remove-btn" data-withdraw title="${T('ta.tip.withdraw')}">${T('ta.withdraw')}</button>` : ''}</td>
     </tr>
   `).join('');
 
@@ -571,12 +572,12 @@ function renderTimeOffTable(){
       const req = TIME_OFF_REQUESTS[i];
       try {
         await HITT_API.withdrawTimeOffRequest(req.id);
-        toast('Request withdrawn.', 'navy');
+        toast(T('ta.toast.withdrawn'), 'navy');
         await loadTimeOff();
         renderSideReport();
       } catch (err) {
         console.error(err);
-        toast('Could not withdraw that request.', 'red');
+        toast(T('ta.toast.withdrawFail'), 'red');
       }
     });
   });
@@ -595,27 +596,27 @@ async function loadTimeOff(){
     TIME_OFF_REQUESTS = [];
     tbody.innerHTML = '';
     empty.textContent = usingDemoData
-      ? 'Not available in demo data.'
-      : "Your account isn't linked to an employee record — contact an admin.";
+      ? T('common.notAvailableDemo')
+      : T('ta.noEmployeeContact');
     empty.classList.remove('hidden');
     return;
   }
   if (usingDemoData) {
     TIME_OFF_REQUESTS = [];
     tbody.innerHTML = '';
-    empty.textContent = 'Not available in demo data.';
+    empty.textContent = T('common.notAvailableDemo');
     empty.classList.remove('hidden');
     return;
   }
 
-  tbody.innerHTML = `<tr><td colspan="5" class="sub-empty">Loading…</td></tr>`;
+  tbody.innerHTML = `<tr><td colspan="5" class="sub-empty">${T('common.loading')}</td></tr>`;
   empty.classList.add('hidden');
   try {
     TIME_OFF_REQUESTS = await HITT_API.getTimeOffRequests(currentEmployeeId);
   } catch (err) {
     console.warn('Could not load time-off requests:', err);
     TIME_OFF_REQUESTS = [];
-    toast('Could not load time-off requests.', 'red');
+    toast(T('ta.toast.reqLoadFail'), 'red');
   }
   renderTimeOffTable();
   await loadBalance();
@@ -642,7 +643,7 @@ async function loadApprovals(){
 
   const tbody = document.getElementById('approvalsTableBody');
   const empty = document.getElementById('approvalsEmpty');
-  tbody.innerHTML = `<tr><td colspan="5" class="sub-empty">Loading…</td></tr>`;
+  tbody.innerHTML = `<tr><td colspan="5" class="sub-empty">${T('common.loading')}</td></tr>`;
   empty.classList.add('hidden');
 
   let pending = [];
@@ -650,7 +651,7 @@ async function loadApprovals(){
     pending = await HITT_API.getPendingTimeOffRequests();
   } catch (err) {
     console.warn('Could not load pending approvals:', err);
-    toast('Could not load pending approvals.', 'red');
+    toast(T('ta.toast.approvalsLoadFail'), 'red');
   }
   renderApprovalsTable(pending);
 }
@@ -671,8 +672,8 @@ function renderApprovalsTable(pending){
       <td style="text-align:right;">${r.daysrequested}</td>
       <td style="font-size:0.78rem; color:var(--text-secondary);">${formatDateOnly(r.submittedat)}</td>
       <td style="display:flex; gap:0.4rem;">
-        <button class="btn btn-primary" style="padding:0.3rem 0.65rem; font-size:0.78rem;" data-approve>Approve</button>
-        <button class="btn btn-secondary" style="padding:0.3rem 0.65rem; font-size:0.78rem;" data-reject>Reject</button>
+        <button class="btn btn-primary" style="padding:0.3rem 0.65rem; font-size:0.78rem;" data-approve>${T('ta.approve')}</button>
+        <button class="btn btn-secondary" style="padding:0.3rem 0.65rem; font-size:0.78rem;" data-reject>${T('ta.reject')}</button>
       </td>
     </tr>
   `).join('');
@@ -681,12 +682,12 @@ function renderApprovalsTable(pending){
     btn.addEventListener('click', async () => {
       try {
         await HITT_API.approveTimeOffRequest(pending[i].id);
-        toast(`Approved ${pending[i].employeeName}'s request.`, 'green');
+        toast(T('ta.toast.approved', { name: pending[i].employeeName }), 'green');
         await loadApprovals();
         refreshTimeOffBadge();
       } catch (err) {
         console.error(err);
-        toast('Could not approve that request.', 'red');
+        toast(T('ta.toast.approveFail'), 'red');
       }
     });
   });
@@ -694,12 +695,12 @@ function renderApprovalsTable(pending){
     btn.addEventListener('click', async () => {
       try {
         await HITT_API.rejectTimeOffRequest(pending[i].id);
-        toast(`Rejected ${pending[i].employeeName}'s request.`, 'navy');
+        toast(T('ta.toast.rejected', { name: pending[i].employeeName }), 'navy');
         await loadApprovals();
         refreshTimeOffBadge();
       } catch (err) {
         console.error(err);
-        toast('Could not reject that request.', 'red');
+        toast(T('ta.toast.rejectFail'), 'red');
       }
     });
   });
@@ -709,8 +710,8 @@ function renderApprovalsTable(pending){
 const timeOffOverlay = document.getElementById('timeOffOverlay');
 
 function openTimeOffModal(){
-  if (!currentEmployeeId) { toast("Your account isn't linked to an employee record — contact an admin.", 'red'); return; }
-  if (usingDemoData) { toast("Time-off requests aren't available in demo data.", 'navy'); return; }
+  if (!currentEmployeeId) { toast(T("ta.noEmployeeContact"), 'red'); return; }
+  if (usingDemoData) { toast(T("ta.demo.noTimeOff"), 'navy'); return; }
   document.getElementById('toStartDate').value = '';
   document.getElementById('toEndDate').value = '';
   document.getElementById('toDaysRequested').value = '';
@@ -744,18 +745,18 @@ document.getElementById('timeOffSubmit').addEventListener('click', async () => {
   const endDate = document.getElementById('toEndDate').value;
   const daysRequested = Number(document.getElementById('toDaysRequested').value);
   if (!startDate || !endDate || !daysRequested) {
-    toast('Start date, end date and days requested are all required.', 'red');
+    toast(T('ta.toast.reqFieldsRequired'), 'red');
     return;
   }
   try {
     await HITT_API.createTimeOffRequest({ empId: currentEmployeeId, startDate, endDate, daysRequested });
     closeTimeOffModal();
-    toast('Request submitted.', 'green');
+    toast(T('ta.toast.submitted'), 'green');
     await loadTimeOff();
     renderSideReport();
   } catch (err) {
     console.error(err);
-    toast('Could not submit the request.', 'red');
+    toast(T('ta.toast.submitFail'), 'red');
   }
 });
 
@@ -766,3 +767,10 @@ document.getElementById('timeOffSubmit').addEventListener('click', async () => {
   refreshTimeOffBadge();
   renderSideReport();
 })();
+
+
+/* Re-render dynamic content when the UI language changes. */
+window.addEventListener("hitt:langchange", () => {
+  if (typeof setDataSourcePill === "function") setDataSourcePill();
+  if (typeof refreshActiveTab === "function") refreshActiveTab();
+});
