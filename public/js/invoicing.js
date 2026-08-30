@@ -59,11 +59,11 @@ function toast(msg, tone = 'navy'){
 function setDataSourcePill(){
   const pill = document.getElementById("dataSourcePill");
   if (usingDemoData) {
-    pill.textContent = "Demo data (API unreachable)";
+    pill.textContent = T('common.demoData');
     pill.style.background = "rgba(188,154,28,0.18)";
     pill.style.color = "#8A6E12";
   } else {
-    pill.textContent = "Live · test environment";
+    pill.textContent = T('common.liveData');
     pill.style.background = "rgba(110,143,90,0.18)";
     pill.style.color = "#4C6B3A";
   }
@@ -141,7 +141,8 @@ function computeBucket(row){
   if (budget > 0 && invoiced >= budget) return 'total';
   return 'partial';
 }
-const BUCKET_LABEL = { 'not-released': 'Not released', 'not-started': 'Not started', 'partial': 'Partially invoiced', 'total': 'Totally invoiced' };
+const BUCKET_LABEL_KEY = { 'not-released': 'inv.bucket.notReleased', 'not-started': 'inv.bucket.notStarted', 'partial': 'inv.bucket.partial', 'total': 'inv.bucket.total' };
+const bucketLabel = (b) => T(BUCKET_LABEL_KEY[b] || b);
 const BUCKET_ORDER = ['not-released', 'not-started', 'partial', 'total'];
 
 // Count per invoice-status bucket, shown inside each filter chip (e.g.
@@ -206,7 +207,7 @@ function populateProjectStatusOptions(){
           <input type="checkbox" value="${escapeHtml(l)}" ${projectStatusSel.has(l) ? 'checked' : ''} />
           <span>${escapeHtml(l)}</span>
         </label>`).join('')
-    : `<div class="inv-status-opt inv-status-opt--empty">No statuses</div>`;
+    : `<div class="inv-status-opt inv-status-opt--empty">${T('inv.status.none')}</div>`;
   menu.querySelectorAll('input[type="checkbox"]').forEach(cb => {
     cb.addEventListener('change', () => {
       if (cb.checked) projectStatusSel.add(cb.value);
@@ -221,9 +222,9 @@ function populateProjectStatusOptions(){
 function updateProjectStatusLabel(){
   const el = document.getElementById('projectStatusBtnLabel');
   if (!el) return;
-  if (projectStatusSel.size === 0) el.textContent = 'all';
+  if (projectStatusSel.size === 0) el.textContent = T('inv.status.all');
   else if (projectStatusSel.size === 1) el.textContent = [...projectStatusSel][0];
-  else el.textContent = `${projectStatusSel.size} selected`;
+  else el.textContent = T('inv.status.nSelected', { n: projectStatusSel.size });
 }
 
 function renderTable(){
@@ -250,7 +251,7 @@ function renderTable(){
     const alreadyClosed = isClosedStatus(p.projectStatusLabel);
     return `
       <tr data-i="${i}">
-        <td class="inv-proceed-col">${p.proceedtoinvoice ? `<span class="inv-proceed-icon" title="Proceed to invoice">✔</span>` : ''}</td>
+        <td class="inv-proceed-col">${p.proceedtoinvoice ? `<span class="inv-proceed-icon" title="${T('inv.tip.proceed')}">✔</span>` : ''}</td>
         <td><span style="font-weight:600;">${escapeHtml(p.code)}</span> — ${escapeHtml(p.name)}</td>
         <td>${escapeHtml(p.entityLabel || '—')}</td>
         <td>${p.bpName ? escapeHtml(p.bpName) : '—'}</td>
@@ -260,16 +261,16 @@ function renderTable(){
           ${formatMoney(p.invoicedTotal)}${pct !== null ? ` <span class="inv-invoiced-pct">(${pct}%)</span>` : ''}
         </td>
         <td style="text-align:right;">${Number(p.invoiceCount) || 0}</td>
-        <td><span class="inv-bucket-pill inv-bucket-${bucket}">${BUCKET_LABEL[bucket]}</span></td>
+        <td><span class="inv-bucket-pill inv-bucket-${bucket}">${bucketLabel(bucket)}</span></td>
         <td class="inv-actions-col">
           <div class="inv-row-actions">
-            <a class="inv-row-btn" href="projects.html?projectId=${encodeURIComponent(p.id)}" data-row-action title="Open project page" aria-label="Open project page">📁</a>
+            <a class="inv-row-btn" href="projects.html?projectId=${encodeURIComponent(p.id)}" data-row-action title="${T('inv.tip.openProject')}" aria-label="${T('inv.tip.openProject')}">📁</a>
             ${p.bpId
-              ? `<a class="inv-row-btn" href="business-partners.html?open=${encodeURIComponent(p.bpId)}" data-row-action title="Open business partner page" aria-label="Open business partner page">🤝</a>`
-              : `<span class="inv-row-btn" data-row-action aria-disabled="true" title="No business partner assigned" style="opacity:0.3; cursor:default;">🤝</span>`}
+              ? `<a class="inv-row-btn" href="business-partners.html?open=${encodeURIComponent(p.bpId)}" data-row-action title="${T('inv.tip.openBp')}" aria-label="${T('inv.tip.openBp')}">🤝</a>`
+              : `<span class="inv-row-btn" data-row-action aria-disabled="true" title="${T('inv.tip.noBp')}" style="opacity:0.3; cursor:default;">🤝</span>`}
             <button type="button" class="inv-row-btn inv-row-btn--danger" data-close-project data-row-action
-              title="${alreadyClosed ? 'Project is already closed' : 'Close project (set status to Closed)'}"
-              aria-label="Close project" ${alreadyClosed ? 'disabled' : ''}>⊘</button>
+              title="${alreadyClosed ? T('inv.tip.alreadyClosed') : T('inv.tip.closeProject')}"
+              aria-label="${T('inv.tip.closeProjectAria')}" ${alreadyClosed ? 'disabled' : ''}>⊘</button>
           </div>
         </td>
       </tr>
@@ -290,16 +291,16 @@ function renderTable(){
 
 async function closeProjectFromList(p){
   if (!p || isClosedStatus(p.projectStatusLabel)) return;
-  if (usingDemoData) { toast("Closing a project isn't available in demo data.", 'navy'); return; }
-  if (CLOSED_STATUS_ID == null) { toast("Couldn't resolve the \"Closed\" status — try reloading.", 'red'); return; }
-  if (!confirm(`Close project ${p.code} — ${p.name}?\nIts status will be set to "Closed".`)) return;
+  if (usingDemoData) { toast(T('inv.demo.noClose'), 'navy'); return; }
+  if (CLOSED_STATUS_ID == null) { toast(T('inv.err.noClosedStatus'), 'red'); return; }
+  if (!confirm(T('inv.confirm.closeProject', { code: p.code, name: p.name }))) return;
   try {
     await HITT_API.updateProjectStage(p.id, CLOSED_STATUS_ID, currentEmployeeId);
-    toast(`${p.code} closed`, 'green');
+    toast(T('inv.toast.closed', { code: p.code }), 'green');
     await loadProjects();
   } catch (err) {
     console.error(err);
-    toast('Could not close the project.', 'red');
+    toast(T('inv.toast.closeFail'), 'red');
   }
 }
 
@@ -364,7 +365,7 @@ document.addEventListener('click', () => {
 
 /* ============================== TAX COMPANY SELECT + PICKER ============== */
 function taxCompanyOptionLabel(tc){
-  const name = tc.taxcompanyname || '(unnamed)';
+  const name = tc.taxcompanyname || T('common.unnamed');
   return tc.bpName ? `${name} — ${tc.bpName}` : name;
 }
 
@@ -382,7 +383,7 @@ function fillTaxCompanySelect(sel, { bpTaxCompanies = [], extras = [], selectedI
   };
   bpTaxCompanies.forEach(add);
   extras.forEach(add);
-  opts.push(`<option value="__more__">＋ Choose another tax company…</option>`);
+  opts.push(`<option value="__more__">${T('inv.tc.chooseAnother')}</option>`);
   sel.innerHTML = opts.join('');
 }
 
@@ -402,7 +403,7 @@ let tcPickerDebounce = null;
 function openTaxCompanyPicker(onPick){
   tcPickerOnPick = onPick;
   document.getElementById('tcPickerSearch').value = '';
-  document.getElementById('tcPickerBody').innerHTML = `<tr><td colspan="4" class="sub-empty">Loading…</td></tr>`;
+  document.getElementById('tcPickerBody').innerHTML = `<tr><td colspan="4" class="sub-empty">${T('common.loading')}</td></tr>`;
   document.getElementById('tcPickerEmpty').classList.add('hidden');
   tcPickerOverlay.classList.remove('hidden');
   loadTcPicker('');
@@ -421,7 +422,7 @@ async function loadTcPicker(search){
     empty.classList.add('hidden');
     tbody.innerHTML = rows.map((tc, i) => `
       <tr data-i="${i}" style="cursor:pointer;">
-        <td>${escapeHtml(tc.taxcompanyname || '(unnamed)')}</td>
+        <td>${escapeHtml(tc.taxcompanyname || T('common.unnamed'))}</td>
         <td>${escapeHtml(tc.vatnumber || '—')}</td>
         <td>${escapeHtml(tc.bpName || '—')}</td>
         <td>${escapeHtml(tc.emailinvoicing || '—')}</td>
@@ -435,7 +436,7 @@ async function loadTcPicker(search){
     });
   } catch (err) {
     console.warn('Could not load tax companies:', err);
-    tbody.innerHTML = `<tr><td colspan="4" class="sub-empty">Could not load tax companies.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="4" class="sub-empty">${T('inv.tc.loadFail')}</td></tr>`;
   }
 }
 document.getElementById('tcPickerClose').addEventListener('click', closeTaxCompanyPicker);
@@ -456,7 +457,7 @@ async function openProjectModal(projectId){
   activeProjectBpId = null;
   activeProjectBpTaxCompanies = [];
   activeProjectDefaultTc = null;
-  document.getElementById('invoicesDefaultTaxCompany').innerHTML = `<option value="">Loading…</option>`;
+  document.getElementById('invoicesDefaultTaxCompany').innerHTML = `<option value="">${T('common.loading')}</option>`;
 
   document.getElementById('mTitle').value = `${p.code} — ${p.name}`;
   document.getElementById('relSchedule').innerHTML = lookupOptionsHtml(LOOKUPS.scheduleTypes, null, true);
@@ -481,7 +482,7 @@ async function openProjectModal(projectId){
     const detail = await HITT_API.getProject(projectId);
     activeProjectBpId = detail.busspartnerid || null;
     if (detail.busspartnertoinvoiceid) {
-      activeProjectDefaultTc = { id: detail.busspartnertoinvoiceid, taxcompanyname: detail.invoicingPartnerLabel || '(tax company)' };
+      activeProjectDefaultTc = { id: detail.busspartnertoinvoiceid, taxcompanyname: detail.invoicingPartnerLabel || T('inv.tc.generic') };
     }
   } catch (err) {
     console.warn('Could not load project detail for tax-company context:', err);
@@ -502,25 +503,25 @@ function populateInvoicesDefaultTcSelect(){
     bpTaxCompanies: activeProjectBpTaxCompanies,
     extras: activeProjectDefaultTc ? [activeProjectDefaultTc] : [],
     selectedId: activeProjectDefaultTc?.id,
-    blankLabel: '— none set —',
+    blankLabel: T('inv.tc.noneSet'),
   });
   invoicesDefaultTcPrev = sel.value;
 }
 
 async function saveProjectDefaultTaxCompany(tcId){
-  if (usingDemoData) { toast("Not available in demo data.", 'navy'); return; }
+  if (usingDemoData) { toast(T('common.notAvailableDemo'), 'navy'); return; }
   try {
     await HITT_API.assignProjectInvoicingPartner(activeProjectId, tcId, currentEmployeeId);
     invoicesDefaultTcPrev = String(tcId);
     const sel = document.getElementById('invoicesDefaultTaxCompany');
-    const label = [...sel.options].find(o => o.value === String(tcId))?.textContent || '(tax company)';
+    const label = [...sel.options].find(o => o.value === String(tcId))?.textContent || T('inv.tc.generic');
     activeProjectDefaultTc = { id: tcId, taxcompanyname: label };
     const proj = PROJECTS.find(x => x.id === activeProjectId);
     if (proj) proj.busspartnertoinvoiceid = tcId;
-    toast('Default tax company saved', 'green');
+    toast(T('inv.toast.defaultTcSaved'), 'green');
   } catch (err) {
     console.error(err);
-    toast('Could not save the default tax company.', 'red');
+    toast(T('inv.toast.defaultTcFail'), 'red');
     populateInvoicesDefaultTcSelect();
   }
 }
@@ -558,7 +559,7 @@ document.querySelectorAll('[data-mtab]').forEach(btn => {
 });
 
 document.getElementById('relSave').addEventListener('click', async () => {
-  if (!activeProjectId || usingDemoData) { if (usingDemoData) toast("Not available in demo data.", 'navy'); return; }
+  if (!activeProjectId || usingDemoData) { if (usingDemoData) toast(T('common.notAvailableDemo'), 'navy'); return; }
   try {
     await HITT_API.saveProjectRelease(activeProjectId, {
       proceedToInvoice: document.getElementById('relProceed').checked,
@@ -568,34 +569,34 @@ document.getElementById('relSave').addEventListener('click', async () => {
       firstDate: document.getElementById('relFirstDate').value || null,
       lastDate: document.getElementById('relLastDate').value || null,
     });
-    toast('Proceed-to-invoice settings saved', 'green');
+    toast(T('inv.toast.releaseSaved'), 'green');
     await loadProjects();
   } catch (err) {
     console.error(err);
-    toast('Could not save settings.', 'red');
+    toast(T('inv.toast.settingsFail'), 'red');
   }
 });
 
 /* ============================== INVOICES LIST ============================= */
 async function loadInvoices(){
   const tbody = document.getElementById('invoicesTableBody');
-  tbody.innerHTML = `<tr><td colspan="7" class="sub-empty">Loading…</td></tr>`;
+  tbody.innerHTML = `<tr><td colspan="7" class="sub-empty">${T('common.loading')}</td></tr>`;
   try {
     INVOICES = await HITT_API.getProjectInvoices(activeProjectId);
   } catch (err) {
     console.warn('Could not load invoices:', err);
     INVOICES = [];
-    toast('Could not load invoices.', 'red');
+    toast(T('inv.toast.invoicesLoadFail'), 'red');
   }
   renderInvoicesTable();
 }
 
 function sentBadgeTitle(inv){
   const when = inv.emailedAt ? new Date(inv.emailedAt).toLocaleString() : '';
-  const bits = [`Emailed${when ? ` on ${when}` : ''}`];
-  if (inv.emailedTo) bits.push(`to ${inv.emailedTo}`);
-  if (inv.emailedByName) bits.push(`by ${inv.emailedByName}`);
-  if (Number(inv.emailedCount) > 1) bits.push(`(${inv.emailedCount}× total)`);
+  const bits = [when ? T('inv.sent.emailedOn', { when }) : T('inv.sent.emailed')];
+  if (inv.emailedTo) bits.push(T('inv.sent.to', { to: inv.emailedTo }));
+  if (inv.emailedByName) bits.push(T('inv.sent.by', { by: inv.emailedByName }));
+  if (Number(inv.emailedCount) > 1) bits.push(T('inv.sent.times', { n: inv.emailedCount }));
   return bits.join(' ');
 }
 
@@ -610,20 +611,20 @@ function renderInvoicesTable(){
   empty.classList.add('hidden');
   tbody.innerHTML = INVOICES.map((inv, i) => `
     <tr data-i="${i}" style="cursor:pointer;">
-      <td>${escapeHtml(inv.invoicecode || '(draft)')}</td>
+      <td>${escapeHtml(inv.invoicecode || T('inv.draft'))}</td>
       <td>
         <span class="inv-status-pill inv-status-${inv.invoicestatusid}">${escapeHtml(inv.statusLabel || '—')}</span>
-        ${inv.emailedAt ? `<span class="inv-sent-badge" title="${escapeHtml(sentBadgeTitle(inv))}">✉ Sent</span>` : ''}
+        ${inv.emailedAt ? `<span class="inv-sent-badge" title="${escapeHtml(sentBadgeTitle(inv))}">${T('inv.sent.badge')}</span>` : ''}
       </td>
       <td style="text-align:right;" class="${Number(inv.amount) < 0 ? 'inv-money inv-money--neg' : 'inv-money'}">${formatMoney(inv.amount, inv.currency)}</td>
       <td style="text-align:right;">${formatMoney(inv.vatamount, inv.currency)}</td>
       <td>${formatDateOnly(inv.invoicedate)}</td>
       <td>${escapeHtml(inv.invoicingPartnerLabel || '—')}</td>
       <td style="white-space:nowrap;">
-        <button class="ta-remove-btn" data-pdf title="View PDF">📄</button>
-        <button class="ta-remove-btn" data-email title="Email this invoice">📧</button>
+        <button class="ta-remove-btn" data-pdf title="${T('inv.tip.viewPdf')}">📄</button>
+        <button class="ta-remove-btn" data-email title="${T('inv.tip.email')}">📧</button>
       </td>
-      <td><button class="ta-remove-btn" data-delete title="Delete this invoice">✕</button></td>
+      <td><button class="ta-remove-btn" data-delete title="${T('inv.tip.delete')}">✕</button></td>
     </tr>
   `).join('');
 
@@ -648,15 +649,15 @@ function renderInvoicesTable(){
   tbody.querySelectorAll('[data-delete]').forEach((btn, i) => {
     btn.addEventListener('click', async (e) => {
       e.stopPropagation();
-      if (!confirm(`Delete invoice ${INVOICES[i].invoicecode || '(draft)'}? This cannot be undone.`)) return;
+      if (!confirm(T('inv.confirm.deleteInvoice', { code: INVOICES[i].invoicecode || T('inv.draft') }))) return;
       try {
         await HITT_API.deleteInvoice(INVOICES[i].id);
-        toast('Invoice deleted', 'navy');
+        toast(T('inv.toast.invoiceDeleted'), 'navy');
         await loadInvoices();
         await loadProjects();
       } catch (err) {
         console.error(err);
-        toast('Could not delete the invoice.', 'red');
+        toast(T('inv.toast.invoiceDeleteFail'), 'red');
       }
     });
   });
@@ -676,7 +677,7 @@ async function openInvoicePdf(invoiceId){
   } catch (err) {
     console.error(err);
     if (w) w.close();
-    toast('Could not open the invoice PDF.', 'red');
+    toast(T('inv.toast.pdfFail'), 'red');
   }
 }
 document.getElementById('invViewPdf').addEventListener('click', () => {
@@ -689,7 +690,7 @@ document.getElementById('invEmail').addEventListener('click', () => {
 /* ============================== EMAIL INVOICE MODAL ===================== */
 const invoiceEmailOverlay = document.getElementById('invoiceEmailOverlay');
 let emailInvoiceId = null;
-const LANG_NAME = { 1: 'English', 2: 'Spanish', 3: 'Catalan' };
+const LANG_NAME = () => ({ 1: T('lang.en'), 2: T('lang.es'), 3: T('lang.ca') });
 
 function closeInvoiceEmailModal(){
   invoiceEmailOverlay.classList.add('hidden');
@@ -702,7 +703,7 @@ async function openInvoiceEmailModal(invoiceId){
   err.textContent = '';
   ['invEmailFrom', 'invEmailTo', 'invEmailCc', 'invEmailSubject'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('invEmailBody').value = '';
-  document.getElementById('invEmailLangHint').textContent = 'Loading…';
+  document.getElementById('invEmailLangHint').textContent = T('common.loading');
   document.getElementById('invEmailSend').disabled = true;
   invoiceEmailOverlay.classList.remove('hidden');
 
@@ -715,23 +716,23 @@ async function openInvoiceEmailModal(invoiceId){
     document.getElementById('invEmailTo').value = d.to || '';
     document.getElementById('invEmailSubject').value = d.subject || '';
     document.getElementById('invEmailBody').value = d.body || '';
-    const lang = LANG_NAME[d.languageId] || 'English';
-    let hint = `Text is in the business partner's language (${lang}). Edit anything before sending.`;
+    const lang = LANG_NAME()[d.languageId] || T('lang.en');
+    let hint = T('inv.email.langHint', { lang });
     if (d.emailedAt) {
-      hint += ` — already emailed on ${new Date(d.emailedAt).toLocaleString()}` +
-        (Number(d.emailedCount) > 1 ? ` (${d.emailedCount}×)` : '') + '.';
+      hint += T('inv.email.alreadyEmailed', { when: new Date(d.emailedAt).toLocaleString() }) +
+        (Number(d.emailedCount) > 1 ? T('inv.email.alreadyEmailedTimes', { n: d.emailedCount }) : '') + '.';
     }
     document.getElementById('invEmailLangHint').textContent = hint;
     if (d.mailConfigured === false) {
       err.textContent = d.channel === 'smtp'
-        ? 'SMTP for FHiTT invoices is not configured on the server yet — sending will fail until an admin sets it up.'
-        : 'Email sending is not configured on the server yet — sending will fail until an admin sets it up.';
+        ? T('inv.email.smtpNotConfigured')
+        : T('inv.email.notConfigured');
     }
     document.getElementById('invEmailSend').disabled = false;
   } catch (e) {
     console.error(e);
     document.getElementById('invEmailLangHint').textContent = '';
-    err.textContent = e.message || 'Could not load the email details.';
+    err.textContent = e.message || T('inv.email.loadFail');
   }
 }
 
@@ -752,23 +753,23 @@ document.getElementById('invEmailSend').addEventListener('click', async () => {
   const body = document.getElementById('invEmailBody').value.trim();
   const err = document.getElementById('invEmailError');
   err.textContent = '';
-  if (!to) { err.textContent = 'Enter at least one recipient.'; return; }
-  if (!confirm(`Send this invoice to:\n${to}${cc ? `\nCc: ${cc}` : ''}`)) return;
+  if (!to) { err.textContent = T('inv.email.needRecipient'); return; }
+  if (!confirm(cc ? T('inv.email.confirmSendCc', { to, cc }) : T('inv.email.confirmSend', { to }))) return;
 
   const btn = document.getElementById('invEmailSend');
   btn.disabled = true;
-  btn.textContent = 'Sending…';
+  btn.textContent = T('inv.email.sending');
   try {
     const r = await HITT_API.sendInvoiceEmail(emailInvoiceId, { to, cc, subject, body });
-    toast(`Invoice emailed to ${r.to.join(', ')}`, 'green');
+    toast(T('inv.toast.emailed', { to: r.to.join(', ') }), 'green');
     closeInvoiceEmailModal();
     if (activeProjectId) loadInvoices(); // refresh so the "Sent" badge shows
   } catch (e) {
     console.error(e);
-    err.textContent = e.message || 'The email could not be sent.';
+    err.textContent = e.message || T('inv.email.sendFail');
   } finally {
     btn.disabled = false;
-    btn.textContent = 'Send email';
+    btn.textContent = T('inv.email.send');
   }
 });
 
@@ -787,11 +788,11 @@ function clientSideStatusPreview(){
   const s = document.getElementById('invSentDate').value;
   const dep = document.getElementById('invDipositDate').value;
   let id, label;
-  if (!d && !s && !dep) { id = 2; label = 'Not generated'; }
-  else if (d && !s && !dep) { id = 3; label = 'To be sent'; }
-  else if (d && s && !dep) { id = 4; label = 'Sent to customer'; }
-  else if (d && s && dep) { id = 5; label = 'Collected'; }
-  else { id = 1; label = 'Pending PO'; }
+  if (!d && !s && !dep) { id = 2; label = T('inv.status.notGenerated'); }
+  else if (d && !s && !dep) { id = 3; label = T('inv.status.toBeSent'); }
+  else if (d && s && !dep) { id = 4; label = T('inv.status.sentToCustomer'); }
+  else if (d && s && dep) { id = 5; label = T('inv.status.collected'); }
+  else { id = 1; label = T('inv.status.pendingPo'); }
   const el = document.getElementById('invStatusPreview');
   el.textContent = label;
   el.className = `inv-status-pill inv-status-${id}`;
@@ -824,15 +825,15 @@ function recalcInvTotal(){
 function renderInvItems(){
   const tbody = document.getElementById('invItemsBody');
   if (!invLineItems.length) {
-    tbody.innerHTML = `<tr class="inv-items-none"><td colspan="5">No items yet — “+ Add item” to start.</td></tr>`;
+    tbody.innerHTML = `<tr class="inv-items-none"><td colspan="5">${T('inv.items.none')}</td></tr>`;
   } else {
     tbody.innerHTML = invLineItems.map((li, i) => `
       <tr data-i="${i}">
-        <td><input type="text" class="field-input" data-li-desc value="${escapeHtml(li.description || '')}" placeholder="What is being invoiced" /></td>
+        <td><input type="text" class="field-input" data-li-desc value="${escapeHtml(li.description || '')}" placeholder="${T('inv.items.descPlaceholder')}" /></td>
         <td><input type="number" class="field-input" step="1" min="0" data-li-qty value="${li.quantity ?? ''}" /></td>
         <td><input type="number" class="field-input" step="0.01" min="0" data-li-price value="${li.unitPrice ?? ''}" /></td>
         <td class="inv-items-sub" data-li-sub>${formatMoney(invItemSubtotal(li), invCurCode())}</td>
-        <td><button type="button" class="ta-remove-btn" data-li-del title="Remove item">✕</button></td>
+        <td><button type="button" class="ta-remove-btn" data-li-del title="${T('inv.tip.removeItem')}">✕</button></td>
       </tr>`).join('');
   }
   tbody.querySelectorAll('tr[data-i]').forEach(tr => {
@@ -867,7 +868,7 @@ document.getElementById('invIsCorrective').addEventListener('change', (e) => {
   if (e.target.checked) {
     const candidates = INVOICES.filter(inv => !inv.iscorrective && inv.invoicestatusid !== 6);
     document.getElementById('invSourceInvoice').innerHTML = lookupOptionsHtml(
-      candidates.map(inv => ({ id: inv.id, label: `${inv.invoicecode || '(draft)'} — ${formatMoney(inv.amount)}` })),
+      candidates.map(inv => ({ id: inv.id, label: `${inv.invoicecode || T('inv.draft')} — ${formatMoney(inv.amount)}` })),
       null, true
     );
   }
@@ -878,7 +879,7 @@ async function openInvoiceModal(invoiceId){
   const inv = invoiceId ? INVOICES.find(x => x.id === invoiceId) : null;
 
   document.getElementById('invModalTitle').textContent = inv
-    ? `${T('inv.modal.edit')} ${inv.invoicecode || '(draft)'}`
+    ? `${T('inv.modal.edit')} ${inv.invoicecode || T('inv.draft')}`
     : T('inv.modal.new');
   document.getElementById('invDelete').classList.toggle('hidden', !inv);
   document.getElementById('invViewPdf').classList.toggle('hidden', !inv);
@@ -888,8 +889,8 @@ async function openInvoiceModal(invoiceId){
   document.getElementById('invChangedBadge').classList.add('hidden');
   const updatedInfo = document.getElementById('invUpdatedInfo');
   if (inv && inv.updatedAt) {
-    const who = inv.updatedByName || (inv.updatedById ? `#${inv.updatedById}` : 'someone');
-    updatedInfo.innerHTML = `Last updated by <strong>${escapeHtml(who)}</strong> on ${escapeHtml(new Date(inv.updatedAt).toLocaleString())}`;
+    const who = inv.updatedByName || (inv.updatedById ? `#${inv.updatedById}` : T('inv.someone'));
+    updatedInfo.innerHTML = T('inv.lastUpdatedBy', { who: escapeHtml(who), when: escapeHtml(new Date(inv.updatedAt).toLocaleString()) });
     updatedInfo.classList.remove('hidden');
   } else {
     updatedInfo.classList.add('hidden');
@@ -941,8 +942,7 @@ async function openInvoiceModal(invoiceId){
   const taxSel = document.getElementById('invTaxCompany');
   taxSel.disabled = true;
   document.getElementById('invTaxCompanyChange').style.display = '';
-  document.getElementById('invTaxCompanyHint').textContent =
-    'Defaults to the project’s tax company. “Change” overrides it for this invoice only.';
+  document.getElementById('invTaxCompanyHint').textContent = T('inv.f.taxCompanyHint');
   const currentTcId = inv?.busspartnertoinvoiceid || activeProjectDefaultTc?.id || null;
   const extras = [];
   if (inv?.busspartnertoinvoiceid) {
@@ -954,7 +954,7 @@ async function openInvoiceModal(invoiceId){
     bpTaxCompanies: activeProjectBpTaxCompanies,
     extras,
     selectedId: currentTcId,
-    blankLabel: '— none —',
+    blankLabel: T('inv.tc.none'),
   });
   invTaxCompanyPrev = taxSel.value;
 
@@ -965,7 +965,7 @@ document.getElementById('invTaxCompanyChange').addEventListener('click', () => {
   const sel = document.getElementById('invTaxCompany');
   sel.disabled = false;
   document.getElementById('invTaxCompanyChange').style.display = 'none';
-  document.getElementById('invTaxCompanyHint').textContent = 'Overriding for this invoice only.';
+  document.getElementById('invTaxCompanyHint').textContent = T('inv.f.taxCompanyOverride');
   sel.focus();
 });
 document.getElementById('invTaxCompany').addEventListener('change', (e) => {
@@ -1025,47 +1025,57 @@ function invoicePayload(){
 document.getElementById('invSave').addEventListener('click', async () => {
   if (!activeProjectId) return;
   if (!invoiceLineItemsPayload().length) {
-    toast('Add at least one invoiceable item.', 'red');
+    toast(T('inv.toast.needItem'), 'red');
     return;
   }
   try {
     if (activeInvoiceId) {
       await HITT_API.updateInvoice(activeInvoiceId, invoicePayload());
-      toast('Invoice saved', 'green');
+      toast(T('inv.toast.saved'), 'green');
     } else {
       const isCorrective = document.getElementById('invIsCorrective').checked;
       const sourceInvoiceId = document.getElementById('invSourceInvoice').value || null;
       if (isCorrective && !sourceInvoiceId) {
-        toast('Pick which invoice this corrective invoice replaces.', 'red');
+        toast(T('inv.toast.needSource'), 'red');
         return;
       }
       await HITT_API.createInvoice(activeProjectId, { ...invoicePayload(), isCorrective, sourceInvoiceId });
-      toast('Invoice created', 'green');
+      toast(T('inv.toast.created'), 'green');
     }
     closeInvoiceModal();
     await loadInvoices();
     await loadProjects();
   } catch (err) {
     console.error(err);
-    toast('Could not save the invoice.', 'red');
+    toast(T('inv.toast.saveFail'), 'red');
   }
 });
 
 document.getElementById('invDelete').addEventListener('click', async () => {
   if (!activeInvoiceId) return;
   const inv = INVOICES.find(x => x.id === activeInvoiceId);
-  if (!confirm(`Delete invoice ${inv?.invoicecode || '(draft)'}? This cannot be undone.`)) return;
+  if (!confirm(T('inv.confirm.deleteInvoice', { code: inv?.invoicecode || T('inv.draft') }))) return;
   try {
     await HITT_API.deleteInvoice(activeInvoiceId);
-    toast('Invoice deleted', 'navy');
+    toast(T('inv.toast.invoiceDeleted'), 'navy');
     closeInvoiceModal();
     await loadInvoices();
     await loadProjects();
   } catch (err) {
     console.error(err);
-    toast('Could not delete the invoice.', 'red');
+    toast(T('inv.toast.invoiceDeleteFail'), 'red');
   }
 });
 
 /* ============================== INIT ==================================== */
 loadProjects();
+
+
+/* Re-render dynamic content when the UI language changes. */
+window.addEventListener('hitt:langchange', () => {
+  if (typeof setDataSourcePill === 'function') setDataSourcePill();
+  if (typeof updateProjectStatusLabel === 'function') updateProjectStatusLabel();
+  if (typeof renderTable === 'function') renderTable();
+  const mo = document.getElementById('modalOverlay');
+  if (mo && !mo.classList.contains('hidden') && typeof renderInvoicesTable === 'function') renderInvoicesTable();
+});
