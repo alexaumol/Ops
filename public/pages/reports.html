@@ -27,47 +27,47 @@
     <p class="page-subtitle" data-i18n="page.reports.sub">Portfolio-wide views built from live project and time-off data.</p>
 
     <div class="page-tabs">
-      <button data-rtab="stats" class="page-tab" aria-selected="true">Project stats</button>
-      <button data-rtab="hours" class="page-tab" aria-selected="false">Hours per project</button>
-      <button data-rtab="leaves" class="page-tab" aria-selected="false">Resource leaves</button>
+      <button data-rtab="stats" class="page-tab" aria-selected="true" data-i18n="rpt.tab.stats">Project stats</button>
+      <button data-rtab="hours" class="page-tab" aria-selected="false" data-i18n="rpt.tab.hours">Hours per project</button>
+      <button data-rtab="leaves" class="page-tab" aria-selected="false" data-i18n="rpt.tab.leaves">Resource leaves</button>
     </div>
 
     <!-- ============================ HOURS PER PROJECT ============================ -->
     <div id="paneHours" class="page-pane hidden">
       <div class="rpt-toolbar">
         <label class="rpt-field">
-          <span>From</span>
+          <span data-i18n="exp.f.from">From</span>
           <input type="date" id="hoursStartDate" />
         </label>
         <label class="rpt-field">
-          <span>To</span>
+          <span data-i18n="exp.f.to">To</span>
           <input type="date" id="hoursEndDate" />
         </label>
-        <button class="btn btn-secondary" id="btnHoursThisYear">This year</button>
-        <button class="btn btn-secondary" id="btnHoursAllTime">All time</button>
-        <button class="btn btn-secondary" id="btnHoursExport">Export CSV</button>
+        <button class="btn btn-secondary" id="btnHoursThisYear" data-i18n="rpt.thisYear">This year</button>
+        <button class="btn btn-secondary" id="btnHoursAllTime" data-i18n="rpt.allTime">All time</button>
+        <button class="btn btn-secondary" id="btnHoursExport" data-i18n="rpt.exportCsv">Export CSV</button>
         <div class="rpt-spacer"></div>
         <span id="hoursTotal" class="rpt-total"></span>
       </div>
-      <p class="rpt-hint">Click a project row for a per-employee breakdown.</p>
+      <p class="rpt-hint" data-i18n="rpt.hours.hint">Click a project row for a per-employee breakdown.</p>
 
       <div class="rpt-table-wrap">
         <table class="rpt-table">
           <thead>
             <tr>
-              <th>Project</th>
-              <th>Project owner</th>
-              <th>Entity</th>
-              <th>Status</th>
-              <th style="text-align:right;">Total hours</th>
-              <th style="text-align:right;">PO hours</th>
-              <th style="text-align:right;">RES hours</th>
-              <th style="text-align:right;">Resources</th>
+              <th data-i18n="bp.col.project">Project</th>
+              <th data-i18n="proj.f.owner">Project owner</th>
+              <th data-i18n="proj.f.entity">Entity</th>
+              <th data-i18n="form.status">Status</th>
+              <th style="text-align:right;" data-i18n="rpt.col.totalHours">Total hours</th>
+              <th style="text-align:right;" data-i18n="rpt.col.poHours">PO hours</th>
+              <th style="text-align:right;" data-i18n="rpt.col.resHours">RES hours</th>
+              <th style="text-align:right;" data-i18n="proj.section.resources">Resources</th>
             </tr>
           </thead>
           <tbody id="hoursTableBody"></tbody>
         </table>
-        <div id="hoursEmpty" class="bp-empty hidden">No hours logged in this range.</div>
+        <div id="hoursEmpty" class="bp-empty hidden" data-i18n="rpt.hours.empty">No hours logged in this range.</div>
       </div>
     </div>
 
@@ -77,20 +77,20 @@
         <button class="btn btn-secondary" id="btnPrevMonth" title="Previous month">&larr;</button>
         <span id="leavesMonthLabel" class="rpt-month-label"></span>
         <button class="btn btn-secondary" id="btnNextMonth" title="Next month">&rarr;</button>
-        <button class="btn btn-secondary" id="btnThisMonth">Today</button>
-        <button class="btn btn-secondary" id="btnLeavesExport">Export CSV</button>
+        <button class="btn btn-secondary" id="btnThisMonth" data-i18n="rpt.today">Today</button>
+        <button class="btn btn-secondary" id="btnLeavesExport" data-i18n="rpt.exportCsv">Export CSV</button>
         <div class="rpt-spacer"></div>
         <div class="rpt-legend">
-          <span class="rpt-legend-item"><span class="rpt-swatch rpt-swatch-holiday"></span>Holiday</span>
-          <span class="rpt-legend-item"><span class="rpt-swatch rpt-swatch-approved"></span>Approved leave</span>
-          <span class="rpt-legend-item"><span class="rpt-swatch rpt-swatch-pending"></span>Pending leave</span>
+          <span class="rpt-legend-item"><span class="rpt-swatch rpt-swatch-holiday"></span><span data-i18n="rpt.legend.holiday">Holiday</span></span>
+          <span class="rpt-legend-item"><span class="rpt-swatch rpt-swatch-approved"></span><span data-i18n="rpt.legend.approved">Approved leave</span></span>
+          <span class="rpt-legend-item"><span class="rpt-swatch rpt-swatch-pending"></span><span data-i18n="rpt.legend.pending">Pending leave</span></span>
         </div>
       </div>
 
       <div class="rpt-leaves-layout">
         <div id="leavesCalendar" class="rpt-calendar"></div>
         <aside class="rpt-leaves-side">
-          <h3 class="rpt-leaves-side-title">This month's leaves</h3>
+          <h3 class="rpt-leaves-side-title" data-i18n="rpt.leaves.sideTitle">This month's leaves</h3>
           <div id="leavesMonthList" class="rpt-leaves-list"></div>
         </aside>
       </div>
@@ -101,21 +101,21 @@
       <!-- Row 1: full width -->
       <div class="rpt-chart-card">
         <div class="rpt-chart-head">
-          <h2>Projects by status</h2>
+          <h2 data-i18n="rpt.chart.byStatus">Projects by status</h2>
           <label class="rpt-field" style="margin-right:0.5rem;">
-            <span>Show</span>
+            <span data-i18n="rpt.show">Show</span>
             <select id="statusMetricSelect">
-              <option value="count" selected>Total</option>
-              <option value="budget">Budgeted</option>
+              <option value="count" selected data-i18n="rpt.metric.total">Total</option>
+              <option value="budget" data-i18n="rpt.metric.budgeted">Budgeted</option>
             </select>
           </label>
           <label class="rpt-field" style="margin-right:0.5rem;">
-            <span>Year</span>
+            <span data-i18n="rpt.year">Year</span>
             <select id="statusYearSelect">
-              <option value="">All years</option>
+              <option value="" data-i18n="rpt.allYears">All years</option>
             </select>
           </label>
-          <button class="btn btn-secondary" id="btnStatusExport">Export CSV</button>
+          <button class="btn btn-secondary" id="btnStatusExport" data-i18n="rpt.exportCsv">Export CSV</button>
         </div>
         <div id="statusChart"></div>
       </div>
@@ -124,40 +124,40 @@
       <div class="rpt-charts-grid rpt-charts-grid--row2">
         <div class="rpt-chart-card">
           <div class="rpt-chart-head">
-            <h2>Projects opened &amp; closed by month</h2>
+            <h2 data-i18n="rpt.chart.openedClosed">Projects opened &amp; closed by month</h2>
             <label class="rpt-field" style="margin-right:0.5rem;">
-              <span>Year</span>
+              <span data-i18n="rpt.year">Year</span>
               <select id="openedYearSelect"></select>
             </label>
-            <button class="btn btn-secondary" id="btnOpenedExport">Export CSV</button>
+            <button class="btn btn-secondary" id="btnOpenedExport" data-i18n="rpt.exportCsv">Export CSV</button>
           </div>
           <div id="openedChart"></div>
         </div>
 
         <div class="rpt-chart-card">
           <div class="rpt-chart-head">
-            <h2>Stale projects</h2>
-            <button class="btn btn-secondary" id="btnStaleExport">Export CSV</button>
+            <h2 data-i18n="rpt.chart.stale">Stale projects</h2>
+            <button class="btn btn-secondary" id="btnStaleExport" data-i18n="rpt.exportCsv">Export CSV</button>
           </div>
-          <p class="rpt-hint">Open projects (excludes Closed/Cancelled) with the oldest — or no — logged status change. Most will show "—" until more changes are made under the new tracking.</p>
+          <p class="rpt-hint" data-i18n="rpt.stale.hint">Open projects (excludes Closed/Cancelled) with the oldest — or no — logged status change. Most will show "—" until more changes are made under the new tracking.</p>
           <div class="rpt-table-wrap">
             <table class="rpt-table">
               <thead>
                 <tr>
-                  <th>Project</th>
-                  <th>Entry date</th>
-                  <th>Last status change</th>
+                  <th data-i18n="bp.col.project">Project</th>
+                  <th data-i18n="rpt.col.entryDate">Entry date</th>
+                  <th data-i18n="rpt.col.lastStatusChange">Last status change</th>
                 </tr>
               </thead>
               <tbody id="staleTableBody"></tbody>
             </table>
-            <div id="staleEmpty" class="bp-empty hidden">No open projects.</div>
+            <div id="staleEmpty" class="bp-empty hidden" data-i18n="rpt.stale.empty">No open projects.</div>
           </div>
           <div class="rpt-pagination">
             <span id="stalePageInfo" class="rpt-page-info"></span>
             <div class="rpt-spacer"></div>
-            <button class="btn btn-secondary" id="btnStalePrev">&larr; Prev</button>
-            <button class="btn btn-secondary" id="btnStaleNext">Next &rarr;</button>
+            <button class="btn btn-secondary" id="btnStalePrev" data-i18n="form.prev">&larr; Prev</button>
+            <button class="btn btn-secondary" id="btnStaleNext" data-i18n="form.next">Next &rarr;</button>
           </div>
         </div>
       </div>
@@ -165,39 +165,39 @@
       <!-- Row 3: full width -->
       <div class="rpt-chart-card">
         <div class="rpt-chart-head">
-          <h2>Project timeline</h2>
-          <input type="text" id="timelineFilter" placeholder="Filter by project code or name…" class="rpt-timeline-filter" />
-          <button class="btn btn-secondary" id="btnTimelineExport">Export CSV</button>
+          <h2 data-i18n="rpt.chart.timeline">Project timeline</h2>
+          <input type="text" id="timelineFilter" placeholder="Filter by project code or name…" class="rpt-timeline-filter" data-i18n-placeholder="rpt.timeline.filter" />
+          <button class="btn btn-secondary" id="btnTimelineExport" data-i18n="rpt.exportCsv">Export CSV</button>
         </div>
-        <p class="rpt-hint">Only shows status changes made since this log was added — earlier history wasn't tracked.</p>
+        <p class="rpt-hint" data-i18n="rpt.timeline.hint">Only shows status changes made since this log was added — earlier history wasn't tracked.</p>
         <div class="rpt-table-wrap">
           <table class="rpt-table">
             <thead>
               <tr>
-                <th>Project</th>
-                <th>Change</th>
-                <th>When</th>
-                <th>Changed by</th>
+                <th data-i18n="bp.col.project">Project</th>
+                <th data-i18n="rpt.col.change">Change</th>
+                <th data-i18n="rpt.col.when">When</th>
+                <th data-i18n="rpt.col.changedBy">Changed by</th>
               </tr>
             </thead>
             <tbody id="timelineTableBody"></tbody>
           </table>
-          <div id="timelineEmpty" class="bp-empty hidden">No status changes logged yet.</div>
+          <div id="timelineEmpty" class="bp-empty hidden" data-i18n="rpt.timeline.empty">No status changes logged yet.</div>
         </div>
         <div class="rpt-pagination">
           <span id="timelinePageInfo" class="rpt-page-info"></span>
           <div class="rpt-spacer"></div>
           <label class="rpt-field" style="margin-right:0.25rem;">
-            <span>Per page</span>
+            <span data-i18n="form.perPage">Per page</span>
             <select id="timelinePageSizeSelect">
               <option value="10" selected>10</option>
               <option value="25">25</option>
               <option value="50">50</option>
-              <option value="1000">All</option>
+              <option value="1000" data-i18n="exp.scope.all">All</option>
             </select>
           </label>
-          <button class="btn btn-secondary" id="btnTimelinePrev">&larr; Prev</button>
-          <button class="btn btn-secondary" id="btnTimelineNext">Next &rarr;</button>
+          <button class="btn btn-secondary" id="btnTimelinePrev" data-i18n="form.prev">&larr; Prev</button>
+          <button class="btn btn-secondary" id="btnTimelineNext" data-i18n="form.next">Next &rarr;</button>
         </div>
       </div>
     </div>
@@ -207,7 +207,7 @@
   <div id="drillOverlay" class="modal-overlay hidden">
     <div class="modal-panel modal-panel--sm">
       <div class="modal-head">
-        <h2 id="drillTitle" style="flex:1; font-size:1rem; font-weight:700; color:#fff; margin:0;">Project</h2>
+        <h2 id="drillTitle" style="flex:1; font-size:1rem; font-weight:700; color:#fff; margin:0;" data-i18n="bp.col.project">Project</h2>
         <button id="drillExport" class="modal-head-btn" title="Export CSV" style="background: var(--hitt-charcoal);">⬇</button>
         <button id="drillClose" class="modal-head-btn modal-head-btn--close" title="Close">✕</button>
       </div>
@@ -215,15 +215,15 @@
         <table class="rpt-table">
           <thead>
             <tr>
-              <th>Employee</th>
-              <th style="text-align:right;">Total</th>
+              <th data-i18n="ta.col.employee">Employee</th>
+              <th style="text-align:right;" data-i18n="rpt.metric.total">Total</th>
               <th style="text-align:right;">PO</th>
               <th style="text-align:right;">RES</th>
             </tr>
           </thead>
           <tbody id="drillTableBody"></tbody>
         </table>
-        <div id="drillEmpty" class="bp-empty hidden">No hours logged by anyone for this project in this range.</div>
+        <div id="drillEmpty" class="bp-empty hidden" data-i18n="rpt.drill.empty">No hours logged by anyone for this project in this range.</div>
       </div>
     </div>
   </div>
@@ -232,16 +232,16 @@
   <div id="monthDetailOverlay" class="modal-overlay hidden">
     <div class="modal-panel modal-panel--sm">
       <div class="modal-head">
-        <h2 id="monthDetailTitle" style="flex:1; font-size:1rem; font-weight:700; color:#fff; margin:0;">Projects</h2>
+        <h2 id="monthDetailTitle" style="flex:1; font-size:1rem; font-weight:700; color:#fff; margin:0;" data-i18n="page.projects.title">Projects</h2>
         <button id="monthDetailClose" class="modal-head-btn modal-head-btn--close" title="Close">✕</button>
       </div>
       <div class="modal-body">
         <table class="rpt-table">
           <thead>
             <tr>
-              <th>Project</th>
-              <th>Entry date</th>
-              <th>Entity</th>
+              <th data-i18n="bp.col.project">Project</th>
+              <th data-i18n="rpt.col.entryDate">Entry date</th>
+              <th data-i18n="proj.f.entity">Entity</th>
             </tr>
           </thead>
           <tbody id="monthDetailTableBody"></tbody>
