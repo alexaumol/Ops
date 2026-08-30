@@ -975,16 +975,19 @@ let DELIVERABLES = [];
 let editingDeliverableId = null;
 
 // Sub-item changes made during the current modal session. Each "Add" /
-// "Save" on a sub-row persists immediately, so a confirmed discard undoes
-// them: session-added rows are deleted, edited pre-existing rows are
-// PATCHed back to how they loaded. Reset on open, cleared on Save.
+// "Save" / delete on a sub-row persists immediately, so a confirmed
+// discard undoes them: session-added rows are deleted, edited
+// pre-existing rows are PATCHed back to how they loaded, and deleted
+// pre-existing rows are re-created. Reset on open, cleared on Save.
 let projectSessionAdds = { notes: [], deliverables: [], quotations: [] };
 let projectOrigDeliverables = new Map();   // String(id) -> row as loaded
 let projectEditedDeliverables = new Set(); // String(id) of pre-existing rows edited this session
+let projectDeletedDeliverables = [];       // original rows of pre-existing deliverables deleted this session
 
 function resetProjectSessionAdds(){
   projectSessionAdds = { notes: [], deliverables: [], quotations: [] };
   projectEditedDeliverables = new Set();
+  projectDeletedDeliverables = [];
   projectOrigDeliverables = new Map(); // repopulated by snapshotProjectDeliverables on load
 }
 function snapshotProjectDeliverables(rows){
@@ -994,7 +997,14 @@ function projectHasSessionAdds(){
   return projectSessionAdds.notes.length || projectSessionAdds.deliverables.length || projectSessionAdds.quotations.length;
 }
 function projectHasSessionChanges(){
-  return projectHasSessionAdds() || projectEditedDeliverables.size > 0;
+  return projectHasSessionAdds() || projectEditedDeliverables.size > 0 || projectDeletedDeliverables.length > 0;
+}
+function deliverableFields(o){
+  return {
+    deliverablename: o.deliverablename || '',
+    deliverydate: o.deliverydate ? String(o.deliverydate).slice(0, 10) : null,
+    effectivedd: o.effectivedd ? String(o.effectivedd).slice(0, 10) : null,
+  };
 }
 async function discardProjectSessionChanges(){
   const pid = activeProjectId;
@@ -1005,13 +1015,9 @@ async function discardProjectSessionChanges(){
     ...projectSessionAdds.quotations.map(qId => HITT_API.deleteProjectQuotation(pid, qId)),
     ...[...projectEditedDeliverables].map(dId => {
       const o = projectOrigDeliverables.get(String(dId));
-      if (!o) return Promise.resolve();
-      return HITT_API.updateProjectDeliverable(pid, dId, {
-        deliverablename: o.deliverablename || '',
-        deliverydate: o.deliverydate ? String(o.deliverydate).slice(0, 10) : null,
-        effectivedd: o.effectivedd ? String(o.effectivedd).slice(0, 10) : null,
-      });
+      return o ? HITT_API.updateProjectDeliverable(pid, dId, deliverableFields(o)) : Promise.resolve();
     }),
+    ...projectDeletedDeliverables.map(o => HITT_API.addProjectDeliverable(pid, deliverableFields(o))),
   ];
   resetProjectSessionAdds();
   const results = await Promise.allSettled(jobs);
@@ -1040,11 +1046,17 @@ function cancelEditDeliverable(){
 
 async function deleteDeliverable(id){
   const d = DELIVERABLES.find(x => x.id === id);
-  if (!d || !confirm(`Delete deliverable "${d.deliverablename || '(unnamed)'}"? This cannot be undone.`)) return;
+  if (!d || !confirm(`Delete deliverable "${d.deliverablename || '(unnamed)'}"?`)) return;
+  const wasSessionAdd = projectSessionAdds.deliverables.some(x => String(x) === String(id));
   try {
     await HITT_API.deleteProjectDeliverable(activeProjectId, id);
     projectSessionAdds.deliverables = projectSessionAdds.deliverables.filter(x => String(x) !== String(id));
     projectEditedDeliverables.delete(String(id));
+    // A pre-existing deliverable deleted this session — remember it so a
+    // discard can re-create it.
+    if (!wasSessionAdd && projectOrigDeliverables.has(String(id))) {
+      projectDeletedDeliverables.push(projectOrigDeliverables.get(String(id)));
+    }
     if (editingDeliverableId === id) cancelEditDeliverable();
     const deliverables = await HITT_API.getProjectDeliverables(activeProjectId);
     renderDeliverables(deliverables);
@@ -1346,7 +1358,7 @@ function closeProjectModal(){
 async function requestCloseProjectModal(){
   if (!projectModalHasUnsaved()) { closeProjectModal(); return; }
   const msg = projectHasSessionChanges()
-    ? 'Discard your changes? Notes, deliverables and quotations you added or edited will be reverted.'
+    ? 'Discard your changes? Notes, deliverables and quotations you added, edited or deleted will be reverted.'
     : 'Discard your unsaved changes to this project?';
   if (!confirm(msg)) return;
   if (projectHasSessionChanges()) await discardProjectSessionChanges();
