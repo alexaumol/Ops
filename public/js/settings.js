@@ -299,6 +299,7 @@ let auditLoaded = false;
 let pathsLoaded = false;
 let expCatsLoaded = false;
 let currenciesLoaded = false;
+let customizationsLoaded = false;
 
 document.querySelectorAll("[data-stab]").forEach((btn) => {
   btn.addEventListener("click", () => {
@@ -311,6 +312,7 @@ document.querySelectorAll("[data-stab]").forEach((btn) => {
     document.getElementById("panePaths").classList.toggle("hidden", tab !== "paths");
     document.getElementById("paneExpCats").classList.toggle("hidden", tab !== "expcats");
     document.getElementById("paneCurrencies").classList.toggle("hidden", tab !== "currencies");
+    document.getElementById("paneCustomizations").classList.toggle("hidden", tab !== "customizations");
     document.getElementById("paneAudit").classList.toggle("hidden", tab !== "audit");
     if (tab === "holidays" && !holidaysLoaded) {
       holidaysLoaded = true;
@@ -331,6 +333,10 @@ document.querySelectorAll("[data-stab]").forEach((btn) => {
     if (tab === "currencies" && !currenciesLoaded) {
       currenciesLoaded = true;
       loadCurrencies();
+    }
+    if (tab === "customizations" && !customizationsLoaded) {
+      customizationsLoaded = true;
+      loadBranding();
     }
     if (tab === "audit" && !auditLoaded) {
       auditLoaded = true;
@@ -974,6 +980,185 @@ document.getElementById("btnAuditPrev").addEventListener("click", () => {
 });
 document.getElementById("btnAuditNext").addEventListener("click", () => {
   if (auditPage < auditTotalPages()) { auditPage++; loadAudit(); }
+});
+
+/* ============================== CUSTOMIZATIONS (logo) ================== */
+const BRAND_FRAME = 260;   // on-screen crop frame, px (matches canvas + CSS)
+const BRAND_EXPORT = 512;  // saved PNG size, px
+
+const brandEls = {
+  current: document.getElementById("brandCurrentLogo"),
+  reset: document.getElementById("btnBrandReset"),
+  updated: document.getElementById("brandUpdatedInfo"),
+  file: document.getElementById("brandFile"),
+  cropArea: document.getElementById("brandCropArea"),
+  stage: document.getElementById("brandCropStage"),
+  canvas: document.getElementById("brandCropCanvas"),
+  zoom: document.getElementById("brandZoom"),
+  cancel: document.getElementById("btnBrandCancel"),
+  save: document.getElementById("btnBrandSave"),
+};
+
+const brandCrop = { img: null, baseScale: 1, zoom: 1, offsetX: 0, offsetY: 0, drag: null };
+const DEFAULT_LOGO_SRC = "../assets/fhitt-logo.png";
+
+async function loadBranding() {
+  try {
+    const { dataUrl } = await HITT_API.getBrandingLogo();
+    if (dataUrl) {
+      brandEls.current.src = dataUrl;
+      brandEls.reset.disabled = false;
+      brandEls.updated.textContent = "A custom logo is in use.";
+    } else {
+      brandEls.current.src = DEFAULT_LOGO_SRC;
+      brandEls.reset.disabled = true;
+      brandEls.updated.textContent = "Using the default Fundació HiTT mark.";
+    }
+  } catch (err) {
+    console.error("[settings] branding:", err.message);
+    brandEls.updated.textContent = "Could not load the current logo.";
+  }
+}
+
+function brandClampOffsets() {
+  if (!brandCrop.img) return;
+  const w = brandCrop.img.naturalWidth * brandCrop.baseScale * brandCrop.zoom;
+  const h = brandCrop.img.naturalHeight * brandCrop.baseScale * brandCrop.zoom;
+  const maxX = Math.max(0, (w - BRAND_FRAME) / 2);
+  const maxY = Math.max(0, (h - BRAND_FRAME) / 2);
+  brandCrop.offsetX = Math.min(maxX, Math.max(-maxX, brandCrop.offsetX));
+  brandCrop.offsetY = Math.min(maxY, Math.max(-maxY, brandCrop.offsetY));
+}
+
+function brandDraw() {
+  const ctx = brandEls.canvas.getContext("2d");
+  ctx.clearRect(0, 0, BRAND_FRAME, BRAND_FRAME);
+  if (!brandCrop.img) return;
+  const w = brandCrop.img.naturalWidth * brandCrop.baseScale * brandCrop.zoom;
+  const h = brandCrop.img.naturalHeight * brandCrop.baseScale * brandCrop.zoom;
+  const x = (BRAND_FRAME - w) / 2 + brandCrop.offsetX;
+  const y = (BRAND_FRAME - h) / 2 + brandCrop.offsetY;
+  ctx.drawImage(brandCrop.img, x, y, w, h);
+}
+
+function brandStartCrop(dataUrl) {
+  const img = new Image();
+  img.onload = () => {
+    brandCrop.img = img;
+    // "contain" — whole image visible at zoom 1, user zooms in to crop.
+    brandCrop.baseScale = Math.min(BRAND_FRAME / img.naturalWidth, BRAND_FRAME / img.naturalHeight);
+    brandCrop.zoom = 1;
+    brandCrop.offsetX = 0;
+    brandCrop.offsetY = 0;
+    brandEls.zoom.value = "1";
+    brandEls.cropArea.classList.remove("hidden");
+    brandDraw();
+  };
+  img.onerror = () => toast("That image could not be read.", "red");
+  img.src = dataUrl;
+}
+
+brandEls.file.addEventListener("change", () => {
+  const f = brandEls.file.files && brandEls.file.files[0];
+  if (!f) return;
+  if (!/^image\/(png|jpeg|webp)$/.test(f.type)) {
+    toast("Choose a PNG, JPEG or WebP image.", "red");
+    brandEls.file.value = "";
+    return;
+  }
+  if (f.size > 8 * 1024 * 1024) {
+    toast("That file is over 8 MB — pick a smaller one.", "red");
+    brandEls.file.value = "";
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = () => brandStartCrop(reader.result);
+  reader.onerror = () => toast("That image could not be read.", "red");
+  reader.readAsDataURL(f);
+});
+
+brandEls.zoom.addEventListener("input", () => {
+  brandCrop.zoom = Number(brandEls.zoom.value) || 1;
+  brandClampOffsets();
+  brandDraw();
+});
+
+function brandPointerXY(e) {
+  const t = e.touches && e.touches[0];
+  return { x: (t || e).clientX, y: (t || e).clientY };
+}
+brandEls.stage.addEventListener("pointerdown", (e) => {
+  if (!brandCrop.img) return;
+  const p = brandPointerXY(e);
+  brandCrop.drag = { x: p.x, y: p.y, ox: brandCrop.offsetX, oy: brandCrop.offsetY };
+  try { brandEls.stage.setPointerCapture(e.pointerId); } catch (err) {}
+});
+brandEls.stage.addEventListener("pointermove", (e) => {
+  if (!brandCrop.drag) return;
+  const p = brandPointerXY(e);
+  brandCrop.offsetX = brandCrop.drag.ox + (p.x - brandCrop.drag.x);
+  brandCrop.offsetY = brandCrop.drag.oy + (p.y - brandCrop.drag.y);
+  brandClampOffsets();
+  brandDraw();
+});
+["pointerup", "pointercancel", "pointerleave"].forEach((ev) =>
+  brandEls.stage.addEventListener(ev, () => { brandCrop.drag = null; })
+);
+
+function brandCloseCrop() {
+  brandCrop.img = null;
+  brandCrop.drag = null;
+  brandEls.cropArea.classList.add("hidden");
+  brandEls.file.value = "";
+}
+brandEls.cancel.addEventListener("click", brandCloseCrop);
+
+brandEls.save.addEventListener("click", async () => {
+  if (!brandCrop.img) return;
+  const out = document.createElement("canvas");
+  out.width = BRAND_EXPORT;
+  out.height = BRAND_EXPORT;
+  const k = BRAND_EXPORT / BRAND_FRAME;
+  const ctx = out.getContext("2d");
+  const w = brandCrop.img.naturalWidth * brandCrop.baseScale * brandCrop.zoom * k;
+  const h = brandCrop.img.naturalHeight * brandCrop.baseScale * brandCrop.zoom * k;
+  const x = (BRAND_EXPORT - w) / 2 + brandCrop.offsetX * k;
+  const y = (BRAND_EXPORT - h) / 2 + brandCrop.offsetY * k;
+  ctx.drawImage(brandCrop.img, x, y, w, h);
+  const dataUrl = out.toDataURL("image/png");
+
+  brandEls.save.disabled = true;
+  try {
+    await HITT_API.setBrandingLogo(dataUrl);
+    brandEls.current.src = dataUrl;
+    brandEls.reset.disabled = false;
+    brandEls.updated.textContent = "A custom logo is in use.";
+    if (window.HITT_BRANDING) {
+      window.HITT_BRANDING.cache(dataUrl);
+      window.HITT_BRANDING.apply(dataUrl);
+    }
+    brandCloseCrop();
+    toast("Logo saved. Other pages update on their next load.", "green");
+  } catch (err) {
+    toast(err.message || "Could not save the logo.", "red");
+  } finally {
+    brandEls.save.disabled = false;
+  }
+});
+
+brandEls.reset.addEventListener("click", async () => {
+  if (!confirm("Reset the company logo back to the default Fundació HiTT mark?")) return;
+  brandEls.reset.disabled = true;
+  try {
+    await HITT_API.clearBrandingLogo();
+    brandEls.current.src = DEFAULT_LOGO_SRC;
+    brandEls.updated.textContent = "Using the default Fundació HiTT mark.";
+    if (window.HITT_BRANDING) window.HITT_BRANDING.cache(null);
+    toast("Logo reset. Other pages revert on their next load.", "green");
+  } catch (err) {
+    brandEls.reset.disabled = false;
+    toast(err.message || "Could not reset the logo.", "red");
+  }
 });
 
 loadEmployees();

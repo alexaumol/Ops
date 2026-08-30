@@ -38,6 +38,7 @@ const invoicingRouter = loadRouter("invoicing");
 const employeesRouter = loadRouter("employees");
 const permissionsRouter = loadRouter("permissions");
 const settingsRouter = loadRouter("settings");
+const brandingRouter = loadRouter("branding");
 const reportsRouter = loadRouter("reports");
 const auditRouter = loadRouter("audit");
 const expensesRouter = loadRouter("expenses");
@@ -56,7 +57,9 @@ const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS || "")
   .filter(Boolean);
 
 app.use(helmet());
-app.use(express.json());
+// 2 MB ceiling — most bodies are tiny, but Settings → Customizations posts
+// the company logo as a base64 data URL (see routes/branding.js).
+app.use(express.json({ limit: "2mb" }));
 app.use(
   cors({
     origin(origin, callback) {
@@ -87,6 +90,7 @@ app.use("/api/expenses", expensesRouter);
 app.use("/api/employees", employeesRouter);
 app.use("/api/permissions", permissionsRouter);
 app.use("/api/settings", settingsRouter);
+app.use("/api/branding", brandingRouter);
 app.use("/api/reports", reportsRouter);
 app.use("/api/audit", auditRouter);
 

@@ -262,7 +262,7 @@ function renderTable(){
         <td><span class="inv-bucket-pill inv-bucket-${bucket}">${BUCKET_LABEL[bucket]}</span></td>
         <td class="inv-actions-col">
           <div class="inv-row-actions">
-            <a class="inv-row-btn" href="projects.html?projectId=${encodeURIComponent(p.id)}" data-row-action title="Open project page" aria-label="Open project page">↗</a>
+            <a class="inv-row-btn" href="projects.html?projectId=${encodeURIComponent(p.id)}" data-row-action title="Open project page" aria-label="Open project page">📁</a>
             ${p.bpId
               ? `<a class="inv-row-btn" href="business-partners.html?open=${encodeURIComponent(p.bpId)}" data-row-action title="Open business partner page" aria-label="Open business partner page">🤝</a>`
               : `<span class="inv-row-btn" data-row-action aria-disabled="true" title="No business partner assigned" style="opacity:0.3; cursor:default;">🤝</span>`}

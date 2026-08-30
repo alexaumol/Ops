@@ -339,3 +339,49 @@
 .toast-navy { background: var(--hitt-ink); }
 .toast-green { background: var(--success); }
 .toast-red { background: var(--danger); }
+
+/* ==================== CUSTOMIZATIONS — company logo ==================== */
+.brand-editor {
+  display: flex; flex-wrap: wrap; gap: 2rem;
+  align-items: flex-start;
+}
+.brand-editor__col { flex: 1 1 260px; min-width: 240px; }
+.brand-editor__h {
+  font-size: 0.9rem; font-weight: 700; margin: 0 0 0.75rem;
+}
+.brand-logo-frame {
+  width: 160px; height: 160px;
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-sm);
+  background:
+    repeating-conic-gradient(var(--bg-surface-alt) 0% 25%, transparent 0% 50%) 50% / 20px 20px;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden; margin-bottom: 0.85rem;
+}
+.brand-logo-frame img { max-width: 100%; max-height: 100%; object-fit: contain; }
+
+.brand-file-btn { display: inline-block; cursor: pointer; }
+
+.brand-crop { margin-top: 1rem; max-width: 260px; }
+.brand-crop__stage {
+  position: relative; width: 260px; height: 260px;
+  border-radius: var(--radius-sm); overflow: hidden;
+  background:
+    repeating-conic-gradient(var(--bg-surface-alt) 0% 25%, transparent 0% 50%) 50% / 20px 20px;
+  touch-action: none; cursor: grab;
+}
+.brand-crop__stage:active { cursor: grabbing; }
+.brand-crop__stage canvas { display: block; width: 260px; height: 260px; }
+.brand-crop__mask {
+  position: absolute; inset: 0; pointer-events: none;
+  border: 2px solid var(--brand);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 0 0 9999px rgba(0,0,0,0.04) inset;
+}
+.brand-crop__zoom {
+  display: flex; align-items: center; gap: 0.6rem;
+  margin: 0.85rem 0 0.4rem; font-size: 0.82rem; font-weight: 600;
+}
+.brand-crop__zoom input[type="range"] { flex: 1; }
+.brand-crop__actions {
+  display: flex; gap: 0.5rem; margin-top: 0.85rem;
+}

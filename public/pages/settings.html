@@ -39,6 +39,7 @@
         <button data-stab="paths" class="settings-tab" role="tab" aria-selected="false">Paths</button>
         <button data-stab="expcats" class="settings-tab" role="tab" aria-selected="false">Expense categories</button>
         <button data-stab="currencies" class="settings-tab" role="tab" aria-selected="false">Currencies</button>
+        <button data-stab="customizations" class="settings-tab" role="tab" aria-selected="false">Customizations</button>
         <button data-stab="audit" class="settings-tab" role="tab" aria-selected="false">Auditing</button>
       </div>
 
@@ -158,6 +159,46 @@
             <input type="text" id="newCurrencySymbol" placeholder="Symbol ($)" style="width:5rem;" />
             <input type="text" id="newCurrencyLabel" placeholder="Name (US Dollar)" />
             <button class="btn btn-primary" id="btnAddCurrency">Add currency</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================== CUSTOMIZATIONS ==================== -->
+      <section id="paneCustomizations" class="settings-pane hidden">
+        <p class="settings-note">Your organisation's logo. It replaces the default mark on the sign-in screen and in every page header. A square-ish image works best — after choosing a file you can zoom and drag it to frame the part you want.</p>
+
+        <div class="brand-editor">
+          <div class="brand-editor__col">
+            <h3 class="brand-editor__h">Current logo</h3>
+            <div class="brand-logo-frame">
+              <img id="brandCurrentLogo" src="../assets/fhitt-logo.png" alt="Current company logo" />
+            </div>
+            <button class="btn btn-secondary" id="btnBrandReset" disabled>Reset to default</button>
+            <p class="settings-emp-sub" id="brandUpdatedInfo" style="margin:0.5rem 0 0;"></p>
+          </div>
+
+          <div class="brand-editor__col">
+            <h3 class="brand-editor__h">Upload a new logo</h3>
+            <label class="btn btn-primary brand-file-btn">
+              Choose image…
+              <input type="file" id="brandFile" accept="image/png,image/jpeg,image/webp" hidden />
+            </label>
+
+            <div id="brandCropArea" class="brand-crop hidden">
+              <div class="brand-crop__stage" id="brandCropStage">
+                <canvas id="brandCropCanvas" width="260" height="260"></canvas>
+                <div class="brand-crop__mask" aria-hidden="true"></div>
+              </div>
+              <label class="brand-crop__zoom">
+                <span>Zoom</span>
+                <input type="range" id="brandZoom" min="1" max="5" step="0.01" value="1" />
+              </label>
+              <p class="settings-emp-sub">Drag the image to reposition. The framed square is what gets saved (as a transparent PNG).</p>
+              <div class="brand-crop__actions">
+                <button class="btn btn-secondary" id="btnBrandCancel">Cancel</button>
+                <button class="btn btn-primary" id="btnBrandSave">Save logo</button>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -293,6 +334,7 @@
   <div id="toastHost" class="toast-host"></div>
 
   <script src="../js/config.js"></script>
+  <script src="../js/branding.js"></script>
   <script src="../js/auth.js"></script>
   <script src="../js/api.js"></script>
   <script src="../js/permissions.js"></script>

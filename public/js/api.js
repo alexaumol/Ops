@@ -176,6 +176,11 @@ const HITT_API = (() => {
     deleteExpenseCategory: (id) =>
       request(`/api/settings/expense-categories/${id}`, { method: "DELETE" }),
 
+    getBrandingLogo: () => request("/api/branding/logo"),
+    setBrandingLogo: (dataUrl) =>
+      request("/api/branding/logo", { method: "PUT", body: JSON.stringify({ dataUrl }) }),
+    clearBrandingLogo: () => request("/api/branding/logo", { method: "DELETE" }),
+
     getInvoiceCurrencies: () => request("/api/settings/currencies"),
     createInvoiceCurrency: (payload) =>
       request("/api/settings/currencies", { method: "POST", body: JSON.stringify(payload) }),

@@ -130,3 +130,17 @@ CREATE TABLE IF NOT EXISTS invoicecurrencies (
 ALTER TABLE invoicecurrencies ADD COLUMN IF NOT EXISTS sortorder int NOT NULL DEFAULT 0;
 INSERT INTO invoicecurrencies (code, symbol, label, sortorder) VALUES ('EUR', '€', 'Euro', 0)
   ON CONFLICT (code) DO NOTHING;
+
+-- 2026-08 — Company logo customization (Settings → Customizations)
+-- --------------------------------------------------------------------------
+-- The admin-uploaded company logo is stored as a base64 data URL in the
+-- shared appconfig table under key 'branding.logo'. Kept in the DB (not a
+-- file under public/) so it survives a `git pull` deploy. Served publicly
+-- by GET /api/branding/logo (the sign-in page shows it too). The appconfig
+-- table itself is created by ensureSettingsSchema() / ensureConfigTable().
+CREATE TABLE IF NOT EXISTS public.appconfig (
+  configkey   varchar(64) PRIMARY KEY,
+  configvalue text,
+  updatedat   timestamp without time zone,
+  updatedby   bigint
+);
