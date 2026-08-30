@@ -29,25 +29,25 @@
     <p class="page-subtitle" data-i18n="page.invoicing.sub">Proceed-to-invoice settings and invoice follow-up, per project.</p>
 
     <div class="inv-filters">
-      <button data-bucket="not-released" class="inv-filter-btn" aria-selected="false">Not released <span class="inv-filter-count" data-count-for="not-released"></span></button>
-      <button data-bucket="not-started" class="inv-filter-btn" aria-selected="false">Not started <span class="inv-filter-count" data-count-for="not-started"></span></button>
-      <button data-bucket="partial" class="inv-filter-btn" aria-selected="true">Partially invoiced <span class="inv-filter-count" data-count-for="partial"></span></button>
-      <button data-bucket="total" class="inv-filter-btn" aria-selected="false">Totally invoiced <span class="inv-filter-count" data-count-for="total"></span></button>
-      <button data-bucket="all" class="inv-filter-btn" aria-selected="false">All <span class="inv-filter-count" data-count-for="all"></span></button>
+      <button data-bucket="not-released" class="inv-filter-btn" aria-selected="false"><span data-i18n="inv.bucket.notReleased">Not released</span> <span class="inv-filter-count" data-count-for="not-released"></span></button>
+      <button data-bucket="not-started" class="inv-filter-btn" aria-selected="false"><span data-i18n="inv.bucket.notStarted">Not started</span> <span class="inv-filter-count" data-count-for="not-started"></span></button>
+      <button data-bucket="partial" class="inv-filter-btn" aria-selected="true"><span data-i18n="inv.bucket.partial">Partially invoiced</span> <span class="inv-filter-count" data-count-for="partial"></span></button>
+      <button data-bucket="total" class="inv-filter-btn" aria-selected="false"><span data-i18n="inv.bucket.total">Totally invoiced</span> <span class="inv-filter-count" data-count-for="total"></span></button>
+      <button data-bucket="all" class="inv-filter-btn" aria-selected="false"><span data-i18n="exp.scope.all">All</span> <span class="inv-filter-count" data-count-for="all"></span></button>
       <div class="inv-filter-spacer"></div>
-      <input id="searchBox" type="text" placeholder="Search by project code, name or business partner…" />
+      <input id="searchBox" type="text" placeholder="Search by project code, name or business partner…" data-i18n-placeholder="inv.search" />
     </div>
 
     <div class="inv-filters inv-filters--row2">
       <div class="inv-lifecycle-toggle" role="group" aria-label="Filter by project lifecycle">
-        <button data-lifecycle="alive" class="inv-lifecycle-btn" aria-selected="true">Only alive projects</button>
-        <button data-lifecycle="closed" class="inv-lifecycle-btn" aria-selected="false">Only closed projects</button>
-        <button data-lifecycle="all" class="inv-lifecycle-btn" aria-selected="false">All projects</button>
+        <button data-lifecycle="alive" class="inv-lifecycle-btn" aria-selected="true" data-i18n="inv.lifecycle.aliveOnly">Only alive projects</button>
+        <button data-lifecycle="closed" class="inv-lifecycle-btn" aria-selected="false" data-i18n="inv.lifecycle.closedOnly">Only closed projects</button>
+        <button data-lifecycle="all" class="inv-lifecycle-btn" aria-selected="false" data-i18n="inv.lifecycle.allProjects">All projects</button>
       </div>
       <div class="inv-filter-spacer"></div>
       <div class="inv-status-filter" id="projectStatusFilterWrap">
         <button type="button" id="projectStatusBtn" class="inv-status-filter-btn" aria-expanded="false" aria-haspopup="true">
-          Project status: <span id="projectStatusBtnLabel">all</span> <span aria-hidden="true">▾</span>
+          <span data-i18n="inv.projectStatus">Project status:</span> <span id="projectStatusBtnLabel">all</span> <span aria-hidden="true">▾</span>
         </button>
         <div id="projectStatusMenu" class="inv-status-filter-menu hidden"></div>
       </div>
@@ -58,20 +58,20 @@
         <thead>
           <tr>
             <th class="inv-proceed-col" title="Proceed to invoice"></th>
-            <th data-sort="code">Project<span class="sort-arrow"></span></th>
-            <th data-sort="entityLabel">Entity<span class="sort-arrow"></span></th>
-            <th data-sort="bpName">Business partner<span class="sort-arrow"></span></th>
-            <th data-sort="projectStatusLabel">Project status<span class="sort-arrow"></span></th>
-            <th data-sort="budget" style="text-align:right;">Budget<span class="sort-arrow"></span></th>
-            <th data-sort="invoicedTotal" style="text-align:right;">Invoiced<span class="sort-arrow"></span></th>
-            <th data-sort="invoiceCount" style="text-align:right;">Generated invoices<span class="sort-arrow"></span></th>
-            <th data-sort="bucket">Invoice status<span class="sort-arrow"></span></th>
+            <th data-sort="code" data-i18n="bp.col.project">Project<span class="sort-arrow"></span></th>
+            <th data-sort="entityLabel" data-i18n="inv.col.entity">Entity<span class="sort-arrow"></span></th>
+            <th data-sort="bpName" data-i18n="page.businessPartners.title">Business partner<span class="sort-arrow"></span></th>
+            <th data-sort="projectStatusLabel" data-i18n="inv.col.projectStatus">Project status<span class="sort-arrow"></span></th>
+            <th data-sort="budget" style="text-align:right;" data-i18n="inv.col.budget">Budget<span class="sort-arrow"></span></th>
+            <th data-sort="invoicedTotal" style="text-align:right;" data-i18n="inv.col.invoiced">Invoiced<span class="sort-arrow"></span></th>
+            <th data-sort="invoiceCount" style="text-align:right;" data-i18n="inv.col.generated">Generated invoices<span class="sort-arrow"></span></th>
+            <th data-sort="bucket" data-i18n="inv.col.invoiceStatus">Invoice status<span class="sort-arrow"></span></th>
             <th class="inv-actions-col" aria-label="Actions"></th>
           </tr>
         </thead>
         <tbody id="invTableBody"></tbody>
       </table>
-      <div id="invEmpty" class="bp-empty hidden">No projects match this filter.</div>
+      <div id="invEmpty" class="bp-empty hidden" data-i18n="inv.empty">No projects match this filter.</div>
     </div>
   </main>
 
@@ -85,69 +85,69 @@
         <button id="mClose" class="modal-head-btn modal-head-btn--close" title="Close">✕</button>
       </div>
       <div class="modal-tabs">
-        <button data-mtab="release" class="modal-tab" aria-selected="true">Proceed to invoice</button>
-        <button data-mtab="invoices" class="modal-tab" aria-selected="false">Invoices</button>
+        <button data-mtab="release" class="modal-tab" aria-selected="true" data-i18n="inv.tab.release">Proceed to invoice</button>
+        <button data-mtab="invoices" class="modal-tab" aria-selected="false" data-i18n="inv.tab.invoices">Invoices</button>
       </div>
       <div class="modal-body">
         <div id="paneRelease" class="modal-pane">
           <div class="field-section">
-            <h3>Proceed-to-invoice settings</h3>
+            <h3 data-i18n="inv.rel.title">Proceed-to-invoice settings</h3>
             <div class="field-grid">
               <div class="span-2">
                 <label style="display:flex; align-items:center; gap:0.4rem; font-size:0.85rem;">
-                  <input id="relProceed" type="checkbox" /> Proceed to invoice
+                  <input id="relProceed" type="checkbox" /> <span data-i18n="inv.rel.proceed">Proceed to invoice</span>
                 </label>
               </div>
               <div>
-                <label class="field-label">Scheduling</label>
+                <label class="field-label" data-i18n="inv.rel.scheduling">Scheduling</label>
                 <select id="relSchedule" class="field-input"></select>
               </div>
               <div>
-                <label class="field-label">Delivery method</label>
+                <label class="field-label" data-i18n="inv.rel.delivery">Delivery method</label>
                 <select id="relDelivery" class="field-input"></select>
               </div>
               <div>
-                <label class="field-label">Invoices to be issued</label>
+                <label class="field-label" data-i18n="inv.rel.numInvoices">Invoices to be issued</label>
                 <input id="relNumInvoices" type="number" min="1" class="field-input" />
               </div>
               <div></div>
               <div>
-                <label class="field-label">First invoice date</label>
+                <label class="field-label" data-i18n="inv.rel.firstDate">First invoice date</label>
                 <input id="relFirstDate" type="date" class="field-input" />
               </div>
               <div>
-                <label class="field-label">Last invoice date</label>
+                <label class="field-label" data-i18n="inv.rel.lastDate">Last invoice date</label>
                 <input id="relLastDate" type="date" class="field-input" />
               </div>
             </div>
           </div>
-          <button id="relSave" class="btn btn-primary">Save settings</button>
+          <button id="relSave" class="btn btn-primary" data-i18n="inv.rel.save">Save settings</button>
         </div>
 
         <div id="paneInvoices" class="modal-pane hidden">
           <div class="inv-default-tc">
-            <label class="field-label" for="invoicesDefaultTaxCompany">Default tax company for this project's invoices</label>
+            <label class="field-label" for="invoicesDefaultTaxCompany" data-i18n="inv.defaultTc">Default tax company for this project's invoices</label>
             <select id="invoicesDefaultTaxCompany" class="field-input"></select>
           </div>
           <div style="display:flex; justify-content:flex-end; margin-bottom:0.75rem;">
-            <button id="btnNewInvoice" class="btn btn-primary">+ New invoice</button>
+            <button id="btnNewInvoice" class="btn btn-primary" data-i18n="inv.newInvoice">+ New invoice</button>
           </div>
           <table class="mini-table">
             <thead>
               <tr>
-                <th>Code</th>
-                <th>Status</th>
-                <th style="text-align:right;">Amount</th>
-                <th style="text-align:right;">VAT</th>
-                <th>Issue date</th>
-                <th>Tax company</th>
+                <th data-i18n="inv.col.code">Code</th>
+                <th data-i18n="form.status">Status</th>
+                <th style="text-align:right;" data-i18n="form.amount">Amount</th>
+                <th style="text-align:right;" data-i18n="inv.col.vat">VAT</th>
+                <th data-i18n="inv.col.issueDate">Issue date</th>
+                <th data-i18n="bp.tc.colName">Tax company</th>
                 <th></th>
                 <th></th>
               </tr>
             </thead>
             <tbody id="invoicesTableBody"></tbody>
           </table>
-          <div id="invoicesEmpty" class="sub-empty hidden">No invoices for this project yet.</div>
+          <div id="invoicesEmpty" class="sub-empty hidden" data-i18n="inv.noInvoices">No invoices for this project yet.</div>
         </div>
       </div>
     </div>
@@ -157,8 +157,8 @@
   <div id="invoiceOverlay" class="modal-overlay hidden">
     <div class="modal-panel" style="max-width:640px;">
       <div class="modal-head">
-        <h2 id="invModalTitle" style="flex:1; font-size:1rem; font-weight:700; color:#fff; margin:0;">New invoice</h2>
-        <span id="invChangedBadge" class="modal-changed-badge hidden">Data has changed</span>
+        <h2 id="invModalTitle" style="flex:1; font-size:1rem; font-weight:700; color:#fff; margin:0;" data-i18n="inv.modal.new">New invoice</h2>
+        <span id="invChangedBadge" class="modal-changed-badge hidden" data-i18n="form.dataChanged">Data has changed</span>
         <button id="invClose" class="modal-head-btn modal-head-btn--close" title="Close">✕</button>
       </div>
       <div class="modal-body">
@@ -167,111 +167,111 @@
           <div class="field-grid">
             <div class="span-2">
               <label style="display:flex; align-items:center; gap:0.4rem; font-size:0.85rem;">
-                <input id="invIsCorrective" type="checkbox" /> This is a corrective invoice
+                <input id="invIsCorrective" type="checkbox" /> <span data-i18n="inv.f.corrective">This is a corrective invoice</span>
               </label>
             </div>
             <div id="invSourceRow" class="span-2 hidden">
-              <label class="field-label">Source invoice (will be cancelled)</label>
+              <label class="field-label" data-i18n="inv.f.sourceInvoice">Source invoice (will be cancelled)</label>
               <select id="invSourceInvoice" class="field-input"></select>
             </div>
           </div>
         </div>
 
         <div class="field-section">
-          <h3>Dates</h3>
+          <h3 data-i18n="inv.section.dates">Dates</h3>
           <div class="field-grid">
             <div>
-              <label class="field-label">Issue date</label>
+              <label class="field-label" data-i18n="inv.col.issueDate">Issue date</label>
               <input id="invDate" type="date" class="field-input" />
             </div>
             <div>
-              <label class="field-label">Due date</label>
+              <label class="field-label" data-i18n="inv.f.dueDate">Due date</label>
               <input id="invDueDate" type="date" class="field-input" />
             </div>
             <div>
-              <label class="field-label">Sent date</label>
+              <label class="field-label" data-i18n="inv.f.sentDate">Sent date</label>
               <input id="invSentDate" type="date" class="field-input" />
             </div>
             <div>
-              <label class="field-label">Deposit (collected) date</label>
+              <label class="field-label" data-i18n="inv.f.depositDate">Deposit (collected) date</label>
               <input id="invDipositDate" type="date" class="field-input" />
             </div>
           </div>
           <div style="padding:0 0.75rem 0.75rem;">
-            <span class="field-label">Status (auto-computed from the dates above)</span>
+            <span class="field-label" data-i18n="inv.f.statusAuto">Status (auto-computed from the dates above)</span>
             <div><span id="invStatusPreview" class="inv-status-pill">—</span></div>
           </div>
         </div>
 
         <div class="field-section">
-          <h3>Invoiceable items</h3>
+          <h3 data-i18n="inv.section.items">Invoiceable items</h3>
           <div class="inv-items-wrap">
             <table class="inv-items-table">
               <thead>
                 <tr>
-                  <th>Item description</th>
-                  <th class="inv-items-num">Nº</th>
-                  <th class="inv-items-price">Price / item</th>
-                  <th class="inv-items-sub">Subtotal</th>
+                  <th data-i18n="inv.items.desc">Item description</th>
+                  <th class="inv-items-num" data-i18n="inv.items.qty">Nº</th>
+                  <th class="inv-items-price" data-i18n="inv.items.price">Price / item</th>
+                  <th class="inv-items-sub" data-i18n="inv.items.subtotal">Subtotal</th>
                   <th class="inv-items-del"></th>
                 </tr>
               </thead>
               <tbody id="invItemsBody"></tbody>
             </table>
             <div class="inv-items-foot">
-              <button type="button" class="btn btn-secondary" id="invAddItem">+ Add item</button>
-              <span class="inv-items-total">Total <strong id="invItemsTotal">—</strong></span>
+              <button type="button" class="btn btn-secondary" id="invAddItem" data-i18n="inv.items.add">+ Add item</button>
+              <span class="inv-items-total"><span data-i18n="inv.items.totalLabel">Total</span> <strong id="invItemsTotal">—</strong></span>
             </div>
           </div>
         </div>
 
         <div class="field-section">
-          <h3>Amount &amp; VAT</h3>
+          <h3 data-i18n="inv.section.amountVat">Amount &amp; VAT</h3>
           <div class="field-grid">
             <div>
-              <label class="field-label">Currency</label>
+              <label class="field-label" data-i18n="inv.f.currency">Currency</label>
               <select id="invCurrency" class="field-input"></select>
             </div>
             <div>
-              <label class="field-label">Amount (from items)</label>
+              <label class="field-label" data-i18n="inv.f.amountFromItems">Amount (from items)</label>
               <input id="invAmount" type="number" step="0.01" class="field-input" readonly />
             </div>
             <div>
-              <label class="field-label">VAT type</label>
+              <label class="field-label" data-i18n="inv.f.vatType">VAT type</label>
               <select id="invVatType" class="field-input"></select>
             </div>
             <div>
-              <span class="field-label">VAT amount (auto-computed)</span>
+              <span class="field-label" data-i18n="inv.f.vatAmountAuto">VAT amount (auto-computed)</span>
               <div class="field-static" id="invVatAmountPreview">—</div>
             </div>
           </div>
         </div>
 
         <div class="field-section">
-          <h3>Billing details</h3>
+          <h3 data-i18n="inv.section.billing">Billing details</h3>
           <div class="field-grid">
             <div>
-              <label class="field-label">Tax company (business partner to invoice)</label>
+              <label class="field-label" data-i18n="inv.f.taxCompany">Tax company (business partner to invoice)</label>
               <div class="inv-taxco-row">
                 <select id="invTaxCompany" class="field-input" disabled></select>
-                <button type="button" id="invTaxCompanyChange" class="btn btn-secondary">Change</button>
+                <button type="button" id="invTaxCompanyChange" class="btn btn-secondary" data-i18n="inv.f.change">Change</button>
               </div>
-              <p id="invTaxCompanyHint" class="inv-taxco-hint">Defaults to the project's tax company. “Change” overrides it for this invoice only.</p>
+              <p id="invTaxCompanyHint" class="inv-taxco-hint" data-i18n="inv.f.taxCompanyHint">Defaults to the project's tax company. “Change” overrides it for this invoice only.</p>
             </div>
             <div>
-              <label class="field-label">Billing account</label>
+              <label class="field-label" data-i18n="inv.f.billingAccount">Billing account</label>
               <select id="invDepositAccount" class="field-input"></select>
             </div>
             <div>
-              <label class="field-label">Purchase order</label>
+              <label class="field-label" data-i18n="inv.f.purchaseOrder">Purchase order</label>
               <input id="invPurchaseOrder" type="text" class="field-input" />
             </div>
             <div>
-              <label class="field-label">Other reference</label>
+              <label class="field-label" data-i18n="inv.f.otherReference">Other reference</label>
               <input id="invNumOcClient" type="text" class="field-input" />
             </div>
             <div class="span-2">
-              <label class="field-label">Comments</label>
+              <label class="field-label" data-i18n="inv.f.comments">Comments</label>
               <textarea id="invComments" class="field-input" rows="2"></textarea>
             </div>
           </div>
@@ -279,13 +279,13 @@
       </div>
       <div style="flex-shrink:0; border-top:1px solid var(--border-subtle); padding:0.75rem 1.1rem; display:flex; justify-content:space-between; gap:0.5rem;">
         <div style="display:flex; gap:0.5rem;">
-          <button id="invDelete" class="btn btn-secondary hidden" style="color:var(--danger);">Delete invoice</button>
-          <button id="invViewPdf" class="btn btn-secondary hidden">View PDF</button>
-          <button id="invEmail" class="btn btn-secondary hidden">Email invoice</button>
+          <button id="invDelete" class="btn btn-secondary hidden" style="color:var(--danger);" data-i18n="inv.deleteInvoice">Delete invoice</button>
+          <button id="invViewPdf" class="btn btn-secondary hidden" data-i18n="inv.viewPdf">View PDF</button>
+          <button id="invEmail" class="btn btn-secondary hidden" data-i18n="inv.emailInvoice">Email invoice</button>
         </div>
         <div style="display:flex; gap:0.5rem; margin-left:auto;">
-          <button id="invCancel" class="btn btn-secondary">Cancel</button>
-          <button id="invSave" class="btn btn-primary">Save invoice</button>
+          <button id="invCancel" class="btn btn-secondary" data-i18n="form.cancel">Cancel</button>
+          <button id="invSave" class="btn btn-primary" data-i18n="inv.saveInvoice">Save invoice</button>
         </div>
       </div>
     </div>
@@ -295,7 +295,7 @@
   <div id="invoiceEmailOverlay" class="modal-overlay hidden">
     <div class="modal-panel modal-panel--sm">
       <div class="modal-head">
-        <h2 id="invEmailTitle" style="flex:1; font-size:1rem; font-weight:700; color:#fff; margin:0;">Email invoice</h2>
+        <h2 id="invEmailTitle" style="flex:1; font-size:1rem; font-weight:700; color:#fff; margin:0;" data-i18n="inv.emailInvoice">Email invoice</h2>
         <button id="invEmailClose" class="modal-head-btn modal-head-btn--close" title="Close">✕</button>
       </div>
       <div class="modal-body">
@@ -303,34 +303,34 @@
         <div class="field-section">
           <div class="field-grid">
             <div class="span-2">
-              <label class="field-label">From</label>
+              <label class="field-label" data-i18n="inv.email.from">From</label>
               <input id="invEmailFrom" type="text" class="field-input" readonly disabled />
-              <p class="inv-taxco-hint" style="margin-top:0.25rem;">Set automatically from the invoice's billing entity.</p>
+              <p class="inv-taxco-hint" style="margin-top:0.25rem;" data-i18n="inv.email.fromHint">Set automatically from the invoice's billing entity.</p>
             </div>
             <div class="span-2">
-              <label class="field-label">To <span style="color:var(--danger);">*</span></label>
+              <label class="field-label"><span data-i18n="inv.email.to">To</span> <span style="color:var(--danger);">*</span></label>
               <input id="invEmailTo" type="text" class="field-input" placeholder="name@client.com; second@client.com" />
             </div>
             <div class="span-2">
-              <label class="field-label">Cc</label>
-              <input id="invEmailCc" type="text" class="field-input" placeholder="optional" />
+              <label class="field-label" data-i18n="inv.email.cc">Cc</label>
+              <input id="invEmailCc" type="text" class="field-input" placeholder="optional" data-i18n-placeholder="inv.email.optional" />
             </div>
             <div class="span-2">
-              <label class="field-label">Subject</label>
+              <label class="field-label" data-i18n="inv.email.subject">Subject</label>
               <input id="invEmailSubject" type="text" class="field-input" />
             </div>
             <div class="span-2">
-              <label class="field-label">Message</label>
+              <label class="field-label" data-i18n="inv.email.message">Message</label>
               <textarea id="invEmailBody" class="field-input" rows="5"></textarea>
             </div>
           </div>
         </div>
-        <p class="inv-taxco-hint">The invoice PDF is attached automatically.</p>
+        <p class="inv-taxco-hint" data-i18n="inv.email.pdfNote">The invoice PDF is attached automatically.</p>
         <p id="invEmailError" class="inv-taxco-hint" style="color:var(--danger);"></p>
       </div>
       <div style="flex-shrink:0; border-top:1px solid var(--border-subtle); padding:0.75rem 1.1rem; display:flex; justify-content:flex-end; gap:0.5rem;">
-        <button id="invEmailCancel" class="btn btn-secondary">Cancel</button>
-        <button id="invEmailSend" class="btn btn-primary">Send email</button>
+        <button id="invEmailCancel" class="btn btn-secondary" data-i18n="form.cancel">Cancel</button>
+        <button id="invEmailSend" class="btn btn-primary" data-i18n="inv.email.send">Send email</button>
       </div>
     </div>
   </div>
@@ -339,25 +339,25 @@
   <div id="tcPickerOverlay" class="modal-overlay hidden">
     <div class="modal-panel" style="max-width:760px;">
       <div class="modal-head">
-        <h2 style="flex:1; font-size:1rem; font-weight:700; color:#fff; margin:0;">Choose a tax company</h2>
+        <h2 style="flex:1; font-size:1rem; font-weight:700; color:#fff; margin:0;" data-i18n="inv.tcPicker.title">Choose a tax company</h2>
         <button id="tcPickerClose" class="modal-head-btn modal-head-btn--close" title="Close">✕</button>
       </div>
       <div style="padding:0.75rem 1.1rem; border-bottom:1px solid var(--border-subtle);">
-        <input id="tcPickerSearch" type="text" class="field-input" placeholder="Search name, VAT, business partner, or invoicing email…" autocomplete="off" />
+        <input id="tcPickerSearch" type="text" class="field-input" placeholder="Search name, VAT, business partner, or invoicing email…" autocomplete="off" data-i18n-placeholder="inv.tcPicker.search" />
       </div>
       <div class="modal-body" style="padding:0;">
         <table class="mini-table tc-picker-table">
           <thead>
             <tr>
-              <th>Tax company</th>
-              <th>VAT number</th>
-              <th>Business partner</th>
-              <th>Invoicing email</th>
+              <th data-i18n="bp.tc.colName">Tax company</th>
+              <th data-i18n="bp.tc.colVat">VAT number</th>
+              <th data-i18n="page.businessPartners.title">Business partner</th>
+              <th data-i18n="bp.tc.colEmail">Invoicing email</th>
             </tr>
           </thead>
           <tbody id="tcPickerBody"></tbody>
         </table>
-        <div id="tcPickerEmpty" class="sub-empty hidden">No tax companies match.</div>
+        <div id="tcPickerEmpty" class="sub-empty hidden" data-i18n="inv.tcPicker.empty">No tax companies match.</div>
       </div>
     </div>
   </div>

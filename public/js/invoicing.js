@@ -9,6 +9,7 @@
  */
 
 const session = HITT_AUTH.requireSession("../index.html");
+const T = (k, v) => (window.HITT_I18N ? HITT_I18N.t(k, v) : k);
 HITT_PERMS.guardModule("invoicing", "../welcome.html");
 document.getElementById("userName").textContent = session.displayName;
 document.getElementById("userAvatar").textContent = HITT_AUTH.initials(session);
@@ -709,7 +710,7 @@ async function openInvoiceEmailModal(invoiceId){
     const d = await HITT_API.getInvoiceEmailDefaults(invoiceId);
     if (emailInvoiceId !== invoiceId) return; // modal changed while loading
     document.getElementById('invEmailTitle').textContent =
-      d.invoiceCode ? `Email invoice ${d.invoiceCode}` : 'Email invoice';
+      d.invoiceCode ? `${T('inv.emailInvoice')} ${d.invoiceCode}` : T('inv.emailInvoice');
     document.getElementById('invEmailFrom').value = d.from || '';
     document.getElementById('invEmailTo').value = d.to || '';
     document.getElementById('invEmailSubject').value = d.subject || '';
@@ -876,7 +877,9 @@ async function openInvoiceModal(invoiceId){
   activeInvoiceId = invoiceId;
   const inv = invoiceId ? INVOICES.find(x => x.id === invoiceId) : null;
 
-  document.getElementById('invModalTitle').textContent = inv ? `Edit invoice ${inv.invoicecode || '(draft)'}` : 'New invoice';
+  document.getElementById('invModalTitle').textContent = inv
+    ? `${T('inv.modal.edit')} ${inv.invoicecode || '(draft)'}`
+    : T('inv.modal.new');
   document.getElementById('invDelete').classList.toggle('hidden', !inv);
   document.getElementById('invViewPdf').classList.toggle('hidden', !inv);
   document.getElementById('invEmail').classList.toggle('hidden', !inv);

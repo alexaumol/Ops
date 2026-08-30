@@ -28,8 +28,8 @@
     <p class="page-subtitle" data-i18n="page.timeAllocation.sub">Log your hours against projects and manage time-off requests.</p>
 
     <div class="page-tabs">
-      <button data-ptab="tracking" class="page-tab" aria-selected="true">Project time tracking</button>
-      <button data-ptab="timeoff" class="page-tab" aria-selected="false">Time off requests <span class="notif-badge hidden" id="timeoffTabBadge"></span></button>
+      <button data-ptab="tracking" class="page-tab" aria-selected="true" data-i18n="ta.tab.tracking">Project time tracking</button>
+      <button data-ptab="timeoff" class="page-tab" aria-selected="false"><span data-i18n="ta.tab.timeoff">Time off requests</span> <span class="notif-badge hidden" id="timeoffTabBadge"></span></button>
     </div>
 
     <div class="ta-layout">
@@ -49,36 +49,36 @@
         <table class="ta-table">
           <thead>
             <tr>
-              <th>Project</th>
-              <th>Status</th>
-              <th>Resource type</th>
-              <th style="text-align:right;">Hours</th>
-              <th>Last update</th>
+              <th data-i18n="bp.col.project">Project</th>
+              <th data-i18n="form.status">Status</th>
+              <th data-i18n="ta.col.resourceType">Resource type</th>
+              <th style="text-align:right;" data-i18n="ta.col.hours">Hours</th>
+              <th data-i18n="ta.col.lastUpdate">Last update</th>
               <th></th>
             </tr>
           </thead>
           <tbody id="taTableBody"></tbody>
         </table>
-        <div id="taEmpty" class="bp-empty hidden">No projects logged for this week yet.</div>
+        <div id="taEmpty" class="bp-empty hidden" data-i18n="ta.empty.tracking">No projects logged for this week yet.</div>
         <div class="ta-add-row">
-          <button class="btn btn-secondary" id="btnAddProject">+ Add project</button>
+          <button class="btn btn-secondary" id="btnAddProject" data-i18n="ta.addProject">+ Add project</button>
         </div>
       </div>
     </div>
 
     <div id="paneTimeOff" class="page-pane hidden">
       <div class="ta-banner">
-        <label for="balanceYear">Balance for</label>
+        <label for="balanceYear" data-i18n="ta.balanceFor">Balance for</label>
         <select id="balanceYear"></select>
         <div class="ta-spacer"></div>
-        <button class="btn btn-primary" id="btnNewTimeOff">+ New request</button>
+        <button class="btn btn-primary" id="btnNewTimeOff" data-i18n="ta.newRequest">+ New request</button>
       </div>
 
       <div class="to-stats">
-        <div class="to-stat"><span class="to-stat__value" id="statTotal">—</span><span class="to-stat__label">Total days</span></div>
-        <div class="to-stat"><span class="to-stat__value" id="statApproved">—</span><span class="to-stat__label">Approved</span></div>
-        <div class="to-stat"><span class="to-stat__value" id="statPending">—</span><span class="to-stat__label">Pending</span></div>
-        <div class="to-stat to-stat--highlight"><span class="to-stat__value" id="statAvailable">—</span><span class="to-stat__label">Available</span></div>
+        <div class="to-stat"><span class="to-stat__value" id="statTotal">—</span><span class="to-stat__label" data-i18n="ta.stat.total">Total days</span></div>
+        <div class="to-stat"><span class="to-stat__value" id="statApproved">—</span><span class="to-stat__label" data-i18n="ta.stat.approved">Approved</span></div>
+        <div class="to-stat"><span class="to-stat__value" id="statPending">—</span><span class="to-stat__label" data-i18n="ta.stat.pending">Pending</span></div>
+        <div class="to-stat to-stat--highlight"><span class="to-stat__value" id="statAvailable">—</span><span class="to-stat__label" data-i18n="ta.stat.available">Available</span></div>
       </div>
       <div id="balanceHint" class="hidden" style="font-size:0.78rem; color:var(--text-secondary); margin:-0.5rem 0 1rem;"></div>
 
@@ -86,16 +86,16 @@
         <table class="ta-table">
           <thead>
             <tr>
-              <th>Dates</th>
-              <th style="text-align:right;">Days</th>
-              <th>Status</th>
-              <th>Submitted</th>
+              <th data-i18n="ta.col.dates">Dates</th>
+              <th style="text-align:right;" data-i18n="ta.col.days">Days</th>
+              <th data-i18n="form.status">Status</th>
+              <th data-i18n="ta.col.submitted">Submitted</th>
               <th></th>
             </tr>
           </thead>
           <tbody id="toTableBody"></tbody>
         </table>
-        <div id="toEmpty" class="bp-empty hidden">No time-off requests yet.</div>
+        <div id="toEmpty" class="bp-empty hidden" data-i18n="ta.empty.timeoff">No time-off requests yet.</div>
       </div>
 
       <div id="approvalsSection" class="hidden">
@@ -105,26 +105,26 @@
           <table class="ta-table">
             <thead>
               <tr>
-                <th>Employee</th>
-                <th>Dates</th>
-                <th style="text-align:right;">Days</th>
-                <th>Submitted</th>
+                <th data-i18n="ta.col.employee">Employee</th>
+                <th data-i18n="ta.col.dates">Dates</th>
+                <th style="text-align:right;" data-i18n="ta.col.days">Days</th>
+                <th data-i18n="ta.col.submitted">Submitted</th>
                 <th></th>
               </tr>
             </thead>
             <tbody id="approvalsTableBody"></tbody>
           </table>
-          <div id="approvalsEmpty" class="bp-empty hidden">No requests waiting on you.</div>
+          <div id="approvalsEmpty" class="bp-empty hidden" data-i18n="ta.empty.approvals">No requests waiting on you.</div>
         </div>
       </div>
     </div>
     </div><!-- /.ta-main -->
 
     <aside class="ta-side" id="taSide">
-      <button type="button" id="taSideReopen" class="ta-side-reopen" title="Show reports" aria-label="Show reports panel">‹ Reports</button>
+      <button type="button" id="taSideReopen" class="ta-side-reopen" title="Show reports" aria-label="Show reports panel" data-i18n="ta.side.reopen">‹ Reports</button>
       <div class="ta-side-card">
         <div class="ta-side-head">
-          <span class="ta-side-title" id="taSideTitle">Yearly summary</span>
+          <span class="ta-side-title" id="taSideTitle" data-i18n="ta.side.title">Yearly summary</span>
           <button type="button" id="taSideToggle" class="ta-side-toggle" title="Collapse reports panel" aria-label="Collapse reports panel" aria-expanded="true">›</button>
         </div>
         <div id="taSideBody" class="ta-side-body"></div>
@@ -139,11 +139,11 @@
   <div id="projectPickerOverlay" class="modal-overlay hidden">
     <div class="modal-panel modal-panel--sm">
       <div class="modal-head">
-        <h2 style="flex:1; font-size:1rem; font-weight:700; color:#fff; margin:0;">Add a project</h2>
+        <h2 style="flex:1; font-size:1rem; font-weight:700; color:#fff; margin:0;" data-i18n="ta.picker.title">Add a project</h2>
         <button id="projectPickerClose" class="modal-head-btn modal-head-btn--close" title="Close">✕</button>
       </div>
       <div style="padding: 0.75rem 1.1rem; border-bottom:1px solid var(--border-subtle);">
-        <input id="projectPickerSearch" type="text" placeholder="Search by project code or name…" class="field-input" autocomplete="off" />
+        <input id="projectPickerSearch" type="text" placeholder="Search by project code or name…" class="field-input" autocomplete="off" data-i18n-placeholder="ta.picker.search" />
       </div>
       <div id="projectPickerResults" class="modal-body" style="max-height:50vh;"></div>
     </div>
@@ -153,30 +153,30 @@
   <div id="timeOffOverlay" class="modal-overlay hidden">
     <div class="modal-panel modal-panel--sm">
       <div class="modal-head">
-        <h2 style="flex:1; font-size:1rem; font-weight:700; color:#fff; margin:0;">New time-off request</h2>
+        <h2 style="flex:1; font-size:1rem; font-weight:700; color:#fff; margin:0;" data-i18n="ta.req.title">New time-off request</h2>
         <button id="timeOffClose" class="modal-head-btn modal-head-btn--close" title="Close">✕</button>
       </div>
       <div class="modal-body">
         <div class="field-section">
           <div class="field-grid">
             <div>
-              <label class="field-label">Start date</label>
+              <label class="field-label" data-i18n="ta.req.startDate">Start date</label>
               <input id="toStartDate" type="date" class="field-input" />
             </div>
             <div>
-              <label class="field-label">End date</label>
+              <label class="field-label" data-i18n="ta.req.endDate">End date</label>
               <input id="toEndDate" type="date" class="field-input" />
             </div>
             <div class="span-2">
-              <label class="field-label">Days requested</label>
+              <label class="field-label" data-i18n="ta.req.daysRequested">Days requested</label>
               <input id="toDaysRequested" type="number" min="0.5" step="0.5" class="field-input" />
             </div>
           </div>
         </div>
       </div>
       <div style="flex-shrink:0; border-top:1px solid var(--border-subtle); padding:0.75rem 1.1rem; display:flex; justify-content:flex-end; gap:0.5rem;">
-        <button id="timeOffCancel" class="btn btn-secondary">Cancel</button>
-        <button id="timeOffSubmit" class="btn btn-primary">Submit request</button>
+        <button id="timeOffCancel" class="btn btn-secondary" data-i18n="form.cancel">Cancel</button>
+        <button id="timeOffSubmit" class="btn btn-primary" data-i18n="ta.req.submit">Submit request</button>
       </div>
     </div>
   </div>
