@@ -31,27 +31,27 @@
     <div class="exp-layout">
     <div class="exp-main">
     <div class="exp-filters">
-      <input id="expSearch" type="text" placeholder="Search description, category, project…" />
+      <input id="expSearch" type="text" placeholder="Search description, category, project…" data-i18n-placeholder="exp.search" />
       <div class="exp-scope" role="group" aria-label="Scope">
-        <button data-scope="" class="exp-scope-btn" aria-selected="true">All <span class="exp-scope-count" data-count="all"></span></button>
-        <button data-scope="project" class="exp-scope-btn" aria-selected="false">On a project <span class="exp-scope-count" data-count="project"></span></button>
-        <button data-scope="internal" class="exp-scope-btn" aria-selected="false">Internal <span class="exp-scope-count" data-count="internal"></span></button>
+        <button data-scope="" class="exp-scope-btn" aria-selected="true"><span data-i18n="exp.scope.all">All</span> <span class="exp-scope-count" data-count="all"></span></button>
+        <button data-scope="project" class="exp-scope-btn" aria-selected="false"><span data-i18n="exp.scope.project">On a project</span> <span class="exp-scope-count" data-count="project"></span></button>
+        <button data-scope="internal" class="exp-scope-btn" aria-selected="false"><span data-i18n="exp.scope.internal">Internal</span> <span class="exp-scope-count" data-count="internal"></span></button>
       </div>
-      <label class="exp-field">Category
-        <select id="expCategoryFilter"><option value="">Any</option></select>
+      <label class="exp-field"><span data-i18n="exp.f.category">Category</span>
+        <select id="expCategoryFilter"><option value="" data-i18n="exp.filter.any">Any</option></select>
       </label>
-      <label class="exp-field">From <input type="date" id="expStartDate" /></label>
-      <label class="exp-field">To <input type="date" id="expEndDate" /></label>
+      <label class="exp-field"><span data-i18n="exp.f.from">From</span> <input type="date" id="expStartDate" /></label>
+      <label class="exp-field"><span data-i18n="exp.f.to">To</span> <input type="date" id="expEndDate" /></label>
       <div class="exp-filter-spacer"></div>
-      <button class="btn btn-primary" id="btnNewExpense">+ New expense</button>
+      <button class="btn btn-primary" id="btnNewExpense" data-i18n="exp.new">+ New expense</button>
     </div>
 
     <div id="expBulkBar" class="exp-bulk-bar hidden">
       <span id="expBulkCount"></span>
       <div class="exp-filter-spacer"></div>
-      <button class="btn btn-secondary" id="btnBulkEdit">Edit selected…</button>
-      <button class="btn btn-secondary" id="btnBulkDelete" style="color:var(--danger);">Delete selected</button>
-      <button class="btn btn-secondary" id="btnBulkClear">Clear</button>
+      <button class="btn btn-secondary" id="btnBulkEdit" data-i18n="exp.bulk.edit">Edit selected…</button>
+      <button class="btn btn-secondary" id="btnBulkDelete" style="color:var(--danger);" data-i18n="exp.bulk.delete">Delete selected</button>
+      <button class="btn btn-secondary" id="btnBulkClear" data-i18n="exp.bulk.clear">Clear</button>
     </div>
 
     <div class="exp-table-wrap">
@@ -59,46 +59,46 @@
         <thead>
           <tr>
             <th class="exp-check-col"><input type="checkbox" id="expCheckAll" title="Select all on this page" /></th>
-            <th data-sort="date">Date <span class="sort-arrow"></span></th>
-            <th data-sort="category">Category <span class="sort-arrow"></span></th>
-            <th data-sort="description">Description <span class="sort-arrow"></span></th>
-            <th data-sort="project">Project <span class="sort-arrow"></span></th>
-            <th data-sort="paidBy">Paid by <span class="sort-arrow"></span></th>
-            <th data-sort="amount" style="text-align:right;">Amount <span class="sort-arrow"></span></th>
+            <th data-sort="date" data-i18n="form.date">Date <span class="sort-arrow"></span></th>
+            <th data-sort="category" data-i18n="exp.f.category">Category <span class="sort-arrow"></span></th>
+            <th data-sort="description" data-i18n="form.description">Description <span class="sort-arrow"></span></th>
+            <th data-sort="project" data-i18n="bp.col.project">Project <span class="sort-arrow"></span></th>
+            <th data-sort="paidBy" data-i18n="exp.col.paidBy">Paid by <span class="sort-arrow"></span></th>
+            <th data-sort="amount" style="text-align:right;" data-i18n="form.amount">Amount <span class="sort-arrow"></span></th>
             <th class="exp-doc-col" title="Evidence">📎</th>
             <th></th>
           </tr>
         </thead>
         <tbody id="expTableBody"></tbody>
       </table>
-      <div id="expEmpty" class="bp-empty hidden">No expenses match these filters.</div>
+      <div id="expEmpty" class="bp-empty hidden" data-i18n="exp.empty">No expenses match these filters.</div>
     </div>
 
     <div class="exp-pagination">
       <span id="expPageInfo" class="exp-page-info"></span>
       <span id="expSum" class="exp-sum"></span>
       <div class="exp-filter-spacer"></div>
-      <label class="exp-field">Per page
+      <label class="exp-field"><span data-i18n="form.perPage">Per page</span>
         <select id="expPageSize"><option>25</option><option selected>50</option><option>100</option><option>250</option></select>
       </label>
-      <button class="btn btn-secondary" id="btnExpPrev">&larr; Prev</button>
-      <button class="btn btn-secondary" id="btnExpNext">Next &rarr;</button>
+      <button class="btn btn-secondary" id="btnExpPrev" data-i18n="form.prev">&larr; Prev</button>
+      <button class="btn btn-secondary" id="btnExpNext" data-i18n="form.next">Next &rarr;</button>
     </div>
     </div><!-- /.exp-main -->
 
     <aside class="exp-side">
       <div class="exp-side-card">
         <div class="exp-side-head">
-          <h2 class="exp-side-title">Top projects by expense</h2>
+          <h2 class="exp-side-title" data-i18n="exp.side.title">Top projects by expense</h2>
           <div class="exp-side-toggle" role="group" aria-label="Project scope">
-            <button data-topscope="" class="exp-side-toggle-btn" aria-selected="true">All</button>
-            <button data-topscope="alive" class="exp-side-toggle-btn" aria-selected="false">Alive</button>
+            <button data-topscope="" class="exp-side-toggle-btn" aria-selected="true" data-i18n="exp.scope.all">All</button>
+            <button data-topscope="alive" class="exp-side-toggle-btn" aria-selected="false" data-i18n="inv.lifecycle.alive">Alive</button>
           </div>
         </div>
-        <p class="exp-side-hint">Top 10 by total spend, each split re-invoiceable vs. not. Follows the filters above (not the scope toggle).</p>
+        <p class="exp-side-hint" data-i18n="exp.side.hint">Top 10 by total spend, each split re-invoiceable vs. not. Follows the filters above (not the scope toggle).</p>
         <div id="expTopProjects" class="exp-top-list"></div>
         <div class="exp-side-internal">
-          <span>Internal <small>(no project)</small></span>
+          <span><span data-i18n="exp.scope.internal">Internal</span> <small data-i18n="exp.side.noProject">(no project)</small></span>
           <strong id="expInternalTotal">—</strong>
         </div>
       </div>
@@ -112,67 +112,67 @@
   <div id="expenseOverlay" class="modal-overlay hidden">
     <div class="modal-panel" style="max-width:560px;">
       <div class="modal-head">
-        <h2 id="expModalTitle" style="flex:1; font-size:1rem; font-weight:700; color:#fff; margin:0;">New expense</h2>
+        <h2 id="expModalTitle" style="flex:1; font-size:1rem; font-weight:700; color:#fff; margin:0;" data-i18n="exp.modal.new">New expense</h2>
         <button id="expClose" class="modal-head-btn modal-head-btn--close" title="Close">✕</button>
       </div>
       <div class="modal-body">
         <div class="field-section">
           <div class="field-grid">
             <div>
-              <label class="field-label">Date</label>
+              <label class="field-label" data-i18n="form.date">Date</label>
               <input id="expDate" type="date" class="field-input" />
             </div>
             <div>
-              <label class="field-label">Category</label>
+              <label class="field-label" data-i18n="exp.f.category">Category</label>
               <select id="expCategory" class="field-input"></select>
             </div>
             <div class="span-2">
-              <label class="field-label">Description</label>
-              <input id="expDescription" type="text" class="field-input" placeholder="What was it for?" />
+              <label class="field-label" data-i18n="form.description">Description</label>
+              <input id="expDescription" type="text" class="field-input" placeholder="What was it for?" data-i18n-placeholder="exp.f.descPlaceholder" />
             </div>
             <div>
-              <label class="field-label">Amount (EUR)</label>
+              <label class="field-label" data-i18n="exp.f.amountEur">Amount (EUR)</label>
               <input id="expAmount" type="number" step="0.01" min="0" class="field-input" />
             </div>
             <div>
-              <label class="field-label">Paid by</label>
+              <label class="field-label" data-i18n="exp.f.paidBy">Paid by</label>
               <select id="expPaidBy" class="field-input"></select>
             </div>
             <div class="span-2">
               <label style="display:flex; align-items:center; gap:0.4rem; font-size:0.85rem;">
-                <input id="expInternal" type="checkbox" /> Internal expense (not tied to a project)
+                <input id="expInternal" type="checkbox" /> <span data-i18n="exp.f.internal">Internal expense (not tied to a project)</span>
               </label>
             </div>
             <div class="span-2" id="expProjectRow">
-              <label class="field-label">Project</label>
+              <label class="field-label" data-i18n="bp.col.project">Project</label>
               <select id="expProject" class="field-input"></select>
             </div>
             <div class="span-2" id="expInvoiceableRow">
               <label style="display:flex; align-items:center; gap:0.4rem; font-size:0.85rem;">
-                <input id="expInvoiceable" type="checkbox" /> Re-invoiceable to the client
+                <input id="expInvoiceable" type="checkbox" /> <span data-i18n="exp.f.reinvoiceable">Re-invoiceable to the client</span>
               </label>
             </div>
           </div>
         </div>
 
         <div class="field-section">
-          <h3>Evidence</h3>
+          <h3 data-i18n="exp.section.evidence">Evidence</h3>
           <div style="padding:0.75rem;">
             <div id="expDocCurrent" class="exp-doc-current hidden">
               <span id="expDocName"></span>
-              <button type="button" id="expDocView" class="btn-icon-add" style="background:var(--hitt-teal);">View</button>
-              <button type="button" id="expDocRemove" class="btn-icon-add" style="background:var(--danger);">Remove</button>
+              <button type="button" id="expDocView" class="btn-icon-add" style="background:var(--hitt-teal);" data-i18n="exp.doc.view">View</button>
+              <button type="button" id="expDocRemove" class="btn-icon-add" style="background:var(--danger);" data-i18n="exp.doc.remove">Remove</button>
             </div>
             <input id="expDocFile" type="file" accept="image/*,application/pdf" />
-            <p style="font-size:0.72rem; color:var(--text-secondary); margin:0.4rem 0 0;">Image or PDF, up to 15 MB.</p>
+            <p style="font-size:0.72rem; color:var(--text-secondary); margin:0.4rem 0 0;" data-i18n="exp.doc.hint">Image or PDF, up to 15 MB.</p>
           </div>
         </div>
       </div>
       <div style="flex-shrink:0; border-top:1px solid var(--border-subtle); padding:0.75rem 1.1rem; display:flex; justify-content:space-between; gap:0.5rem;">
-        <button id="expDelete" class="btn btn-secondary hidden" style="color:var(--danger);">Delete</button>
+        <button id="expDelete" class="btn btn-secondary hidden" style="color:var(--danger);" data-i18n="form.delete">Delete</button>
         <div style="display:flex; gap:0.5rem; margin-left:auto;">
-          <button id="expCancel" class="btn btn-secondary">Cancel</button>
-          <button id="expSave" class="btn btn-primary">Save expense</button>
+          <button id="expCancel" class="btn btn-secondary" data-i18n="form.cancel">Cancel</button>
+          <button id="expSave" class="btn btn-primary" data-i18n="exp.save">Save expense</button>
         </div>
       </div>
     </div>
@@ -182,33 +182,33 @@
   <div id="bulkOverlay" class="modal-overlay hidden">
     <div class="modal-panel" style="max-width:420px;">
       <div class="modal-head">
-        <h2 style="flex:1; font-size:1rem; font-weight:700; color:#fff; margin:0;">Edit selected expenses</h2>
+        <h2 style="flex:1; font-size:1rem; font-weight:700; color:#fff; margin:0;" data-i18n="exp.bulk.title">Edit selected expenses</h2>
         <button id="bulkClose" class="modal-head-btn modal-head-btn--close" title="Close">✕</button>
       </div>
       <div class="modal-body">
-        <p class="bp-empty" style="padding:0 0 0.75rem; text-align:left;">Only the fields you fill in are changed. Leave a field blank to keep it as-is.</p>
+        <p class="bp-empty" style="padding:0 0 0.75rem; text-align:left;" data-i18n="exp.bulk.intro">Only the fields you fill in are changed. Leave a field blank to keep it as-is.</p>
         <div class="field-section">
           <div class="field-grid">
             <div class="span-2">
-              <label class="field-label">Category</label>
-              <select id="bulkCategory" class="field-input"><option value="">— keep —</option></select>
+              <label class="field-label" data-i18n="exp.f.category">Category</label>
+              <select id="bulkCategory" class="field-input"><option value="" data-i18n="exp.bulk.keep">— keep —</option></select>
             </div>
             <div class="span-2">
-              <label class="field-label">Re-invoiceable</label>
+              <label class="field-label" data-i18n="exp.col.reinvoiceable">Re-invoiceable</label>
               <select id="bulkInvoiceable" class="field-input">
-                <option value="">— keep —</option>
-                <option value="true">Yes</option>
-                <option value="false">No</option>
+                <option value="" data-i18n="exp.bulk.keep">— keep —</option>
+                <option value="true" data-i18n="form.yes">Yes</option>
+                <option value="false" data-i18n="form.no">No</option>
               </select>
             </div>
             <div class="span-2">
               <label style="display:flex; align-items:center; gap:0.4rem; font-size:0.85rem;">
-                <input id="bulkChangeProject" type="checkbox" /> Change project / internal
+                <input id="bulkChangeProject" type="checkbox" /> <span data-i18n="exp.bulk.changeProject">Change project / internal</span>
               </label>
             </div>
             <div class="span-2" id="bulkProjectWrap" style="display:none;">
               <label style="display:flex; align-items:center; gap:0.4rem; font-size:0.85rem; margin-bottom:0.4rem;">
-                <input id="bulkInternal" type="checkbox" /> Set as internal (no project)
+                <input id="bulkInternal" type="checkbox" /> <span data-i18n="exp.bulk.setInternal">Set as internal (no project)</span>
               </label>
               <select id="bulkProject" class="field-input"></select>
             </div>
@@ -216,8 +216,8 @@
         </div>
       </div>
       <div style="flex-shrink:0; border-top:1px solid var(--border-subtle); padding:0.75rem 1.1rem; display:flex; justify-content:flex-end; gap:0.5rem;">
-        <button id="bulkCancel" class="btn btn-secondary">Cancel</button>
-        <button id="bulkApply" class="btn btn-primary">Apply</button>
+        <button id="bulkCancel" class="btn btn-secondary" data-i18n="form.cancel">Cancel</button>
+        <button id="bulkApply" class="btn btn-primary" data-i18n="exp.bulk.apply">Apply</button>
       </div>
     </div>
   </div>

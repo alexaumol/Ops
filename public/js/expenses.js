@@ -319,7 +319,8 @@ document.getElementById("expInternal").addEventListener("change", syncProjectRow
 function openExpenseModal(row) {
   editingId = row ? row.id : null;
   editingHasDoc = !!row?.hasDocument;
-  document.getElementById("expModalTitle").textContent = row ? "Edit expense" : "New expense";
+  document.getElementById("expModalTitle").textContent =
+    (window.HITT_I18N ? HITT_I18N.t(row ? "exp.modal.edit" : "exp.modal.new") : (row ? "Edit expense" : "New expense"));
   document.getElementById("expDelete").classList.toggle("hidden", !row);
 
   document.getElementById("expDate").value = isoDay(row?.expenseDate) || new Date().toISOString().slice(0, 10);

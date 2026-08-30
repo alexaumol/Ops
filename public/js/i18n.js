@@ -58,8 +58,17 @@
         var key = el.getAttribute(dataAttr);
         if (!key) return;
         var val = t(key);
-        if (target === "textContent") el.textContent = val;
-        else el.setAttribute(target, val);
+        if (target !== "textContent") {
+          el.setAttribute(target, val);
+        } else if (el.children.length) {
+          // Element has child nodes (e.g. a trailing <span class="sort-arrow">
+          // or a "*" required marker) — replace only the leading text so the
+          // children survive.
+          if (el.firstChild && el.firstChild.nodeType === 3) el.firstChild.nodeValue = val;
+          else el.insertBefore(document.createTextNode(val), el.firstChild);
+        } else {
+          el.textContent = val;
+        }
       });
     });
     if (root === document) {
