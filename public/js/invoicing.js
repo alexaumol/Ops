@@ -28,11 +28,11 @@ let LOOKUPS = { statuses: [], scheduleTypes: [], deliveryMethods: [], vatTypes: 
 let invLineItems = []; // [{ description, quantity, unitPrice }] for the open invoice modal
 let INVOICES = [];
 let usingDemoData = false;
-let currentBucket = 'all';
+let currentBucket = 'partial';
 let searchTerm = '';
 let sortColumn = 'code';
 let sortDirection = 'desc';
-let lifecycleFilter = 'all'; // 'alive' | 'closed' | 'all'
+let lifecycleFilter = 'alive'; // 'alive' | 'closed' | 'all'
 const projectStatusSel = new Set(); // selected project-status labels; empty = all
 let activeProjectId = null;
 let activeProjectBpId = null;
@@ -589,6 +589,15 @@ async function loadInvoices(){
   renderInvoicesTable();
 }
 
+function sentBadgeTitle(inv){
+  const when = inv.emailedAt ? new Date(inv.emailedAt).toLocaleString() : '';
+  const bits = [`Emailed${when ? ` on ${when}` : ''}`];
+  if (inv.emailedTo) bits.push(`to ${inv.emailedTo}`);
+  if (inv.emailedByName) bits.push(`by ${inv.emailedByName}`);
+  if (Number(inv.emailedCount) > 1) bits.push(`(${inv.emailedCount}× total)`);
+  return bits.join(' ');
+}
+
 function renderInvoicesTable(){
   const tbody = document.getElementById('invoicesTableBody');
   const empty = document.getElementById('invoicesEmpty');
@@ -601,7 +610,10 @@ function renderInvoicesTable(){
   tbody.innerHTML = INVOICES.map((inv, i) => `
     <tr data-i="${i}" style="cursor:pointer;">
       <td>${escapeHtml(inv.invoicecode || '(draft)')}</td>
-      <td><span class="inv-status-pill inv-status-${inv.invoicestatusid}">${escapeHtml(inv.statusLabel || '—')}</span></td>
+      <td>
+        <span class="inv-status-pill inv-status-${inv.invoicestatusid}">${escapeHtml(inv.statusLabel || '—')}</span>
+        ${inv.emailedAt ? `<span class="inv-sent-badge" title="${escapeHtml(sentBadgeTitle(inv))}">✉ Sent</span>` : ''}
+      </td>
       <td style="text-align:right;" class="${Number(inv.amount) < 0 ? 'inv-money inv-money--neg' : 'inv-money'}">${formatMoney(inv.amount, inv.currency)}</td>
       <td style="text-align:right;">${formatMoney(inv.vatamount, inv.currency)}</td>
       <td>${formatDateOnly(inv.invoicedate)}</td>
@@ -702,8 +714,12 @@ async function openInvoiceEmailModal(invoiceId){
     document.getElementById('invEmailSubject').value = d.subject || '';
     document.getElementById('invEmailBody').value = d.body || '';
     const lang = LANG_NAME[d.languageId] || 'English';
-    document.getElementById('invEmailLangHint').textContent =
-      `Text is in the business partner's language (${lang}). Edit anything before sending.`;
+    let hint = `Text is in the business partner's language (${lang}). Edit anything before sending.`;
+    if (d.emailedAt) {
+      hint += ` — already emailed on ${new Date(d.emailedAt).toLocaleString()}` +
+        (Number(d.emailedCount) > 1 ? ` (${d.emailedCount}×)` : '') + '.';
+    }
+    document.getElementById('invEmailLangHint').textContent = hint;
     if (d.mailConfigured === false) {
       err.textContent = 'Email sending is not configured on the server yet — sending will fail until an admin sets it up.';
     }
@@ -742,6 +758,7 @@ document.getElementById('invEmailSend').addEventListener('click', async () => {
     const r = await HITT_API.sendInvoiceEmail(emailInvoiceId, { to, cc, subject, body });
     toast(`Invoice emailed to ${r.to.join(', ')}`, 'green');
     closeInvoiceEmailModal();
+    if (activeProjectId) loadInvoices(); // refresh so the "Sent" badge shows
   } catch (e) {
     console.error(e);
     err.textContent = e.message || 'The email could not be sent.';

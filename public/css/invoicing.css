@@ -237,3 +237,12 @@
 
 .inv-money { font-weight: 700; }
 .inv-money--neg { color: var(--danger); }
+
+/* "Sent" badge — invoice PDF has been emailed from the app */
+.inv-sent-badge {
+  display: inline-block; margin-left: 0.35rem;
+  font-size: 0.66rem; font-weight: 700; white-space: nowrap;
+  padding: 0.12rem 0.45rem; border-radius: 999px;
+  background: rgba(92,117,124,0.16); color: #3E5559;
+  vertical-align: middle;
+}

@@ -144,3 +144,15 @@ CREATE TABLE IF NOT EXISTS public.appconfig (
   updatedat   timestamp without time zone,
   updatedby   bigint
 );
+
+-- 2026-08 — Invoice "Sent" tracking
+-- --------------------------------------------------------------------------
+-- Set when an invoice PDF is emailed from the app (POST /api/invoicing/
+-- invoices/:id/email). Drives the "Sent" badge in the invoices list and is
+-- also written to the audit log (kind = 'invoice.email'). Separate from
+-- invoicesentdate, which feeds the date-derived invoice status.
+-- Added at runtime by ensureInvoicingSchema() in server/routes/invoicing.js.
+ALTER TABLE invoicesdetails ADD COLUMN IF NOT EXISTS emailedat timestamptz;
+ALTER TABLE invoicesdetails ADD COLUMN IF NOT EXISTS emailedby bigint;
+ALTER TABLE invoicesdetails ADD COLUMN IF NOT EXISTS emailedto text;
+ALTER TABLE invoicesdetails ADD COLUMN IF NOT EXISTS emailedcount int NOT NULL DEFAULT 0;

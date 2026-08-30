@@ -31,18 +31,18 @@
     <div class="inv-filters">
       <button data-bucket="not-released" class="inv-filter-btn" aria-selected="false">Not released <span class="inv-filter-count" data-count-for="not-released"></span></button>
       <button data-bucket="not-started" class="inv-filter-btn" aria-selected="false">Not started <span class="inv-filter-count" data-count-for="not-started"></span></button>
-      <button data-bucket="partial" class="inv-filter-btn" aria-selected="false">Partially invoiced <span class="inv-filter-count" data-count-for="partial"></span></button>
+      <button data-bucket="partial" class="inv-filter-btn" aria-selected="true">Partially invoiced <span class="inv-filter-count" data-count-for="partial"></span></button>
       <button data-bucket="total" class="inv-filter-btn" aria-selected="false">Totally invoiced <span class="inv-filter-count" data-count-for="total"></span></button>
-      <button data-bucket="all" class="inv-filter-btn" aria-selected="true">All <span class="inv-filter-count" data-count-for="all"></span></button>
+      <button data-bucket="all" class="inv-filter-btn" aria-selected="false">All <span class="inv-filter-count" data-count-for="all"></span></button>
       <div class="inv-filter-spacer"></div>
       <input id="searchBox" type="text" placeholder="Search by project code, name or business partner…" />
     </div>
 
     <div class="inv-filters inv-filters--row2">
       <div class="inv-lifecycle-toggle" role="group" aria-label="Filter by project lifecycle">
-        <button data-lifecycle="alive" class="inv-lifecycle-btn" aria-selected="false">Only alive projects</button>
+        <button data-lifecycle="alive" class="inv-lifecycle-btn" aria-selected="true">Only alive projects</button>
         <button data-lifecycle="closed" class="inv-lifecycle-btn" aria-selected="false">Only closed projects</button>
-        <button data-lifecycle="all" class="inv-lifecycle-btn" aria-selected="true">All projects</button>
+        <button data-lifecycle="all" class="inv-lifecycle-btn" aria-selected="false">All projects</button>
       </div>
       <div class="inv-filter-spacer"></div>
       <div class="inv-status-filter" id="projectStatusFilterWrap">
