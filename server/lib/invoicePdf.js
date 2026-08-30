@@ -3,21 +3,19 @@
  * PDF, 2025-033, was provided directly by Alex as the reference to match).
  * Built with pdfkit (pure JS, no external binary/headless-browser needed).
  *
- * IMPORTANT: the entity letterhead block (legal name, address, VAT number,
- * email, website) is NOT stored anywhere in the database — the
- * invoicedocumentcontrols/invoicedocumenttext tables hold only multi-language
- * FIELD LABELS ("INVOICE NUMBER" / "FACTURA NUM"), which ARE now used (see
- * lib/invoiceDocText.js + data.labels), not the entity letterhead data (those
- * control rows are NULL). The Access report had the letterhead hardcoded in
- * its own design. ENTITY_LETTERHEAD below has
- * confirmed real data for HiTT only (from the sample PDF); FHiTT and
- * HiTT/OSM fall back to the same block, which is almost certainly WRONG
- * for a different legal entity (different address/VAT at minimum) — do
- * not send an FHiTT or HiTT/OSM invoice PDF to a real client until
- * someone supplies their real letterhead details.
+ * Letterhead + bank + logo now come from the entity record (Settings →
+ * Entities — legal name / VAT / address / invoicing email / webpage / bank
+ * account / invoice logo), passed in on `data` by routes/invoicing.js
+ * (loadInvoiceForPdf). HITT_LETTERHEAD / ENTITY_LETTERHEAD below are only
+ * the fallback when an entity has no details filled in yet.
  *
- * Header logo: HiTT and HiTT/OSM invoices use public/assets/HITT-logo-invoices.png;
- * anything else (FHiTT) falls back to the plain "HITT" text mark.
+ * Field LABELS ("INVOICE NUMBER" / "FACTURA NUM") come from
+ * invoicedocumentcontrols/invoicedocumenttext in the business partner's
+ * language (see lib/invoiceDocText.js + data.labels).
+ *
+ * Header logo priority: the entity's own invoice logo (data.entityLogo,
+ * PNG/JPEG data URL) → public/assets/HITT-logo-invoices.png for HiTT /
+ * HiTT-OSM → a plain "HITT" text mark.
  */
 const path = require("path");
 const fs = require("fs");
@@ -45,8 +43,8 @@ const HITT_LETTERHEAD = {
           "Inscripción en el Registro Mercantil de Barcelona. Tomo 44830, Folio 163, Hoja nº 468781",
 };
 
-// Same letterhead used for every entity until real FHiTT / HiTT-OSM legal
-// details are supplied — see the file header note above.
+// Fallback letterhead by entity label, used only when the entity record
+// (Settings → Entities) has no legal name filled in.
 const ENTITY_LETTERHEAD = {
   HiTT: HITT_LETTERHEAD,
   FHiTT: HITT_LETTERHEAD,
@@ -91,8 +89,37 @@ function fieldBox(doc, x, y, w, label, value) {
   doc.font("Helvetica").fontSize(9).fillColor(BRAND.ink).text(value || "", x + 4, y + 16, { width: w - 8 });
 }
 
+// Parses "data:image/png;base64,AAAA" -> Buffer (pdfkit only takes PNG/JPEG).
+function dataUrlToBuffer(dataUrl) {
+  const m = /^data:image\/(png|jpe?g);base64,(.+)$/s.exec(String(dataUrl || "").trim());
+  if (!m) return null;
+  try { return Buffer.from(m[2].replace(/\s+/g, ""), "base64"); } catch { return null; }
+}
+
+// Letterhead for the invoice — the entity's own details (Settings →
+// Entities) when present, else the hardcoded HiTT block.
+function entityLetterhead(data) {
+  const fb = ENTITY_LETTERHEAD[data.entityLabel] || HITT_LETTERHEAD;
+  const addr = (data.entityAddress || "").split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+  const name = data.entityLegalName || fb.name;
+  const vat = data.entityVat || fb.vat;
+  let footer = fb.footer;
+  if (data.entityLegalName) {
+    footer = [name, vat && `NIF ${vat}`, addr.join(", ")].filter(Boolean).join(", ");
+  }
+  return {
+    name,
+    addressLines: addr.length ? addr : [fb.addressLine1, fb.addressLine2].filter(Boolean),
+    vat,
+    email: data.entityEmail || fb.email,
+    web: data.entityWeb || fb.web,
+    footer,
+    logo: dataUrlToBuffer(data.entityLogo),
+  };
+}
+
 function renderInvoicePdf(doc, data) {
-  const letter = ENTITY_LETTERHEAD[data.entityLabel] || HITT_LETTERHEAD;
+  const letter = entityLetterhead(data);
   const left = 40;
   const right = 555;
   const width = right - left;
@@ -106,12 +133,22 @@ function renderInvoicePdf(doc, data) {
   const vatWord = String(L("lblVATAmount", "VAT")).replace(/[\s\d.,%]+$/, "").trim() || "VAT";
 
   // ---------- Header: letterhead + contact ----------
+  // Entity's own invoice logo (Settings → Entities) wins; then the bundled
+  // HiTT mark for HiTT / HiTT-OSM; then a plain text mark.
   const usesHittLogo = (() => {
     const l = String(data.entityLabel || "").trim().toLowerCase().replace(/\s+/g, "");
     return l === "hitt" || l === "hitt/osm";
   })();
   let logoDrawn = false;
-  if (usesHittLogo && fs.existsSync(HITT_INVOICE_LOGO)) {
+  if (letter.logo) {
+    try {
+      doc.image(letter.logo, left, 40, { height: 42 });
+      logoDrawn = true;
+    } catch (err) {
+      console.error("[invoicePdf] could not embed the entity logo:", err.message);
+    }
+  }
+  if (!logoDrawn && usesHittLogo && fs.existsSync(HITT_INVOICE_LOGO)) {
     try {
       doc.image(HITT_INVOICE_LOGO, left, 40, { height: 42 });
       logoDrawn = true;
@@ -127,14 +164,17 @@ function renderInvoicePdf(doc, data) {
   }
 
   doc.font("Helvetica-Bold").fontSize(10).fillColor(BRAND.ink).text(letter.name, left, 90);
-  doc.font("Helvetica").fontSize(9).fillColor(BRAND.ink)
-    .text(letter.addressLine1, left, 104)
-    .text(letter.addressLine2, left, 116)
-    .text(letter.vat, left, 128);
+  doc.font("Helvetica").fontSize(9).fillColor(BRAND.ink);
+  let ly = 104;
+  for (const line of letter.addressLines.slice(0, 3)) {
+    doc.text(line, left, ly, { width: 260 });
+    ly += 12;
+  }
+  if (letter.vat) doc.text(letter.vat, left, ly);
 
-  doc.font("Helvetica").fontSize(9).fillColor(BRAND.blue)
-    .text(letter.email, right - 160, 90, { width: 160, align: "right", link: `mailto:${letter.email}` })
-    .text(letter.web, right - 160, 102, { width: 160, align: "right", link: `https://${letter.web}` });
+  doc.font("Helvetica").fontSize(9).fillColor(BRAND.blue);
+  if (letter.email) doc.text(letter.email, right - 160, 90, { width: 160, align: "right", link: `mailto:${letter.email}` });
+  if (letter.web) doc.text(letter.web, right - 160, 102, { width: 160, align: "right", link: `https://${letter.web.replace(/^https?:\/\//, "")}` });
 
   // ---------- Invoice meta grid ----------
   const gridY = 160;

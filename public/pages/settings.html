@@ -39,6 +39,7 @@
         <button data-stab="paths" class="settings-tab" role="tab" aria-selected="false" data-i18n="settings.tab.paths">Paths</button>
         <button data-stab="expcats" class="settings-tab" role="tab" aria-selected="false" data-i18n="settings.tab.expcats">Expense categories</button>
         <button data-stab="currencies" class="settings-tab" role="tab" aria-selected="false" data-i18n="settings.tab.currencies">Currencies</button>
+        <button data-stab="entities" class="settings-tab" role="tab" aria-selected="false" data-i18n="settings.tab.entities">Entities</button>
         <button data-stab="customizations" class="settings-tab" role="tab" aria-selected="false" data-i18n="settings.tab.customizations">Customizations</button>
         <button data-stab="audit" class="settings-tab" role="tab" aria-selected="false" data-i18n="settings.tab.audit">Auditing</button>
       </div>
@@ -163,41 +164,57 @@
         </div>
       </section>
 
+      <!-- ==================== ENTITIES ==================== -->
+      <section id="paneEntities" class="settings-pane hidden">
+        <p class="settings-note" data-i18n="entities.note">Your billing entities. Each one's legal name, VAT number, address, invoicing email, bank account and logo are placed on the invoices it issues. An entity can't be deleted while a project still uses it.</p>
+        <div class="settings-table-wrap">
+          <table class="settings-table">
+            <thead>
+              <tr>
+                <th data-i18n="entities.col.name">Entity</th>
+                <th data-i18n="entities.col.legalName">Legal name</th>
+                <th data-i18n="entities.col.vat">VAT number</th>
+                <th data-i18n="entities.col.email">Invoicing email</th>
+                <th style="text-align:right;" data-i18n="entities.col.projects">Projects</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="entityTableBody"></tbody>
+          </table>
+          <div id="entityEmpty" class="settings-pane-empty hidden" data-i18n="entities.empty">No entities yet.</div>
+          <div class="settings-add-row">
+            <button class="btn btn-primary" id="btnAddEntity" data-i18n="entities.add">+ Add entity</button>
+          </div>
+        </div>
+      </section>
+
       <!-- ==================== CUSTOMIZATIONS ==================== -->
       <section id="paneCustomizations" class="settings-pane hidden">
         <p class="settings-note" data-i18n="cust.logo.note">Your organisation's logo. It replaces the default mark on the sign-in screen and in every page header. A square-ish image works best — after choosing a file you can zoom and drag it to frame the part you want.</p>
 
-        <div class="brand-editor">
-          <div class="brand-editor__col">
-            <h3 class="brand-editor__h" data-i18n="cust.logo.current">Current logo</h3>
-            <div class="brand-logo-frame">
-              <img id="brandCurrentLogo" src="../assets/fhitt-logo.png" alt="Current company logo" />
-            </div>
-            <button class="btn btn-secondary" id="btnBrandReset" disabled data-i18n="cust.logo.reset">Reset to default</button>
-            <p class="settings-emp-sub" id="brandUpdatedInfo" style="margin:0.5rem 0 0;"></p>
+        <div class="brand-editor brand-editor--stack">
+          <h3 class="brand-editor__h" data-i18n="cust.logo.current">Current logo</h3>
+          <div class="brand-logo-frame">
+            <img id="brandCurrentLogo" src="../assets/fhitt-logo.png" alt="Current company logo" />
           </div>
+          <label class="btn btn-primary brand-file-btn">
+            <span data-i18n="cust.logo.choose">Choose image…</span>
+            <input type="file" id="brandFile" accept="image/png,image/jpeg,image/webp" hidden />
+          </label>
 
-          <div class="brand-editor__col">
-            <h3 class="brand-editor__h" data-i18n="cust.logo.uploadHead">Upload a new logo</h3>
-            <label class="btn btn-primary brand-file-btn">
-              <span data-i18n="cust.logo.choose">Choose image…</span>
-              <input type="file" id="brandFile" accept="image/png,image/jpeg,image/webp" hidden />
+          <div id="brandCropArea" class="brand-crop hidden">
+            <div class="brand-crop__stage" id="brandCropStage">
+              <canvas id="brandCropCanvas" width="260" height="260"></canvas>
+              <div class="brand-crop__mask" aria-hidden="true"></div>
+            </div>
+            <label class="brand-crop__zoom">
+              <span data-i18n="cust.logo.zoom">Zoom</span>
+              <input type="range" id="brandZoom" min="1" max="5" step="0.01" value="1" />
             </label>
-
-            <div id="brandCropArea" class="brand-crop hidden">
-              <div class="brand-crop__stage" id="brandCropStage">
-                <canvas id="brandCropCanvas" width="260" height="260"></canvas>
-                <div class="brand-crop__mask" aria-hidden="true"></div>
-              </div>
-              <label class="brand-crop__zoom">
-                <span data-i18n="cust.logo.zoom">Zoom</span>
-                <input type="range" id="brandZoom" min="1" max="5" step="0.01" value="1" />
-              </label>
-              <p class="settings-emp-sub" data-i18n="cust.logo.dragHint">Drag the image to reposition. The framed square is what gets saved (as a transparent PNG).</p>
-              <div class="brand-crop__actions">
-                <button class="btn btn-secondary" id="btnBrandCancel" data-i18n="cust.logo.cancel">Cancel</button>
-                <button class="btn btn-primary" id="btnBrandSave" data-i18n="cust.logo.save">Save logo</button>
-              </div>
+            <p class="settings-emp-sub" data-i18n="cust.logo.dragHint">Drag the image to reposition. The framed square is what gets saved (as a transparent PNG).</p>
+            <div class="brand-crop__actions">
+              <button class="btn btn-secondary" id="btnBrandCancel" data-i18n="cust.logo.cancel">Cancel</button>
+              <button class="btn btn-primary" id="btnBrandSave" data-i18n="cust.logo.save">Save logo</button>
             </div>
           </div>
         </div>
@@ -338,6 +355,82 @@
       <div class="settings-modal-foot">
         <button id="userModalCancel" class="btn btn-secondary">Cancel</button>
         <button id="userModalSave" class="btn btn-primary">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== ADD / EDIT ENTITY ==================== -->
+  <div id="entityModal" class="settings-modal hidden">
+    <div class="settings-modal-panel">
+      <div class="settings-modal-head">
+        <h2 id="entityModalTitle" data-i18n="entities.modal.addTitle">Add entity</h2>
+        <button id="entityModalClose" class="settings-modal-x" title="Close">✕</button>
+      </div>
+      <div class="settings-modal-body">
+        <div class="settings-modal-section">
+          <h3 data-i18n="entities.section.identity">Identity</h3>
+          <div class="settings-form-grid">
+            <label class="settings-field"><span data-i18n="entities.f.name">Entity name</span> <span class="req">*</span>
+              <input type="text" id="entName" autocomplete="off" placeholder="HiTT" />
+            </label>
+            <label class="settings-field"><span data-i18n="entities.f.legalName">Legal name</span>
+              <input type="text" id="entLegalName" autocomplete="off" />
+            </label>
+            <label class="settings-field"><span data-i18n="entities.f.vat">VAT number</span>
+              <input type="text" id="entVat" autocomplete="off" />
+            </label>
+            <label class="settings-field"><span data-i18n="entities.f.email">Invoicing email</span>
+              <input type="email" id="entEmail" autocomplete="off" />
+            </label>
+            <label class="settings-field"><span data-i18n="entities.f.web">Website</span> <span class="settings-emp-sub" data-i18n="entities.f.optional">(optional)</span>
+              <input type="text" id="entWeb" autocomplete="off" placeholder="www.example.com" />
+            </label>
+            <label class="settings-field span-2"><span data-i18n="entities.f.address">Address</span>
+              <textarea id="entAddress" rows="2" placeholder="Street, number&#10;ZIP City, Country"></textarea>
+            </label>
+          </div>
+        </div>
+
+        <div class="settings-modal-section">
+          <h3 data-i18n="entities.section.bank">Bank account</h3>
+          <div class="settings-form-grid">
+            <label class="settings-field span-2"><span data-i18n="entities.f.bankName">Bank name</span>
+              <input type="text" id="entBankName" autocomplete="off" />
+            </label>
+            <label class="settings-field"><span data-i18n="entities.f.bankAddr1">Bank address line 1</span>
+              <input type="text" id="entBankAddr1" autocomplete="off" />
+            </label>
+            <label class="settings-field"><span data-i18n="entities.f.bankAddr2">Bank address line 2</span>
+              <input type="text" id="entBankAddr2" autocomplete="off" />
+            </label>
+            <label class="settings-field"><span data-i18n="entities.f.iban">IBAN</span>
+              <input type="text" id="entIban" autocomplete="off" />
+            </label>
+            <label class="settings-field"><span data-i18n="entities.f.bic">BIC / SWIFT</span>
+              <input type="text" id="entBic" autocomplete="off" />
+            </label>
+          </div>
+        </div>
+
+        <div class="settings-modal-section">
+          <h3 data-i18n="entities.section.logo">Invoice logo</h3>
+          <p class="settings-emp-sub" data-i18n="entities.logo.note">Shown on the invoice PDF for this entity. PNG with a transparent background works best. This is separate from the portal logo.</p>
+          <div class="entity-logo-row">
+            <div class="entity-logo-frame"><img id="entLogoPreview" alt="" /></div>
+            <div class="entity-logo-actions">
+              <label class="btn btn-secondary brand-file-btn">
+                <span data-i18n="entities.logo.choose">Choose image…</span>
+                <input type="file" id="entLogoFile" accept="image/png,image/jpeg" hidden />
+              </label>
+              <button type="button" class="btn btn-secondary" id="btnEntLogoClear" data-i18n="entities.logo.clear">Remove logo</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="settings-modal-foot">
+        <button id="btnEntityDelete" class="btn btn-secondary hidden" style="color:var(--danger); margin-right:auto;" data-i18n="entities.delete">Delete entity</button>
+        <button id="entityModalCancel" class="btn btn-secondary" data-i18n="entities.cancel">Cancel</button>
+        <button id="entityModalSave" class="btn btn-primary" data-i18n="entities.save">Save</button>
       </div>
     </div>
   </div>

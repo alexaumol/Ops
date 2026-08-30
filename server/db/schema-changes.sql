@@ -165,3 +165,17 @@ ALTER TABLE invoicesdetails ADD COLUMN IF NOT EXISTS emailedcount int NOT NULL D
 -- themselves; that choice lives in their browser (localStorage "hitt.lang"),
 -- not the DB. appconfig table created by ensureConfigTable() in
 -- server/routes/branding.js.
+
+-- 2026-08 — Billing entities (Settings → Entities)
+-- --------------------------------------------------------------------------
+-- Multi-organization setup: each entity's letterhead, bank account and
+-- invoice logo are stamped onto the invoice PDF. Added at runtime by
+-- ensureEntitySchema() in server/lib/entitySchema.js (called by both
+-- routes/entities.js and routes/invoicing.js). Bank details reuse the
+-- existing bankaccts table (one row per entity, linked by bankaccts.entityid).
+ALTER TABLE entity ADD COLUMN IF NOT EXISTS legalname      varchar(255);
+ALTER TABLE entity ADD COLUMN IF NOT EXISTS vatnumber      varchar(64);
+ALTER TABLE entity ADD COLUMN IF NOT EXISTS address        text;
+ALTER TABLE entity ADD COLUMN IF NOT EXISTS emailinvoicing varchar(255);
+ALTER TABLE entity ADD COLUMN IF NOT EXISTS webpage        varchar(255);
+ALTER TABLE entity ADD COLUMN IF NOT EXISTS logo           text;   -- PNG/JPEG data URL

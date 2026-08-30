@@ -210,6 +210,14 @@ const HITT_API = (() => {
     setAppLanguage: (language) =>
       request("/api/branding/language", { method: "PUT", body: JSON.stringify({ language }) }),
 
+    getEntities: () => request("/api/entities"),
+    getEntity: (id) => request(`/api/entities/${id}`),
+    createEntity: (payload) =>
+      request("/api/entities", { method: "POST", body: JSON.stringify(payload) }),
+    updateEntity: (id, payload) =>
+      request(`/api/entities/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
+    deleteEntity: (id) => request(`/api/entities/${id}`, { method: "DELETE" }),
+
     getInvoiceCurrencies: () => request("/api/settings/currencies"),
     createInvoiceCurrency: (payload) =>
       request("/api/settings/currencies", { method: "POST", body: JSON.stringify(payload) }),

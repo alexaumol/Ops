@@ -41,6 +41,7 @@ const employeesRouter = loadRouter("employees");
 const permissionsRouter = loadRouter("permissions");
 const settingsRouter = loadRouter("settings");
 const brandingRouter = loadRouter("branding");
+const entitiesRouter = loadRouter("entities");
 const reportsRouter = loadRouter("reports");
 const auditRouter = loadRouter("audit");
 const expensesRouter = loadRouter("expenses");
@@ -103,6 +104,7 @@ app.use("/api/expenses", expensesRouter);
 app.use("/api/employees", employeesRouter);
 app.use("/api/permissions", permissionsRouter);
 app.use("/api/settings", settingsRouter);
+app.use("/api/entities", entitiesRouter);
 app.use("/api/reports", reportsRouter);
 app.use("/api/audit", auditRouter);
 

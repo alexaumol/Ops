@@ -299,6 +299,7 @@ let auditLoaded = false;
 let pathsLoaded = false;
 let expCatsLoaded = false;
 let currenciesLoaded = false;
+let entitiesLoaded = false;
 let customizationsLoaded = false;
 
 document.querySelectorAll("[data-stab]").forEach((btn) => {
@@ -312,6 +313,7 @@ document.querySelectorAll("[data-stab]").forEach((btn) => {
     document.getElementById("panePaths").classList.toggle("hidden", tab !== "paths");
     document.getElementById("paneExpCats").classList.toggle("hidden", tab !== "expcats");
     document.getElementById("paneCurrencies").classList.toggle("hidden", tab !== "currencies");
+    document.getElementById("paneEntities").classList.toggle("hidden", tab !== "entities");
     document.getElementById("paneCustomizations").classList.toggle("hidden", tab !== "customizations");
     document.getElementById("paneAudit").classList.toggle("hidden", tab !== "audit");
     if (tab === "holidays" && !holidaysLoaded) {
@@ -333,6 +335,10 @@ document.querySelectorAll("[data-stab]").forEach((btn) => {
     if (tab === "currencies" && !currenciesLoaded) {
       currenciesLoaded = true;
       loadCurrencies();
+    }
+    if (tab === "entities" && !entitiesLoaded) {
+      entitiesLoaded = true;
+      loadEntities();
     }
     if (tab === "customizations" && !customizationsLoaded) {
       customizationsLoaded = true;
@@ -989,8 +995,6 @@ const BRAND_EXPORT = 512;  // saved PNG size, px
 
 const brandEls = {
   current: document.getElementById("brandCurrentLogo"),
-  reset: document.getElementById("btnBrandReset"),
-  updated: document.getElementById("brandUpdatedInfo"),
   file: document.getElementById("brandFile"),
   cropArea: document.getElementById("brandCropArea"),
   stage: document.getElementById("brandCropStage"),
@@ -1008,18 +1012,9 @@ const TI = (k, v) => (window.HITT_I18N ? HITT_I18N.t(k, v) : k);
 async function loadBranding() {
   try {
     const { dataUrl } = await HITT_API.getBrandingLogo();
-    if (dataUrl) {
-      brandEls.current.src = dataUrl;
-      brandEls.reset.disabled = false;
-      brandEls.updated.textContent = TI("cust.logo.inUse");
-    } else {
-      brandEls.current.src = DEFAULT_LOGO_SRC;
-      brandEls.reset.disabled = true;
-      brandEls.updated.textContent = TI("cust.logo.default");
-    }
+    brandEls.current.src = dataUrl || DEFAULT_LOGO_SRC;
   } catch (err) {
     console.error("[settings] branding:", err.message);
-    brandEls.updated.textContent = "Could not load the current logo.";
   }
 }
 
@@ -1200,8 +1195,6 @@ brandEls.save.addEventListener("click", async () => {
   try {
     await HITT_API.setBrandingLogo(dataUrl);
     brandEls.current.src = dataUrl;
-    brandEls.reset.disabled = false;
-    brandEls.updated.textContent = TI("cust.logo.inUse");
     if (window.HITT_BRANDING) {
       window.HITT_BRANDING.cache(dataUrl);
       window.HITT_BRANDING.apply(dataUrl);
@@ -1215,18 +1208,198 @@ brandEls.save.addEventListener("click", async () => {
   }
 });
 
-brandEls.reset.addEventListener("click", async () => {
-  if (!confirm("Reset the company logo back to the default Fundació HiTT mark?")) return;
-  brandEls.reset.disabled = true;
+/* ============================== ENTITIES ============================== */
+const ENT_MAX_LOGO_BYTES = 1.5 * 1024 * 1024;
+let ENTITIES = [];
+let editingEntityId = null;
+let entLogoValue; // undefined = unchanged, null = clear, string = new data URL
+
+const entModal = document.getElementById("entityModal");
+const entEls = {
+  body: document.getElementById("entityTableBody"),
+  empty: document.getElementById("entityEmpty"),
+  title: document.getElementById("entityModalTitle"),
+  name: document.getElementById("entName"),
+  legalName: document.getElementById("entLegalName"),
+  vat: document.getElementById("entVat"),
+  email: document.getElementById("entEmail"),
+  web: document.getElementById("entWeb"),
+  address: document.getElementById("entAddress"),
+  bankName: document.getElementById("entBankName"),
+  bankAddr1: document.getElementById("entBankAddr1"),
+  bankAddr2: document.getElementById("entBankAddr2"),
+  iban: document.getElementById("entIban"),
+  bic: document.getElementById("entBic"),
+  logoPreview: document.getElementById("entLogoPreview"),
+  logoFile: document.getElementById("entLogoFile"),
+  logoClear: document.getElementById("btnEntLogoClear"),
+  del: document.getElementById("btnEntityDelete"),
+};
+
+async function loadEntities() {
+  entEls.body.innerHTML = `<tr><td colspan="6" class="settings-emp-sub" style="padding:1rem;">Loading…</td></tr>`;
   try {
-    await HITT_API.clearBrandingLogo();
-    brandEls.current.src = DEFAULT_LOGO_SRC;
-    brandEls.updated.textContent = TI("cust.logo.default");
-    if (window.HITT_BRANDING) window.HITT_BRANDING.cache(null);
-    toast("Logo reset. Other pages revert on their next load.", "green");
+    ENTITIES = await HITT_API.getEntities();
   } catch (err) {
-    brandEls.reset.disabled = false;
-    toast(err.message || "Could not reset the logo.", "red");
+    console.error("[settings] entities:", err.message);
+    ENTITIES = [];
+    entEls.body.innerHTML = `<tr><td colspan="6" class="settings-emp-sub" style="padding:1rem;">Could not load entities.</td></tr>`;
+    return;
+  }
+  renderEntities();
+}
+
+function renderEntities() {
+  entEls.empty.classList.toggle("hidden", ENTITIES.length > 0);
+  entEls.body.innerHTML = ENTITIES.map((e) => `
+    <tr>
+      <td>
+        <span class="settings-emp-name">${escapeHtml(e.entitydesc || "—")}</span>
+        ${e.hasLogo ? `<span class="settings-badge" style="margin-left:0.4rem;">logo</span>` : ""}
+      </td>
+      <td>${escapeHtml(e.legalname || "—")}</td>
+      <td>${escapeHtml(e.vatnumber || "—")}</td>
+      <td>${escapeHtml(e.emailinvoicing || "—")}</td>
+      <td style="text-align:right;">${e.projectCount}</td>
+      <td style="text-align:right;">
+        <button class="settings-emp-edit" data-edit-entity="${e.id}" title="${escapeHtml(TI("entities.edit"))}">✎</button>
+      </td>
+    </tr>`).join("");
+  entEls.body.querySelectorAll("[data-edit-entity]").forEach((btn) => {
+    btn.addEventListener("click", () => openEntityModal(btn.dataset.editEntity));
+  });
+}
+
+function setEntityLogoPreview(dataUrl) {
+  if (dataUrl) {
+    entEls.logoPreview.src = dataUrl;
+    entEls.logoPreview.style.display = "";
+  } else {
+    entEls.logoPreview.removeAttribute("src");
+    entEls.logoPreview.style.display = "none";
+  }
+}
+
+function fillEntityModal(e) {
+  const d = e || {};
+  const b = d.bank || {};
+  entEls.name.value = d.entitydesc || "";
+  entEls.legalName.value = d.legalname || "";
+  entEls.vat.value = d.vatnumber || "";
+  entEls.email.value = d.emailinvoicing || "";
+  entEls.web.value = d.webpage || "";
+  entEls.address.value = d.address || "";
+  entEls.bankName.value = b.bankname || "";
+  entEls.bankAddr1.value = b.bankaddrline1 || "";
+  entEls.bankAddr2.value = b.bankaddrline2 || "";
+  entEls.iban.value = b.iban || "";
+  entEls.bic.value = b.bicswift || "";
+  entLogoValue = undefined;
+  entEls.logoFile.value = "";
+  setEntityLogoPreview(d.logo || null);
+}
+
+async function openEntityModal(id) {
+  editingEntityId = id || null;
+  entEls.title.textContent = TI(id ? "entities.modal.editTitle" : "entities.modal.addTitle");
+  entEls.del.classList.toggle("hidden", !id);
+  fillEntityModal(null);
+  entModal.classList.remove("hidden");
+  if (id) {
+    try {
+      const detail = await HITT_API.getEntity(id);
+      if (editingEntityId !== id) return;
+      fillEntityModal(detail);
+    } catch (err) {
+      toast(err.message || "Could not load that entity.", "red");
+    }
+  }
+  setTimeout(() => entEls.name.focus(), 40);
+}
+function closeEntityModal() { entModal.classList.add("hidden"); editingEntityId = null; }
+
+document.getElementById("btnAddEntity").addEventListener("click", () => openEntityModal(null));
+document.getElementById("entityModalClose").addEventListener("click", closeEntityModal);
+document.getElementById("entityModalCancel").addEventListener("click", closeEntityModal);
+entModal.addEventListener("click", (e) => { if (e.target === entModal) closeEntityModal(); });
+
+entEls.logoFile.addEventListener("change", () => {
+  const f = entEls.logoFile.files && entEls.logoFile.files[0];
+  if (!f) return;
+  if (!/^image\/(png|jpeg)$/.test(f.type)) {
+    toast("Choose a PNG or JPEG image.", "red");
+    entEls.logoFile.value = "";
+    return;
+  }
+  if (f.size > ENT_MAX_LOGO_BYTES) {
+    toast("That image is too large — use a smaller file (under 1.5 MB).", "red");
+    entEls.logoFile.value = "";
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = () => { entLogoValue = reader.result; setEntityLogoPreview(reader.result); };
+  reader.onerror = () => toast("That image could not be read.", "red");
+  reader.readAsDataURL(f);
+});
+
+entEls.logoClear.addEventListener("click", () => {
+  entLogoValue = null;
+  entEls.logoFile.value = "";
+  setEntityLogoPreview(null);
+});
+
+document.getElementById("entityModalSave").addEventListener("click", async () => {
+  const name = entEls.name.value.trim();
+  if (!name) { toast(TI("entities.nameRequired"), "red"); return; }
+  const payload = {
+    entitydesc: name,
+    legalname: entEls.legalName.value,
+    vatnumber: entEls.vat.value,
+    emailinvoicing: entEls.email.value,
+    webpage: entEls.web.value,
+    address: entEls.address.value,
+    bank: {
+      bankname: entEls.bankName.value,
+      bankaddrline1: entEls.bankAddr1.value,
+      bankaddrline2: entEls.bankAddr2.value,
+      iban: entEls.iban.value,
+      bicswift: entEls.bic.value,
+    },
+  };
+  if (entLogoValue !== undefined) payload.logo = entLogoValue; // string or null
+  const btn = document.getElementById("entityModalSave");
+  btn.disabled = true;
+  try {
+    if (editingEntityId) await HITT_API.updateEntity(editingEntityId, payload);
+    else await HITT_API.createEntity(payload);
+    toast(TI("entities.saved"), "green");
+    closeEntityModal();
+    await loadEntities();
+  } catch (err) {
+    toast(err.message || "Could not save the entity.", "red");
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+entEls.del.addEventListener("click", async () => {
+  if (!editingEntityId) return;
+  const ent = ENTITIES.find((e) => String(e.id) === String(editingEntityId));
+  if (!confirm(TI("entities.deleteConfirm", { name: (ent && ent.entitydesc) || "" }))) return;
+  try {
+    await HITT_API.deleteEntity(editingEntityId);
+    toast(TI("entities.deleted"), "green");
+    closeEntityModal();
+    await loadEntities();
+  } catch (err) {
+    toast(err.message || "Could not delete the entity.", "red");
+  }
+});
+
+window.addEventListener("hitt:langchange", () => {
+  if (entitiesLoaded) renderEntities();
+  if (!entModal.classList.contains("hidden")) {
+    entEls.title.textContent = TI(editingEntityId ? "entities.modal.editTitle" : "entities.modal.addTitle");
   }
 });
 

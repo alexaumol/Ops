@@ -63,6 +63,7 @@ const { pool } = require("../config/db");
 const { requireModuleAccess } = require("../lib/permissions");
 const { streamInvoicePdf, renderInvoicePdfBuffer } = require("../lib/invoicePdf");
 const { invoiceLabels, fillTemplate } = require("../lib/invoiceDocText");
+const { ensureEntitySchema } = require("../lib/entitySchema");
 const { graphMailConfigured, sendMail } = require("../lib/graph");
 const { smtpConfigured, sendSmtpMail } = require("../lib/mailer");
 const { logAudit } = require("../lib/audit");
@@ -330,6 +331,7 @@ router.get("/projects/:projectId/invoices", async (req, res) => {
 // when the invoice doesn't exist.
 async function loadInvoiceForPdf(invoiceId) {
   await ensureInvoicingSchema();
+  await ensureEntitySchema();
   const { rows } = await pool.query(
     `SELECT i.id, i.invoicecode,
             d.amount, d.invoicedate, d.invoiceduedate, d.invoicesentdate, d.invoicedipositdate,
@@ -342,10 +344,16 @@ async function loadInvoiceForPdf(invoiceId) {
             tca.city AS "taxCompanyCity", co.countrydesc AS "taxCompanyCountry",
             p.projectnumber AS "projectCode", p.projectname AS "projectName",
             ent.entitydesc AS "entityLabel",
+            ent.legalname AS "entityLegalName", ent.vatnumber AS "entityVat",
+            ent.address AS "entityAddress", ent.emailinvoicing AS "entityEmail",
+            ent.webpage AS "entityWeb", ent.logo AS "entityLogo",
             d.emailedat AS "emailedAt", COALESCE(d.emailedcount, 0) AS "emailedCount", d.emailedto AS "emailedTo",
             COALESCE(tcbp.languageid, pbp.languageid)::int AS "languageId",
-            ba.bankname AS "bankName", ba.bankaddrline1 AS "bankAddressLine1",
-            ba.bankaddrline2 AS "bankAddressLine2", ba.iban, ba.bicswift AS "bicSwift",
+            COALESCE(eba.bankname, ba.bankname) AS "bankName",
+            COALESCE(eba.bankaddrline1, ba.bankaddrline1) AS "bankAddressLine1",
+            COALESCE(eba.bankaddrline2, ba.bankaddrline2) AS "bankAddressLine2",
+            COALESCE(eba.iban, ba.iban) AS iban,
+            COALESCE(eba.bicswift, ba.bicswift) AS "bicSwift",
             cur.symbol AS "currencySymbol",
             COALESCE(li.items, '[]'::json) AS "lineItems"
      FROM invoices i
@@ -353,6 +361,7 @@ async function loadInvoiceForPdf(invoiceId) {
      LEFT JOIN projects p ON p.id = i.projectid::bigint
      LEFT JOIN businesspartners pbp ON pbp.id = p.busspartnerid::bigint
      LEFT JOIN entity ent ON ent.id = p.entityid::bigint
+     LEFT JOIN LATERAL (SELECT * FROM bankaccts WHERE entityid = ent.id ORDER BY id LIMIT 1) eba ON true
      LEFT JOIN invoices_vattypes vt ON vt.id = d.vatid
      LEFT JOIN taxcompanies tc ON tc.id = d.busspartnertoinvoiceid::bigint
      LEFT JOIN businesspartners tcbp ON tcbp.id = tc.businesspartnerid::bigint
