@@ -32,6 +32,7 @@ const MODULE_LABELS = {
   "invoicing": "Invoicing",
   "expenses": "Expenses",
   "reports": "Reports",
+  "chat": "Ops assistant",
 };
 
 let EMPLOYEES = [];

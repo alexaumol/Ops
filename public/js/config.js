@@ -71,6 +71,10 @@ window.HITT_CONFIG = {
     businessPartnersLive: true,
     timeAllocationLive: true,
     invoicingLive: true,
+    // Ops assistant (js/chat.js). Even when true, the widget only appears
+    // if the server reports GET /api/chat/status as configured — so this
+    // can ship on before Azure OpenAI is wired up.
+    chatEnabled: true,
   },
 
   APP_VERSION: "0.1.0-prototype",

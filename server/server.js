@@ -45,6 +45,7 @@ const entitiesRouter = loadRouter("entities");
 const reportsRouter = loadRouter("reports");
 const auditRouter = loadRouter("audit");
 const expensesRouter = loadRouter("expenses");
+const chatRouter = loadRouter("chat");
 const { attachHittUser, requireAuth, AUTH_MODE } = require("./lib/permissions");
 const { entraConfigured } = require("./lib/entraToken");
 
@@ -107,6 +108,7 @@ app.use("/api/settings", settingsRouter);
 app.use("/api/entities", entitiesRouter);
 app.use("/api/reports", reportsRouter);
 app.use("/api/audit", auditRouter);
+app.use("/api/chat", chatRouter);
 
 // Fallback 404 for unknown API routes.
 app.use("/api", (req, res) => {

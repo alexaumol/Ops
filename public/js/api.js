@@ -369,5 +369,10 @@ const HITT_API = (() => {
     },
 
     health: () => request("/api/health"),
+
+    // Ops assistant (see js/chat.js). getChatStatus tells the widget
+    // whether to show itself; sendChat posts the conversation so far.
+    getChatStatus: () => request("/api/chat/status"),
+    sendChat: (messages) => request("/api/chat", { method: "POST", body: JSON.stringify({ messages }) }),
   };
 })();

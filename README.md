@@ -28,6 +28,10 @@ independently while the rest keeps working as static placeholder pages.
   a calendar view of company holidays and employee leaves, portfolio
   charts (projects by status/entity, projects opened by month), a project
   status-change timeline, and CSV export on every report.
+- **Ops assistant** — an in-app chat widget that answers questions about a
+  project or business partner and gives portfolio insight (budgeted vs
+  invoiced, trends). Backed by Azure OpenAI with read-only tool calls; off
+  until configured. See [Ops assistant](#ops-assistant).
 - Corporate design system with light/dark support and a small set of
   reusable UI primitives (buttons, app header, cards).
 
@@ -148,13 +152,49 @@ restart — `/api/health` stays open in every mode.
 **Offline / `file://` testing** still works: set `FEATURES.msalLoginEnabled`
 to `false` in `config.js` and run the server with `AUTH_MODE=header`.
 
+## Ops assistant
+
+A chat widget (bottom-right on every module page) that answers questions
+about a project or business partner and reads the portfolio for insight —
+budgeted vs invoiced, trends, where attention is worth spending.
+
+**How it works.** `public/js/chat.js` posts the conversation to
+`POST /api/chat`. The server ([`server/routes/chat.js`](server/routes/chat.js))
+runs a tool-calling loop against Azure OpenAI
+([`server/lib/chatLlm.js`](server/lib/chatLlm.js)): the model can only call
+the fixed read-only tools in
+[`server/lib/chatTools.js`](server/lib/chatTools.js) — `get_project`,
+`get_business_partner`, `budget_vs_invoiced`, `portfolio_trend`,
+`search_projects`, `list_projects` — each a parameterised query run inside
+a `READ ONLY` transaction on a SELECT-only pool. The model never sees the
+database and never emits SQL; every figure in an answer comes from a tool
+result. Access is gated by the `chat` module permission (Settings), a
+per-user rate limit, and the `chatEnabled` feature flag.
+
+**Turn it on:**
+
+1. Create an **Azure OpenAI** resource in an EU region, deploy a chat model
+   (e.g. `gpt-4.1`), and set `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_API_KEY`,
+   `AZURE_OPENAI_DEPLOYMENT` in `server/.env`.
+2. Create the read-only DB role and set `PG_READONLY_USER` /
+   `PG_READONLY_PASSWORD` (SQL in `server/.env.example`). Until you do, the
+   tools run on the main pool — fine for a first test, not for production.
+3. Restart the server. `GET /api/chat/status` flips to
+   `{ configured: true }` and the widget appears for users with `chat`
+   access.
+
+Without step 1 the feature is simply off: `/api/chat` returns 503 and the
+widget stays hidden.
+
 ## Status
 
 Early-stage prototype. Projects, Business partners, Time allocation,
 Invoicing, and Reports are all wired to a real PostgreSQL test database.
 Microsoft 365 sign-in is real (Entra ID via MSAL.js), and the API verifies
 the access token server-side on every request (see
-[Authentication](#authentication)). A permissions layer controls module
+[Authentication](#authentication)). The Ops assistant is scaffolded and
+runs once Azure OpenAI is configured (see [Ops assistant](#ops-assistant)).
+A permissions layer controls module
 access, admin rights, and time-off approve/reject rights (see Settings,
 admin-only). Not yet built: invoice-PDF emailing.
 

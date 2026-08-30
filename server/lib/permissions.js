@@ -46,9 +46,9 @@
  *           offline / stub-login / rollback only.
  *
  * MODULE_KEYS: 'projects' | 'business-partners' | 'time-allocation' |
- * 'invoicing' | 'reports'. 'time-allocation' covers both
- * routes/timeTracking.js and routes/timeOff.js — they're one module in the
- * frontend menu.
+ * 'invoicing' | 'expenses' | 'reports' | 'chat'. 'time-allocation' covers
+ * both routes/timeTracking.js and routes/timeOff.js — they're one module in
+ * the frontend menu. 'chat' gates the Ops assistant (routes/chat.js).
  * ---------------------------------------------------------------------------
  */
 const { pool } = require("../config/db");
@@ -64,7 +64,7 @@ if (!["bearer", "hybrid", "header"].includes(AUTH_MODE)) {
 }
 const RESOLVED_AUTH_MODE = ["bearer", "hybrid", "header"].includes(AUTH_MODE) ? AUTH_MODE : "header";
 
-const MODULE_KEYS = ["projects", "business-partners", "time-allocation", "invoicing", "expenses", "reports"];
+const MODULE_KEYS = ["projects", "business-partners", "time-allocation", "invoicing", "expenses", "reports", "chat"];
 
 // Resolves the X-HITT-User header (a stub-mode short username OR a real
 // MSAL UPN/email — this app supports both auth modes) to an employees row.
