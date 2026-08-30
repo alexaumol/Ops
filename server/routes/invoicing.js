@@ -49,8 +49,11 @@
  *
  * "Send by email" (Access's cmdSendToEmailPDF): GET/POST /invoices/:id/email.
  * The PDF is attached and sent via Microsoft Graph (lib/graph.js, app-only,
- * needs Mail.Send + GRAPH_MAIL_SENDER). The user confirms recipient/subject/
- * body in a dialog before the POST — nothing is sent without that.
+ * needs Mail.Send). The sender mailbox is chosen from the billing entity —
+ * invoices@hittbcn.com for HiTT / HiTT-OSM, invoices@fhitt.org for FHiTT
+ * (invoiceSenderFor(); override with GRAPH_MAIL_SENDER_HITT / _FHITT). The
+ * user confirms From/recipient/subject/body in a dialog before the POST —
+ * nothing is sent without that.
  * ---------------------------------------------------------------------------
  */
 const express = require("express");
@@ -389,6 +392,17 @@ const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const splitAddrs = (v) =>
   String(v || "").split(/[;,]/).map((s) => s.trim()).filter(Boolean);
 
+// The mailbox an invoice email is sent from, by billing entity. Defaults
+// match the entity letterhead (lib/invoicePdf.js); overridable via env.
+const INVOICE_SENDER_HITT = process.env.GRAPH_MAIL_SENDER_HITT || "invoices@hittbcn.com";
+const INVOICE_SENDER_FHITT = process.env.GRAPH_MAIL_SENDER_FHITT || "invoices@fhitt.org";
+function invoiceSenderFor(entityLabel) {
+  const key = String(entityLabel || "").trim().toLowerCase().replace(/\s+/g, "");
+  if (key === "hitt" || key === "hitt/osm") return INVOICE_SENDER_HITT;
+  if (key === "fhitt") return INVOICE_SENDER_FHITT;
+  return process.env.GRAPH_MAIL_SENDER || INVOICE_SENDER_HITT;
+}
+
 // GET /api/invoicing/invoices/:id/email — the prefilled recipient / subject /
 // body for the "email this invoice" dialog, in the partner's language.
 router.get("/invoices/:id/email", requireModuleAccess("invoicing"), async (req, res) => {
@@ -397,6 +411,7 @@ router.get("/invoices/:id/email", requireModuleAccess("invoicing"), async (req, 
     if (!data) return res.status(404).json({ error: "not_found" });
     const tokens = { InvoiceCode: data.invoicecode || "", Entity: data.entityLabel || "HITT" };
     res.json({
+      from: invoiceSenderFor(data.entityLabel),
       to: data.taxCompanyEmail || "",
       subject: fillTemplate(data.labels.get("strSubject", "[{Entity}] New invoice"), tokens),
       body: fillTemplate(
@@ -425,7 +440,7 @@ router.post("/invoices/:id/email", requireModuleAccess("invoicing"), async (req,
     return res.status(503).json({
       error: "mail_unavailable",
       message:
-        "Email sending isn't configured on the server — the Graph app needs the Mail.Send permission and GRAPH_MAIL_SENDER set.",
+        "Email sending isn't configured on the server — the Graph app registration (GRAPH_TENANT_ID / GRAPH_CLIENT_ID / GRAPH_CLIENT_SECRET) and the Mail.Send permission are required.",
     });
   }
   try {
@@ -461,8 +476,10 @@ router.post("/invoices/:id/email", requireModuleAccess("invoicing"), async (req,
       return res.status(500).json({ error: "pdf_failed", message: "Could not render the invoice PDF." });
     }
 
+    const from = invoiceSenderFor(data.entityLabel);
     try {
       await sendMail({
+        from,
         to,
         cc,
         subject,
@@ -494,10 +511,10 @@ router.post("/invoices/:id/email", requireModuleAccess("invoicing"), async (req,
       console.error("[POST /invoices/:id/email] could not record the send:", err.message);
     }
 
-    res.json({ sent: true, to, cc, emailedAt: sentAt });
+    res.json({ sent: true, from, to, cc, emailedAt: sentAt });
     logAudit(req, {
       kind: "invoice.email",
-      desc: `Emailed invoice ${data.invoicecode || `#${req.params.id}`} to ${recipients}`,
+      desc: `Emailed invoice ${data.invoicecode || `#${req.params.id}`} from ${from} to ${recipients}`,
       level: 2,
     });
   } catch (err) {

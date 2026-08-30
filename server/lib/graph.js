@@ -104,29 +104,39 @@ async function createProjectFolder(folderName) {
  * Outbound email (Microsoft Graph /sendMail, app-only)
  * ------------------------------------------------------------------------
  * Used by the invoicing module's "email this invoice PDF" action. Needs
- * the SAME confidential app registration as above, plus:
- *   - Mail.Send  Application permission (admin-consented), and
- *   - GRAPH_MAIL_SENDER  — the mailbox the invoice goes out from (a UPN or
- *     shared-mailbox address the app is allowed to send as). Falls back to
- *     GRAPH_ONEDRIVE_USER when unset.
- * When Mail.Send isn't granted or GRAPH_MAIL_SENDER is unset the caller
- * gets a clear 503 — nothing is sent silently.
+ * the SAME confidential app registration as above, plus the Mail.Send
+ * Application permission (admin-consented) — ideally scoped with an
+ * application access policy to just the invoice mailboxes.
+ *
+ * The sender mailbox is passed per-call (`from`) — the invoicing route
+ * picks it from the billing entity (invoices@hittbcn.com for HiTT / HiTT-OSM,
+ * invoices@fhitt.org for FHiTT). GRAPH_MAIL_SENDER is only the last-resort
+ * fallback when a caller passes no `from`.
+ *
+ * When Mail.Send isn't granted / the app can't send as that mailbox, the
+ * caller gets a clear 5xx — nothing is sent silently.
  * ===================================================================== */
-const MAIL_SENDER = process.env.GRAPH_MAIL_SENDER || ONEDRIVE_USER;
+const MAIL_SENDER = process.env.GRAPH_MAIL_SENDER || ONEDRIVE_USER || null;
 
 function graphMailConfigured() {
-  return !!(TENANT_ID && CLIENT_ID && CLIENT_SECRET && MAIL_SENDER);
+  return !!(TENANT_ID && CLIENT_ID && CLIENT_SECRET);
 }
 
-// Sends one message as MAIL_SENDER.
+// Sends one message.
+//   from        : sender mailbox (UPN / shared-mailbox address). Falls back
+//                 to GRAPH_MAIL_SENDER, then GRAPH_ONEDRIVE_USER.
 //   to / cc     : string or string[] of addresses
 //   subject     : string
 //   text / html : body (text unless html is given)
 //   attachments : [{ filename, contentType, content }] where content is a
 //                 Buffer or a base64 string
-async function sendMail({ to, cc, subject, text, html, attachments = [], replyTo }) {
+async function sendMail({ from, to, cc, subject, text, html, attachments = [], replyTo }) {
   if (!graphMailConfigured()) {
-    throw new Error("Graph mail not configured (missing GRAPH_* env vars or GRAPH_MAIL_SENDER)");
+    throw new Error("Graph mail not configured (missing GRAPH_TENANT_ID / GRAPH_CLIENT_ID / GRAPH_CLIENT_SECRET)");
+  }
+  const sender = (from && String(from).trim()) || MAIL_SENDER;
+  if (!sender) {
+    throw new Error("sendMail: no sender mailbox (pass `from`, or set GRAPH_MAIL_SENDER)");
   }
   const list = (v) => (Array.isArray(v) ? v : v ? [v] : []).map((s) => String(s).trim()).filter(Boolean);
   const recip = (a) => ({ emailAddress: { address: a } });
@@ -151,7 +161,7 @@ async function sendMail({ to, cc, subject, text, html, attachments = [], replyTo
 
   const token = await getAccessToken();
   const res = await fetch(
-    `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(MAIL_SENDER)}/sendMail`,
+    `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(sender)}/sendMail`,
     {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
@@ -161,7 +171,7 @@ async function sendMail({ to, cc, subject, text, html, attachments = [], replyTo
   if (!res.ok) {
     throw new Error(`Graph sendMail failed: ${res.status} ${await res.text().catch(() => "")}`);
   }
-  return { sender: MAIL_SENDER };
+  return { sender };
 }
 
 module.exports = { graphConfigured, createProjectFolder, graphMailConfigured, sendMail };

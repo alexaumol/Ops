@@ -303,6 +303,11 @@
         <div class="field-section">
           <div class="field-grid">
             <div class="span-2">
+              <label class="field-label">From</label>
+              <input id="invEmailFrom" type="text" class="field-input" readonly disabled />
+              <p class="inv-taxco-hint" style="margin-top:0.25rem;">Set automatically from the invoice's billing entity.</p>
+            </div>
+            <div class="span-2">
               <label class="field-label">To <span style="color:var(--danger);">*</span></label>
               <input id="invEmailTo" type="text" class="field-input" placeholder="name@client.com; second@client.com" />
             </div>
@@ -320,7 +325,7 @@
             </div>
           </div>
         </div>
-        <p class="inv-taxco-hint">The invoice PDF is attached automatically. Sent from the HITT invoicing mailbox.</p>
+        <p class="inv-taxco-hint">The invoice PDF is attached automatically.</p>
         <p id="invEmailError" class="inv-taxco-hint" style="color:var(--danger);"></p>
       </div>
       <div style="flex-shrink:0; border-top:1px solid var(--border-subtle); padding:0.75rem 1.1rem; display:flex; justify-content:flex-end; gap:0.5rem;">

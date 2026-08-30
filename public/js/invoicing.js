@@ -699,7 +699,7 @@ async function openInvoiceEmailModal(invoiceId){
   emailInvoiceId = invoiceId;
   const err = document.getElementById('invEmailError');
   err.textContent = '';
-  ['invEmailTo', 'invEmailCc', 'invEmailSubject'].forEach(id => document.getElementById(id).value = '');
+  ['invEmailFrom', 'invEmailTo', 'invEmailCc', 'invEmailSubject'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('invEmailBody').value = '';
   document.getElementById('invEmailLangHint').textContent = 'Loading…';
   document.getElementById('invEmailSend').disabled = true;
@@ -710,6 +710,7 @@ async function openInvoiceEmailModal(invoiceId){
     if (emailInvoiceId !== invoiceId) return; // modal changed while loading
     document.getElementById('invEmailTitle').textContent =
       d.invoiceCode ? `Email invoice ${d.invoiceCode}` : 'Email invoice';
+    document.getElementById('invEmailFrom').value = d.from || '';
     document.getElementById('invEmailTo').value = d.to || '';
     document.getElementById('invEmailSubject').value = d.subject || '';
     document.getElementById('invEmailBody').value = d.body || '';
