@@ -287,6 +287,7 @@ const HITT_API = (() => {
     saveProjectRelease: (projectId, payload) =>
       request(`/api/invoicing/projects/${projectId}/release`, { method: "PATCH", body: JSON.stringify(payload) }),
     getProjectInvoices: (projectId) => request(`/api/invoicing/projects/${projectId}/invoices`),
+    getAllInvoices: () => request("/api/invoicing/invoices"),
     createInvoice: (projectId, payload) =>
       request(`/api/invoicing/projects/${projectId}/invoices`, { method: "POST", body: JSON.stringify(payload) }),
     updateInvoice: (id, payload) =>

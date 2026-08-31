@@ -43,6 +43,13 @@ let activeProjectDefaultTc = null;            // { id, taxcompanyname } — proj
 let invTaxCompanyPrev = '';                   // last real value of the invoice-modal select
 let invoicesDefaultTcPrev = '';               // last real value of the Invoices-tab default select
 
+// "Invoice view" tab — a flat list of every invoice across all projects.
+let currentView = 'project';                  // 'project' | 'invoice'
+let ALL_INVOICES = [];
+let allInvoicesLoaded = false;
+const ivStatusSel = new Set();                // selected invoice-status labels; empty = all
+let ivSearch = '';
+
 function escapeHtml(s){
   const d = document.createElement('div');
   d.textContent = s ?? "";
@@ -363,6 +370,198 @@ document.addEventListener('click', () => {
   projectStatusBtn.setAttribute('aria-expanded', 'false');
 });
 
+/* ============================== INVOICE VIEW ============================== */
+function switchView(view){
+  currentView = view;
+  document.querySelectorAll('.inv-view-tab').forEach(b =>
+    b.setAttribute('aria-selected', String(b.dataset.view === view)));
+  document.getElementById('paneProjectView').classList.toggle('hidden', view !== 'project');
+  document.getElementById('paneInvoiceView').classList.toggle('hidden', view !== 'invoice');
+  if (view === 'invoice' && !allInvoicesLoaded) loadAllInvoices();
+}
+document.querySelectorAll('.inv-view-tab').forEach(btn => {
+  btn.addEventListener('click', () => switchView(btn.dataset.view));
+});
+
+async function loadAllInvoices(){
+  const tbody = document.getElementById('ivTableBody');
+  const empty = document.getElementById('ivEmpty');
+  tbody.innerHTML = `<tr><td colspan="5" class="sub-empty">${T('common.loading')}</td></tr>`;
+  empty.classList.add('hidden');
+  if (usingDemoData) {
+    ALL_INVOICES = [];
+    allInvoicesLoaded = true;
+    populateIvStatusOptions();
+    renderInvoiceViewTable();
+    return;
+  }
+  try {
+    ALL_INVOICES = await HITT_API.getAllInvoices();
+    allInvoicesLoaded = true;
+  } catch (err) {
+    console.warn('Could not load the invoice list:', err);
+    ALL_INVOICES = [];
+    toast(T('inv.toast.invoicesLoadFail'), 'red');
+  }
+  populateIvStatusOptions();
+  renderInvoiceViewTable();
+}
+
+// Only reload the flat invoice list if the user has actually opened that
+// tab — called after any create / edit / delete so it stays in sync.
+function maybeRefreshAllInvoices(){
+  if (allInvoicesLoaded) loadAllInvoices();
+}
+
+function populateIvStatusOptions(){
+  const menu = document.getElementById('ivStatusMenu');
+  const labels = [...new Set(ALL_INVOICES.map(x => x.statusLabel).filter(Boolean))].sort();
+  [...ivStatusSel].forEach(l => { if (!labels.includes(l)) ivStatusSel.delete(l); });
+  menu.innerHTML = labels.length
+    ? labels.map(l => `
+        <label class="inv-status-opt">
+          <input type="checkbox" value="${escapeHtml(l)}" ${ivStatusSel.has(l) ? 'checked' : ''} />
+          <span>${escapeHtml(l)}</span>
+        </label>`).join('')
+    : `<div class="inv-status-opt inv-status-opt--empty">${T('inv.status.none')}</div>`;
+  menu.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+    cb.addEventListener('change', () => {
+      if (cb.checked) ivStatusSel.add(cb.value);
+      else ivStatusSel.delete(cb.value);
+      updateIvStatusLabel();
+      renderInvoiceViewTable();
+    });
+  });
+  updateIvStatusLabel();
+}
+
+function updateIvStatusLabel(){
+  const el = document.getElementById('ivStatusBtnLabel');
+  if (!el) return;
+  if (ivStatusSel.size === 0) el.textContent = T('inv.status.all');
+  else if (ivStatusSel.size === 1) el.textContent = [...ivStatusSel][0];
+  else el.textContent = T('inv.status.nSelected', { n: ivStatusSel.size });
+}
+
+function ivMatches(inv){
+  if (ivStatusSel.size && !ivStatusSel.has(String(inv.statusLabel || ''))) return false;
+  if (ivSearch) {
+    const t = ivSearch.toLowerCase();
+    const desc = String(inv.descriptionservice || '').replace(/<[^>]+>/g, ' ');
+    const hay = `${inv.invoicecode || ''} ${desc} ${inv.projectBpName || ''} ${inv.taxCompanyName || ''} ${inv.projectCode || ''} ${inv.projectName || ''}`.toLowerCase();
+    if (!hay.includes(t)) return false;
+  }
+  return true;
+}
+
+function renderInvoiceViewTable(){
+  const tbody = document.getElementById('ivTableBody');
+  const empty = document.getElementById('ivEmpty');
+  const rows = ALL_INVOICES.filter(ivMatches);
+
+  if (!rows.length) {
+    tbody.innerHTML = '';
+    empty.classList.remove('hidden');
+    return;
+  }
+  empty.classList.add('hidden');
+
+  tbody.innerHTML = rows.map((inv, i) => {
+    const statusPill = `<span class="inv-status-pill inv-status-${inv.invoicestatusid}">${escapeHtml(inv.statusLabel || '—')}</span>`;
+    const sent = inv.emailedAt
+      ? `<span class="inv-sent-badge" title="${escapeHtml(sentBadgeTitle(inv))}">${T('inv.sent.badge')}</span>`
+      : '';
+    const corrective = (inv.iscorrective && inv.sourceInvoiceCode)
+      ? `<i class="inv-corrective-src" title="${escapeHtml(T('inv.iv.correctiveTip', { code: inv.sourceInvoiceCode }))}">(${escapeHtml(inv.sourceInvoiceCode)})</i>`
+      : '';
+    const tcCell = inv.taxCompanyName
+      ? (inv.taxCompanyBpId
+        ? `<a href="business-partners.html?open=${encodeURIComponent(inv.taxCompanyBpId)}" data-link>${escapeHtml(inv.taxCompanyName)}</a>`
+        : escapeHtml(inv.taxCompanyName))
+      : '—';
+    const projCell = inv.projectId
+      ? `<a href="projects.html?projectId=${encodeURIComponent(inv.projectId)}" data-link><span style="font-weight:600;">${escapeHtml(inv.projectCode || '')}</span> — ${escapeHtml(inv.projectName || '')}</a>`
+      : '—';
+    return `
+      <tr data-i="${i}">
+        <td>
+          <div class="inv-iv-code"><a href="#" data-open>${escapeHtml(inv.invoicecode || T('inv.draft'))}</a>${corrective}</div>
+          <div class="inv-iv-sub">${statusPill}${sent}</div>
+        </td>
+        <td>${tcCell}</td>
+        <td>${projCell}</td>
+        <td style="text-align:right;" class="inv-money${Number(inv.amount) < 0 ? ' inv-money--neg' : ''}">${formatMoney(inv.amount, inv.currency)}</td>
+        <td class="inv-actions-col">
+          <div class="inv-row-actions">
+            <button type="button" class="inv-row-btn" data-open title="${T('inv.iv.openRecord')}" aria-label="${T('inv.iv.openRecord')}">✎</button>
+            <button type="button" class="inv-row-btn" data-pdf title="${T('inv.tip.viewPdf')}" aria-label="${T('inv.tip.viewPdf')}">📄</button>
+          </div>
+        </td>
+      </tr>`;
+  }).join('');
+
+  tbody.querySelectorAll('tr').forEach((tr, i) => {
+    const inv = rows[i];
+    tr.querySelectorAll('[data-open]').forEach(el => {
+      el.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); openInvoiceFromList(inv); });
+    });
+    tr.querySelector('[data-pdf]')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openInvoicePdf(inv.id);
+    });
+    tr.addEventListener('click', (e) => {
+      if (e.target.closest('a[data-link], [data-open], [data-pdf]')) return;
+      openInvoiceFromList(inv);
+    });
+  });
+}
+
+// Open the New/Edit invoice modal for an invoice picked from the flat list.
+// The modal expects the owning project's invoicing context (default tax
+// company, the BP's tax companies, that project's invoice list for the
+// corrective-source dropdown), so load it first — same as openProjectModal.
+async function openInvoiceFromList(inv){
+  if (usingDemoData) { toast(T('common.notAvailableDemo'), 'navy'); return; }
+  if (!inv.projectId) { toast(T('inv.toast.invoicesLoadFail'), 'red'); return; }
+  activeProjectId = inv.projectId;
+  activeProjectBpId = null;
+  activeProjectBpTaxCompanies = [];
+  activeProjectDefaultTc = null;
+  try {
+    const detail = await HITT_API.getProject(inv.projectId);
+    activeProjectBpId = detail.busspartnerid || null;
+    if (detail.busspartnertoinvoiceid) {
+      activeProjectDefaultTc = { id: detail.busspartnertoinvoiceid, taxcompanyname: detail.invoicingPartnerLabel || T('inv.tc.generic') };
+    }
+  } catch (err) {
+    console.warn('Could not load project context for the invoice:', err);
+  }
+  if (activeProjectBpId) {
+    try { activeProjectBpTaxCompanies = await HITT_API.getBusinessPartnerTaxCompanies(activeProjectBpId); }
+    catch { activeProjectBpTaxCompanies = []; }
+  }
+  try { INVOICES = await HITT_API.getProjectInvoices(inv.projectId); }
+  catch { INVOICES = []; }
+  openInvoiceModal(inv.id);
+}
+
+const ivStatusBtn = document.getElementById('ivStatusBtn');
+const ivStatusMenu = document.getElementById('ivStatusMenu');
+ivStatusBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  const open = ivStatusMenu.classList.toggle('hidden');
+  ivStatusBtn.setAttribute('aria-expanded', String(!open));
+});
+ivStatusMenu.addEventListener('click', (e) => e.stopPropagation());
+document.addEventListener('click', () => {
+  ivStatusMenu.classList.add('hidden');
+  ivStatusBtn.setAttribute('aria-expanded', 'false');
+});
+document.getElementById('ivSearchBox').addEventListener('input', (e) => {
+  ivSearch = e.target.value.trim();
+  renderInvoiceViewTable();
+});
+
 /* ============================== TAX COMPANY SELECT + PICKER ============== */
 function taxCompanyOptionLabel(tc){
   const name = tc.taxcompanyname || T('common.unnamed');
@@ -655,6 +854,7 @@ function renderInvoicesTable(){
         toast(T('inv.toast.invoiceDeleted'), 'navy');
         await loadInvoices();
         await loadProjects();
+        maybeRefreshAllInvoices();
       } catch (err) {
         console.error(err);
         toast(T('inv.toast.invoiceDeleteFail'), 'red');
@@ -1045,6 +1245,7 @@ document.getElementById('invSave').addEventListener('click', async () => {
     closeInvoiceModal();
     await loadInvoices();
     await loadProjects();
+    maybeRefreshAllInvoices();
   } catch (err) {
     console.error(err);
     toast(T('inv.toast.saveFail'), 'red');
@@ -1061,6 +1262,7 @@ document.getElementById('invDelete').addEventListener('click', async () => {
     closeInvoiceModal();
     await loadInvoices();
     await loadProjects();
+    maybeRefreshAllInvoices();
   } catch (err) {
     console.error(err);
     toast(T('inv.toast.invoiceDeleteFail'), 'red');
@@ -1075,7 +1277,9 @@ loadProjects();
 window.addEventListener('hitt:langchange', () => {
   if (typeof setDataSourcePill === 'function') setDataSourcePill();
   if (typeof updateProjectStatusLabel === 'function') updateProjectStatusLabel();
+  if (typeof updateIvStatusLabel === 'function') updateIvStatusLabel();
   if (typeof renderTable === 'function') renderTable();
+  if (allInvoicesLoaded && typeof renderInvoiceViewTable === 'function') renderInvoiceViewTable();
   const mo = document.getElementById('modalOverlay');
   if (mo && !mo.classList.contains('hidden') && typeof renderInvoicesTable === 'function') renderInvoicesTable();
 });

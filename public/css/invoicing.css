@@ -9,6 +9,31 @@
   margin-bottom: 1.25rem;
 }
 
+/* Page-level view tabs — "Invoice view" / "Project view" */
+.inv-view-tabs {
+  display: flex; gap: 0.25rem;
+  margin-bottom: 1.1rem;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.inv-view-tab {
+  background: none; border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  padding: 0.5rem 0.95rem;
+  font-size: 0.92rem; font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.inv-view-tab:hover { color: var(--text-primary); }
+.inv-view-tab[aria-selected="true"] {
+  color: var(--hitt-teal);
+  border-bottom-color: var(--hitt-teal);
+}
+
+/* Project-status menu normally anchors to the right of the toolbar; the
+   Invoice-view status filter sits on the left, so its menu opens leftward. */
+.inv-status-filter--left .inv-status-filter-menu { right: auto; left: 0; }
+
 /* Invoice modal: unsaved-edits badge + "last updated by" line */
 .modal-changed-badge {
   flex-shrink: 0;
@@ -237,6 +262,18 @@
 
 .inv-money { font-weight: 700; }
 .inv-money--neg { color: var(--danger); }
+
+/* Invoice-view table */
+.inv-table--invoices { min-width: 48rem; }
+.inv-table--invoices a { color: inherit; text-decoration: none; }
+.inv-table--invoices a:hover { color: var(--hitt-teal); text-decoration: underline; }
+.inv-iv-code { font-weight: 700; }
+.inv-iv-sub { margin-top: 0.2rem; }
+.inv-corrective-src {
+  margin-left: 0.35rem;
+  font-size: 0.85em; font-style: italic;
+  color: var(--text-secondary); font-weight: 400;
+}
 
 /* "Sent" badge — invoice PDF has been emailed from the app */
 .inv-sent-badge {

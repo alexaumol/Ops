@@ -325,6 +325,43 @@ router.get("/projects/:projectId/invoices", async (req, res) => {
   }
 });
 
+// GET /api/invoicing/invoices — every invoice across all projects, for the
+// dashboard's "Invoice view" tab. One flat row per invoice with the tax
+// company it's billed to, its project, amount, status, "sent" markers, and
+// (for correctives) the code of the invoice it replaces.
+router.get("/invoices", requireModuleAccess("invoicing"), async (req, res) => {
+  try {
+    await ensureInvoicingSchema();
+    const { rows } = await pool.query(`
+      SELECT i.id, i.invoicecode, i.invoicestatusid, ist.statusdesc AS "statusLabel",
+             i.iscorrective, i.sourceinvoiceid, src.invoicecode AS "sourceInvoiceCode",
+             d.amount, COALESCE(d.currency, 'EUR') AS currency,
+             d.descriptionservice,
+             d.busspartnertoinvoiceid AS "taxCompanyId",
+             tc.taxcompanyname AS "taxCompanyName",
+             tc.businesspartnerid AS "taxCompanyBpId",
+             d.emailedat AS "emailedAt", COALESCE(d.emailedcount, 0) AS "emailedCount",
+             d.emailedto AS "emailedTo",
+             NULLIF(TRIM(CONCAT(ee.employeefirstname, ' ', ee.employeelastname)), '') AS "emailedByName",
+             p.id::text AS "projectId", p.projectnumber AS "projectCode", p.projectname AS "projectName",
+             p.busspartnerid AS "projectBpId", pbp.bpname AS "projectBpName"
+      FROM invoices i
+      LEFT JOIN invoicesdetails d ON d.invoiceid = i.id
+      LEFT JOIN invoicesstatus ist ON ist.id = i.invoicestatusid::bigint
+      LEFT JOIN invoices src ON src.id = i.sourceinvoiceid
+      LEFT JOIN taxcompanies tc ON tc.id = d.busspartnertoinvoiceid::bigint
+      LEFT JOIN projects p ON p.id = i.projectid::bigint
+      LEFT JOIN businesspartners pbp ON pbp.id = p.busspartnerid::bigint
+      LEFT JOIN employees ee ON ee.id = d.emailedby
+      ORDER BY i.invoiceyear DESC NULLS LAST, i.invoiceseq DESC NULLS LAST, i.id DESC
+    `);
+    res.json(rows);
+  } catch (err) {
+    console.error("[GET /api/invoicing/invoices] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
 // Loads everything the invoice PDF needs, including the recipient's
 // invoicing email and the language that drives its labels
 // (tax company's business partner first, then the project's). Returns null

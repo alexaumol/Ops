@@ -28,51 +28,87 @@
     <h1 class="page-title" data-i18n="page.invoicing.title">Invoicing</h1>
     <p class="page-subtitle" data-i18n="page.invoicing.sub">Proceed-to-invoice settings and invoice follow-up, per project.</p>
 
-    <div class="inv-filters">
-      <button data-bucket="not-released" class="inv-filter-btn" aria-selected="false"><span data-i18n="inv.bucket.notReleased">Not released</span> <span class="inv-filter-count" data-count-for="not-released"></span></button>
-      <button data-bucket="not-started" class="inv-filter-btn" aria-selected="false"><span data-i18n="inv.bucket.notStarted">Not started</span> <span class="inv-filter-count" data-count-for="not-started"></span></button>
-      <button data-bucket="partial" class="inv-filter-btn" aria-selected="true"><span data-i18n="inv.bucket.partial">Partially invoiced</span> <span class="inv-filter-count" data-count-for="partial"></span></button>
-      <button data-bucket="total" class="inv-filter-btn" aria-selected="false"><span data-i18n="inv.bucket.total">Totally invoiced</span> <span class="inv-filter-count" data-count-for="total"></span></button>
-      <button data-bucket="all" class="inv-filter-btn" aria-selected="false"><span data-i18n="exp.scope.all">All</span> <span class="inv-filter-count" data-count-for="all"></span></button>
-      <div class="inv-filter-spacer"></div>
-      <input id="searchBox" type="text" placeholder="Search by project code, name or business partner…" data-i18n-placeholder="inv.search" />
+    <div class="inv-view-tabs" role="tablist" aria-label="Invoicing view">
+      <button id="viewTabInvoice" class="inv-view-tab" data-view="invoice" role="tab" aria-selected="false" data-i18n="inv.view.invoice">Invoice view</button>
+      <button id="viewTabProject" class="inv-view-tab" data-view="project" role="tab" aria-selected="true" data-i18n="inv.view.project">Project view</button>
     </div>
 
-    <div class="inv-filters inv-filters--row2">
-      <div class="inv-lifecycle-toggle" role="group" aria-label="Filter by project lifecycle">
-        <button data-lifecycle="alive" class="inv-lifecycle-btn" aria-selected="true" data-i18n="inv.lifecycle.aliveOnly">Only alive projects</button>
-        <button data-lifecycle="closed" class="inv-lifecycle-btn" aria-selected="false" data-i18n="inv.lifecycle.closedOnly">Only closed projects</button>
-        <button data-lifecycle="all" class="inv-lifecycle-btn" aria-selected="false" data-i18n="inv.lifecycle.allProjects">All projects</button>
+    <section id="paneInvoiceView" class="inv-view-pane hidden">
+      <div class="inv-filters">
+        <div class="inv-status-filter inv-status-filter--left" id="ivStatusFilterWrap">
+          <button type="button" id="ivStatusBtn" class="inv-status-filter-btn" aria-expanded="false" aria-haspopup="true">
+            <span data-i18n="form.status">Status</span>: <span id="ivStatusBtnLabel">all</span> <span aria-hidden="true">▾</span>
+          </button>
+          <div id="ivStatusMenu" class="inv-status-filter-menu hidden"></div>
+        </div>
+        <div class="inv-filter-spacer"></div>
+        <input id="ivSearchBox" type="text" placeholder="Search description or business partner…" data-i18n-placeholder="inv.iv.search" />
       </div>
-      <div class="inv-filter-spacer"></div>
-      <div class="inv-status-filter" id="projectStatusFilterWrap">
-        <button type="button" id="projectStatusBtn" class="inv-status-filter-btn" aria-expanded="false" aria-haspopup="true">
-          <span data-i18n="inv.projectStatus">Project status:</span> <span id="projectStatusBtnLabel">all</span> <span aria-hidden="true">▾</span>
-        </button>
-        <div id="projectStatusMenu" class="inv-status-filter-menu hidden"></div>
-      </div>
-    </div>
 
-    <div class="inv-table-wrap">
-      <table class="inv-table">
-        <thead>
-          <tr>
-            <th class="inv-proceed-col" title="Proceed to invoice"></th>
-            <th data-sort="code" data-i18n="bp.col.project">Project<span class="sort-arrow"></span></th>
-            <th data-sort="entityLabel" data-i18n="inv.col.entity">Entity<span class="sort-arrow"></span></th>
-            <th data-sort="bpName" data-i18n="page.businessPartners.title">Business partner<span class="sort-arrow"></span></th>
-            <th data-sort="projectStatusLabel" data-i18n="inv.col.projectStatus">Project status<span class="sort-arrow"></span></th>
-            <th data-sort="budget" style="text-align:right;" data-i18n="inv.col.budget">Budget<span class="sort-arrow"></span></th>
-            <th data-sort="invoicedTotal" style="text-align:right;" data-i18n="inv.col.invoiced">Invoiced<span class="sort-arrow"></span></th>
-            <th data-sort="invoiceCount" style="text-align:right;" data-i18n="inv.col.generated">Generated invoices<span class="sort-arrow"></span></th>
-            <th data-sort="bucket" data-i18n="inv.col.invoiceStatus">Invoice status<span class="sort-arrow"></span></th>
-            <th class="inv-actions-col" aria-label="Actions"></th>
-          </tr>
-        </thead>
-        <tbody id="invTableBody"></tbody>
-      </table>
-      <div id="invEmpty" class="bp-empty hidden" data-i18n="inv.empty">No projects match this filter.</div>
-    </div>
+      <div class="inv-table-wrap">
+        <table class="inv-table inv-table--invoices">
+          <thead>
+            <tr>
+              <th data-i18n="inv.iv.col.invoice">Invoice</th>
+              <th data-i18n="inv.iv.col.invoicedTo">Invoiced to</th>
+              <th data-i18n="inv.iv.col.project">Project</th>
+              <th style="text-align:right;" data-i18n="form.amount">Amount</th>
+              <th class="inv-actions-col" aria-label="Actions"></th>
+            </tr>
+          </thead>
+          <tbody id="ivTableBody"></tbody>
+        </table>
+        <div id="ivEmpty" class="bp-empty hidden" data-i18n="inv.iv.empty">No invoices match this filter.</div>
+      </div>
+    </section>
+
+    <section id="paneProjectView" class="inv-view-pane">
+      <div class="inv-filters">
+        <button data-bucket="not-released" class="inv-filter-btn" aria-selected="false"><span data-i18n="inv.bucket.notReleased">Not released</span> <span class="inv-filter-count" data-count-for="not-released"></span></button>
+        <button data-bucket="not-started" class="inv-filter-btn" aria-selected="false"><span data-i18n="inv.bucket.notStarted">Not started</span> <span class="inv-filter-count" data-count-for="not-started"></span></button>
+        <button data-bucket="partial" class="inv-filter-btn" aria-selected="true"><span data-i18n="inv.bucket.partial">Partially invoiced</span> <span class="inv-filter-count" data-count-for="partial"></span></button>
+        <button data-bucket="total" class="inv-filter-btn" aria-selected="false"><span data-i18n="inv.bucket.total">Totally invoiced</span> <span class="inv-filter-count" data-count-for="total"></span></button>
+        <button data-bucket="all" class="inv-filter-btn" aria-selected="false"><span data-i18n="exp.scope.all">All</span> <span class="inv-filter-count" data-count-for="all"></span></button>
+        <div class="inv-filter-spacer"></div>
+        <input id="searchBox" type="text" placeholder="Search by project code, name or business partner…" data-i18n-placeholder="inv.search" />
+      </div>
+
+      <div class="inv-filters inv-filters--row2">
+        <div class="inv-lifecycle-toggle" role="group" aria-label="Filter by project lifecycle">
+          <button data-lifecycle="alive" class="inv-lifecycle-btn" aria-selected="true" data-i18n="inv.lifecycle.aliveOnly">Only alive projects</button>
+          <button data-lifecycle="closed" class="inv-lifecycle-btn" aria-selected="false" data-i18n="inv.lifecycle.closedOnly">Only closed projects</button>
+          <button data-lifecycle="all" class="inv-lifecycle-btn" aria-selected="false" data-i18n="inv.lifecycle.allProjects">All projects</button>
+        </div>
+        <div class="inv-filter-spacer"></div>
+        <div class="inv-status-filter" id="projectStatusFilterWrap">
+          <button type="button" id="projectStatusBtn" class="inv-status-filter-btn" aria-expanded="false" aria-haspopup="true">
+            <span data-i18n="inv.projectStatus">Project status:</span> <span id="projectStatusBtnLabel">all</span> <span aria-hidden="true">▾</span>
+          </button>
+          <div id="projectStatusMenu" class="inv-status-filter-menu hidden"></div>
+        </div>
+      </div>
+
+      <div class="inv-table-wrap">
+        <table class="inv-table">
+          <thead>
+            <tr>
+              <th class="inv-proceed-col" title="Proceed to invoice"></th>
+              <th data-sort="code" data-i18n="bp.col.project">Project<span class="sort-arrow"></span></th>
+              <th data-sort="entityLabel" data-i18n="inv.col.entity">Entity<span class="sort-arrow"></span></th>
+              <th data-sort="bpName" data-i18n="page.businessPartners.title">Business partner<span class="sort-arrow"></span></th>
+              <th data-sort="projectStatusLabel" data-i18n="inv.col.projectStatus">Project status<span class="sort-arrow"></span></th>
+              <th data-sort="budget" style="text-align:right;" data-i18n="inv.col.budget">Budget<span class="sort-arrow"></span></th>
+              <th data-sort="invoicedTotal" style="text-align:right;" data-i18n="inv.col.invoiced">Invoiced<span class="sort-arrow"></span></th>
+              <th data-sort="invoiceCount" style="text-align:right;" data-i18n="inv.col.generated">Generated invoices<span class="sort-arrow"></span></th>
+              <th data-sort="bucket" data-i18n="inv.col.invoiceStatus">Invoice status<span class="sort-arrow"></span></th>
+              <th class="inv-actions-col" aria-label="Actions"></th>
+            </tr>
+          </thead>
+          <tbody id="invTableBody"></tbody>
+        </table>
+        <div id="invEmpty" class="bp-empty hidden" data-i18n="inv.empty">No projects match this filter.</div>
+      </div>
+    </section>
   </main>
 
   <div id="toastHost" class="toast-host"></div>
