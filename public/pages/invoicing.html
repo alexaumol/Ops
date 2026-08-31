@@ -29,11 +29,11 @@
     <p class="page-subtitle" data-i18n="page.invoicing.sub">Proceed-to-invoice settings and invoice follow-up, per project.</p>
 
     <div class="inv-view-tabs" role="tablist" aria-label="Invoicing view">
-      <button id="viewTabInvoice" class="inv-view-tab" data-view="invoice" role="tab" aria-selected="false" data-i18n="inv.view.invoice">Invoice view</button>
-      <button id="viewTabProject" class="inv-view-tab" data-view="project" role="tab" aria-selected="true" data-i18n="inv.view.project">Project view</button>
+      <button id="viewTabInvoice" class="inv-view-tab" data-view="invoice" role="tab" aria-selected="true" data-i18n="inv.view.invoice">Invoice view</button>
+      <button id="viewTabProject" class="inv-view-tab" data-view="project" role="tab" aria-selected="false" data-i18n="inv.view.project">Project view</button>
     </div>
 
-    <section id="paneInvoiceView" class="inv-view-pane hidden">
+    <section id="paneInvoiceView" class="inv-view-pane">
       <div class="inv-filters">
         <div class="inv-status-filter inv-status-filter--left" id="ivStatusFilterWrap">
           <button type="button" id="ivStatusBtn" class="inv-status-filter-btn" aria-expanded="false" aria-haspopup="true">
@@ -63,7 +63,7 @@
       </div>
     </section>
 
-    <section id="paneProjectView" class="inv-view-pane">
+    <section id="paneProjectView" class="inv-view-pane hidden">
       <div class="inv-filters">
         <button data-bucket="not-released" class="inv-filter-btn" aria-selected="false"><span data-i18n="inv.bucket.notReleased">Not released</span> <span class="inv-filter-count" data-count-for="not-released"></span></button>
         <button data-bucket="not-started" class="inv-filter-btn" aria-selected="false"><span data-i18n="inv.bucket.notStarted">Not started</span> <span class="inv-filter-count" data-count-for="not-started"></span></button>

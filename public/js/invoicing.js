@@ -44,7 +44,9 @@ let invTaxCompanyPrev = '';                   // last real value of the invoice-
 let invoicesDefaultTcPrev = '';               // last real value of the Invoices-tab default select
 
 // "Invoice view" tab — a flat list of every invoice across all projects.
-let currentView = 'project';                  // 'project' | 'invoice'
+// It's the default landing view (see INIT); the project dashboard sits
+// behind the "Project view" tab.
+let currentView = 'invoice';                   // 'project' | 'invoice'
 let ALL_INVOICES = [];
 let allInvoicesLoaded = false;
 const ivStatusSel = new Set();                // selected invoice-status labels; empty = all
@@ -1328,7 +1330,10 @@ document.getElementById('invDelete').addEventListener('click', async () => {
 });
 
 /* ============================== INIT ==================================== */
-loadProjects();
+// loadProjects() resolves usingDemoData, the data-source pill and the
+// lookups the invoice modal needs; it also fills the (hidden) Project
+// view so switching to it is instant. Then load the default Invoice view.
+loadProjects().then(() => switchView('invoice'));
 
 
 /* Re-render dynamic content when the UI language changes. */
