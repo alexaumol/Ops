@@ -1,10 +1,12 @@
 /**
- * HITT Ops — company logo application
+ * Ops — branding application (product name + logo)
  * ---------------------------------------------------------------------------
- * Swaps the bundled Fundació HiTT mark for an admin-uploaded logo
- * (Settings → Customizations). The logo lives server-side in appconfig and
- * is fetched from GET /api/branding/logo — a public endpoint, so this also
- * works on the pre-auth sign-in page.
+ * - Product name: from HITT_CONFIG.APP_NAME (config.js), applied to the app
+ *   header wordmark, the sign-in card, and the document title.
+ * - Logo: swaps the bundled neutral mark for an admin-uploaded logo
+ *   (Settings → Customizations). The logo lives server-side in appconfig and
+ *   is fetched from GET /api/branding/logo — a public endpoint, so this also
+ *   works on the pre-auth sign-in page.
  *
  * The last-seen logo is cached in localStorage and applied synchronously on
  * load so headers don't flash the default mark before the fetch resolves.
@@ -14,6 +16,23 @@
 (function () {
   var LS_KEY = "hitt.branding.logo";
   var SELECTOR = ".app-header__logo, .login-brand__logo";
+
+  // --- Product name ---------------------------------------------------
+  var APP_NAME = (window.HITT_CONFIG && window.HITT_CONFIG.APP_NAME) || "";
+  function applyName() {
+    if (!APP_NAME) return;
+    document.querySelectorAll(".app-header__name, .login-brand__name").forEach(function (el) {
+      if (el.textContent !== APP_NAME) el.textContent = APP_NAME;
+    });
+    // Titles are "<Default> — Page"; swap the product part, keep the page.
+    if (document.title) {
+      document.title = document.title.replace(/^(HITT Ops|HITT·Ops|Ops)\b/, APP_NAME);
+    }
+  }
+  applyName();
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", applyName);
+  }
 
   function applyLogo(dataUrl) {
     if (!dataUrl) return;

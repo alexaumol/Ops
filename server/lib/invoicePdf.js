@@ -1,27 +1,22 @@
 /**
- * Invoice PDF rendering — matches the real HITT invoice template (a sample
- * PDF, 2025-033, was provided directly by Alex as the reference to match).
- * Built with pdfkit (pure JS, no external binary/headless-browser needed).
+ * Invoice PDF rendering — layout matched to a real reference invoice
+ * (sample 2025-033). Built with pdfkit (pure JS, no external binary /
+ * headless-browser needed).
  *
- * Letterhead + bank + logo now come from the entity record (Settings →
+ * Letterhead + bank + logo come entirely from the entity record (Settings →
  * Entities — legal name / VAT / address / invoicing email / webpage / bank
  * account / invoice logo), passed in on `data` by routes/invoicing.js
- * (loadInvoiceForPdf). HITT_LETTERHEAD / ENTITY_LETTERHEAD below are only
- * the fallback when an entity has no details filled in yet.
+ * (loadInvoiceForPdf). Nothing about the issuing company is hardcoded — a
+ * blank field renders blank rather than borrowing another entity's details.
  *
  * Field LABELS ("INVOICE NUMBER" / "FACTURA NUM") come from
  * invoicedocumentcontrols/invoicedocumenttext in the business partner's
  * language (see lib/invoiceDocText.js + data.labels).
  *
  * Header logo priority: the entity's own invoice logo (data.entityLogo,
- * PNG/JPEG data URL) → public/assets/HITT-logo-invoices.png for HiTT /
- * HiTT-OSM → a plain "HITT" text mark.
+ * PNG/JPEG data URL) → a plain text mark from the entity name.
  */
-const path = require("path");
-const fs = require("fs");
 const PDFDocument = require("pdfkit");
-
-const HITT_INVOICE_LOGO = path.join(__dirname, "..", "..", "public", "assets", "HITT-logo-invoices.png");
 
 const BRAND = {
   ink: "#171717",
@@ -30,25 +25,6 @@ const BRAND = {
   border: "#CFC9B0",
   gray: "#5A5650",
   blue: "#2255AA",
-};
-
-const HITT_LETTERHEAD = {
-  name: "Health Innovation Technology Transfer, SLU",
-  addressLine1: "c/Aragó 60, pral. 1º",
-  addressLine2: "E-08015 Barcelona",
-  vat: "B-66540501",
-  email: "invoices@hittbcn.com",
-  web: "www.hittbcn.com",
-  footer: "Health Innovation Technology Transfer, S.L.U., NIF B66540501, c/Aragó 60, pral.1, Barcelona, Spain\n" +
-          "Inscripción en el Registro Mercantil de Barcelona. Tomo 44830, Folio 163, Hoja nº 468781",
-};
-
-// Fallback letterhead by entity label, used only when the entity record
-// (Settings → Entities) has no legal name filled in.
-const ENTITY_LETTERHEAD = {
-  HiTT: HITT_LETTERHEAD,
-  FHiTT: HITT_LETTERHEAD,
-  "HiTT/OSM": HITT_LETTERHEAD,
 };
 
 function money(n, sym = "€") {
@@ -96,23 +72,20 @@ function dataUrlToBuffer(dataUrl) {
   try { return Buffer.from(m[2].replace(/\s+/g, ""), "base64"); } catch { return null; }
 }
 
-// Letterhead for the invoice — the entity's own details (Settings →
-// Entities) when present, else the hardcoded HiTT block.
+// Letterhead for the invoice — entirely from the entity record (Settings →
+// Entities). Missing fields render blank; nothing is borrowed from another
+// entity or hardcoded.
 function entityLetterhead(data) {
-  const fb = ENTITY_LETTERHEAD[data.entityLabel] || HITT_LETTERHEAD;
   const addr = (data.entityAddress || "").split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
-  const name = data.entityLegalName || fb.name;
-  const vat = data.entityVat || fb.vat;
-  let footer = fb.footer;
-  if (data.entityLegalName) {
-    footer = [name, vat && `NIF ${vat}`, addr.join(", ")].filter(Boolean).join(", ");
-  }
+  const name = data.entityLegalName || data.entityLabel || "";
+  const vat = data.entityVat || "";
+  const footer = [name, vat && `NIF ${vat}`, addr.join(", ")].filter(Boolean).join(", ");
   return {
     name,
-    addressLines: addr.length ? addr : [fb.addressLine1, fb.addressLine2].filter(Boolean),
+    addressLines: addr,
     vat,
-    email: data.entityEmail || fb.email,
-    web: data.entityWeb || fb.web,
+    email: data.entityEmail || "",
+    web: data.entityWeb || "",
     footer,
     logo: dataUrlToBuffer(data.entityLogo),
   };
@@ -133,12 +106,8 @@ function renderInvoicePdf(doc, data) {
   const vatWord = String(L("lblVATAmount", "VAT")).replace(/[\s\d.,%]+$/, "").trim() || "VAT";
 
   // ---------- Header: letterhead + contact ----------
-  // Entity's own invoice logo (Settings → Entities) wins; then the bundled
-  // HiTT mark for HiTT / HiTT-OSM; then a plain text mark.
-  const usesHittLogo = (() => {
-    const l = String(data.entityLabel || "").trim().toLowerCase().replace(/\s+/g, "");
-    return l === "hitt" || l === "hitt/osm";
-  })();
+  // Entity's own invoice logo (Settings → Entities) wins; else a plain text
+  // mark from the entity name.
   let logoDrawn = false;
   if (letter.logo) {
     try {
@@ -148,19 +117,11 @@ function renderInvoicePdf(doc, data) {
       console.error("[invoicePdf] could not embed the entity logo:", err.message);
     }
   }
-  if (!logoDrawn && usesHittLogo && fs.existsSync(HITT_INVOICE_LOGO)) {
-    try {
-      doc.image(HITT_INVOICE_LOGO, left, 40, { height: 42 });
-      logoDrawn = true;
-    } catch (err) {
-      console.error("[invoicePdf] could not embed the HITT invoice logo:", err.message);
-    }
-  }
   if (!logoDrawn) {
-    doc.font("Helvetica-Bold").fontSize(16).fillColor(BRAND.teal).text("HITT", left, 40);
-    doc.font("Helvetica").fontSize(6).fillColor(BRAND.gray)
-      .text("Health Innovation", left, 58)
-      .text("Technology Transfer", left, 66);
+    const mark = (data.entityLabel || letter.name || "").trim();
+    if (mark) {
+      doc.font("Helvetica-Bold").fontSize(16).fillColor(BRAND.teal).text(mark.slice(0, 40), left, 40);
+    }
   }
 
   doc.font("Helvetica-Bold").fontSize(10).fillColor(BRAND.ink).text(letter.name, left, 90);
@@ -270,10 +231,12 @@ function renderInvoicePdf(doc, data) {
   doc.text(`${L("txtDipositInfo", "When paying by bank transfer, please state invoice number")} ${data.invoicecode || ""}`, left, bY + 30);
 
   // ---------- Footer ----------
-  const footerY = 780;
-  doc.rect(left, footerY, width, 30).stroke(BRAND.blue);
-  doc.font("Helvetica").fontSize(7).fillColor(BRAND.blue)
-    .text(letter.footer, left + 6, footerY + 6, { width: width - 12, align: "center" });
+  if (letter.footer) {
+    const footerY = 780;
+    doc.rect(left, footerY, width, 30).stroke(BRAND.blue);
+    doc.font("Helvetica").fontSize(7).fillColor(BRAND.blue)
+      .text(letter.footer, left + 6, footerY + 6, { width: width - 12, align: "center" });
+  }
 }
 
 function streamInvoicePdf(res, data) {

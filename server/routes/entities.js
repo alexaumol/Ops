@@ -35,6 +35,12 @@ const trimOrNull = (v) => {
   return s === "" ? null : s;
 };
 
+const MAIL_TRANSPORTS = ["graph", "smtp"];
+function mailTransport(v) {
+  const s = trimOrNull(v);
+  return s && MAIL_TRANSPORTS.includes(s.toLowerCase()) ? s.toLowerCase() : null;
+}
+
 function entityFields(body) {
   const b = body || {};
   return {
@@ -44,6 +50,8 @@ function entityFields(body) {
     address: trimOrNull(b.address),
     emailinvoicing: trimOrNull(b.emailinvoicing),
     webpage: trimOrNull(b.webpage),
+    mailtransport: mailTransport(b.mailtransport),
+    mailsender: trimOrNull(b.mailsender),
   };
 }
 
@@ -93,7 +101,7 @@ async function upsertBank(client, entityId, bank) {
 
 const LIST_SELECT = `
   SELECT e.id, e.entitydesc, e.legalname, e.vatnumber, e.address,
-         e.emailinvoicing, e.webpage,
+         e.emailinvoicing, e.webpage, e.mailtransport, e.mailsender,
          (e.logo IS NOT NULL AND e.logo <> '') AS "hasLogo",
          b.bankname, b.bankaddrline1, b.bankaddrline2, b.iban, b.bicswift,
          COALESCE(p.n, 0)::int AS "projectCount"
@@ -111,6 +119,8 @@ function shapeRow(r) {
     address: r.address,
     emailinvoicing: r.emailinvoicing,
     webpage: r.webpage,
+    mailtransport: r.mailtransport || null,
+    mailsender: r.mailsender || null,
     hasLogo: !!r.hasLogo,
     projectCount: Number(r.projectCount) || 0,
     bank: {
@@ -163,9 +173,9 @@ router.post("/", async (req, res) => {
     await ensureEntitySchema();
     await client.query("BEGIN");
     const { rows } = await client.query(
-      `INSERT INTO entity (entitydesc, legalname, vatnumber, address, emailinvoicing, webpage, logo)
-       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
-      [f.entitydesc, f.legalname, f.vatnumber, f.address, f.emailinvoicing, f.webpage, logo.skip ? null : logo.value]
+      `INSERT INTO entity (entitydesc, legalname, vatnumber, address, emailinvoicing, webpage, mailtransport, mailsender, logo)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+      [f.entitydesc, f.legalname, f.vatnumber, f.address, f.emailinvoicing, f.webpage, f.mailtransport, f.mailsender, logo.skip ? null : logo.value]
     );
     const id = rows[0].id;
     await upsertBank(client, id, bankFields(req.body));
@@ -198,8 +208,9 @@ router.patch("/:id", async (req, res) => {
     const sets = [
       "entitydesc = $1", "legalname = $2", "vatnumber = $3",
       "address = $4", "emailinvoicing = $5", "webpage = $6",
+      "mailtransport = $7", "mailsender = $8",
     ];
-    const params = [f.entitydesc, f.legalname, f.vatnumber, f.address, f.emailinvoicing, f.webpage];
+    const params = [f.entitydesc, f.legalname, f.vatnumber, f.address, f.emailinvoicing, f.webpage, f.mailtransport, f.mailsender];
     if (!logo.skip) {
       params.push(logo.value);
       sets.push(`logo = $${params.length}`);

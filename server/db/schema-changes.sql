@@ -190,3 +190,14 @@ ALTER TABLE entity ADD COLUMN IF NOT EXISTS logo           text;   -- PNG/JPEG d
 ALTER TABLE employeesinfo ADD COLUMN IF NOT EXISTS showbirthday   boolean NOT NULL DEFAULT false;
 ALTER TABLE employeesinfo ADD COLUMN IF NOT EXISTS avatarimage    text;
 ALTER TABLE employeesinfo ADD COLUMN IF NOT EXISTS avatarusephoto boolean NOT NULL DEFAULT false;
+
+-- 2026-09 — Per-entity invoice-email delivery (Settings → Entities → "Invoice
+-- email"). Replaces the old routing in routes/invoicing.js that switched the
+-- sender mailbox + transport on the entity's DISPLAY NAME ("HiTT" -> Graph,
+-- "FHiTT" -> SMTP). Added at runtime by ensureEntitySchema().
+--   mailtransport  'graph' | 'smtp' | NULL  (NULL -> inferred from which
+--                  transport is configured on the server)
+--   mailsender     From mailbox; NULL -> entity.emailinvoicing, then
+--                  GRAPH_MAIL_SENDER / SMTP_FROM
+ALTER TABLE entity ADD COLUMN IF NOT EXISTS mailtransport  varchar(8);
+ALTER TABLE entity ADD COLUMN IF NOT EXISTS mailsender     varchar(255);

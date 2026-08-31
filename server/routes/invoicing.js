@@ -48,12 +48,15 @@
  * businesspartners.languageid (tax company's BP first, then the project's).
  *
  * "Send by email" (Access's cmdSendToEmailPDF): GET/POST /invoices/:id/email.
- * The PDF is attached; the sender mailbox + transport are chosen from the
- * billing entity (invoiceSenderFor / invoiceMailChannel):
- *   HiTT / HiTT-OSM -> invoices@hittbcn.com via Microsoft Graph (lib/graph.js)
- *   FHiTT           -> invoices@fhitt.org via SMTP (lib/mailer.js) — that
- *                      mailbox is at IONOS, not the M365 tenant, so Graph
- *                      can't send as it.
+ * The PDF is attached; the sender mailbox + transport come from the billing
+ * entity record (Settings -> Entities -> "Invoice email"), via
+ * invoiceSenderFor / invoiceMailChannel:
+ *   mailsender     the From mailbox (falls back to the entity's invoicing
+ *                  email, then GRAPH_MAIL_SENDER / SMTP_FROM)
+ *   mailtransport  'graph' (lib/graph.js) or 'smtp' (lib/mailer.js) — pick
+ *                  SMTP when the sender mailbox isn't in the M365 tenant, so
+ *                  Graph can't send as it. Unset -> inferred from which
+ *                  transport is configured.
  * The user confirms From/recipient/subject/body in a dialog before the POST
  * — nothing is sent without that.
  * ---------------------------------------------------------------------------
@@ -391,6 +394,7 @@ async function loadInvoiceForPdf(invoiceId) {
             ent.legalname AS "entityLegalName", ent.vatnumber AS "entityVat",
             ent.address AS "entityAddress", ent.emailinvoicing AS "entityEmail",
             ent.webpage AS "entityWeb", ent.logo AS "entityLogo",
+            ent.mailtransport AS "entityMailTransport", ent.mailsender AS "entityMailSender",
             d.emailedat AS "emailedAt", COALESCE(d.emailedcount, 0) AS "emailedCount", d.emailedto AS "emailedTo",
             COALESCE(tcbp.languageid, pbp.languageid)::int AS "languageId",
             COALESCE(eba.bankname, ba.bankname) AS "bankName",
@@ -448,30 +452,33 @@ const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const splitAddrs = (v) =>
   String(v || "").split(/[;,]/).map((s) => s.trim()).filter(Boolean);
 
-// The mailbox an invoice email is sent from, by billing entity. Defaults
-// match the entity letterhead (lib/invoicePdf.js); overridable via env.
-const INVOICE_SENDER_HITT = process.env.GRAPH_MAIL_SENDER_HITT || "invoices@hittbcn.com";
-const INVOICE_SENDER_FHITT = process.env.GRAPH_MAIL_SENDER_FHITT || process.env.SMTP_FROM || "invoices@fhitt.org";
-function invoiceSenderFor(entityLabel) {
-  const key = String(entityLabel || "").trim().toLowerCase().replace(/\s+/g, "");
-  if (key === "fhitt") return INVOICE_SENDER_FHITT;
-  if (key === "hitt" || key === "hitt/osm") return INVOICE_SENDER_HITT;
-  return process.env.GRAPH_MAIL_SENDER || INVOICE_SENDER_HITT;
+// The mailbox an invoice email is sent from. Per entity (Settings →
+// Entities → "Invoice email"), not by entity name. Preference:
+//   1. the entity's configured sender mailbox
+//   2. the entity's invoicing email
+//   3. a server default (GRAPH_MAIL_SENDER, then SMTP_FROM)
+const DEFAULT_INVOICE_SENDER = process.env.GRAPH_MAIL_SENDER || process.env.SMTP_FROM || "";
+function invoiceSenderFor(data) {
+  const d = data || {};
+  return d.entityMailSender || d.entityEmail || DEFAULT_INVOICE_SENDER || "";
 }
 
-// Which transport carries an invoice email. FHiTT's sender mailbox lives at
-// IONOS (not the M365 tenant), so it goes over SMTP (lib/mailer.js);
-// everything else goes through Microsoft Graph (lib/graph.js).
-function invoiceMailChannel(entityLabel) {
-  const key = String(entityLabel || "").trim().toLowerCase().replace(/\s+/g, "");
-  return key === "fhitt" ? "smtp" : "graph";
+// Which transport carries an invoice email — the entity's configured
+// transport (Settings → Entities), else inferred: a sender mailbox that
+// isn't in the M365 tenant can't go through Graph, so fall back to SMTP
+// when only SMTP is configured, otherwise Graph.
+function invoiceMailChannel(data) {
+  const explicit = String((data && data.entityMailTransport) || "").trim().toLowerCase();
+  if (explicit === "smtp" || explicit === "graph") return explicit;
+  if (!graphMailConfigured() && smtpConfigured()) return "smtp";
+  return "graph";
 }
 function invoiceMailReady(channel) {
   return channel === "smtp" ? smtpConfigured() : graphMailConfigured();
 }
 const MAIL_UNAVAILABLE_MSG = {
-  smtp: "Email for FHiTT invoices isn't configured on the server — set SMTP_HOST / SMTP_PORT / SMTP_USER / SMTP_PASS (the invoices@fhitt.org mailbox at IONOS).",
-  graph: "Email for HiTT invoices isn't configured on the server — the Graph app registration and its Mail.Send permission are required.",
+  smtp: "Invoice email over SMTP isn't configured on the server — set SMTP_HOST / SMTP_PORT / SMTP_USER / SMTP_PASS.",
+  graph: "Invoice email over Microsoft Graph isn't configured on the server — the Graph app registration and its Mail.Send permission are required.",
 };
 
 // GET /api/invoicing/invoices/:id/email — the prefilled recipient / subject /
@@ -480,10 +487,10 @@ router.get("/invoices/:id/email", requireModuleAccess("invoicing"), async (req, 
   try {
     const data = await loadInvoiceForPdf(req.params.id);
     if (!data) return res.status(404).json({ error: "not_found" });
-    const tokens = { InvoiceCode: data.invoicecode || "", Entity: data.entityLabel || "HITT" };
-    const channel = invoiceMailChannel(data.entityLabel);
+    const tokens = { InvoiceCode: data.invoicecode || "", Entity: data.entityLabel || data.entityLegalName || "" };
+    const channel = invoiceMailChannel(data);
     res.json({
-      from: invoiceSenderFor(data.entityLabel),
+      from: invoiceSenderFor(data),
       to: data.taxCompanyEmail || "",
       subject: fillTemplate(data.labels.get("strSubject", "[{Entity}] New invoice"), tokens),
       body: fillTemplate(
@@ -519,13 +526,13 @@ router.post("/invoices/:id/email", requireModuleAccess("invoicing"), async (req,
   }
   if (!data) return res.status(404).json({ error: "not_found" });
 
-  const channel = invoiceMailChannel(data.entityLabel);
+  const channel = invoiceMailChannel(data);
   if (!invoiceMailReady(channel)) {
     return res.status(503).json({ error: "mail_unavailable", message: MAIL_UNAVAILABLE_MSG[channel] });
   }
 
   try {
-    const tokens = { InvoiceCode: data.invoicecode || "", Entity: data.entityLabel || "HITT" };
+    const tokens = { InvoiceCode: data.invoicecode || "", Entity: data.entityLabel || data.entityLegalName || "" };
     const to = splitAddrs(req.body?.to || data.taxCompanyEmail);
     const cc = splitAddrs(req.body?.cc);
     if (!to.length) {
@@ -554,7 +561,7 @@ router.post("/invoices/:id/email", requireModuleAccess("invoicing"), async (req,
       return res.status(500).json({ error: "pdf_failed", message: "Could not render the invoice PDF." });
     }
 
-    const from = invoiceSenderFor(data.entityLabel);
+    const from = invoiceSenderFor(data);
     const mailArgs = {
       from,
       to,

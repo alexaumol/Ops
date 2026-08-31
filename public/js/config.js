@@ -14,6 +14,11 @@
  * ---------------------------------------------------------------------------
  */
 window.HITT_CONFIG = {
+  // Product name shown in the app header and on the sign-in page. The logo
+  // is uploaded separately in Settings → Customizations (served from the
+  // API, see js/branding.js); this is just the wordmark next to it.
+  APP_NAME: "HITT Ops",
+
   // Base URL of the Node/Express API (see /server). Same-origin as the
   // frontend — nginx on ops.fhitt.org proxies /api/ to the Node app on
   // 127.0.0.1:4000 (see /etc/nginx/sites-enabled/hitt-ops on the VPS), so

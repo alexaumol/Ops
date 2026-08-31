@@ -1058,7 +1058,7 @@ const brandEls = {
 };
 
 const brandCrop = { img: null, baseScale: 1, zoom: 1, offsetX: 0, offsetY: 0, drag: null };
-const DEFAULT_LOGO_SRC = "../assets/fhitt-logo.png";
+const DEFAULT_LOGO_SRC = "../assets/ops-mark.svg";
 
 const TI = (k, v) => (window.HITT_I18N ? HITT_I18N.t(k, v) : k);
 
@@ -1278,6 +1278,8 @@ const entEls = {
   email: document.getElementById("entEmail"),
   web: document.getElementById("entWeb"),
   address: document.getElementById("entAddress"),
+  mailTransport: document.getElementById("entMailTransport"),
+  mailSender: document.getElementById("entMailSender"),
   bankName: document.getElementById("entBankName"),
   bankAddr1: document.getElementById("entBankAddr1"),
   bankAddr2: document.getElementById("entBankAddr2"),
@@ -1342,6 +1344,8 @@ function fillEntityModal(e) {
   entEls.email.value = d.emailinvoicing || "";
   entEls.web.value = d.webpage || "";
   entEls.address.value = d.address || "";
+  entEls.mailTransport.value = d.mailtransport || "";
+  entEls.mailSender.value = d.mailsender || "";
   entEls.bankName.value = b.bankname || "";
   entEls.bankAddr1.value = b.bankaddrline1 || "";
   entEls.bankAddr2.value = b.bankaddrline2 || "";
@@ -1411,6 +1415,8 @@ document.getElementById("entityModalSave").addEventListener("click", async () =>
     emailinvoicing: entEls.email.value,
     webpage: entEls.web.value,
     address: entEls.address.value,
+    mailtransport: entEls.mailTransport.value,
+    mailsender: entEls.mailSender.value,
     bank: {
       bankname: entEls.bankName.value,
       bankaddrline1: entEls.bankAddr1.value,

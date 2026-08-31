@@ -9,7 +9,7 @@
 </head>
 <body>
   <header class="app-header">
-    <a class="app-header__brand" href="../welcome.html"><img class="app-header__logo" src="../assets/fhitt-logo.png?v=2" alt="" aria-hidden="true" />HITT<span class="dot">·</span>Ops</a>
+    <a class="app-header__brand" href="../welcome.html"><img class="app-header__logo" src="../assets/ops-mark.svg" alt="" aria-hidden="true" /><span class="app-header__name">Ops</span></a>
     <nav class="app-header__nav" aria-label="Primary">
       <a href="../welcome.html" data-i18n="nav.home">Home</a>
       <a href="settings.html" class="active" data-i18n="nav.settings">Settings</a>
@@ -233,7 +233,7 @@
         <div class="brand-editor brand-editor--stack">
           <h3 class="brand-editor__h" data-i18n="cust.logo.current">Current logo</h3>
           <div class="brand-logo-frame">
-            <img id="brandCurrentLogo" src="../assets/fhitt-logo.png" alt="Current company logo" />
+            <img id="brandCurrentLogo" src="../assets/ops-mark.svg" alt="Current company logo" />
           </div>
           <label class="btn btn-primary brand-file-btn">
             <span data-i18n="cust.logo.choose">Choose image…</span>
@@ -465,6 +465,24 @@
               <input type="text" id="entBic" autocomplete="off" />
             </label>
           </div>
+        </div>
+
+        <div class="settings-modal-section">
+          <h3 data-i18n="entities.section.mail">Invoice email</h3>
+          <p class="settings-emp-sub" data-i18n="entities.mail.note">How invoices issued by this entity are emailed. Leave the transport on “Server default” unless this entity's mailbox needs a specific one.</p>
+          <div class="settings-form-grid">
+            <label class="settings-field"><span data-i18n="entities.f.mailTransport">Transport</span>
+              <select id="entMailTransport">
+                <option value="" data-i18n="entities.mail.transport.default">Server default</option>
+                <option value="graph" data-i18n="entities.mail.transport.graph">Microsoft Graph</option>
+                <option value="smtp" data-i18n="entities.mail.transport.smtp">SMTP</option>
+              </select>
+            </label>
+            <label class="settings-field"><span data-i18n="entities.f.mailSender">Send from</span> <span class="settings-emp-sub" data-i18n="entities.f.optional">(optional)</span>
+              <input type="email" id="entMailSender" autocomplete="off" placeholder="invoices@company.com" />
+            </label>
+          </div>
+          <p class="settings-emp-sub" data-i18n="entities.mail.senderNote">If blank, the entity's invoicing email is used, then the server default.</p>
         </div>
 
         <div class="settings-modal-section">

@@ -17,6 +17,13 @@ function ensureEntitySchema() {
       await pool.query(`ALTER TABLE entity ADD COLUMN IF NOT EXISTS emailinvoicing varchar(255)`);
       await pool.query(`ALTER TABLE entity ADD COLUMN IF NOT EXISTS webpage varchar(255)`);
       await pool.query(`ALTER TABLE entity ADD COLUMN IF NOT EXISTS logo text`);
+      // Invoice-email delivery, per entity — replaces the old routing that
+      // switched on the entity's display name (see routes/invoicing.js).
+      //   mailtransport  'graph' | 'smtp' | NULL (NULL = server default)
+      //   mailsender     the From mailbox; NULL falls back to emailinvoicing,
+      //                  then the env default.
+      await pool.query(`ALTER TABLE entity ADD COLUMN IF NOT EXISTS mailtransport varchar(8)`);
+      await pool.query(`ALTER TABLE entity ADD COLUMN IF NOT EXISTS mailsender varchar(255)`);
     })().catch((err) => {
       ready = null;
       throw err;

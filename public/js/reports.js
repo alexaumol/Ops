@@ -222,13 +222,29 @@ document.getElementById("drillExport").addEventListener("click", () => {
 });
 
 /* ============================== PROJECT STATS ============================ */
-const ENTITY_COLORS = {
-  "HiTT": "#5C757C",       // --hitt-teal
-  "FHiTT": "#B3B07D",      // --hitt-olive
-  "HiTT/OSM": "#BC9A1C",   // --hitt-amber
-  "Unassigned": "#ABAF96", // --hitt-sage
+// Entity bars/legend take colours from a fixed palette, assigned by the
+// order entities first appear in the data — no entity names are hardcoded,
+// so this works for any customer's set of billing entities.
+const ENTITY_PALETTE = ["#5C757C", "#B3B07D", "#BC9A1C", "#7A9E9F", "#A6791F", "#6B8E8A", "#9A8C5A"];
+const UNASSIGNED_LABEL = "—";
+const isUnassigned = (label) => {
+  const s = String(label == null ? "" : label).trim().toLowerCase();
+  return s === "" || s === "—" || s === "unassigned" || s === "n/a" || s === "none";
 };
-const ENTITY_ORDER = ["HiTT", "FHiTT", "HiTT/OSM", "Unassigned"];
+// Ordered entity list + a {label: colour} map, derived from report rows.
+function entityDisplay(rows) {
+  const order = [];
+  rows.forEach((r) => {
+    const label = isUnassigned(r.entityLabel) ? UNASSIGNED_LABEL : r.entityLabel;
+    if (!order.includes(label)) order.push(label);
+  });
+  order.sort((a, b) => (a === UNASSIGNED_LABEL ? 1 : 0) - (b === UNASSIGNED_LABEL ? 1 : 0));
+  const colors = {};
+  order.forEach((label, i) => {
+    colors[label] = label === UNASSIGNED_LABEL ? "#ABAF96" : ENTITY_PALETTE[i % ENTITY_PALETTE.length];
+  });
+  return { order, colors };
+}
 const MONTH_LABELS = () => T('common.monthsShort').split('|');
 
 // Rounds a max value up to a "nice" chart ceiling divisible by 5, so the
@@ -346,12 +362,12 @@ function renderStatusChart(rows) {
       statuses.push(r.statusId);
     }
     const group = byStatus.get(r.statusId);
-    group.entities.set(r.entityLabel, Number(r[metricField]));
-    group.counts.set(r.entityLabel, Number(r.count)); // kept for tooltip context even in Budgeted mode
+    const entityLabel = isUnassigned(r.entityLabel) ? UNASSIGNED_LABEL : r.entityLabel;
+    group.entities.set(entityLabel, Number(r[metricField]));
+    group.counts.set(entityLabel, Number(r.count)); // kept for tooltip context even in Budgeted mode
     group.total += Number(r[metricField]);
   });
-  const entitiesPresent = ENTITY_ORDER.filter((e) => rows.some((r) => r.entityLabel === e));
-  const entities = entitiesPresent.length ? entitiesPresent : ENTITY_ORDER;
+  const { order: entities, colors: entityColors } = entityDisplay(rows);
 
   // Bars use one real scale (whichever metric is selected). The total
   // line is NOT plotted against a value axis at all — it just floats a
@@ -404,7 +420,7 @@ function renderStatusChart(rows) {
       const tooltip = isBudget
         ? T('rpt.chart.tooltipBudget', { status: escapeHtml(group.label), entity: escapeHtml(entityLabel), value: fmtFull(value), n: group.counts.get(entityLabel) || 0 })
         : T('rpt.chart.tooltip', { status: escapeHtml(group.label), entity: escapeHtml(entityLabel), value });
-      svg += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${(barW * 0.82).toFixed(1)}" height="${barH.toFixed(1)}" fill="${ENTITY_COLORS[entityLabel] || "#999"}" rx="2">
+      svg += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${(barW * 0.82).toFixed(1)}" height="${barH.toFixed(1)}" fill="${entityColors[entityLabel] || "#999"}" rx="2">
         <title>${tooltip}</title>
       </rect>`;
       if (value > 0) {
@@ -430,7 +446,7 @@ function renderStatusChart(rows) {
   });
 
   const legend = entities.map((e) => `
-    <span class="rpt-legend-item"><span class="rpt-swatch" style="background:${ENTITY_COLORS[e] || "#999"}"></span>${escapeHtml(e)}</span>
+    <span class="rpt-legend-item"><span class="rpt-swatch" style="background:${entityColors[e] || "#999"}"></span>${escapeHtml(e)}</span>
   `).join("") + `
     <span class="rpt-legend-item"><span class="rpt-swatch" style="width:14px; height:3px; border-radius:2px; background:var(--text-primary);"></span>${T('rpt.legend.total')}</span>
   `;
