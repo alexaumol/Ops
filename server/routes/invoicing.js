@@ -327,14 +327,16 @@ router.get("/projects/:projectId/invoices", async (req, res) => {
 
 // GET /api/invoicing/invoices — every invoice across all projects, for the
 // dashboard's "Invoice view" tab. One flat row per invoice with the tax
-// company it's billed to, its project, amount, status, "sent" markers, and
-// (for correctives) the code of the invoice it replaces.
+// company it's billed to, its project, amount, status, "sent" markers,
+// last-updated stamp, and (for correctives) the code + record of the
+// invoice it replaces. Ordered most-recently-updated first.
 router.get("/invoices", requireModuleAccess("invoicing"), async (req, res) => {
   try {
     await ensureInvoicingSchema();
     const { rows } = await pool.query(`
       SELECT i.id, i.invoicecode, i.invoicestatusid, ist.statusdesc AS "statusLabel",
-             i.iscorrective, i.sourceinvoiceid, src.invoicecode AS "sourceInvoiceCode",
+             i.iscorrective, i.sourceinvoiceid AS "sourceInvoiceId",
+             src.invoicecode AS "sourceInvoiceCode", sp.id::text AS "sourceProjectId",
              d.amount, COALESCE(d.currency, 'EUR') AS currency,
              d.descriptionservice,
              d.busspartnertoinvoiceid AS "taxCompanyId",
@@ -343,17 +345,22 @@ router.get("/invoices", requireModuleAccess("invoicing"), async (req, res) => {
              d.emailedat AS "emailedAt", COALESCE(d.emailedcount, 0) AS "emailedCount",
              d.emailedto AS "emailedTo",
              NULLIF(TRIM(CONCAT(ee.employeefirstname, ' ', ee.employeelastname)), '') AS "emailedByName",
+             d.updatedat AS "updatedAt",
+             NULLIF(TRIM(CONCAT(ue.employeefirstname, ' ', ue.employeelastname)), '') AS "updatedByName",
              p.id::text AS "projectId", p.projectnumber AS "projectCode", p.projectname AS "projectName",
              p.busspartnerid AS "projectBpId", pbp.bpname AS "projectBpName"
       FROM invoices i
       LEFT JOIN invoicesdetails d ON d.invoiceid = i.id
       LEFT JOIN invoicesstatus ist ON ist.id = i.invoicestatusid::bigint
       LEFT JOIN invoices src ON src.id = i.sourceinvoiceid
+      LEFT JOIN projects sp ON sp.id = src.projectid::bigint
       LEFT JOIN taxcompanies tc ON tc.id = d.busspartnertoinvoiceid::bigint
       LEFT JOIN projects p ON p.id = i.projectid::bigint
       LEFT JOIN businesspartners pbp ON pbp.id = p.busspartnerid::bigint
       LEFT JOIN employees ee ON ee.id = d.emailedby
-      ORDER BY i.invoiceyear DESC NULLS LAST, i.invoiceseq DESC NULLS LAST, i.id DESC
+      LEFT JOIN employees ue ON ue.id = d.updatedby
+      ORDER BY d.updatedat DESC NULLS LAST,
+               i.invoiceyear DESC NULLS LAST, i.invoiceseq DESC NULLS LAST, i.id DESC
     `);
     res.json(rows);
   } catch (err) {

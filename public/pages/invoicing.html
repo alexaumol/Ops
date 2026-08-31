@@ -49,10 +49,11 @@
         <table class="inv-table inv-table--invoices">
           <thead>
             <tr>
-              <th data-i18n="inv.iv.col.invoice">Invoice</th>
-              <th data-i18n="inv.iv.col.invoicedTo">Invoiced to</th>
-              <th data-i18n="inv.iv.col.project">Project</th>
-              <th style="text-align:right;" data-i18n="form.amount">Amount</th>
+              <th data-sort="code" data-i18n="inv.iv.col.invoice">Invoice<span class="sort-arrow"></span></th>
+              <th data-sort="taxco" data-i18n="inv.iv.col.invoicedTo">Invoiced to<span class="sort-arrow"></span></th>
+              <th data-sort="project" data-i18n="inv.iv.col.project">Project<span class="sort-arrow"></span></th>
+              <th data-sort="amount" style="text-align:right;" data-i18n="form.amount">Amount<span class="sort-arrow"></span></th>
+              <th data-sort="updated" data-i18n="form.lastUpdated">Last updated<span class="sort-arrow"></span></th>
               <th class="inv-actions-col" aria-label="Actions"></th>
             </tr>
           </thead>

@@ -49,6 +49,8 @@ let ALL_INVOICES = [];
 let allInvoicesLoaded = false;
 const ivStatusSel = new Set();                // selected invoice-status labels; empty = all
 let ivSearch = '';
+let ivSortColumn = 'updated';                 // default: most recently updated on top
+let ivSortDirection = 'desc';
 
 function escapeHtml(s){
   const d = document.createElement('div');
@@ -312,7 +314,7 @@ async function closeProjectFromList(p){
 }
 
 function updateSortIndicators(){
-  document.querySelectorAll('.inv-table th[data-sort]').forEach(th => {
+  document.querySelectorAll('#paneProjectView .inv-table th[data-sort]').forEach(th => {
     const active = th.dataset.sort === sortColumn;
     th.classList.toggle('sorted', active);
     const arrow = th.querySelector('.sort-arrow');
@@ -320,7 +322,7 @@ function updateSortIndicators(){
   });
 }
 
-document.querySelectorAll('.inv-table th[data-sort]').forEach(th => {
+document.querySelectorAll('#paneProjectView .inv-table th[data-sort]').forEach(th => {
   th.addEventListener('click', () => {
     const col = th.dataset.sort;
     if (sortColumn === col) {
@@ -386,7 +388,7 @@ document.querySelectorAll('.inv-view-tab').forEach(btn => {
 async function loadAllInvoices(){
   const tbody = document.getElementById('ivTableBody');
   const empty = document.getElementById('ivEmpty');
-  tbody.innerHTML = `<tr><td colspan="5" class="sub-empty">${T('common.loading')}</td></tr>`;
+  tbody.innerHTML = `<tr><td colspan="6" class="sub-empty">${T('common.loading')}</td></tr>`;
   empty.classList.add('hidden');
   if (usingDemoData) {
     ALL_INVOICES = [];
@@ -454,10 +456,46 @@ function ivMatches(inv){
   return true;
 }
 
+function ivSortValue(inv, col){
+  switch (col) {
+    case 'code': return String(inv.invoicecode || '');
+    case 'taxco': return String(inv.taxCompanyName || '');
+    case 'project': return String(inv.projectCode || '');
+    case 'amount': return Number(inv.amount) || 0;
+    case 'updated': return inv.updatedAt ? new Date(inv.updatedAt).getTime() : 0;
+    default: return '';
+  }
+}
+function ivCompareRows(a, b){
+  const dir = ivSortDirection === 'asc' ? 1 : -1;
+  const av = ivSortValue(a, ivSortColumn), bv = ivSortValue(b, ivSortColumn);
+  if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * dir;
+  return String(av).localeCompare(String(bv), undefined, { numeric: true }) * dir;
+}
+function updateIvSortIndicators(){
+  document.querySelectorAll('.inv-table--invoices th[data-sort]').forEach(th => {
+    const active = th.dataset.sort === ivSortColumn;
+    th.classList.toggle('sorted', active);
+    const arrow = th.querySelector('.sort-arrow');
+    if (arrow) arrow.textContent = active ? (ivSortDirection === 'asc' ? ' ▲' : ' ▼') : '';
+  });
+}
+
+function ivFormatUpdated(inv){
+  if (!inv.updatedAt) return '—';
+  const d = new Date(inv.updatedAt);
+  const txt = `${d.toLocaleDateString()} ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+  return inv.updatedByName
+    ? `<span title="${escapeHtml(inv.updatedByName)}">${escapeHtml(txt)}</span>`
+    : escapeHtml(txt);
+}
+
 function renderInvoiceViewTable(){
   const tbody = document.getElementById('ivTableBody');
   const empty = document.getElementById('ivEmpty');
-  const rows = ALL_INVOICES.filter(ivMatches);
+  const rows = ALL_INVOICES.filter(ivMatches).sort(ivCompareRows);
+
+  updateIvSortIndicators();
 
   if (!rows.length) {
     tbody.innerHTML = '';
@@ -472,7 +510,7 @@ function renderInvoiceViewTable(){
       ? `<span class="inv-sent-badge" title="${escapeHtml(sentBadgeTitle(inv))}">${T('inv.sent.badge')}</span>`
       : '';
     const corrective = (inv.iscorrective && inv.sourceInvoiceCode)
-      ? `<i class="inv-corrective-src" title="${escapeHtml(T('inv.iv.correctiveTip', { code: inv.sourceInvoiceCode }))}">(${escapeHtml(inv.sourceInvoiceCode)})</i>`
+      ? `<i class="inv-corrective-src" title="${escapeHtml(T('inv.iv.correctiveTip', { code: inv.sourceInvoiceCode }))}">(<a href="#" data-open-src>${escapeHtml(inv.sourceInvoiceCode)}</a>)</i>`
       : '';
     const tcCell = inv.taxCompanyName
       ? (inv.taxCompanyBpId
@@ -491,6 +529,7 @@ function renderInvoiceViewTable(){
         <td>${tcCell}</td>
         <td>${projCell}</td>
         <td style="text-align:right;" class="inv-money${Number(inv.amount) < 0 ? ' inv-money--neg' : ''}">${formatMoney(inv.amount, inv.currency)}</td>
+        <td class="inv-iv-updated">${ivFormatUpdated(inv)}</td>
         <td class="inv-actions-col">
           <div class="inv-row-actions">
             <button type="button" class="inv-row-btn" data-open title="${T('inv.iv.openRecord')}" aria-label="${T('inv.iv.openRecord')}">✎</button>
@@ -505,12 +544,17 @@ function renderInvoiceViewTable(){
     tr.querySelectorAll('[data-open]').forEach(el => {
       el.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); openInvoiceFromList(inv); });
     });
+    tr.querySelector('[data-open-src]')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      openInvoiceFromList({ id: inv.sourceInvoiceId, projectId: inv.sourceProjectId });
+    });
     tr.querySelector('[data-pdf]')?.addEventListener('click', (e) => {
       e.stopPropagation();
       openInvoicePdf(inv.id);
     });
     tr.addEventListener('click', (e) => {
-      if (e.target.closest('a[data-link], [data-open], [data-pdf]')) return;
+      if (e.target.closest('a[data-link], [data-open], [data-open-src], [data-pdf]')) return;
       openInvoiceFromList(inv);
     });
   });
@@ -560,6 +604,20 @@ document.addEventListener('click', () => {
 document.getElementById('ivSearchBox').addEventListener('input', (e) => {
   ivSearch = e.target.value.trim();
   renderInvoiceViewTable();
+});
+
+document.querySelectorAll('.inv-table--invoices th[data-sort]').forEach(th => {
+  th.addEventListener('click', () => {
+    const col = th.dataset.sort;
+    if (ivSortColumn === col) {
+      ivSortDirection = ivSortDirection === 'asc' ? 'desc' : 'asc';
+    } else {
+      ivSortColumn = col;
+      // Amount + last-updated read best most-first; text columns A→Z.
+      ivSortDirection = (col === 'amount' || col === 'updated') ? 'desc' : 'asc';
+    }
+    renderInvoiceViewTable();
+  });
 });
 
 /* ============================== TAX COMPANY SELECT + PICKER ============== */
