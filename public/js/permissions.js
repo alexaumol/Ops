@@ -82,7 +82,11 @@ const HITT_PERMS = (() => {
         const nameEl = document.getElementById("userName");
         if (nameEl) nameEl.textContent = perms.name;
         const avatarEl = document.getElementById("userAvatar");
-        if (avatarEl) avatarEl.textContent = HITT_AUTH.initials({ displayName: perms.name });
+        if (avatarEl) {
+          const initials = HITT_AUTH.initials({ displayName: perms.name });
+          if (window.HITT_AVATAR) HITT_AVATAR.paint(avatarEl, { dataUrl: perms.avatar || null, initials });
+          else avatarEl.textContent = initials;
+        }
       }
       return perms;
     } catch (err) {

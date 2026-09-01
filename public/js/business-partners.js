@@ -14,7 +14,6 @@ const T = (k, v) => (window.HITT_I18N ? HITT_I18N.t(k, v) : k);
 HITT_PERMS.guardModule("business-partners", "../welcome.html");
 document.getElementById("userName").textContent = session.displayName;
 document.getElementById("userAvatar").textContent = HITT_AUTH.initials(session);
-document.getElementById("btnSignOut").addEventListener("click", () => HITT_AUTH.signOut("../index.html"));
 HITT_PERMS.applyRealName();
 
 // Resolved once and reused for create/update calls so

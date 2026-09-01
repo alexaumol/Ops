@@ -119,7 +119,6 @@
     <div class="app-header__user">
       <div class="avatar" id="userAvatar">?</div>
       <span id="userName">Signed in</span>
-      <button class="btn btn-secondary" id="btnSignOut" style="padding:0.35rem 0.75rem; font-size:0.8rem;" data-i18n="action.signOut">Sign out</button>
     </div>
   </header>
 
@@ -197,6 +196,8 @@
   <script src="js/auth.js"></script>
   <script src="js/api.js"></script>
   <script src="js/permissions.js"></script>
+  <script src="js/avatar.js"></script>
+  <script src="js/usermenu.js"></script>
   <script src="js/notifications.js"></script>
   <script src="js/chat.js"></script>
   <script>
@@ -221,7 +222,6 @@
       document.querySelectorAll(".module-card.is-restricted .module-card__status")
         .forEach((s) => { s.textContent = T("welcome.status.restricted"); });
     });
-    document.getElementById("btnSignOut").addEventListener("click", () => HITT_AUTH.signOut());
 
     // A deactivated employee should never actually see this page — bounced
     // straight back to sign-in (see js/permissions.js). This is a fallback

@@ -30,6 +30,7 @@ window.HITT_I18N_DICT = {
     "nav.settings": "Settings",
     "chrome.signedIn": "Signed in",
     "action.signOut": "Sign out",
+    "usermenu.profile": "Profile",
 
     // welcome
     "welcome.hero.title": "Welcome back",
@@ -933,6 +934,7 @@ window.HITT_I18N_DICT = {
     "nav.settings": "Configuración",
     "chrome.signedIn": "Sesión iniciada",
     "action.signOut": "Cerrar sesión",
+    "usermenu.profile": "Perfil",
 
     "welcome.hero.title": "Bienvenido de nuevo",
     "welcome.hero.titleNamed": "Bienvenido de nuevo, {name}",
@@ -1822,6 +1824,7 @@ window.HITT_I18N_DICT = {
     "nav.settings": "Configuració",
     "chrome.signedIn": "Sessió iniciada",
     "action.signOut": "Tancar sessió",
+    "usermenu.profile": "Perfil",
 
     "welcome.hero.title": "Benvingut de nou",
     "welcome.hero.titleNamed": "Benvingut de nou, {name}",
