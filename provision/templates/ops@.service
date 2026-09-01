@@ -1,0 +1,25 @@
+[Unit]
+Description=Ops instance %i
+After=network.target postgresql.service
+PartOf=ops.target
+# `systemctl restart ops.target` then cycles every instance (deploy fan-out).
+
+[Service]
+Type=simple
+# Shared code, per-instance state.
+WorkingDirectory={{CODE_DIR}}/server
+Environment=OPS_ENV_FILE={{INSTANCE_ROOT}}/%i/env
+ExecStart=/usr/bin/node {{CODE_DIR}}/server/server.js
+Restart=on-failure
+RestartSec=3
+# Hardening
+DynamicUser=no
+User={{RUN_USER}}
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths={{INSTANCE_ROOT}}/%i
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target ops.target

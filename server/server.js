@@ -12,7 +12,7 @@
  * Run with:  npm install && npm start
  * ---------------------------------------------------------------------------
  */
-require("dotenv").config();
+require("./lib/loadEnv");
 
 const express = require("express");
 const cors = require("cors");

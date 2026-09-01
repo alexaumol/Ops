@@ -1,0 +1,8 @@
+[Unit]
+Description=All Ops instances
+# `systemctl restart ops.target` restarts every ops@<slug> — the deploy
+# fan-out after `git pull` + migrations. Individual instances are still
+# managed with `systemctl <verb> ops@<slug>`.
+
+[Install]
+WantedBy=multi-user.target

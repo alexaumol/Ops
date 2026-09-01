@@ -1,0 +1,32 @@
+-- ==========================================================================
+-- REFERENCE DATA — lookup rows every Ops instance needs
+-- --------------------------------------------------------------------------
+-- >>> PLACEHOLDER. Populate from a real database once. <<<
+--
+-- A fresh instance's schema (the 0C baseline) has EMPTY tables. Without this
+-- data there are no project statuses, countries, currencies, VAT types, or
+-- invoice-PDF field labels, and the app is unusable.
+--
+-- Generate it from test_ops (data only, these tables only):
+--
+--   pg_dump --data-only --no-owner --column-inserts \
+--     -t public.countries -t public.languages -t public.loglevels \
+--     -t public.documenttypes -t public.companytypes -t public.biotechspectrums \
+--     -t public.projecttypes -t public.projectstatus -t public.invoicesstatus \
+--     -t public.invoicepaymentmethods -t public.invoicescheduletypes \
+--     -t public.invoices_vattypes -t public.invoicecurrencies \
+--     -t public.timeoffworkflowstatus -t public.expensescategories \
+--     -t public.invoicedocumentcontrols -t public.invoicedocumenttext \
+--     -t public.global_settings \
+--     "postgresql://.../test_ops" > provision/seed/reference-data.sql
+--
+-- Review it before committing:
+--   - it must NOT contain any real customer/employee/project/invoice data
+--   - `--column-inserts` makes it INSERT-per-row and order-independent
+--   - re-runnable is a bonus but not required (provision loads it once, into
+--     an empty DB)
+--
+-- Replace everything below this header with the dump output. Commit.
+-- ==========================================================================
+
+-- (reference data goes here)

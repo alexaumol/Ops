@@ -1,5 +1,9 @@
 node_modules/
 
+# Per-host provisioning config — infra IPs, admin DB URL. Copy from
+# provision/config.example.json.
+provision/config.json
+
 # Uploaded evidence files (expense documents, …) — stored on the API host,
 # never in the repo.
 server/uploads/

@@ -1,0 +1,52 @@
+{
+  "_comment": "Copy to provision/config.json (gitignored) and fill in for this host. See docs/provisioning.md.",
+
+  "codeDir": "/opt/ops",
+  "instanceRoot": "/srv/ops",
+  "runUser": "ops",
+
+  "baseDomain": "ops.theaumol.com",
+  "publicIp": "217.154.101.149",
+
+  "portRange": [4001, 4099],
+
+  "postgres": {
+    "host": "127.0.0.1",
+    "port": 5432,
+    "sslmode": "disable",
+    "adminUrl": "postgresql://postgres@127.0.0.1:5432/postgres",
+    "_adminUrl_note": "superuser connection used only to CREATE DATABASE / ROLE. Prefer a .pgpass entry or PGPASSWORD in the environment over putting a password here."
+  },
+
+  "tls": {
+    "cert": "/etc/letsencrypt/live/ops.theaumol.com/fullchain.pem",
+    "key": "/etc/letsencrypt/live/ops.theaumol.com/privkey.pem"
+  },
+
+  "oidc": {
+    "issuer": "https://auth.theaumol.com",
+    "audience": "388838887646035969",
+    "clientId": "388838887646035969"
+  },
+
+  "msal": {
+    "tenantId": "",
+    "clientId": ""
+  },
+
+  "dns": {
+    "provider": "ionos",
+    "zone": "theaumol.com",
+    "_apiKey": "set IONOS_API_KEY in the environment, not here"
+  },
+
+  "zitadel": {
+    "apiUrl": "https://auth.theaumol.com",
+    "_pat": "set ZITADEL_PAT in the environment, not here"
+  },
+
+  "nginx": {
+    "sitesAvailable": "/etc/nginx/sites-available",
+    "sitesEnabled": "/etc/nginx/sites-enabled"
+  }
+}

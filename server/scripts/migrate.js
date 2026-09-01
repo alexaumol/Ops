@@ -14,7 +14,7 @@
  * already has the schema (HITT, or any instance created before this).
  * ---------------------------------------------------------------------------
  */
-require("dotenv").config();
+require("../lib/loadEnv");
 const path = require("path");
 const runner = require("node-pg-migrate").default;
 

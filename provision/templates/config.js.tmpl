@@ -1,0 +1,39 @@
+/**
+ * Ops runtime config — {{SLUG}} ({{DISPLAY_NAME}})
+ * Rendered by provision/provision.js. Served by nginx at /js/config.js for
+ * this instance only (the shared /opt/ops/public/js/config.js is overridden
+ * per host). No secrets — public endpoints + OAuth client identifiers.
+ */
+window.HITT_CONFIG = {
+  APP_NAME: "{{DISPLAY_NAME}}",
+  API_BASE_URL: "https://{{DOMAIN}}",
+
+  AUTH: { provider: "oidc" },
+
+  OIDC: {
+    authority: "{{OIDC_ISSUER}}",
+    clientId: "{{OIDC_CLIENT_ID}}",
+    scopes: ["openid", "profile", "email", "offline_access"],
+    redirectUri: window.location.origin + "/index.html",
+  },
+
+  // Legacy Entra block kept for rollback; unused while AUTH.provider is oidc.
+  MSAL: {
+    tenantId: "{{MSAL_TENANT_ID}}",
+    clientId: "{{MSAL_CLIENT_ID}}",
+    redirectUri: window.location.origin + "/index.html",
+    authority: null,
+    apiScopes: null,
+  },
+
+  FEATURES: {
+    msalLoginEnabled: true,
+    projectsLive: true,
+    businessPartnersLive: true,
+    timeAllocationLive: true,
+    invoicingLive: true,
+    chatEnabled: true,
+  },
+
+  APP_VERSION: "{{APP_VERSION}}",
+};
