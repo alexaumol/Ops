@@ -179,3 +179,14 @@ ALTER TABLE entity ADD COLUMN IF NOT EXISTS address        text;
 ALTER TABLE entity ADD COLUMN IF NOT EXISTS emailinvoicing varchar(255);
 ALTER TABLE entity ADD COLUMN IF NOT EXISTS webpage        varchar(255);
 ALTER TABLE entity ADD COLUMN IF NOT EXISTS logo           text;   -- PNG/JPEG data URL
+
+-- 2026-09 — Employee profile: birthday opt-in + avatar photo
+-- --------------------------------------------------------------------------
+-- Backs the "show my birthday in the team calendar" toggle and the avatar
+-- photo upload (Profile modal + Settings → Users). avatarimage is a
+-- data:image/... URL, auto square-cropped + downscaled client-side;
+-- avatarusephoto false keeps the image on file as a rollback. Added at
+-- runtime by ensureEmployeeProfileSchema() in server/lib/employeeProfile.js.
+ALTER TABLE employeesinfo ADD COLUMN IF NOT EXISTS showbirthday   boolean NOT NULL DEFAULT false;
+ALTER TABLE employeesinfo ADD COLUMN IF NOT EXISTS avatarimage    text;
+ALTER TABLE employeesinfo ADD COLUMN IF NOT EXISTS avatarusephoto boolean NOT NULL DEFAULT false;

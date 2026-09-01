@@ -22,6 +22,9 @@ const express = require("express");
 const { pool } = require("../config/db");
 const { MODULE_KEYS, requireAdmin } = require("../lib/permissions");
 const { logAudit } = require("../lib/audit");
+const {
+  ensureEmployeeProfileSchema, upsertEmployeeInfo, employeeInfoRow,
+} = require("../lib/employeeProfile");
 
 const router = express.Router();
 
@@ -63,6 +66,7 @@ function ensureSettingsSchema() {
           updatedby   bigint
         )
       `);
+      await ensureEmployeeProfileSchema();
     })().catch((err) => {
       schemaReady = null; // allow a later request to retry
       throw err;
@@ -178,63 +182,8 @@ async function countActiveAdmins(excludeEmployeeId = null) {
   return Number(rows[0].count);
 }
 
-// The employeesinfo columns the add/edit modal manages. employeedocumentpath
-// is derived server-side (base folder + username), never taken from the
-// client. onboard/termination/birthday are timestamps stored via ::date.
-const INFO_DATE_COLS = ["onboarddate", "terminationdate", "birthdaydate"];
-const INFO_TEXT_COLS = [
-  "phone_personal", "email_personal",
-  "phone_emergency1", "contact_emergency1",
-  "phone_emergency2", "contact_emergency2",
-  "bankname", "bankacctemp",
-];
-const trimOrNull = (x) => (x != null && String(x).trim() !== "" ? String(x).trim() : null);
-
-// One employeesinfo row per employee: update the earliest if present, else
-// insert. Column names are hardcoded above — never client input.
-async function upsertEmployeeInfo(empId, info = {}, docPath) {
-  const cols = [...INFO_DATE_COLS, ...INFO_TEXT_COLS, "employeedocumentpath"];
-  const values = [
-    ...INFO_DATE_COLS.map((c) => info[c] || null),
-    ...INFO_TEXT_COLS.map((c) => trimOrNull(info[c])),
-    docPath || null,
-  ];
-  const cast = (c, ph) => (INFO_DATE_COLS.includes(c) ? `${ph}::date` : ph);
-
-  const existing = await pool.query(
-    `SELECT id FROM employeesinfo WHERE empid = $1::double precision ORDER BY id LIMIT 1`,
-    [empId]
-  );
-  if (existing.rows.length) {
-    const setClause = cols.map((c, i) => `${c} = ${cast(c, `$${i + 1}`)}`).join(", ");
-    await pool.query(
-      `UPDATE employeesinfo SET ${setClause} WHERE id = $${cols.length + 1}`,
-      [...values, existing.rows[0].id]
-    );
-  } else {
-    const placeholders = cols.map((c, i) => cast(c, `$${i + 2}`)).join(", ");
-    await pool.query(
-      `INSERT INTO employeesinfo (empid, ${cols.join(", ")}) VALUES ($1, ${placeholders})`,
-      [empId, ...values]
-    );
-  }
-}
-
-async function employeeInfoRow(empId) {
-  const { rows } = await pool.query(
-    `SELECT TO_CHAR(onboarddate, 'YYYY-MM-DD') AS onboarddate,
-            TO_CHAR(terminationdate, 'YYYY-MM-DD') AS terminationdate,
-            TO_CHAR(birthdaydate, 'YYYY-MM-DD') AS birthdaydate,
-            employeedocumentpath,
-            phone_personal, email_personal,
-            phone_emergency1, contact_emergency1,
-            phone_emergency2, contact_emergency2,
-            bankname, bankacctemp
-     FROM employeesinfo WHERE empid = $1::double precision ORDER BY id LIMIT 1`,
-    [empId]
-  );
-  return rows[0] || {};
-}
+// employeesinfo read/write (the add/edit modal's whole `info` object) is
+// shared with the self-service Profile modal — see lib/employeeProfile.js.
 
 // GET /api/settings/employees/:id — full detail for the edit modal
 // (profile + roles + employeesinfo).

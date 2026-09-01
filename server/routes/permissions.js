@@ -7,8 +7,27 @@
 const express = require("express");
 const { pool } = require("../config/db");
 const { MODULE_KEYS, isTimeOffApprover } = require("../lib/permissions");
+const { ensureEmployeeProfileSchema } = require("../lib/employeeProfile");
 
 const router = express.Router();
+
+// The avatar image data URL to show in the header, or null when the user
+// is on the initials avatar (the photo, if any, stays on file as a
+// rollback and just isn't returned here).
+async function avatarFor(employeeId) {
+  try {
+    await ensureEmployeeProfileSchema();
+    const { rows } = await pool.query(
+      `SELECT avatarimage FROM employeesinfo
+       WHERE empid = $1::double precision AND avatarusephoto = true
+       ORDER BY id LIMIT 1`,
+      [employeeId]
+    );
+    return rows[0]?.avatarimage || null;
+  } catch {
+    return null;
+  }
+}
 
 // GET /api/permissions/me
 router.get("/me", async (req, res) => {
@@ -18,7 +37,7 @@ router.get("/me", async (req, res) => {
     // header that doesn't match any employee record). Fail open on module
     // access (matches the open-by-default model) but report no elevated
     // roles.
-    return res.json({ employeeId: null, name: null, firstName: null, isAdmin: false, isTimeOffApprover: false, isDeactivated: false, restrictedModules: [] });
+    return res.json({ employeeId: null, name: null, firstName: null, avatar: null, isAdmin: false, isTimeOffApprover: false, isDeactivated: false, restrictedModules: [] });
   }
   try {
     // The frontend's session.displayName is only ever a guess derived from
@@ -42,7 +61,7 @@ router.get("/me", async (req, res) => {
       // the normal module grid. Real enforcement is server-side (see
       // requireModuleAccess/requireAdmin/requireTimeOffApprover), this is
       // just what the UI renders.
-      return res.json({ employeeId, name, firstName, isAdmin: false, isTimeOffApprover: false, isDeactivated: true, restrictedModules: MODULE_KEYS });
+      return res.json({ employeeId, name, firstName, isAdmin: false, isTimeOffApprover: false, isDeactivated: true, restrictedModules: MODULE_KEYS, avatar: null });
     }
 
     const approver = await isTimeOffApprover(employeeId);
@@ -54,7 +73,8 @@ router.get("/me", async (req, res) => {
       );
       restrictedModules = rows.map((r) => r.modulekey);
     }
-    res.json({ employeeId, name, firstName, isAdmin: !!isAdmin, isTimeOffApprover: approver, isDeactivated: false, restrictedModules });
+    const avatar = await avatarFor(employeeId);
+    res.json({ employeeId, name, firstName, avatar, isAdmin: !!isAdmin, isTimeOffApprover: approver, isDeactivated: false, restrictedModules });
   } catch (err) {
     console.error("[GET /api/permissions/me] DB error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });

@@ -128,6 +128,21 @@ const USER_INFO_FIELDS = {
 };
 const isoDay = (v) => (v ? String(v).slice(0, 10) : "");
 
+// Avatar state for the open edit-user modal. avatarImage is kept even when
+// avatarUsePhoto is turned off, so "Use initials" is a reversible choice.
+let userAvatarImage = null;
+let userAvatarUsePhoto = false;
+function userModalInitials() {
+  const name = `${document.getElementById("userFirstName").value} ${document.getElementById("userLastName").value}`.trim();
+  return name ? HITT_AUTH.initials({ displayName: name }) : "?";
+}
+function paintUserAvatar() {
+  HITT_AVATAR.paint(document.getElementById("userAvatarPreview"), {
+    dataUrl: userAvatarUsePhoto ? userAvatarImage : null,
+    initials: userModalInitials(),
+  });
+}
+
 function updateDocPathPreview() {
   const username = document.getElementById("userUsername").value.trim();
   const el = document.getElementById("userDocPath");
@@ -157,6 +172,10 @@ function fillUserModal(detail) {
     const isDate = fieldId === "userOnboard" || fieldId === "userTermination" || fieldId === "userBirthday";
     document.getElementById(fieldId).value = isDate ? isoDay(info[col]) : (info[col] || "");
   });
+  document.getElementById("userShowBirthday").checked = !!info.showbirthday;
+  userAvatarImage = info.avatarimage || null;
+  userAvatarUsePhoto = !!info.avatarusephoto;
+  paintUserAvatar();
   updateDocPathPreview();
 }
 
@@ -191,11 +210,33 @@ document.getElementById("empTableBody").addEventListener("click", (e) => {
   if (btn) openUserModal(Number(btn.dataset.editUser));
 });
 
+document.getElementById("userAvatarFile").addEventListener("change", async (e) => {
+  const file = e.target.files && e.target.files[0];
+  e.target.value = "";
+  if (!file) return;
+  try {
+    userAvatarImage = await HITT_AVATAR.cropSquareDataUrl(file);
+    userAvatarUsePhoto = true;
+    paintUserAvatar();
+  } catch (err) {
+    toast(err.message || "Could not use that image.", "red");
+  }
+});
+document.getElementById("userAvatarUseInitials").addEventListener("click", () => {
+  userAvatarUsePhoto = false;   // keeps userAvatarImage as a rollback
+  paintUserAvatar();
+});
+["userFirstName", "userLastName"].forEach((id) =>
+  document.getElementById(id).addEventListener("input", paintUserAvatar));
+
 document.getElementById("userModalSave").addEventListener("click", async () => {
   const info = {};
   Object.entries(USER_INFO_FIELDS).forEach(([fieldId, col]) => {
     info[col] = document.getElementById(fieldId).value.trim() || null;
   });
+  info.showbirthday = document.getElementById("userShowBirthday").checked;
+  info.avatarimage = userAvatarImage;
+  info.avatarusephoto = userAvatarUsePhoto;
   const payload = {
     firstName: document.getElementById("userFirstName").value.trim(),
     lastName: document.getElementById("userLastName").value.trim(),

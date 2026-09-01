@@ -28,6 +28,7 @@ const express = require("express");
 const { pool } = require("../config/db");
 const { requireModuleAccess, requireTimeOffApprover, isTimeOffApprover } = require("../lib/permissions");
 const { logAudit } = require("../lib/audit");
+const { ensureEmployeeProfileSchema } = require("../lib/employeeProfile");
 
 const router = express.Router();
 
@@ -319,14 +320,15 @@ router.get("/balance", async (req, res) => {
 // drives a month calendar, an unbounded range isn't a sensible query).
 // Company holidays + everyone's approved/submitted/pending time-off
 // overlapping the range. (Was GET /api/reports/resource-leaves — moved
-// here when the calendar became a Time allocation tab.) Team birthdays
-// are added to the response by a later change.
+// here when the calendar became a Time allocation tab.) Plus team
+// birthdays, for employees who opted in via their Profile.
 router.get("/calendar", requireModuleAccess("time-allocation"), async (req, res) => {
   const { startDate, endDate } = req.query;
   if (!startDate || !endDate) {
     return res.status(400).json({ error: "validation_error", message: "startDate and endDate are required" });
   }
   try {
+    await ensureEmployeeProfileSchema();
     const holidays = await pool.query(
       `SELECT id, holidaydate AS date, holidaydesc AS description, holidaycode AS code
        FROM holidays
@@ -350,7 +352,21 @@ router.get("/calendar", requireModuleAccess("time-allocation"), async (req, res)
       [startDate, endDate]
     );
 
-    res.json({ holidays: holidays.rows, timeOff: timeOff.rows });
+    // Birthdays recur every year — return month/day, the frontend places
+    // them on the matching cells of whatever month is shown.
+    const birthdays = await pool.query(
+      `SELECT TRIM(CONCAT(e.employeefirstname, ' ', e.employeelastname)) AS name,
+              EXTRACT(MONTH FROM i.birthdaydate)::int AS month,
+              EXTRACT(DAY FROM i.birthdaydate)::int AS day
+       FROM employeesinfo i
+       JOIN employees e ON e.id = i.empid::bigint
+       WHERE i.showbirthday = true
+         AND i.birthdaydate IS NOT NULL
+         AND e.deactivated = false
+       ORDER BY name`
+    );
+
+    res.json({ holidays: holidays.rows, timeOff: timeOff.rows, birthdays: birthdays.rows });
   } catch (err) {
     console.error("[GET /api/time-off/calendar] DB error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });

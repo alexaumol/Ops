@@ -189,6 +189,15 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; }
   display: flex; align-items: center; justify-content: center;
   font-weight: 700;
   font-size: 0.8rem;
+  overflow: hidden;
+}
+/* Photo avatar — the image is set as a cover background so it stays a
+   perfect circle regardless of aspect ratio (see js/avatar.js paint()). */
+.avatar--photo {
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  color: transparent;
 }
 
 /* .btn-secondary defaults to --text-primary, which is near-black — right

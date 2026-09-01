@@ -167,6 +167,10 @@ const HITT_API = (() => {
     getMyPermissions: () => request("/api/permissions/me"),
     getModuleKeys: () => request("/api/permissions/module-keys"),
 
+    getMyProfile: () => request("/api/me/profile"),
+    updateMyProfile: (payload) =>
+      request("/api/me/profile", { method: "PATCH", body: JSON.stringify(payload) }),
+
     getSettingsEmployees: () => request("/api/settings/employees"),
     getEmployeeDetail: (id) => request(`/api/settings/employees/${id}`),
     createEmployee: (payload) =>

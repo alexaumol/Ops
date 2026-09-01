@@ -335,6 +335,19 @@
       <div class="settings-modal-body">
         <div class="settings-modal-section">
           <h3 data-i18n="settings.user.profile">Profile</h3>
+          <div class="settings-avatar-row">
+            <div class="avatar settings-avatar-preview" id="userAvatarPreview">?</div>
+            <div class="settings-avatar-actions">
+              <span class="settings-field-label" data-i18n="settings.user.avatar">Avatar</span>
+              <div class="settings-avatar-buttons">
+                <label class="btn btn-secondary settings-avatar-upload">
+                  <span data-i18n="settings.user.uploadPhoto">Upload photo</span>
+                  <input type="file" id="userAvatarFile" accept="image/*" hidden />
+                </label>
+                <button type="button" class="btn btn-secondary" id="userAvatarUseInitials" data-i18n="settings.user.useInitials">Use initials</button>
+              </div>
+            </div>
+          </div>
           <div class="settings-form-grid">
             <label class="settings-field"><span data-i18n="settings.user.firstName">First name</span> <span class="req">*</span>
               <input type="text" id="userFirstName" autocomplete="off" />
@@ -359,6 +372,10 @@
             <label class="settings-field"><span data-i18n="settings.user.termination">Termination date</span><input type="date" id="userTermination" /></label>
             <label class="settings-field"><span data-i18n="settings.user.birthday">Birthday</span><input type="date" id="userBirthday" /></label>
           </div>
+          <label class="settings-toggle" style="margin-top:0.6rem;">
+            <input type="checkbox" id="userShowBirthday" />
+            <span data-i18n="settings.user.showBirthday">Show this birthday in the team calendar</span>
+          </label>
           <label class="settings-field" style="margin-top:0.6rem;"><span data-i18n="settings.user.docsFolder">Documents folder</span>
             <input type="text" id="userDocPath" readonly placeholder="Set the base folder on the Paths tab" data-i18n-placeholder="settings.user.docsPlaceholder" />
           </label>
@@ -484,6 +501,7 @@
   <script src="../js/auth.js"></script>
   <script src="../js/api.js"></script>
   <script src="../js/permissions.js"></script>
+  <script src="../js/avatar.js"></script>
   <script src="../js/chat.js"></script>
   <script src="../js/settings.js"></script>
 </body>
