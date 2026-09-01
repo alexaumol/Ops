@@ -338,8 +338,8 @@ const HITT_API = (() => {
       const qs = params.toString();
       return request(`/api/reports/hours-per-project/${projectId}${qs ? `?${qs}` : ""}`);
     },
-    getResourceLeaves: (startDate, endDate) =>
-      request(`/api/reports/resource-leaves?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`),
+    getCalendarLeaves: (startDate, endDate) =>
+      request(`/api/time-off/calendar?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`),
 
     getProjectsByStatusEntity: (year) =>
       request(`/api/reports/projects-by-status-entity${year ? `?year=${encodeURIComponent(year)}` : ""}`),

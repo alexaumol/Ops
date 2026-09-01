@@ -2,18 +2,16 @@
  * HITT Ops — Reports
  * ---------------------------------------------------------------------------
  * New module, no direct Access precedent (closest analogue was the
- * per-employee "TimeAllocationLog" report and the admin "Manage
- * calendar.frm" holidays subform). Two reports:
+ * per-employee "TimeAllocationLog" report). Tabs:
  *
+ *   Project stats       Charts: projects by status/entity, opened vs
+ *                        closed by month, the status-change timeline, and
+ *                        stale open projects.
  *   Hours per project   SUM(projectstimetracking.projtimetrackhours) per
  *                        project over an optional date range.
- *   Resource leaves      A month calendar of company holidays (holidays
- *                        table) + employee time-off requests
- *                        (timeoffrequests), Submitted/Pending/Approved.
  *
- * See server/routes/reports.js for why corporateworkcalendar/
- * employeeworkcalendar (annual totals only, no dates) aren't the source
- * for the calendar despite holding "calendar" in their name.
+ * (The company-holidays + time-off + birthdays calendar that used to be
+ * the "Resource leaves" tab moved to the Time allocation page.)
  * ---------------------------------------------------------------------------
  */
 
@@ -75,14 +73,6 @@ function statusChipHtml(label) {
   return `<span class="rpt-status-chip" style="background:${color}">${escapeHtml(label)}</span>`;
 }
 
-function pad2(n) { return String(n).padStart(2, "0"); }
-// Uses the browser's local date components (not UTC) — matches how the
-// rest of the app already displays timestamp-without-timezone columns
-// (see time-allocation.js formatDateOnly), so a date fetched from the API
-// lands in the same calendar cell it's shown as elsewhere in the app.
-function toISODate(d) { return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; }
-function startOfDay(d) { return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
-
 /* ============================== PAGE TABS ================================= */
 let currentTab = "stats";
 document.querySelectorAll("[data-rtab]").forEach((btn) => {
@@ -91,10 +81,8 @@ document.querySelectorAll("[data-rtab]").forEach((btn) => {
     btn.setAttribute("aria-selected", "true");
     currentTab = btn.dataset.rtab;
     document.getElementById("paneHours").classList.toggle("hidden", currentTab !== "hours");
-    document.getElementById("paneLeaves").classList.toggle("hidden", currentTab !== "leaves");
     document.getElementById("paneStats").classList.toggle("hidden", currentTab !== "stats");
     if (currentTab === "hours" && !hoursLoaded) { hoursLoaded = true; loadHours(); }
-    if (currentTab === "leaves") loadLeavesMonth();
     if (currentTab === "stats" && !statsLoaded) { statsLoaded = true; loadStats(); }
   });
 });
@@ -231,186 +219,6 @@ document.getElementById("drillExport").addEventListener("click", () => {
     `hours_${lastDrillProjectName.replace(/[^\w-]+/g, "_")}.csv`,
     [T('rpt.csv.employee'), T('rpt.csv.totalHours'), T('rpt.csv.poHours'), T('rpt.csv.resHours')],
     lastDrillRows.map((r) => [r.employeeName, r.totalHours, r.poHours, r.resHours])
-  );
-});
-
-/* ============================== RESOURCE LEAVES ============================ */
-let calendarMonth = startOfDay(new Date());
-calendarMonth.setDate(1);
-
-const WEEKDAY_LABELS = () => T('common.weekdaysShort').split('|');
-
-function computeGridRange(monthStart) {
-  const year = monthStart.getFullYear();
-  const month = monthStart.getMonth();
-  const monthEnd = new Date(year, month + 1, 0);
-  const gridStart = new Date(monthStart);
-  gridStart.setDate(gridStart.getDate() - ((gridStart.getDay() + 6) % 7));
-  const gridEnd = new Date(monthEnd);
-  gridEnd.setDate(gridEnd.getDate() + ((7 - ((gridEnd.getDay() + 6) % 7) - 1) % 7));
-  return { monthEnd, gridStart, gridEnd };
-}
-
-let lastLeavesData = null;
-let lastLeavesMonthLabel = "";
-
-async function loadLeavesMonth() {
-  const label = calendarMonth.toLocaleDateString(undefined, { month: "long", year: "numeric" });
-  document.getElementById("leavesMonthLabel").textContent = label;
-  lastLeavesMonthLabel = label;
-
-  const { gridStart, gridEnd } = computeGridRange(calendarMonth);
-  const cal = document.getElementById("leavesCalendar");
-  cal.innerHTML = `<div class="rpt-cal-weekdays">${WEEKDAY_LABELS().map((d) => `<div>${d}</div>`).join("")}</div><div class="sub-empty" style="padding:2rem; text-align:center; color:var(--text-secondary);">${T('common.loading')}</div>`;
-
-  document.getElementById("leavesMonthList").innerHTML = `<div class="rpt-leaves-empty">${T('common.loading')}</div>`;
-
-  let data;
-  try {
-    data = await HITT_API.getResourceLeaves(toISODate(gridStart), toISODate(gridEnd));
-    lastLeavesData = data;
-  } catch (err) {
-    console.error("[reports] failed to load resource-leaves:", err.message);
-    lastLeavesData = null;
-    toast(T('rpt.toast.leavesFail'), "red");
-    cal.innerHTML = `<div class="rpt-cal-weekdays">${WEEKDAY_LABELS().map((d) => `<div>${d}</div>`).join("")}</div><div style="padding:2rem; text-align:center; color:var(--text-secondary);">${T('rpt.err.report')}</div>`;
-    document.getElementById("leavesMonthList").innerHTML = `<div class="rpt-leaves-empty">${T('rpt.err.short')}</div>`;
-    return;
-  }
-  renderCalendar(gridStart, gridEnd, data);
-  renderMonthLeavesList(data);
-}
-
-// "This month's leaves" side table — employee time-off overlapping the
-// visible month (not the padding days of adjacent months), grouped by
-// employee, each with their day count for the month.
-function renderMonthLeavesList(data) {
-  const host = document.getElementById("leavesMonthList");
-  const monthStart = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1);
-  const monthEnd = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 0);
-
-  const inMonth = (data.timeOff || []).filter((t) => {
-    const s = startOfDay(new Date(t.startDate));
-    const e = startOfDay(new Date(t.endDate));
-    return s <= monthEnd && e >= monthStart;
-  });
-
-  if (!inMonth.length) {
-    host.innerHTML = `<div class="rpt-leaves-empty">${T('rpt.leaves.noneThisMonth')}</div>`;
-    return;
-  }
-
-  const byEmp = new Map();
-  inMonth.forEach((t) => {
-    const name = t.employeeName || T('rpt.employeeNum', { n: t.empId });
-    if (!byEmp.has(name)) byEmp.set(name, []);
-    byEmp.get(name).push(t);
-  });
-
-  host.innerHTML = [...byEmp.keys()].sort((a, b) => a.localeCompare(b)).map((name) => {
-    const rows = byEmp.get(name).sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
-    const totalDays = rows.reduce((sum, r) => sum + (Number(r.daysRequested) || 0), 0);
-    return `
-      <div class="rpt-leaves-emp">
-        <div class="rpt-leaves-emp-head">
-          <span>${escapeHtml(name)}</span>
-          <span class="rpt-leaves-emp-days">${T('rpt.leaves.dayCount', { n: totalDays })}</span>
-        </div>
-        ${rows.map((r) => `
-          <div class="rpt-leaves-row">
-            <span>${new Date(r.startDate).toLocaleDateString()} – ${new Date(r.endDate).toLocaleDateString()}</span>
-            <span class="rpt-leaves-badge ${r.statusLabel === "Approved" ? "is-approved" : "is-pending"}">${escapeHtml(r.statusLabel || "—")}</span>
-          </div>
-        `).join("")}
-      </div>`;
-  }).join("");
-}
-
-function renderCalendar(gridStart, gridEnd, data) {
-  const holidaysByDate = new Map();
-  (data.holidays || []).forEach((h) => {
-    holidaysByDate.set(toISODate(new Date(h.date)), h.description);
-  });
-
-  const leavesByDate = new Map();
-  (data.timeOff || []).forEach((t) => {
-    let cur = startOfDay(new Date(t.startDate));
-    const end = startOfDay(new Date(t.endDate));
-    const isApproved = t.statusLabel === "Approved";
-    while (cur <= end) {
-      const key = toISODate(cur);
-      if (!leavesByDate.has(key)) leavesByDate.set(key, []);
-      leavesByDate.get(key).push({ name: t.employeeName || T('rpt.employeeNum', { n: t.empId }), isApproved });
-      cur.setDate(cur.getDate() + 1);
-    }
-  });
-
-  const today = toISODate(startOfDay(new Date()));
-  const cal = document.getElementById("leavesCalendar");
-  let html = `<div class="rpt-cal-weekdays">${WEEKDAY_LABELS().map((d) => `<div>${d}</div>`).join("")}</div>`;
-
-  let day = new Date(gridStart);
-  while (day <= gridEnd) {
-    html += `<div class="rpt-cal-week">`;
-    for (let i = 0; i < 7; i++) {
-      const key = toISODate(day);
-      const isOutside = day.getMonth() !== calendarMonth.getMonth();
-      const isToday = key === today;
-      const holidayDesc = holidaysByDate.get(key);
-      const leaves = leavesByDate.get(key) || [];
-      const shown = leaves.slice(0, 3);
-      const more = leaves.length - shown.length;
-
-      html += `
-        <div class="rpt-cal-day ${isOutside ? "is-outside" : ""} ${isToday ? "is-today" : ""}">
-          <div class="rpt-cal-daynum">${day.getDate()}</div>
-          ${holidayDesc ? `<div class="rpt-cal-holiday" title="${escapeHtml(holidayDesc)}">${escapeHtml(holidayDesc)}</div>` : ""}
-          ${shown.map((l) => `<div class="rpt-cal-leave ${l.isApproved ? "is-approved" : "is-pending"}" title="${escapeHtml(l.name)}${l.isApproved ? "" : escapeHtml(T('rpt.pendingSuffix'))}">${escapeHtml(l.name)}</div>`).join("")}
-          ${more > 0 ? `<div class="rpt-cal-more">${T('rpt.moreCount', { n: more })}</div>` : ""}
-        </div>`;
-      day.setDate(day.getDate() + 1);
-    }
-    html += `</div>`;
-  }
-
-  cal.innerHTML = html;
-}
-
-document.getElementById("btnPrevMonth").addEventListener("click", () => {
-  calendarMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1);
-  loadLeavesMonth();
-});
-document.getElementById("btnNextMonth").addEventListener("click", () => {
-  calendarMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1);
-  loadLeavesMonth();
-});
-document.getElementById("btnThisMonth").addEventListener("click", () => {
-  calendarMonth = startOfDay(new Date());
-  calendarMonth.setDate(1);
-  loadLeavesMonth();
-});
-document.getElementById("btnLeavesExport").addEventListener("click", () => {
-  if (!lastLeavesData || (!lastLeavesData.holidays.length && !lastLeavesData.timeOff.length)) {
-    toast(T('rpt.nothingToExport'), "navy");
-    return;
-  }
-  const rows = [
-    ...lastLeavesData.holidays.map((h) => {
-      const d = toISODate(new Date(h.date));
-      return [T('rpt.csv.holiday'), d, d, h.description, ""];
-    }),
-    ...lastLeavesData.timeOff.map((t) => [
-      T('rpt.csv.leave'),
-      toISODate(new Date(t.startDate)),
-      toISODate(new Date(t.endDate)),
-      t.employeeName || T('rpt.employeeNum', { n: t.empId }),
-      t.statusLabel || "",
-    ]),
-  ];
-  downloadCsv(
-    `resource-leaves_${lastLeavesMonthLabel.replace(/\s+/g, "-")}.csv`,
-    [T('rpt.csv.type'), T('rpt.csv.startDate'), T('rpt.csv.endDate'), T('rpt.csv.description'), T('rpt.csv.status')],
-    rows
   );
 });
 
@@ -998,6 +806,5 @@ loadStats();
 /* Re-render dynamic content when the UI language changes. */
 window.addEventListener("hitt:langchange", () => {
   if (currentTab === "hours" && hoursLoaded) loadHours();
-  else if (currentTab === "leaves") loadLeavesMonth();
   else if (currentTab === "stats" && statsLoaded) loadStats();
 });

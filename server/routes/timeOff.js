@@ -315,4 +315,46 @@ router.get("/balance", async (req, res) => {
   }
 });
 
+// GET /api/time-off/calendar?startDate=&endDate= (both required — this
+// drives a month calendar, an unbounded range isn't a sensible query).
+// Company holidays + everyone's approved/submitted/pending time-off
+// overlapping the range. (Was GET /api/reports/resource-leaves — moved
+// here when the calendar became a Time allocation tab.) Team birthdays
+// are added to the response by a later change.
+router.get("/calendar", requireModuleAccess("time-allocation"), async (req, res) => {
+  const { startDate, endDate } = req.query;
+  if (!startDate || !endDate) {
+    return res.status(400).json({ error: "validation_error", message: "startDate and endDate are required" });
+  }
+  try {
+    const holidays = await pool.query(
+      `SELECT id, holidaydate AS date, holidaydesc AS description, holidaycode AS code
+       FROM holidays
+       WHERE holidaydate::date BETWEEN $1::date AND $2::date
+       ORDER BY holidaydate`,
+      [startDate, endDate]
+    );
+
+    const timeOff = await pool.query(
+      `SELECT r.id, r.empid AS "empId",
+              TRIM(CONCAT(e.employeefirstname, ' ', e.employeelastname)) AS "employeeName",
+              r.startdate AS "startDate", r.enddate AS "endDate", r.daysrequested AS "daysRequested",
+              s.statusid, ws.workflowstatusdesc AS "statusLabel"
+       FROM timeoffrequests r
+       LEFT JOIN timeoffrequeststatus s ON s.timeoffreqid = r.id
+       LEFT JOIN timeoffworkflowstatus ws ON ws.id = s.statusid
+       LEFT JOIN employees e ON e.id = r.empid
+       WHERE s.statusid IN (2, 3, 4)
+         AND r.startdate <= $2::date AND r.enddate >= $1::date
+       ORDER BY r.startdate`,
+      [startDate, endDate]
+    );
+
+    res.json({ holidays: holidays.rows, timeOff: timeOff.rows });
+  } catch (err) {
+    console.error("[GET /api/time-off/calendar] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
 module.exports = router;

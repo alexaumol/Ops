@@ -132,6 +132,7 @@ document.querySelectorAll('[data-ptab]').forEach(btn => {
     currentPageTab = btn.dataset.ptab;
     document.getElementById('paneTracking').classList.toggle('hidden', currentPageTab !== 'tracking');
     document.getElementById('paneTimeOff').classList.toggle('hidden', currentPageTab !== 'timeoff');
+    document.getElementById('paneCalendar').classList.toggle('hidden', currentPageTab !== 'calendar');
     // Opening the Time off tab counts as "seen" — clears the status-change
     // side of the badge (approvers still see their pending count).
     if (currentPageTab === 'timeoff') HITT_NOTIFY.markTimeOffSeen();
@@ -142,6 +143,7 @@ document.querySelectorAll('[data-ptab]').forEach(btn => {
 function refreshActiveTab(){
   renderSideReport();
   if (currentPageTab === 'tracking') loadWeek();
+  else if (currentPageTab === 'calendar') loadCalendarMonth();
   else loadTimeOff();
 }
 
@@ -758,6 +760,223 @@ document.getElementById('timeOffSubmit').addEventListener('click', async () => {
     console.error(err);
     toast(T('ta.toast.submitFail'), 'red');
   }
+});
+
+/* ============================== CALENDAR TAB =============================
+ * Company holidays + everyone's time-off + team birthdays, on a month
+ * grid. Moved here from the Reports page ("Resource leaves"); the DOM
+ * class names keep their historical `rpt-` prefix.
+ * ======================================================================= */
+function pad2(n){ return String(n).padStart(2, '0'); }
+function toISODate(d){ return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; }
+function startOfDay(d){ return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
+function csvEscape(value){
+  const s = String(value ?? '');
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+function downloadCsv(filename, headers, rows){
+  const lines = [headers.map(csvEscape).join(','), ...rows.map((r) => r.map(csvEscape).join(','))];
+  const blob = new Blob([lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+const CAL_WEEKDAYS = () => T('common.weekdaysShort').split('|');
+const CAL_MONTHS = () => T('common.monthsShort').split('|');
+
+let calendarMonth = startOfDay(new Date());
+calendarMonth.setDate(1);
+let lastCalData = null;
+let lastCalMonthLabel = '';
+
+function calGridRange(monthStart){
+  const year = monthStart.getFullYear();
+  const month = monthStart.getMonth();
+  const monthEnd = new Date(year, month + 1, 0);
+  const gridStart = new Date(monthStart);
+  gridStart.setDate(gridStart.getDate() - ((gridStart.getDay() + 6) % 7));
+  const gridEnd = new Date(monthEnd);
+  gridEnd.setDate(gridEnd.getDate() + ((7 - ((gridEnd.getDay() + 6) % 7) - 1) % 7));
+  return { monthEnd, gridStart, gridEnd };
+}
+
+async function loadCalendarMonth(){
+  const cal = document.getElementById('leavesCalendar');
+  const list = document.getElementById('leavesMonthList');
+  const weekdays = `<div class="rpt-cal-weekdays">${CAL_WEEKDAYS().map((d) => `<div>${escapeHtml(d)}</div>`).join('')}</div>`;
+  lastCalMonthLabel = calendarMonth.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+  document.getElementById('leavesMonthLabel').textContent = lastCalMonthLabel;
+
+  if (usingDemoData) {
+    cal.innerHTML = `${weekdays}<div style="padding:2rem; text-align:center; color:var(--text-secondary);">${T('common.notAvailableDemo')}</div>`;
+    list.innerHTML = `<div class="rpt-leaves-empty">${T('common.notAvailableDemo')}</div>`;
+    return;
+  }
+
+  const { gridStart, gridEnd } = calGridRange(calendarMonth);
+  cal.innerHTML = `${weekdays}<div class="sub-empty" style="padding:2rem; text-align:center; color:var(--text-secondary);">${T('common.loading')}</div>`;
+  list.innerHTML = `<div class="rpt-leaves-empty">${T('common.loading')}</div>`;
+
+  let data;
+  try {
+    data = await HITT_API.getCalendarLeaves(toISODate(gridStart), toISODate(gridEnd));
+    lastCalData = data;
+  } catch (err) {
+    console.error('[time-allocation] failed to load the calendar:', err.message);
+    lastCalData = null;
+    toast(T('rpt.toast.leavesFail'), 'red');
+    cal.innerHTML = `${weekdays}<div style="padding:2rem; text-align:center; color:var(--text-secondary);">${T('rpt.err.report')}</div>`;
+    list.innerHTML = `<div class="rpt-leaves-empty">${T('rpt.err.short')}</div>`;
+    return;
+  }
+  renderCalendarGrid(gridStart, gridEnd, data);
+  renderCalendarMonthList(data);
+}
+
+// "This month's leaves" side table — time-off overlapping the visible
+// month, grouped by employee with their day count for the month.
+function renderCalendarMonthList(data){
+  const host = document.getElementById('leavesMonthList');
+  const monthStart = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1);
+  const monthEnd = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 0);
+
+  const inMonth = (data.timeOff || []).filter((t) => {
+    const s = startOfDay(new Date(t.startDate));
+    const e = startOfDay(new Date(t.endDate));
+    return s <= monthEnd && e >= monthStart;
+  });
+
+  if (!inMonth.length) {
+    host.innerHTML = `<div class="rpt-leaves-empty">${T('rpt.leaves.noneThisMonth')}</div>`;
+    return;
+  }
+
+  const byEmp = new Map();
+  inMonth.forEach((t) => {
+    const name = t.employeeName || T('rpt.employeeNum', { n: t.empId });
+    if (!byEmp.has(name)) byEmp.set(name, []);
+    byEmp.get(name).push(t);
+  });
+
+  host.innerHTML = [...byEmp.keys()].sort((a, b) => a.localeCompare(b)).map((name) => {
+    const rows = byEmp.get(name).sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
+    const totalDays = rows.reduce((sum, r) => sum + (Number(r.daysRequested) || 0), 0);
+    return `
+      <div class="rpt-leaves-emp">
+        <div class="rpt-leaves-emp-head">
+          <span>${escapeHtml(name)}</span>
+          <span class="rpt-leaves-emp-days">${T('rpt.leaves.dayCount', { n: totalDays })}</span>
+        </div>
+        ${rows.map((r) => `
+          <div class="rpt-leaves-row">
+            <span>${new Date(r.startDate).toLocaleDateString()} – ${new Date(r.endDate).toLocaleDateString()}</span>
+            <span class="rpt-leaves-badge ${r.statusLabel === 'Approved' ? 'is-approved' : 'is-pending'}">${escapeHtml(r.statusLabel || '—')}</span>
+          </div>
+        `).join('')}
+      </div>`;
+  }).join('');
+}
+
+function renderCalendarGrid(gridStart, gridEnd, data){
+  const holidaysByDate = new Map();
+  (data.holidays || []).forEach((h) => holidaysByDate.set(toISODate(new Date(h.date)), h.description));
+
+  // Birthdays recur every year — keyed by "month-day" (1-based month).
+  const birthdaysByMD = new Map();
+  (data.birthdays || []).forEach((b) => {
+    const key = `${Number(b.month)}-${Number(b.day)}`;
+    if (!birthdaysByMD.has(key)) birthdaysByMD.set(key, []);
+    birthdaysByMD.get(key).push(b.name);
+  });
+
+  const leavesByDate = new Map();
+  (data.timeOff || []).forEach((t) => {
+    let cur = startOfDay(new Date(t.startDate));
+    const end = startOfDay(new Date(t.endDate));
+    const isApproved = t.statusLabel === 'Approved';
+    while (cur <= end) {
+      const key = toISODate(cur);
+      if (!leavesByDate.has(key)) leavesByDate.set(key, []);
+      leavesByDate.get(key).push({ name: t.employeeName || T('rpt.employeeNum', { n: t.empId }), isApproved });
+      cur.setDate(cur.getDate() + 1);
+    }
+  });
+
+  const today = toISODate(startOfDay(new Date()));
+  let html = `<div class="rpt-cal-weekdays">${CAL_WEEKDAYS().map((d) => `<div>${escapeHtml(d)}</div>`).join('')}</div>`;
+
+  let day = new Date(gridStart);
+  while (day <= gridEnd) {
+    html += `<div class="rpt-cal-week">`;
+    for (let i = 0; i < 7; i++) {
+      const key = toISODate(day);
+      const isOutside = day.getMonth() !== calendarMonth.getMonth();
+      const isToday = key === today;
+      const holidayDesc = holidaysByDate.get(key);
+      const birthdays = birthdaysByMD.get(`${day.getMonth() + 1}-${day.getDate()}`) || [];
+      const leaves = leavesByDate.get(key) || [];
+      const shown = leaves.slice(0, 3);
+      const more = leaves.length - shown.length;
+
+      html += `
+        <div class="rpt-cal-day ${isOutside ? 'is-outside' : ''} ${isToday ? 'is-today' : ''}">
+          <div class="rpt-cal-daynum">${day.getDate()}</div>
+          ${holidayDesc ? `<div class="rpt-cal-holiday" title="${escapeHtml(holidayDesc)}">${escapeHtml(holidayDesc)}</div>` : ''}
+          ${birthdays.map((n) => `<div class="rpt-cal-birthday" title="${escapeHtml(T('ta.cal.birthdayOf', { name: n }))}">🎂 ${escapeHtml(String(n).split(' ')[0])}</div>`).join('')}
+          ${shown.map((l) => `<div class="rpt-cal-leave ${l.isApproved ? 'is-approved' : 'is-pending'}" title="${escapeHtml(l.name)}${l.isApproved ? '' : escapeHtml(T('rpt.pendingSuffix'))}">${escapeHtml(l.name)}</div>`).join('')}
+          ${more > 0 ? `<div class="rpt-cal-more">${T('rpt.moreCount', { n: more })}</div>` : ''}
+        </div>`;
+      day.setDate(day.getDate() + 1);
+    }
+    html += `</div>`;
+  }
+  document.getElementById('leavesCalendar').innerHTML = html;
+}
+
+document.getElementById('btnPrevMonth').addEventListener('click', () => {
+  calendarMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1);
+  loadCalendarMonth();
+});
+document.getElementById('btnNextMonth').addEventListener('click', () => {
+  calendarMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1);
+  loadCalendarMonth();
+});
+document.getElementById('btnThisMonth').addEventListener('click', () => {
+  calendarMonth = startOfDay(new Date());
+  calendarMonth.setDate(1);
+  loadCalendarMonth();
+});
+document.getElementById('btnLeavesExport').addEventListener('click', () => {
+  const d = lastCalData;
+  if (!d || (!(d.holidays || []).length && !(d.timeOff || []).length && !(d.birthdays || []).length)) {
+    toast(T('rpt.nothingToExport'), 'navy');
+    return;
+  }
+  const rows = [
+    ...(d.holidays || []).map((h) => {
+      const iso = toISODate(new Date(h.date));
+      return [T('rpt.csv.holiday'), iso, iso, h.description, ''];
+    }),
+    ...(d.birthdays || []).map((b) => {
+      const iso = `${CAL_MONTHS()[Number(b.month) - 1] || b.month} ${pad2(Number(b.day))}`;
+      return [T('ta.cal.birthday'), iso, iso, b.name, ''];
+    }),
+    ...(d.timeOff || []).map((t) => [
+      T('rpt.csv.leave'),
+      toISODate(new Date(t.startDate)),
+      toISODate(new Date(t.endDate)),
+      t.employeeName || T('rpt.employeeNum', { n: t.empId }),
+      t.statusLabel || '',
+    ]),
+  ];
+  downloadCsv(
+    `calendar_${lastCalMonthLabel.replace(/\s+/g, '-')}.csv`,
+    [T('rpt.csv.type'), T('rpt.csv.startDate'), T('rpt.csv.endDate'), T('rpt.csv.description'), T('rpt.csv.status')],
+    rows
+  );
 });
 
 /* ============================== INIT ==================================== */

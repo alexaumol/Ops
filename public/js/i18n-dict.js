@@ -276,6 +276,9 @@ window.HITT_I18N_DICT = {
     // time allocation
     "ta.tab.tracking": "Project time tracking",
     "ta.tab.timeoff": "Time off requests",
+    "ta.tab.calendar": "Calendar",
+    "ta.cal.birthday": "Birthday",
+    "ta.cal.birthdayOf": "{name}'s birthday",
     "ta.col.resourceType": "Resource type",
     "ta.col.hours": "Hours",
     "ta.col.lastUpdate": "Last update",
@@ -1166,6 +1169,9 @@ window.HITT_I18N_DICT = {
 
     "ta.tab.tracking": "Imputación de horas por proyecto",
     "ta.tab.timeoff": "Solicitudes de ausencia",
+    "ta.tab.calendar": "Calendario",
+    "ta.cal.birthday": "Cumpleaños",
+    "ta.cal.birthdayOf": "Cumpleaños de {name}",
     "ta.col.resourceType": "Tipo de recurso",
     "ta.col.hours": "Horas",
     "ta.col.lastUpdate": "Última actualización",
@@ -2048,6 +2054,9 @@ window.HITT_I18N_DICT = {
 
     "ta.tab.tracking": "Imputació d'hores per projecte",
     "ta.tab.timeoff": "Sol·licituds d'absència",
+    "ta.tab.calendar": "Calendari",
+    "ta.cal.birthday": "Aniversari",
+    "ta.cal.birthdayOf": "Aniversari de {name}",
     "ta.col.resourceType": "Tipus de recurs",
     "ta.col.hours": "Hores",
     "ta.col.lastUpdate": "Última actualització",

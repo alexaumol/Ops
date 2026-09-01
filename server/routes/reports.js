@@ -11,9 +11,6 @@
  *   GET /hours-per-project/:projectId   Same sum, broken down per
  *                                        employee, for one project
  *                                        (row-click drill-down).
- *   GET /resource-leaves                Company holidays + employee
- *                                        time-off requests overlapping a
- *                                        date range, for a calendar view.
  *   GET /projects-by-status-entity      Project counts per status,
  *                                        broken down by entity — bar chart.
  *   GET /project-years                  Distinct entrydate years, for the
@@ -33,20 +30,9 @@
  *                                        projects with the oldest (or no)
  *                                        logged status change — paginated.
  *
-
- * IMPORTANT schema note: corporateworkcalendar/employeeworkcalendar (named
- * by Alex as the source for resource-leaves) hold only ANNUAL TOTALS
- * (workyear, labourhoursperyear, holidaysamount, corporateholidaysamount) —
- * confirmed via information_schema, no date columns exist on either table.
- * They're already used for the time-off balance view (routes/timeOff.js
- * GET /balance) and are NOT usable for a calendar of actual dates. The real
- * dated records live in two other tables, used here instead:
- *   holidays          id, holidaycode, holidayyear, holidaydate,
- *                      holidaydesc, holidayweekday — company-wide bank/
- *                      corporate holidays (found via clsHolidays.bas /
- *                      "Manage calendar.frm"'s Holidays subform).
- *   timeoffrequests    already used by routes/timeOff.js — individual
- *                      employee leave date ranges.
+ * (The company-holidays + time-off calendar formerly served here as
+ * GET /resource-leaves is now GET /api/time-off/calendar — see
+ * routes/timeOff.js.)
  * ---------------------------------------------------------------------------
  */
 const express = require("express");
@@ -123,43 +109,9 @@ router.get("/hours-per-project/:projectId", requireModuleAccess("reports"), asyn
   }
 });
 
-// GET /api/reports/resource-leaves?startDate=&endDate= (both required —
-// this drives a calendar view, an unbounded range isn't a sensible query).
-router.get("/resource-leaves", requireModuleAccess("reports"), async (req, res) => {
-  const { startDate, endDate } = req.query;
-  if (!startDate || !endDate) {
-    return res.status(400).json({ error: "validation_error", message: "startDate and endDate are required" });
-  }
-  try {
-    const holidays = await pool.query(
-      `SELECT id, holidaydate AS date, holidaydesc AS description, holidaycode AS code
-       FROM holidays
-       WHERE holidaydate::date BETWEEN $1::date AND $2::date
-       ORDER BY holidaydate`,
-      [startDate, endDate]
-    );
-
-    const timeOff = await pool.query(
-      `SELECT r.id, r.empid AS "empId",
-              TRIM(CONCAT(e.employeefirstname, ' ', e.employeelastname)) AS "employeeName",
-              r.startdate AS "startDate", r.enddate AS "endDate", r.daysrequested AS "daysRequested",
-              s.statusid, ws.workflowstatusdesc AS "statusLabel"
-       FROM timeoffrequests r
-       LEFT JOIN timeoffrequeststatus s ON s.timeoffreqid = r.id
-       LEFT JOIN timeoffworkflowstatus ws ON ws.id = s.statusid
-       LEFT JOIN employees e ON e.id = r.empid
-       WHERE s.statusid IN (2, 3, 4)
-         AND r.startdate <= $2::date AND r.enddate >= $1::date
-       ORDER BY r.startdate`,
-      [startDate, endDate]
-    );
-
-    res.json({ holidays: holidays.rows, timeOff: timeOff.rows });
-  } catch (err) {
-    console.error("[GET /api/reports/resource-leaves] DB error:", err.message);
-    res.status(502).json({ error: "database_unreachable", message: err.message });
-  }
-});
+// (The company-holidays + time-off calendar — formerly
+// GET /api/reports/resource-leaves — moved to GET /api/time-off/calendar
+// when it became a Time allocation tab.)
 
 // GET /api/reports/projects-by-status-entity
 // GET /api/reports/projects-by-status-entity?year=YYYY

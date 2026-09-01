@@ -29,7 +29,6 @@
     <div class="page-tabs">
       <button data-rtab="stats" class="page-tab" aria-selected="true" data-i18n="rpt.tab.stats">Project stats</button>
       <button data-rtab="hours" class="page-tab" aria-selected="false" data-i18n="rpt.tab.hours">Hours per project</button>
-      <button data-rtab="leaves" class="page-tab" aria-selected="false" data-i18n="rpt.tab.leaves">Resource leaves</button>
     </div>
 
     <!-- ============================ HOURS PER PROJECT ============================ -->
@@ -68,31 +67,6 @@
           <tbody id="hoursTableBody"></tbody>
         </table>
         <div id="hoursEmpty" class="bp-empty hidden" data-i18n="rpt.hours.empty">No hours logged in this range.</div>
-      </div>
-    </div>
-
-    <!-- ============================ RESOURCE LEAVES ============================ -->
-    <div id="paneLeaves" class="page-pane hidden">
-      <div class="rpt-toolbar">
-        <button class="btn btn-secondary" id="btnPrevMonth" title="Previous month">&larr;</button>
-        <span id="leavesMonthLabel" class="rpt-month-label"></span>
-        <button class="btn btn-secondary" id="btnNextMonth" title="Next month">&rarr;</button>
-        <button class="btn btn-secondary" id="btnThisMonth" data-i18n="rpt.today">Today</button>
-        <button class="btn btn-secondary" id="btnLeavesExport" data-i18n="rpt.exportCsv">Export CSV</button>
-        <div class="rpt-spacer"></div>
-        <div class="rpt-legend">
-          <span class="rpt-legend-item"><span class="rpt-swatch rpt-swatch-holiday"></span><span data-i18n="rpt.legend.holiday">Holiday</span></span>
-          <span class="rpt-legend-item"><span class="rpt-swatch rpt-swatch-approved"></span><span data-i18n="rpt.legend.approved">Approved leave</span></span>
-          <span class="rpt-legend-item"><span class="rpt-swatch rpt-swatch-pending"></span><span data-i18n="rpt.legend.pending">Pending leave</span></span>
-        </div>
-      </div>
-
-      <div class="rpt-leaves-layout">
-        <div id="leavesCalendar" class="rpt-calendar"></div>
-        <aside class="rpt-leaves-side">
-          <h3 class="rpt-leaves-side-title" data-i18n="rpt.leaves.sideTitle">This month's leaves</h3>
-          <div id="leavesMonthList" class="rpt-leaves-list"></div>
-        </aside>
       </div>
     </div>
 
