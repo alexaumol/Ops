@@ -1,32 +1,41 @@
 -- ==========================================================================
 -- REFERENCE DATA — lookup rows every Ops instance needs
 -- --------------------------------------------------------------------------
--- >>> PLACEHOLDER. Populate from a real database once. <<<
+-- >>> PLACEHOLDER. Populate from test_ops once, review, commit. <<<
 --
 -- A fresh instance's schema (the 0C baseline) has EMPTY tables. Without this
 -- data there are no project statuses, countries, currencies, VAT types, or
 -- invoice-PDF field labels, and the app is unusable.
 --
--- Generate it from test_ops (data only, these tables only):
+-- Generate (Windows PowerShell / any shell — put the password in PGPASSWORD,
+-- not the URL, to avoid quoting issues):
 --
---   pg_dump --data-only --no-owner --column-inserts \
---     -t public.countries -t public.languages -t public.loglevels \
---     -t public.documenttypes -t public.companytypes -t public.biotechspectrums \
---     -t public.projecttypes -t public.projectstatus -t public.invoicesstatus \
---     -t public.invoicepaymentmethods -t public.invoicescheduletypes \
---     -t public.invoices_vattypes -t public.invoicecurrencies \
---     -t public.timeoffworkflowstatus -t public.expensescategories \
---     -t public.invoicedocumentcontrols -t public.invoicedocumenttext \
---     -t public.global_settings \
---     "postgresql://.../test_ops" > provision/seed/reference-data.sql
+--   $env:PGPASSWORD = "..."
+--   pg_dump --data-only --no-owner --column-inserts `
+--     --table=public.countries --table=public.languages `
+--     --table=public.loglevels --table=public.documenttypes `
+--     --table=public.companytypes --table=public.biotechspectrums `
+--     --table=public.projecttypes --table=public.projectstatus `
+--     --table=public.invoicesstatus --table=public.invoicepaymentmethods `
+--     --table=public.invoicescheduletypes --table=public.invoices_vattypes `
+--     --table=public.invoicecurrencies --table=public.timeoffworkflowstatus `
+--     --table=public.expensescategories --table=public.invoicedocumentcontrols `
+--     --table=public.invoicedocumenttext --table=public.global_settings `
+--     -h 217.154.101.149 -p 8432 -U postgres -d test_ops `
+--     > provision/seed/reference-data.sql
 --
--- Review it before committing:
---   - it must NOT contain any real customer/employee/project/invoice data
---   - `--column-inserts` makes it INSERT-per-row and order-independent
---   - re-runnable is a bonus but not required (provision loads it once, into
---     an empty DB)
+-- REVIEW before committing — this ships to every customer:
+--   - no real employee / business-partner / project / invoice rows
+--   - projectstatus / invoices_vattypes carry Catalan/Spanish text and
+--     Spanish VAT law disclaimers — fine as a default (customers rename in
+--     Settings), but know it's there
+--   - global_settings may hold HITT-specific paths (OneDrive, etc.) — grep
+--     it and drop or blank those rows
+--   - biotechspectrums is HITT's domain taxonomy — harmless to ship, or drop
+--     the --table for it if you'd rather start empty
 --
--- Replace everything below this header with the dump output. Commit.
+-- provision.js loads this into the fresh DB, then runs seed-instance.sql and
+-- fix-sequences.sql. Replace everything below with the dump output.
 -- ==========================================================================
 
 -- (reference data goes here)

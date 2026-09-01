@@ -295,6 +295,8 @@ const steps = [
         "-v", `admin_last=${cap(rest.join(" ")) || cap(first)}`,
         "-f", path.join(HERE, "seed", "seed-instance.sql"),
       ]);
+      // reference-data + seed insert explicit ids — resync the sequences.
+      sh("psql", [url, "-v", "ON_ERROR_STOP=1", "-f", path.join(HERE, "seed", "fix-sequences.sql")]);
     },
     undo: () => {}, // the DB drop in the earlier step covers this
   },
