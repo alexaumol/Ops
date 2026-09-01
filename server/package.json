@@ -7,7 +7,10 @@
   "type": "commonjs",
   "scripts": {
     "start": "node server.js",
-    "dev": "node --watch server.js"
+    "dev": "node --watch server.js",
+    "migrate": "node scripts/migrate.js up",
+    "migrate:down": "node scripts/migrate.js down",
+    "migrate:create": "node-pg-migrate create -m migrations --migration-file-language sql --"
   },
   "dependencies": {
     "cors": "^2.8.5",
@@ -16,8 +19,12 @@
     "helmet": "^7.1.0",
     "jose": "^5.10.0",
     "multer": "^2.2.0",
+    "node-pg-migrate": "^7.9.1",
     "nodemailer": "^9.0.6",
     "pdfkit": "^0.20.1",
     "pg": "^8.12.0"
+  },
+  "overrides": {
+    "glob": "^11.0.4"
   }
 }

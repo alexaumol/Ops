@@ -1,0 +1,23 @@
+-- ==========================================================================
+-- BASELINE — the full Ops schema as of v0.2.x
+-- --------------------------------------------------------------------------
+-- >>> PLACEHOLDER. Populate from a real database before a fresh install. <<<
+--
+-- On a host with psql access to a current Ops database (HITT's):
+--
+--   pg_dump --schema-only --no-owner --no-privileges --no-comments \
+--           --schema=public "$PGDATABASE" > baseline.raw.sql
+--
+-- then sanitise (docs/migrations.md § Baseline) and paste the result below,
+-- replacing everything under this header.
+--
+-- A database that ALREADY has the schema (HITT, or any instance created
+-- before migrations existed) must NOT run this — mark it applied instead:
+--
+--   INSERT INTO pgmigrations (name, run_on)
+--   VALUES ('1756684800000_baseline', now());
+--
+-- A fresh instance runs it to build the schema from nothing.
+-- ==========================================================================
+
+-- (schema goes here)
