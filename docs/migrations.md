@@ -41,30 +41,31 @@ that restarts many instances at once is safe. A failing migration exits
 non-zero — wire the deploy to stop there rather than restart on a
 half-migrated schema.
 
-## Baseline — capturing it (one-time, done once for the whole product)
+## Baseline — how it was captured
 
-`1756684800000_baseline.sql` ships as a placeholder. Populate it from a
-real database:
+`1756684800000_baseline.sql` is the full schema of `test_ops` (the dev DB
+that carries the current structure), generated once:
 
 ```bash
-# on a host with psql access to a current Ops DB (HITT's):
+# 1. schema-only dump (pgAdmin "Backup… → Only schema", or)
 pg_dump --schema-only --no-owner --no-privileges --no-comments \
-        --schema=public "$PGDATABASE" > baseline.raw.sql
+        --schema=public "$PGDATABASE" > raw.sql
+
+# 2. sanitise into a portable migration
+node server/scripts/sanitize-baseline.js raw.sql \
+     > server/migrations/1756684800000_baseline.sql
 ```
 
-Sanitise `baseline.raw.sql` so it's portable:
+`sanitize-baseline.js` strips: psql `\restrict` / `SET` / `search_path`
+session lines; the pgAdmin `pgagent` scheduler schema+extension; the
+`pgmigrations` table (node-pg-migrate owns it); known-dead objects
+(`auditlog`, superseded by `actionsaudit`; `update_access_timestamp`, an
+orphan trigger fn); pg_dump's TOC comments. It also resets every sequence
+`START WITH` to 1. It keeps every `CREATE TABLE / SEQUENCE / INDEX /
+CONSTRAINT / FUNCTION` and the 5 real foreign keys.
 
-- drop leading `SET` / `SELECT pg_catalog.set_config(...)` session lines
-- drop `CREATE SCHEMA public` / `COMMENT ON SCHEMA public` (already there)
-- drop any `ALTER … OWNER TO` / `GRANT` / `REVOKE` (`--no-owner
-  --no-privileges` removes most)
-- keep `CREATE TABLE`, `CREATE SEQUENCE`, `CREATE INDEX`, `ALTER TABLE …
-  ADD CONSTRAINT`, `CREATE VIEW`, functions, triggers
-- if any `CREATE INDEX CONCURRENTLY` slipped in, drop `CONCURRENTLY` (a
-  migration runs in a transaction)
-
-Paste the result into `1756684800000_baseline.sql`, replacing the
-`(schema goes here)` line. Commit.
+To regenerate later (schema drifted, want a fresh baseline for a new
+migration line), re-run those two steps.
 
 ## One-time step for a database that ALREADY has the schema
 
