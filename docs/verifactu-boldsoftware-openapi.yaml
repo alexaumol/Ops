@@ -1,0 +1,1549 @@
+openapi: 3.1.0
+jsonSchemaDialect: https://json-schema.org/draft/2020-12/schema
+info:
+  title: Documentación API Veri*Factu
+  version: 1.2.0
+  description: |
+    Permite crear, anular y consultar registros de facturación conformes a la especificación Veri*Factu*.
+    Esta documentación sirve como referencia técnica y funcional para integraciones de terceros.
+
+    Los ejemplos incluidos muestran distintos tipos de factura —simplificadas, rectificativas,
+    exportación, intracomunitarias, autofacturas, subsanaciones...— junto con sus estructuras
+    y respuestas esperadas.
+
+    Todas las operaciones requieren autenticación mediante **API-Key** y devuelven respuestas
+    en formato **JSON**.
+
+    ## Autenticación
+
+    La API-Key se envía en la cabecera `API-Key`. Opcionalmente se puede enviar también la cabecera
+    `Verify-Issuer-Id` con el NIF que se espera que tenga la compañía autenticada; si no coincide,
+    la petición se rechaza con el código `000007`.
+
+    ## Códigos de respuesta HTTP
+
+    Todas las respuestas de error de esta API —tanto de autenticación como de validación de negocio—
+    devuelven **HTTP 400**, independientemente de la causa. Las únicas excepciones son:
+    - **404**, sin cuerpo, si se usa un verbo HTTP distinto de `POST` sobre una ruta válida.
+    - **503**, con el schema `ServiceUnavailableError`, si el servicio está en mantenimiento o hay un
+      error de conexión con la base de datos.
+
+    Los códigos `401`, `403` y `500` **no se producen actualmente** en ningún endpoint de esta API:
+    no existe ningún escenario, incluidos los de autenticación o autorización, que devuelva esos
+    estados.
+
+    ## Errores comunes a todas las operaciones
+
+    Antes de ejecutar la operación solicitada, toda petición pasa por una validación de autenticación
+    compartida por los endpoints de esta documentación. Estos son los códigos que puede devolver esa
+    capa común (siempre HTTP 400, salvo donde se indica):
+
+    - **`000002`** — Falta la cabecera `API-Key`.
+    - **`000003`** — La `API-Key` no tiene el formato esperado.
+    - **`000005`** — La `API-Key` coincide con más de un registro interno (dato inconsistente; contactar soporte).
+    - **`000008`** — La `API-Key` no existe.
+    - **`000012`** — No se encuentra el usuario asociado a la compañía (contactar soporte).
+    - **`000013`** — El origen (IP) de la petición no está autorizado. *(En `/id_check` este mismo código se reutiliza además para "el par NIF/nombre no coincide" — ver el catálogo propio de esa operación.)*
+    - **`953443`** — La licencia de la compañía ha caducado.
+    - **`953444`** — Falta recibir el justificante de alta (POA) de la compañía.
+    - **`000007`** — Se envió la cabecera opcional `Verify-Issuer-Id` y no coincide con el NIF de la compañía autenticada.
+    - **`000001`** — La ruta solicitada no está reconocida por la API (revisar la URL).
+    - **`3017-B`** — Error interno no controlado durante el procesamiento de la petición.
+
+    Nota: el campo `code` de estas respuestas no es necesariamente el mismo tipo JSON (texto o número)
+    en todos los casos — ver la descripción del schema `Error`.
+servers:
+- url: https://vf1.boldsoftware.es/v1
+security:
+- ApiKeyAuth: []
+tags:
+- name: Facturas
+  description: Endpoints disponibles para operar con registros de facturación
+- name: Utilidades
+  description: Endpoints auxiliares
+paths:
+  /invoice:
+    post:
+      tags:
+      - Facturas
+      summary: Crear una factura
+      operationId: createInvoice
+      description: |
+        Crea un registro de facturación (alta de factura) en el sistema Veri*Factu.
+
+        ### Catálogo de códigos de error de negocio (HTTP 400)
+
+        Además de los errores comunes de autenticación (ver introducción de esta documentación),
+        esta operación puede devolver los siguientes códigos propios:
+
+        | code | Causa |
+        |------|-------|
+        | `1GQ3QH` | La petición no cumple el esquema JSON esperado (campo obligatorio ausente, tipo incorrecto, valor fuera de enum, propiedad no reconocida, etc.). Es el **mismo código para cualquier violación de esquema**: el campo concreto afectado se identifica por el texto de `message`, no por `code`. |
+        | `3000` | Fecha inválida. |
+        | `561112` | `issuedTime` está en el futuro. |
+        | `561114` | Falta `creditNote` en una factura rectificativa. |
+        | `561115` | Se envió `creditNote` sin que la factura sea rectificativa. |
+        | `561116` | Falta `replacedTicketIds` en una factura de tipo `F3`. |
+        | `561118` | Falta `creditBase` o `creditVat` cuando `creditNote.style` es `S`. |
+        | `561123` | NIF/NIE/CIF de `recipient` inválido. |
+        | `561125` | `operationDate` excesivamente futura. |
+        | `561126` | Combinación no permitida de `country`/`idType` para destinatario español. |
+        | `561127` | `rate2` fuera de los valores admitidos (5.2, 1.4, 0.5, 0). |
+        | `561130` | Caracteres no imprimibles en `id.number`. |
+        | `561133` / `561134` | `issuedTime` u `operationDate` anteriores a 20 años. |
+        | `561143` | El signo de `base`/`amount` no es coherente. |
+        | `561146` / `561147` / `561148` / `561149` | Reglas específicas de `vatKey` `14`/`15` (orden de fechas, tipo de factura admitido, destinatario admitido). |
+        | `561150` | Suma superior a 3000 en factura simplificada (`F2`). |
+        | `561152` | `issuedTime` anterior al 2024-07-01. |
+        | `561158` | `issuedBy.type` es `D` sin informar `recipient`. |
+        | `561160` | `rate`/`rate2` incompatibles entre sí. |
+        | `561186` | `issuedBy.type` es `T` sin informar `issuer`. |
+        | `561188` | El NIF de `issuedBy.issuer` coincide con el del emisor de la factura. |
+        | `561189` / `561190` | `recipient` obligatorio o prohibido según el `type` de factura. |
+        | `561193` | `recipient` coincide con el propio NIF del emisor sin tratarse de una autofactura. |
+        | `561197` | `vatOperation` `S2` solo admitido en `F1`/`F3`/`R1`-`R4`. |
+        | `561198` | `vatOperation` `S2` exige `rate` y `amount` iguales a 0. |
+        | `561199` / `561200` / `561201` / `561203` / `561205` / `561206` | Restricciones de `vatOperation` según el `vatKey` informado. |
+        | `561207` | `amount` distinto de 0 exige `vatOperation` `S1`. |
+        | `561124` | `rate` fuera de [0, 4, 5, 10, 21] cuando el impuesto es IVA (`tax` ausente o `01`). |
+        | `561142` | `amount` incoherente con `base` × `rate` (tolerancia de 10 unidades). |
+        | `561208` | `vatOperation` `S1` exige `rate` y `amount` distintos de 0. |
+        | `561211` | `issuedBy.issuer.idType` `07` no permitido. |
+        | `561216` | `amount` (global) incoherente con la suma de las líneas de IVA (tolerancia de 1 unidad). |
+        | `561210` | `total` (global) incoherente con la suma de las líneas de IVA (tolerancia de 1 unidad). |
+        | `561237` | `vatOperation` `N1`/`N2` exige todos los importes a 0. |
+        | `561252` | `vatKey` `08` exige `vatOperation` `N2`. |
+        | `561100` | `description.text` vacío. |
+        | `777001-C` | Error del servicio de verificación de NIF intracomunitario (VIES). |
+        | `777001-B` | El NIF no coincide con el registrado en VIES. |
+        | `777002-B` | Se informó `replacedTicketIds` sin que la factura sea de tipo `F3`. |
+        | `405530` / `031916` / `519126` / `169439` | Datos obligatorios del destinatario extranjero incompletos. |
+        | `B113047` | Ya existe una factura con el mismo NIF emisor + número de serie (normalizado) + año de emisión, y la petición no es una subsanación (`isFix: true`). La comprobación es específica del entorno (sandbox/producción no se cruzan). |
+        | `397430` | El destinatario no ha podido identificarse en el servicio de la AEAT. |
+        | `5AXUFV` | No se ha podido determinar el sistema informático (SIF) de la compañía. |
+
+        Nota: `issuedBy.type: T` (autofactura por terceros) está deshabilitado actualmente en el
+        servidor; cualquier petición con ese valor devuelve un error no incluido en la tabla anterior.
+        Está pendiente de habilitación — consultar con BOLD antes de integrarlo.
+      security:
+      - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CrearFacturaRequest'
+            examples:
+              multiples_tipos_impositivos:
+                summary: Factura con múltiples tipos impositivos
+                value:
+                  invoice:
+                    recipient:
+                      irsId: B13674197
+                      name: BOLD Software SL
+                      country: ES
+                    id:
+                      number: DEV-000001
+                      issuedTime: '2025-05-22'
+                    description:
+                      text: Factura con dos tipos impositivos diferentes, del 10%
+                        y del 21%
+                      operationDate: '2025-05-22'
+                    type: F1
+                    vatLines:
+                    - vatOperation: S1
+                      base: 100
+                      rate: 21
+                      amount: 21
+                      vatKey: '01'
+                    - vatOperation: S1
+                      base: 100
+                      rate: 10
+                      amount: 10
+                      vatKey: '01'
+                    total: 231
+                    amount: 31
+              inversion_sujeto_pasivo:
+                summary: Factura con inversión del sujeto pasivo (vatOperation = S2)
+                value:
+                  invoice:
+                    recipient:
+                      irsId: B13674197
+                      name: BOLD Software SL
+                      country: ES
+                    id:
+                      number: ISP-000001
+                      issuedTime: '2025-05-22'
+                    description:
+                      text: Factura con inversión del sujeto pasivo
+                      operationDate: '2025-05-22'
+                    type: F1
+                    vatLines:
+                    - vatOperation: S2
+                      vatKey: '01'
+                      base: 100
+                      rate: 0
+                      amount: 0
+                    total: 100
+                    amount: 0
+              dest_extr_identificado_mediante_otros_documentos_del_pais_del_destinatario:
+                summary: Factura con destinatario extranjero, identificado mediante
+                  otros documentos del país del destinatario
+                value:
+                  invoice:
+                    description:
+                      text: Factura 'normal' - Destinatario extranjero, identificado
+                        mediante otros documentos del país de origen.
+                      operationDate: '2025-07-21'
+                    recipient:
+                      id: ITALIADOCUMENTO
+                      idType: '04'
+                      name: LUIGI LAVAZZA
+                      country: IT
+                    id:
+                      number: DEV-000001
+                      issuedTime: '2025-07-21'
+                    type: F1
+                    vatLines:
+                    - base: 100
+                      rate: 0
+                      amount: 0
+                      vatOperation: N2
+                      vatKey: '01'
+                    total: 100
+                    amount: 0
+              desti_extr_identificado_mediante_numero_de_iva_intracomunitario:
+                summary: Factura con destinatario extranjero, identificado mediante
+                  número de IVA intracomunitario
+                value:
+                  invoice:
+                    description:
+                      text: Factura 'normal' - Destinatario extranjero, identificado
+                        mediante número de  IVA intracomunitario
+                      operationDate: '2025-07-21'
+                    recipient:
+                      id: IT00470550013
+                      idType: '02'
+                      name: LUIGI LAVAZZA
+                      country: IT
+                    id:
+                      number: DEV-000001
+                      issuedTime: '2025-07-21'
+                    type: F1
+                    vatLines:
+                    - base: 100
+                      rate: 0
+                      amount: 0
+                      vatOperation: N2
+                      vatKey: '01'
+                    total: 100
+                    amount: 0
+              dest_espanol_nif_cif_nie:
+                summary: Factura con destinatario español, identificado mediante NIF
+                  (NIF / CIF / NIE)
+                value:
+                  invoice:
+                    description:
+                      text: Factura 'normal' - Destinatario español, identificado
+                        mediante NIF (NIF / CIF / NIE)
+                      operationDate: '2025-07-21'
+                    recipient:
+                      irsId: B13674197
+                      name: BOLD Software SL
+                      country: ES
+                    id:
+                      number: A-000001
+                      issuedTime: '2025-07-21'
+                    type: F1
+                    vatLines:
+                    - base: 100
+                      rate: 21
+                      amount: 21
+                      vatOperation: S1
+                      vatKey: '01'
+                    total: 121
+                    amount: 21
+              dest_espanol_pasaporte:
+                summary: Factura con destinatario español, identificado mediante número
+                  de pasaporte
+                value:
+                  invoice:
+                    description:
+                      text: Factura 'normal' - Destinatario español, identificado
+                        mediante número de pasaporte
+                      operationDate: '2025-07-21'
+                    recipient:
+                      id: NUMEROPASAPORTE
+                      idType: '03'
+                      name: BOLD Software SL
+                      country: ES
+                    id:
+                      number: A-000001
+                      issuedTime: '2025-07-21'
+                    type: F1
+                    vatLines:
+                    - base: 100
+                      rate: 21
+                      amount: 21
+                      vatOperation: S1
+                      vatKey: '01'
+                    total: 121
+                    amount: 21
+              dest_esp_no_censado_el_valor_del_campo_id_debe_ser_el_nif_de_una_persona_fisica:
+                summary: Factura con destinatario español, no censado. El valor del campo 'id' debe ser el NIF de una persona física
+                value:
+                  invoice:
+                    description:
+                      text: Factura 'normal' - Destinatario español, no censado. El
+                        valor del campo 'id' debe ser el NIF de una persona física.
+                      operationDate: '2025-07-21'
+                    recipient:
+                      id: 01234567L
+                      idType: '07'
+                      name: LUIS VILLOSLADA MANSO
+                      country: ES
+                    id:
+                      number: A-000001
+                      issuedTime: '2025-07-21'
+                    type: F1
+                    vatLines:
+                    - base: 100
+                      rate: 21
+                      amount: 21
+                      vatOperation: S1
+                      vatKey: '01'
+                    total: 121
+                    amount: 21
+              canje:
+                summary: Factura emitida en sustitución de facturas simplificadas (canje)
+                value:
+                  invoice:
+                    description:
+                      text: Factura emitida en sustitución de facturas simplificadas (canje)
+                      operationDate: '2025-07-21'
+                    recipient:
+                      irsId: B13674197
+                      name: BOLD Software SL
+                      country: ES
+                    id:
+                      number: A-000001
+                      issuedTime: '2025-07-21'
+                    type: F3
+                    replacedTicketIds:
+                    - number: B-000001
+                      issuedTime: '2025-07-21'
+                    - number: C-000001
+                      issuedTime: '2025-07-21'
+                    vatLines:
+                    - base: 10
+                      rate: 21
+                      amount: 2.1
+                      vatOperation: S1
+                      vatKey: '01'
+                    total: 12.1
+                    amount: 2.1
+              recargo_equiv:
+                summary: Factura con recargo de equivalencia
+                value:
+                  invoice:
+                    recipient:
+                      irsId: B13674197
+                      name: BOLD Software SL
+                      country: ES
+                    id:
+                      number: A-000001
+                      issuedTime: '2025-05-20'
+                    description:
+                      text: Factura con recargo de equivalencia
+                      operationDate: '2025-05-20'
+                    type: F1
+                    vatLines:
+                    - base: 100
+                      rate: 4
+                      amount: 4
+                      rate2: 0.5
+                      amount2: 0.05
+                      vatOperation: S1
+                      vatKey: '18'
+                    amount: 4.05
+                    total: 104.05
+              rectif_difs:
+                summary: Factura rectificativa por diferencias
+                value:
+                  invoice:
+                    recipient:
+                      irsId: B13674197
+                      name: BOLD Software SL
+                      country: ES
+                    id:
+                      number: A-000001
+                      issuedTime: '2025-05-22'
+                    description:
+                      text: Factura rectificativa por diferencias.
+                      operationDate: '2025-05-22'
+                    type: R1
+                    creditNote:
+                      style: I
+                      ids:
+                      - number: B-000001
+                        issuedTime: '2025-05-22'
+                    vatLines:
+                    - vatOperation: S1
+                      base: 100
+                      rate: 21
+                      amount: 21
+                      vatKey: '01'
+                    total: 121
+                    amount: 21
+              simplif_ticket:
+                summary: Factura simplificada (ticket)
+                value:
+                  invoice:
+                    description:
+                      text: Factura simplificada (ticket)
+                      operationDate: '2025-07-21'
+                    id:
+                      number: A-000001
+                      issuedTime: '2025-07-21'
+                    type: F2
+                    vatLines:
+                    - base: 10
+                      rate: 21
+                      amount: 2.1
+                      vatOperation: S1
+                      vatKey: '01'
+                    total: 12.1
+                    amount: 2.1
+              rectif_difs_simplif_ticket:
+                summary: Factura rectificativa por diferencias de una factura simplificada (ticket)
+                value:
+                  invoice:
+                    description:
+                      text: Factura rectificativa por diferencias de una factura simplificada (ticket)
+                      operationDate: '2025-07-21'
+                    id:
+                      number: REC-000001
+                      issuedTime: '2025-07-21'
+                    type: R5
+                    creditNote:
+                      style: I
+                      ids:
+                      - number: SIM-000001
+                        issuedTime: '2025-05-22'
+                    vatLines:
+                    - base: 10
+                      rate: 21
+                      amount: 2.1
+                      vatOperation: S1
+                      vatKey: '01'
+                    total: 12.1
+                    amount: 2.1
+              simplif_sin_iva_reglas_localizacion:
+                summary: Factura simplificada sin IVA por reglas de localización
+                value:
+                  invoice:
+                    description:
+                      text: Factura simplificada sin IVA por reglas de localización.
+                      operationDate: '2025-07-01'
+                    id:
+                      number: A-000001
+                      issuedTime: '2025-07-01'
+                    type: F2
+                    vatLines:
+                    - base: 100
+                      rate: 0
+                      amount: 0
+                      vatOperation: N2
+                      vatKey: '01'
+                    total: 100
+                    amount: 0
+              igic:
+                summary: Factura con IGIC
+                value:
+                  invoice:
+                    recipient:
+                      irsId: B13674197
+                      name: BOLD Software SL
+                      country: ES
+                    id:
+                      number: A-000001
+                      issuedTime: '2025-07-01'
+                    description:
+                      text: Factura con IGIC
+                      operationDate: '2025-07-01'
+                    type: F1
+                    vatLines:
+                    - base: 100
+                      rate: 3
+                      amount: 3
+                      tax: '03'
+                      vatOperation: S1
+                      vatKey: '01'
+                    total: 103
+                    amount: 3
+              exportacion:
+                summary: 'Factura: exportación (E2, vatKey 02)'
+                value:
+                  invoice:
+                    recipient:
+                      id: IT87654321
+                      idType: '02'
+                      name: Wilier Cycling
+                      country: IT
+                    id:
+                      number: VRFCT/100
+                      issuedTime: '2025-01-01'
+                    description:
+                      text: Descripción general de la factura
+                      operationDate: '2025-01-01'
+                    type: F1
+                    vatLines:
+                    - vatOperation: E2
+                      base: 100
+                      rate: 0
+                      amount: 0
+                      vatKey: '02'
+                    total: 100
+                    amount: 0
+              intracomunitaria:
+                summary: Factura intracomunitaria (E5)
+                value:
+                  invoice:
+                    recipient:
+                      id: IT87654321
+                      idType: '02'
+                      name: Wilier Cycling
+                      country: IT
+                    id:
+                      number: VRFCT/100
+                      issuedTime: '2025-01-01'
+                    description:
+                      text: Descripción general de la factura
+                      operationDate: '2025-01-01'
+                    type: F1
+                    vatLines:
+                    - vatOperation: E5
+                      base: 100
+                      rate: 0
+                      amount: 0
+                      vatKey: '01'
+                    total: 100
+                    amount: 0
+              autofact_destinatario:
+                summary: Autofactura por destinatario (issuedBy D)
+                value:
+                  invoice:
+                    recipient:
+                      irsId: B13674197
+                      name: BOLD Software SL
+                      country: ES
+                    id:
+                      number: AUTO/100
+                      issuedTime: '2025-01-01'
+                    description:
+                      text: Descripción general de la factura
+                      operationDate: '2025-01-01'
+                    type: F1
+                    issuedBy:
+                      type: D
+                    vatLines:
+                    - vatOperation: S1
+                      base: 100
+                      rate: 21
+                      amount: 21
+                      vatKey: '01'
+                    total: 121
+                    amount: 21
+              subsanacion:
+                summary: Subsanación de facturas (isFix=true)
+                value:
+                  invoice:
+                    recipient:
+                      irsId: B13674197
+                      name: BOLD Software SL
+                      country: ES
+                    id:
+                      number: VRFCT/100
+                      issuedTime: '2025-01-01'
+                    description:
+                      text: Descripción general de la factura
+                      operationDate: '2025-01-01'
+                    isFix: true
+                    type: F1
+                    vatLines:
+                    - vatOperation: S1
+                      base: 100
+                      rate: 21
+                      amount: 21
+                      vatKey: '01'
+                    total: 121
+                    amount: 21
+      responses:
+        '200':
+          description: Factura aceptada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DatosVerifactu'
+        '400':
+          description: Solicitud incorrecta o error de negocio (ver catálogo de códigos arriba, en la descripción de la operación)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Verbo HTTP no soportado en esta ruta (solo se admite POST). Respuesta sin cuerpo.
+        '503':
+          description: Servicio no disponible temporalmente (mantenimiento) o error de conexión/concurrencia en base de datos.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceUnavailableError'
+  /invoice_cancel:
+    post:
+      tags:
+      - Facturas
+      summary: Anular una factura
+      operationId: cancelInvoice
+      description: |
+        Anula una factura previamente emitida, identificada por su `queueId`.
+
+        El cuerpo de la petición se interpreta como JSON: el valor decodificado debe ser el número
+        de `queueId` sin más envoltorio (no un objeto ni un array). Un valor con ceros a la izquierda
+        (p.ej. `0044`) no es JSON numérico válido y se rechaza como JSON mal formado, con una forma de
+        respuesta distinta a la habitual (ver nota al final).
+
+        La respuesta 200 de esta operación **no incluye el campo `qrcode`** (a diferencia de la
+        respuesta de creación de factura): la anulación no genera código QR.
+
+        No se exige ningún estado previo de tramitación ante la AEAT para poder anular: solo se
+        bloquea si el `queueId` no existe (o no pertenece a la compañía autenticada), si ya fue
+        anulado, o si el `queueId` indicado corresponde en sí mismo a una anulación.
+
+        ### Catálogo de códigos de error de negocio (HTTP 400)
+
+        | code | Causa |
+        |------|-------|
+        | `000100` | Se encontró más de un registro coincidente con ese `queueId` (dato inconsistente). |
+        | `000101` | El `queueId` no existe, o pertenece a otra compañía (mismo código en ambos casos, para no filtrar información). |
+        | `000102` / `000103` | El `queueId` ya fue anulado previamente, o corresponde a una anulación (no a una factura original). |
+
+        Nota: si el cuerpo de la petición no es JSON sintácticamente válido, la respuesta 400 no sigue
+        el schema `Error` habitual: es `{"error": "invalid_json", "message": "..."}`, sin `code` ni
+        `requestId`.
+      security:
+      - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          text/plain:
+            schema:
+              type: string
+              pattern: ^[0-9]+$
+              description: Identificador (queueId) de la factura a anular
+            example: '44'
+      responses:
+        '200':
+          description: Anulación aceptada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DatosVerifactu'
+              example:
+                qrcode: ''
+                chainInfo:
+                  issuerIrsId: B13674197
+                  number: A-000001
+                  issuedTime: '2025-07-21T00:00:00+02:00'
+                  hash: 1B345A165A7F99610AD75B135C8DCDE197AD353BD6E840E53733FD66C5B76264
+                verifactuXml: PHN1bTE6UmVnaXN0cm9BbHRhIHhtbG5zOnN1bTE9Imh0dHBzOi8vd3d3Mi5hZ2VuY2lhdHJpYnV0YXJpYS5nb2IuZXMv...
+                verifactuUrl: ''
+                queueId: '44'
+                requestId: aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee
+        '400':
+          description: Solicitud incorrecta o error de negocio (ver catálogo de códigos arriba, en la descripción de la operación)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                message: Register does not exist.
+                code: '000101'
+                requestId: aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee
+        '404':
+          description: Verbo HTTP no soportado en esta ruta (solo se admite POST). Respuesta sin cuerpo.
+        '503':
+          description: Servicio no disponible temporalmente (mantenimiento) o error de conexión/concurrencia en base de datos.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceUnavailableError'
+  /invoice_state/{id}:
+    post:
+      tags:
+      - Facturas
+      summary: Consultar estado de una factura
+      operationId: getInvoiceState
+      description: |
+        Obtiene el estado de tramitación de una factura por su identificador (queueId).
+
+        Este endpoint informa **solo del estado**, no de los datos originales de la factura (para
+        recuperarlos, ver `POST /invoice_data/{id}`). Si el `queueId` no existe, o pertenece a otra
+        compañía, ambos casos devuelven el mismo error (`520682`), sin distinción.
+
+        Actualmente `state` nunca toma el valor `cancel`: anular una factura no modifica el estado de
+        la factura original consultada por este endpoint (la anulación tiene su propio `queueId` e
+        historial independiente). Cualquier valor interno no reconocido explícitamente se reporta como
+        `pending`.
+
+        ### Catálogo de códigos de error de negocio (HTTP 400)
+
+        | code | Causa |
+        |------|-------|
+        | `520680` | El `id` de la ruta no es un entero válido. |
+        | `520681` | El `id` es un entero pero menor que 1. |
+        | `520682` | No existe una factura con ese `queueId` para la compañía autenticada. |
+      security:
+      - ApiKeyAuth: []
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+          format: int64
+          minimum: 1
+        description: queueId de la factura
+        example: 44
+      responses:
+        '200':
+          description: Estado recuperado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EstadoFactura'
+              example:
+                state: sent
+                requestId: aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee
+        '400':
+          description: Solicitud incorrecta o error de negocio (ver catálogo de códigos arriba, en la descripción de la operación)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                message: Invoice not found.
+                code: '520682'
+                requestId: aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee
+        '404':
+          description: Verbo HTTP no soportado en esta ruta (solo se admite POST). Respuesta sin cuerpo.
+        '503':
+          description: Servicio no disponible temporalmente (mantenimiento) o error de conexión/concurrencia en base de datos.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceUnavailableError'
+  /invoice_data/{id}:
+    post:
+      tags:
+      - Facturas
+      summary: Recuperar los datos originales de una factura
+      operationId: getInvoiceData
+      description: |
+        Devuelve los mismos datos que se entregaron en la respuesta original de creación o anulación
+        de la factura (código QR, XML, hash de encadenamiento, URL de verificación), identificada por
+        su `queueId`. Es útil para recuperar esa respuesta si no se guardó en el momento de la petición
+        original.
+
+        Este endpoint **no informa del estado de tramitación** ante la AEAT (para eso, usar
+        `POST /invoice_state/{id}`): siempre devuelve los mismos datos, generados en el momento de la
+        creación/anulación, con independencia de lo que haya ocurrido después con esa factura.
+
+        Si el `queueId` consultado corresponde a una anulación (no a una emisión original), `qrcode` y
+        `verifactuUrl` se devuelven como cadena vacía `""` (no ausentes, no `null`): una anulación no
+        genera código QR propio.
+
+        Si el `queueId` no existe, o pertenece a otra compañía, ambos casos devuelven el mismo error
+        (`151212`), sin distinción.
+
+        ### Catálogo de códigos de error de negocio (HTTP 400)
+
+        | code | Causa |
+        |------|-------|
+        | `151210` | El `id` de la ruta no es un entero válido. |
+        | `151211` | El `id` es un entero pero menor que 1. |
+        | `151212` | No existe una factura con ese `queueId` para la compañía autenticada. |
+      security:
+      - ApiKeyAuth: []
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+          format: int64
+          minimum: 1
+        description: queueId de la factura
+        example: 44
+      responses:
+        '200':
+          description: Datos originales recuperados
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoiceDataResponse'
+              example:
+                qrcode: data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMgAAAB4CAYAAAAoaKA8AAAAAXNSR0IArs4c6QAAAARnQU1BAAC...
+                chainInfo:
+                  issuerIrsId: B13674197
+                  number: A-000001
+                  issuedTime: '2025-07-21T00:00:00+02:00'
+                  hash: 1B345A165A7F99610AD75B135C8DCDE197AD353BD6E840E53733FD66C5B76264
+                verifactuXml: PHN1bTE6UmVnaXN0cm9BbHRhIHhtbG5zOnN1bTE9Imh0dHBzOi8vd3d3Mi5hZ2VuY2lhdHJpYnV0YXJpYS5nb2IuZXMv...
+                verifactuUrl: https://prewww2.aeat.es/wlpl/TIKE-CONT/ValidarQR?nif=B13674197&numserie=A-000001&fecha=21-07-2025&importe=12.10
+                queueId: 44
+                requestId: aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee
+                originalRequestId: aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee
+        '400':
+          description: Solicitud incorrecta o error de negocio (ver catálogo de códigos arriba, en la descripción de la operación)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                message: Invoice not found.
+                code: '151212'
+                requestId: aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee
+        '404':
+          description: Verbo HTTP no soportado en esta ruta (solo se admite POST). Respuesta sin cuerpo.
+        '503':
+          description: Servicio no disponible temporalmente (mantenimiento) o error de conexión/concurrencia en base de datos.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceUnavailableError'
+  /id_check:
+    post:
+      tags:
+        - Utilidades
+      summary: Verificar NIF/NIE y nombre o razón social
+      operationId: checkId
+      description: |
+        Este endpoint contrasta el par NIF/NIE y nombre o razón social con el servicio de la AEAT
+        habilitado para tal fin. Es obligatorio enviar una API-Key válida.
+
+        El campo `irsId` debe ser, además, un NIF/NIE/CIF español sintácticamente válido (dígito o
+        letra de control correcto); en caso contrario se rechaza antes de consultar a la AEAT.
+
+        El `Content-Type` de la petición no se comprueba: el servidor intenta interpretar el cuerpo
+        como JSON independientemente de la cabecera enviada.
+
+        ### Catálogo de códigos de error propios (HTTP 400)
+
+        - **`000009`** — Falta `irsId` o `name` en el cuerpo de la petición.
+        - **`000010`** — `irsId` no es un NIF/NIE/CIF español sintácticamente válido.
+        - **`000011`** — `name` está vacío.
+        - **`000013`** — El par NIF/nombre no coincide según la AEAT, **o** ha fallado la comunicación con su servicio de contraste (ambos casos son indistinguibles en la respuesta). Nota: este mismo código se usa también, con otro significado, en la capa común de autenticación (bloqueo por IP) — ver la introducción de esta documentación.
+
+        Si la petición falla en una capa previa a esta operación (por ejemplo, demasiados segmentos en
+        la URL, o licencia/POA de la compañía), la respuesta 400 no sigue el schema `IdCheckError` sino
+        el schema genérico `Error` (con `code` numérico en esos casos concretos).
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IdCheckRequest'
+            examples:
+              ejemplo:
+                summary: Petición de contraste
+                value:
+                  irsId: "12345678Z"
+                  name: "Nombre Apellido Ejemplo"
+      responses:
+        '200':
+          description: Par NIF–nombre/razón social válido.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IdCheckResponse'
+        '400':
+          description: Par inválido o error de validación de entrada (ver catálogo de códigos arriba, en la descripción de la operación).
+          content:
+            application/json:
+              schema:
+                oneOf:
+                - $ref: '#/components/schemas/IdCheckError'
+                - $ref: '#/components/schemas/Error'
+        '404':
+          description: Verbo HTTP no soportado en esta ruta (solo se admite POST). Respuesta sin cuerpo.
+        '503':
+          description: Servicio no disponible temporalmente (mantenimiento) o error de conexión/concurrencia en base de datos.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceUnavailableError'
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: API-Key
+  schemas:
+    IdCheckRequest:
+      type: object
+      required: [irsId, name]
+      properties:
+        irsId:
+          type: string
+          description: NIF/NIE/CIF español a contrastar. Debe ser sintácticamente válido (dígito/letra de control correcto).
+          example: "12345678Z"
+        name:
+          type: string
+          description: Nombre completo o razón social asociada.
+          example: "Nombre Apellido Ejemplo"
+    IdCheckResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          enum: [Valid]
+          description: Indica que el par NIF–nombre/razón social es correcto.
+        requestId:
+          type: string
+          description: Identificador de la solicitud para trazabilidad.
+      example:
+        message: "Valid"
+        requestId: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+    IdCheckError:
+      type: object
+      properties:
+        message:
+          type: string
+          description: Descripción del error. "Invalid" para el caso de contraste fallido; otros mensajes para errores de validación de entrada (ver catálogo de códigos de la operación).
+        code:
+          type: string
+          description: Código de error de negocio propio de esta operación. Ver catálogo en la descripción de la operación.
+        requestId:
+          type: string
+          description: Identificador de la solicitud para trazabilidad.
+      example:
+        message: "Invalid"
+        code: "000013"
+        requestId: "ffffffff-1111-2222-3333-444444444444"
+    CrearFacturaRequest:
+      type: object
+      required:
+      - invoice
+      properties:
+        invoice:
+          $ref: '#/components/schemas/Factura'
+    Factura:
+      type: object
+      description: Modelo de factura (referencia).
+      required:
+      - id
+      - type
+      - vatLines
+      - total
+      - amount
+      properties:
+        recipient:
+          $ref: '#/components/schemas/Destinatario'
+        id:
+          $ref: '#/components/schemas/IdentificadorDocumento'
+        type:
+          type: string
+          enum:
+          - F1
+          - F2
+          - F3
+          - R1
+          - R2
+          - R3
+          - R4
+          - R5
+        replacesTicket:
+          type: boolean
+          description: 'Aceptado por la API, pero sin efecto en el procesamiento actual (la sustitución de tickets se determina por `type=F3` + `replacedTicketIds`).'
+        replacedTicketIds:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/IdentificadorDocumento'
+          description: Obligatorio cuando `type` es `F3`.
+        creditNote:
+          $ref: '#/components/schemas/NotaRectificativa'
+        simple:
+          type: boolean
+          description: Aceptado por la API, pero sin efecto en el procesamiento actual (el tratamiento de factura simplificada se determina por el `type`, p.ej. `F2`/`R5`).
+        description:
+          $ref: '#/components/schemas/DescripcionFactura'
+        vatLines:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/LineaIVA'
+        amount:
+          type: number
+          description: Cuota total de IVA de la factura. Se valida con una tolerancia de 1 unidad contra la suma de las líneas de `vatLines`; el importe efectivamente registrado ante la AEAT (XML y hash de encadenamiento) se recalcula siempre a partir de `vatLines`, no a partir de este valor literal.
+        total:
+          type: number
+          description: Importe total de la factura. Misma validación y recálculo que `amount` (tolerancia de 1 unidad; el valor real ante la AEAT se recalcula de `vatLines`).
+        issuedBy:
+          $ref: '#/components/schemas/EmisionPor'
+        isFix:
+          type: boolean
+          description: Subsanación de una factura previa. Permite reenviar una factura con la misma clave (NIF emisor + número + año) que ya existe localmente sin que se rechace como duplicada, y determina automáticamente el indicador de rechazo previo (`RechazoPrevio`) que se envía a la AEAT a partir del histórico local de envíos de esa factura.
+    Destinatario:
+      description: >
+        Identificación del destinatario. Se modela como una de estas dos formas excluyentes,
+        según el tipo de identificador disponible.
+      oneOf:
+      - $ref: '#/components/schemas/DestinatarioPorNif'
+      - $ref: '#/components/schemas/DestinatarioPorId'
+    DestinatarioPorNif:
+      title: DestinatarioPorNif
+      description: Destinatario identificado por NIF/NIE/CIF español.
+      type: object
+      required:
+      - irsId
+      - name
+      properties:
+        irsId:
+          type: string
+        name:
+          type: string
+        country:
+          $ref: '#/components/schemas/CodigoPais'
+          description: Opcional en esta forma.
+    DestinatarioPorId:
+      title: DestinatarioPorId
+      description: Destinatario identificado por un documento distinto de NIF/NIE/CIF español (p.ej. extranjero, o pasaporte).
+      type: object
+      required:
+      - id
+      - idType
+      - name
+      - country
+      properties:
+        id:
+          type: string
+        idType:
+          $ref: '#/components/schemas/TipoIdFiscal'
+        name:
+          type: string
+        country:
+          $ref: '#/components/schemas/CodigoPais'
+    IdentificadorDocumento:
+      type: object
+      required:
+      - number
+      - issuedTime
+      properties:
+        number:
+          oneOf:
+          - type: string
+          - type: integer
+        issuedTime:
+          type: string
+          format: date
+    DescripcionFactura:
+      type: object
+      required:
+      - text
+      properties:
+        text:
+          type: string
+        operationDate:
+          type: string
+          format: date
+    NotaRectificativa:
+      type: object
+      required:
+      - style
+      - ids
+      description: Si `style` es `S` (sustitutiva), `creditBase` y `creditVat` son además obligatorios.
+      properties:
+        style:
+          type: string
+          enum:
+          - S
+          - I
+        ids:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/IdentificadorDocumento'
+        creditBase:
+          type: number
+        creditVat:
+          type: number
+        creditRecharge:
+          type: number
+    EmisionPor:
+      type: object
+      required:
+      - type
+      description: 'Si `type` es `T` (por terceros), `issuer` es obligatorio por regla de negocio (código `561186`). Ver nota sobre `issuedBy.type=T` en la descripción de la operación POST /invoice.'
+      properties:
+        type:
+          type: string
+          enum:
+          - T
+          - D
+        issuer:
+          $ref: '#/components/schemas/Destinatario'
+    LineaIVA:
+      type: object
+      required:
+      - base
+      - rate
+      - vatOperation
+      - vatKey
+      properties:
+        base:
+          type: number
+        rate:
+          type: integer
+          description: 'Tipo impositivo. Cuando el impuesto es IVA (`tax` ausente o `01`), solo se admiten los valores 0, 4, 5, 10 o 21 (código de error `561124` en caso contrario).'
+        amount:
+          type: number
+        rate2:
+          type: number
+          description: Tipo de recargo de equivalencia. Solo se admiten los valores 5.2, 1.4, 0.5 o 0.
+        amount2:
+          type: number
+        vatOperation:
+          oneOf:
+          - $ref: '#/components/schemas/TipoOperacionIVA'
+          - $ref: '#/components/schemas/MotivoExencionIVA'
+        vatKey:
+          $ref: '#/components/schemas/ClaveRegimenIVA'
+        isUsingSimplifiedRegime:
+          type: boolean
+          description: Aceptado por la API, pero sin efecto en el procesamiento actual.
+        tax:
+          $ref: '#/components/schemas/CodigoImpuesto'
+    CodigoImpuesto:
+      type: string
+      description: 'Código de impuesto. Por defecto (si se omite) se asume IVA (''01'').'
+      enum:
+      - '01'
+      - '02'
+      - '03'
+      - '05'
+    DatosVerifactu:
+      type: object
+      properties:
+        qrcode:
+          type: string
+          description: data URL PNG. Cadena vacía si esta respuesta corresponde a una anulación.
+          example: data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMgAAAB4CAYAAAAoaKA8AAAAAXNSR0IArs4c6QAAAARnQU1BAAC...
+        chainInfo:
+          $ref: '#/components/schemas/IdentificadorFacturaPrevio'
+        verifactuXml:
+          type: string
+          description: XML en base64
+          example: PHN1bTE6UmVnaXN0cm9BbHRhIHhtbG5zOnN1bTE9Imh0dHBzOi8vd3d3Mi5hZ2VuY2lhdHJpYnV0YXJpYS5nb2IuZXMv...
+        verifactuUrl:
+          type: string
+          description: URL de verificación (la misma que codifica el código QR). Cadena vacía si esta respuesta corresponde a una anulación.
+          example: https://prewww2.aeat.es/wlpl/TIKE-CONT/ValidarQR?nif=B13674197&numserie=A-000001&fecha=21-07-2025&importe=12.10
+        queueId:
+          description: 'Identificador interno de la factura/anulación. Se emite como texto en las respuestas de creación (`POST /invoice`) y anulación (`POST /invoice_cancel`); como número en `POST /invoice_data/{id}`.'
+          oneOf:
+          - type: string
+          - type: integer
+          example: '44'
+        requestId:
+          type: string
+          example: aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee
+    InvoiceDataResponse:
+      allOf:
+      - $ref: '#/components/schemas/DatosVerifactu'
+      - type: object
+        properties:
+          originalRequestId:
+            type: string
+            format: uuid
+            description: Identificador de la petición original que generó esta factura o anulación.
+            example: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+    IdentificadorFacturaPrevio:
+      type: object
+      properties:
+        issuerIrsId:
+          type: string
+          example: B13674197
+        number:
+          type: string
+          example: A-000001
+        issuedTime:
+          type: string
+          format: date-time
+          description: Incluye hora y offset horario (siempre 00:00:00 del día correspondiente).
+          example: '2025-07-21T00:00:00+02:00'
+        hash:
+          type: string
+          example: 1B345A165A7F99610AD75B135C8DCDE197AD353BD6E840E53733FD66C5B76264
+    EstadoFactura:
+      type: object
+      properties:
+        state:
+          type: string
+          description: '`cancel` está reservado pero no se emite actualmente: anular una factura no cambia el `state` de la factura original consultada por este endpoint. Cualquier valor interno no reconocido se reporta como `pending`.'
+          enum:
+          - pending
+          - sent
+          - cancel
+          - error
+          example: sent
+        requestId:
+          type: string
+          example: aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee
+        error_code:
+          type: string
+          description: Solo presente para determinadas cuentas. Código de error informado por la AEAT en el registro de facturación, si lo hay.
+        error_text:
+          type: string
+          description: Solo presente para determinadas cuentas. Descripción del error informado por la AEAT, si lo hay.
+        aeat_registered:
+          type: boolean
+          description: Solo presente para determinadas cuentas. Indica si la AEAT ha registrado la factura.
+    Error:
+      type: object
+      description: El campo `code` no es único globalmente entre endpoints — el mismo valor puede representar causas distintas según la operación (ver el catálogo propio de cada una).
+      properties:
+        code:
+          description: Código de error interno. Puede llegar como texto o como número según el punto del código que lo generó.
+          oneOf:
+          - type: string
+          - type: integer
+          example: '1GQ3QH'
+        message:
+          type: string
+          example: Valor no permitido en 'invoice/type'
+        requestId:
+          type: string
+          description: Identificador de la petición, útil para soporte. Puede estar ausente en errores producidos antes de la autenticación (503, JSON mal formado).
+          example: 79cbcf2a-3811-49f4-9466-a75f9e72b25c
+    ServiceUnavailableError:
+      type: object
+      description: Respuesta de servicio no disponible (mantenimiento, o error de conexión/concurrencia con la base de datos). A diferencia de Error, no garantiza incluir 'requestId'.
+      properties:
+        code:
+          description: '`000006`: mantenimiento programado. `3015`/`3016`: error de conexión o concurrencia con la base de datos.'
+          oneOf:
+          - type: string
+          - type: integer
+          example: 3015
+        message:
+          type: string
+          example: Concurrency error. Try again later.
+    CodigoPais:
+      title: CodigoPais
+      type: string
+      description: Código de país de 2 letras. Es un catálogo cerrado (no cualquier ISO-3166-1 alpha-2 es válido) e incluye algunos pseudo-códigos no estándar (QU, XB, XU, XN, XG).
+      enum:
+      - AF
+      - AL
+      - DE
+      - AD
+      - AO
+      - AI
+      - AQ
+      - AG
+      - SA
+      - DZ
+      - AR
+      - AM
+      - AW
+      - AU
+      - AT
+      - AZ
+      - BS
+      - BH
+      - BD
+      - BB
+      - BE
+      - BZ
+      - BJ
+      - BM
+      - BY
+      - BO
+      - BA
+      - BW
+      - BV
+      - BR
+      - BN
+      - BG
+      - BF
+      - BI
+      - BT
+      - CV
+      - KY
+      - KH
+      - CM
+      - CA
+      - CF
+      - CC
+      - CO
+      - KM
+      - CG
+      - CD
+      - CK
+      - KP
+      - KR
+      - CI
+      - CR
+      - HR
+      - CU
+      - TD
+      - CZ
+      - CL
+      - CN
+      - CY
+      - CW
+      - DK
+      - DM
+      - DO
+      - EC
+      - EG
+      - AE
+      - ER
+      - SK
+      - SI
+      - ES
+      - US
+      - EE
+      - ET
+      - FO
+      - PH
+      - FI
+      - FJ
+      - FR
+      - GA
+      - GM
+      - GE
+      - GS
+      - GH
+      - GI
+      - GD
+      - GR
+      - GL
+      - GU
+      - GT
+      - GG
+      - GN
+      - GQ
+      - GW
+      - GY
+      - HT
+      - HM
+      - HN
+      - HK
+      - HU
+      - IN
+      - ID
+      - IR
+      - IQ
+      - IE
+      - IM
+      - IS
+      - IL
+      - IT
+      - JM
+      - JP
+      - JE
+      - JO
+      - KZ
+      - KE
+      - KG
+      - KI
+      - KW
+      - LA
+      - LS
+      - LV
+      - LB
+      - LR
+      - LY
+      - LI
+      - LT
+      - LU
+      - XG
+      - MO
+      - MK
+      - MG
+      - MY
+      - MW
+      - MV
+      - ML
+      - MT
+      - FK
+      - MP
+      - MA
+      - MH
+      - MU
+      - MR
+      - YT
+      - UM
+      - MX
+      - FM
+      - MD
+      - MC
+      - MN
+      - ME
+      - MS
+      - MZ
+      - MM
+      - NA
+      - NR
+      - CX
+      - NP
+      - NI
+      - NE
+      - NG
+      - NU
+      - NF
+      - NO
+      - NC
+      - NZ
+      - IO
+      - OM
+      - NL
+      - BQ
+      - PK
+      - PW
+      - PA
+      - PG
+      - PY
+      - PE
+      - PN
+      - PF
+      - PL
+      - PT
+      - PR
+      - QA
+      - GB
+      - RW
+      - RO
+      - RU
+      - SB
+      - SV
+      - WS
+      - AS
+      - KN
+      - SM
+      - SX
+      - PM
+      - VC
+      - SH
+      - LC
+      - ST
+      - SN
+      - RS
+      - SC
+      - SL
+      - SG
+      - SY
+      - SO
+      - LK
+      - SZ
+      - ZA
+      - SD
+      - SS
+      - SE
+      - CH
+      - SR
+      - TH
+      - TW
+      - TZ
+      - TJ
+      - PS
+      - TF
+      - TL
+      - TG
+      - TK
+      - TO
+      - TT
+      - TN
+      - TC
+      - TM
+      - TR
+      - TV
+      - UA
+      - UG
+      - UY
+      - UZ
+      - VU
+      - VA
+      - VE
+      - VN
+      - VG
+      - VI
+      - WF
+      - YE
+      - DJ
+      - ZM
+      - ZW
+      - QU
+      - XB
+      - XU
+      - XN
+      - AX
+      - BL
+      - EH
+      - GF
+      - GP
+      - MF
+      - MQ
+      - RE
+      - SJ
+      example: ES
+    TipoIdFiscal:
+      type: string
+      enum:
+      - '02'
+      - '03'
+      - '04'
+      - '05'
+      - '06'
+      - '07'
+    MotivoExencionIVA:
+      type: string
+      enum:
+      - E1
+      - E2
+      - E3
+      - E4
+      - E5
+      - E6
+    TipoOperacionIVA:
+      type: string
+      enum:
+      - S1
+      - S2
+      - N1
+      - N2
+    ClaveRegimenIVA:
+      type: string
+      enum:
+      - '01'
+      - '02'
+      - '03'
+      - '04'
+      - '05'
+      - '06'
+      - '07'
+      - '08'
+      - '09'
+      - '10'
+      - '11'
+      - '14'
+      - '15'
+      - '17'
+      - '18'
+      - '19'
+      - '20'
