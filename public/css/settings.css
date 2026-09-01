@@ -203,6 +203,25 @@
   display: flex; flex-direction: column;
   overflow: hidden;
 }
+.settings-modal-panel--wide { max-width: 720px; }
+
+/* Tabs inside a modal (e.g. the entity editor) */
+.settings-modal-tabs {
+  display: flex; gap: 1.25rem;
+  padding: 0 1.1rem;
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+.settings-modal-tab {
+  background: none; border: none; cursor: pointer;
+  padding: 0.7rem 0.15rem; margin-bottom: -1px;
+  font-size: 0.85rem; font-weight: 700;
+  color: var(--text-secondary);
+  border-bottom: 2px solid transparent;
+}
+.settings-modal-tab[aria-selected="true"] { color: var(--text-primary); border-bottom-color: var(--accent); }
+.settings-modal-pane { display: flex; flex-direction: column; gap: 1.1rem; }
+.settings-modal-pane.hidden { display: none !important; }
 .settings-modal-head {
   display: flex; align-items: center; justify-content: space-between;
   padding: 0.9rem 1.1rem;
@@ -225,22 +244,32 @@
 .settings-form-grid {
   display: grid; grid-template-columns: 1fr 1fr; gap: 0.7rem 0.9rem;
 }
+.settings-form-grid .span-2 { grid-column: 1 / -1; }
 @media (max-width: 520px) { .settings-form-grid { grid-template-columns: 1fr; } }
 .settings-field {
   display: flex; flex-direction: column; gap: 0.3rem;
   font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);
 }
+/* Label text + its "*" / "(optional)" marker share one line. */
+.settings-field__label { display: block; }
 .settings-field input[readonly] { background: var(--bg-surface-alt); color: var(--text-secondary); }
 .settings-field .req { color: var(--danger); }
-.settings-field input {
+.settings-field input,
+.settings-field select,
+.settings-field textarea {
   padding: 0.5rem 0.6rem;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
   background: var(--bg-surface);
   color: var(--text-primary);
   font-size: 0.9rem; font-weight: 400;
+  font-family: inherit;
+  width: 100%;
 }
-.settings-field input:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+.settings-field textarea { resize: vertical; }
+.settings-field input:focus-visible,
+.settings-field select:focus-visible,
+.settings-field textarea:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
 .settings-modal-foot {
   display: flex; justify-content: flex-end; gap: 0.5rem;
   padding: 0.85rem 1.1rem;

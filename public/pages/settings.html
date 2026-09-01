@@ -416,86 +416,107 @@
 
   <!-- ==================== ADD / EDIT ENTITY ==================== -->
   <div id="entityModal" class="settings-modal hidden">
-    <div class="settings-modal-panel">
+    <div class="settings-modal-panel settings-modal-panel--wide">
       <div class="settings-modal-head">
         <h2 id="entityModalTitle" data-i18n="entities.modal.addTitle">Add entity</h2>
         <button id="entityModalClose" class="settings-modal-x" title="Close">✕</button>
       </div>
+      <div class="settings-modal-tabs" role="tablist" aria-label="Entity sections">
+        <button type="button" class="settings-modal-tab" data-etab="details" role="tab" aria-selected="true" data-i18n="entities.tab.details">Details</button>
+        <button type="button" class="settings-modal-tab" data-etab="invoicing" role="tab" aria-selected="false" data-i18n="entities.tab.invoicing">Invoicing</button>
+      </div>
       <div class="settings-modal-body">
-        <div class="settings-modal-section">
-          <h3 data-i18n="entities.section.identity">Identity</h3>
-          <div class="settings-form-grid">
-            <label class="settings-field"><span data-i18n="entities.f.name">Entity name</span> <span class="req">*</span>
-              <input type="text" id="entName" autocomplete="off" placeholder="HiTT" />
-            </label>
-            <label class="settings-field"><span data-i18n="entities.f.legalName">Legal name</span>
-              <input type="text" id="entLegalName" autocomplete="off" />
-            </label>
-            <label class="settings-field"><span data-i18n="entities.f.vat">VAT number</span>
-              <input type="text" id="entVat" autocomplete="off" />
-            </label>
-            <label class="settings-field"><span data-i18n="entities.f.email">Invoicing email</span>
-              <input type="email" id="entEmail" autocomplete="off" />
-            </label>
-            <label class="settings-field"><span data-i18n="entities.f.web">Website</span> <span class="settings-emp-sub" data-i18n="entities.f.optional">(optional)</span>
-              <input type="text" id="entWeb" autocomplete="off" placeholder="www.example.com" />
-            </label>
-            <label class="settings-field span-2"><span data-i18n="entities.f.address">Address</span>
-              <textarea id="entAddress" rows="2" placeholder="Street, number&#10;ZIP City, Country"></textarea>
-            </label>
-          </div>
-        </div>
-
-        <div class="settings-modal-section">
-          <h3 data-i18n="entities.section.bank">Bank account</h3>
-          <div class="settings-form-grid">
-            <label class="settings-field span-2"><span data-i18n="entities.f.bankName">Bank name</span>
-              <input type="text" id="entBankName" autocomplete="off" />
-            </label>
-            <label class="settings-field"><span data-i18n="entities.f.bankAddr1">Bank address line 1</span>
-              <input type="text" id="entBankAddr1" autocomplete="off" />
-            </label>
-            <label class="settings-field"><span data-i18n="entities.f.bankAddr2">Bank address line 2</span>
-              <input type="text" id="entBankAddr2" autocomplete="off" />
-            </label>
-            <label class="settings-field"><span data-i18n="entities.f.iban">IBAN</span>
-              <input type="text" id="entIban" autocomplete="off" />
-            </label>
-            <label class="settings-field"><span data-i18n="entities.f.bic">BIC / SWIFT</span>
-              <input type="text" id="entBic" autocomplete="off" />
-            </label>
-          </div>
-        </div>
-
-        <div class="settings-modal-section">
-          <h3 data-i18n="entities.section.mail">Invoice email</h3>
-          <p class="settings-emp-sub" data-i18n="entities.mail.note">How invoices issued by this entity are emailed. Leave the transport on “Server default” unless this entity's mailbox needs a specific one.</p>
-          <div class="settings-form-grid">
-            <label class="settings-field"><span data-i18n="entities.f.mailTransport">Transport</span>
-              <select id="entMailTransport">
-                <option value="" data-i18n="entities.mail.transport.default">Server default</option>
-                <option value="graph" data-i18n="entities.mail.transport.graph">Microsoft Graph</option>
-                <option value="smtp" data-i18n="entities.mail.transport.smtp">SMTP</option>
-              </select>
-            </label>
-            <label class="settings-field"><span data-i18n="entities.f.mailSender">Send from</span> <span class="settings-emp-sub" data-i18n="entities.f.optional">(optional)</span>
-              <input type="email" id="entMailSender" autocomplete="off" placeholder="invoices@company.com" />
-            </label>
-          </div>
-          <p class="settings-emp-sub" data-i18n="entities.mail.senderNote">If blank, the entity's invoicing email is used, then the server default.</p>
-        </div>
-
-        <div class="settings-modal-section">
-          <h3 data-i18n="entities.section.logo">Invoice logo</h3>
-          <p class="settings-emp-sub" data-i18n="entities.logo.note">Shown on the invoice PDF for this entity. PNG with a transparent background works best. This is separate from the portal logo.</p>
-          <div class="entity-logo-row">
-            <div class="entity-logo-frame"><img id="entLogoPreview" alt="" /></div>
-            <div class="entity-logo-actions">
-              <label class="btn btn-secondary brand-file-btn">
-                <span data-i18n="entities.logo.choose">Choose image…</span>
-                <input type="file" id="entLogoFile" accept="image/png,image/jpeg" hidden />
+        <div id="entPaneDetails" class="settings-modal-pane">
+          <div class="settings-modal-section">
+            <h3 data-i18n="entities.section.identity">Identity</h3>
+            <div class="settings-form-grid">
+              <label class="settings-field">
+                <span class="settings-field__label"><span data-i18n="entities.f.name">Entity name</span> <span class="req">*</span></span>
+                <input type="text" id="entName" autocomplete="off" placeholder="HiTT" />
               </label>
-              <button type="button" class="btn btn-secondary" id="btnEntLogoClear" data-i18n="entities.logo.clear">Remove logo</button>
+              <label class="settings-field">
+                <span class="settings-field__label"><span data-i18n="entities.f.vat">VAT number</span></span>
+                <input type="text" id="entVat" autocomplete="off" />
+              </label>
+              <label class="settings-field span-2">
+                <span class="settings-field__label"><span data-i18n="entities.f.legalName">Legal name</span></span>
+                <input type="text" id="entLegalName" autocomplete="off" />
+              </label>
+              <label class="settings-field span-2">
+                <span class="settings-field__label"><span data-i18n="entities.f.web">Website</span> <span class="settings-emp-sub" data-i18n="entities.f.optional">(optional)</span></span>
+                <input type="text" id="entWeb" autocomplete="off" placeholder="www.example.com" />
+              </label>
+              <label class="settings-field span-2">
+                <span class="settings-field__label"><span data-i18n="entities.f.address">Address</span></span>
+                <textarea id="entAddress" rows="2" placeholder="Street, number&#10;ZIP City, Country"></textarea>
+              </label>
+            </div>
+          </div>
+
+          <div class="settings-modal-section">
+            <h3 data-i18n="entities.section.bank">Bank account</h3>
+            <div class="settings-form-grid">
+              <label class="settings-field span-2">
+                <span class="settings-field__label"><span data-i18n="entities.f.bankName">Bank name</span></span>
+                <input type="text" id="entBankName" autocomplete="off" />
+              </label>
+              <label class="settings-field">
+                <span class="settings-field__label"><span data-i18n="entities.f.bankAddr1">Bank address line 1</span></span>
+                <input type="text" id="entBankAddr1" autocomplete="off" />
+              </label>
+              <label class="settings-field">
+                <span class="settings-field__label"><span data-i18n="entities.f.bankAddr2">Bank address line 2</span></span>
+                <input type="text" id="entBankAddr2" autocomplete="off" />
+              </label>
+              <label class="settings-field">
+                <span class="settings-field__label"><span data-i18n="entities.f.iban">IBAN</span></span>
+                <input type="text" id="entIban" autocomplete="off" />
+              </label>
+              <label class="settings-field">
+                <span class="settings-field__label"><span data-i18n="entities.f.bic">BIC / SWIFT</span></span>
+                <input type="text" id="entBic" autocomplete="off" />
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div id="entPaneInvoicing" class="settings-modal-pane hidden">
+          <div class="settings-modal-section">
+            <h3 data-i18n="entities.section.mail">Invoice email</h3>
+            <div class="settings-form-grid">
+              <label class="settings-field span-2">
+                <span class="settings-field__label"><span data-i18n="entities.f.email">Invoicing email</span></span>
+                <input type="email" id="entEmail" autocomplete="off" />
+              </label>
+              <label class="settings-field">
+                <span class="settings-field__label"><span data-i18n="entities.f.mailTransport">Transport</span></span>
+                <select id="entMailTransport">
+                  <option value="" data-i18n="entities.mail.transport.default">Server default</option>
+                  <option value="graph" data-i18n="entities.mail.transport.graph">Microsoft Graph</option>
+                  <option value="smtp" data-i18n="entities.mail.transport.smtp">SMTP</option>
+                </select>
+              </label>
+              <label class="settings-field">
+                <span class="settings-field__label"><span data-i18n="entities.f.mailSender">Send from</span> <span class="settings-emp-sub" data-i18n="entities.f.optional">(optional)</span></span>
+                <input type="email" id="entMailSender" autocomplete="off" placeholder="invoices@company.com" />
+              </label>
+            </div>
+            <p class="settings-emp-sub" data-i18n="entities.mail.note">How invoices issued by this entity are emailed. Leave the transport on “Server default” unless this entity's mailbox needs a specific one.</p>
+            <p class="settings-emp-sub" data-i18n="entities.mail.senderNote">If blank, the entity's invoicing email is used, then the server default.</p>
+          </div>
+
+          <div class="settings-modal-section">
+            <h3 data-i18n="entities.section.logo">Invoice logo</h3>
+            <p class="settings-emp-sub" data-i18n="entities.logo.note">Shown on the invoice PDF for this entity. PNG with a transparent background works best. This is separate from the portal logo.</p>
+            <div class="entity-logo-row">
+              <div class="entity-logo-frame"><img id="entLogoPreview" alt="" /></div>
+              <div class="entity-logo-actions">
+                <label class="btn btn-secondary brand-file-btn">
+                  <span data-i18n="entities.logo.choose">Choose image…</span>
+                  <input type="file" id="entLogoFile" accept="image/png,image/jpeg" hidden />
+                </label>
+                <button type="button" class="btn btn-secondary" id="btnEntLogoClear" data-i18n="entities.logo.clear">Remove logo</button>
+              </div>
             </div>
           </div>
         </div>

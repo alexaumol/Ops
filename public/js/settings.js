@@ -1289,7 +1289,35 @@ const entEls = {
   logoFile: document.getElementById("entLogoFile"),
   logoClear: document.getElementById("btnEntLogoClear"),
   del: document.getElementById("btnEntityDelete"),
+  panes: {
+    details: document.getElementById("entPaneDetails"),
+    invoicing: document.getElementById("entPaneInvoicing"),
+  },
 };
+
+// "Edit entity — <name>" (or just "Add entity" for a new one). Reads the
+// name field live so a rename updates the header as you type.
+function setEntityTitle() {
+  if (!editingEntityId) {
+    entEls.title.textContent = TI("entities.modal.addTitle");
+    return;
+  }
+  const name = entEls.name.value.trim() ||
+    (ENTITIES.find((e) => String(e.id) === String(editingEntityId)) || {}).entitydesc || "";
+  entEls.title.textContent = name
+    ? TI("entities.modal.editTitleNamed", { name })
+    : TI("entities.modal.editTitle");
+}
+
+function showEntityTab(tab) {
+  entModal.querySelectorAll(".settings-modal-tab").forEach((b) =>
+    b.setAttribute("aria-selected", String(b.dataset.etab === tab)));
+  entEls.panes.details.classList.toggle("hidden", tab !== "details");
+  entEls.panes.invoicing.classList.toggle("hidden", tab !== "invoicing");
+}
+entModal.querySelectorAll(".settings-modal-tab").forEach((btn) =>
+  btn.addEventListener("click", () => showEntityTab(btn.dataset.etab)));
+entEls.name.addEventListener("input", setEntityTitle);
 
 async function loadEntities() {
   entEls.body.innerHTML = `<tr><td colspan="6" class="settings-emp-sub" style="padding:1rem;">Loading…</td></tr>`;
@@ -1358,15 +1386,17 @@ function fillEntityModal(e) {
 
 async function openEntityModal(id) {
   editingEntityId = id || null;
-  entEls.title.textContent = TI(id ? "entities.modal.editTitle" : "entities.modal.addTitle");
+  showEntityTab("details");
   entEls.del.classList.toggle("hidden", !id);
   fillEntityModal(null);
+  setEntityTitle();
   entModal.classList.remove("hidden");
   if (id) {
     try {
       const detail = await HITT_API.getEntity(id);
       if (editingEntityId !== id) return;
       fillEntityModal(detail);
+      setEntityTitle();
     } catch (err) {
       toast(err.message || "Could not load that entity.", "red");
     }
@@ -1457,9 +1487,7 @@ entEls.del.addEventListener("click", async () => {
 
 window.addEventListener("hitt:langchange", () => {
   if (entitiesLoaded) renderEntities();
-  if (!entModal.classList.contains("hidden")) {
-    entEls.title.textContent = TI(editingEntityId ? "entities.modal.editTitle" : "entities.modal.addTitle");
-  }
+  if (!entModal.classList.contains("hidden")) setEntityTitle();
 });
 
 loadEmployees();
