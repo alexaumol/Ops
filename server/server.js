@@ -49,6 +49,7 @@ const expensesRouter = loadRouter("expenses");
 const chatRouter = loadRouter("chat");
 const { attachHittUser, requireAuth, AUTH_MODE } = require("./lib/permissions");
 const { entraConfigured } = require("./lib/entraToken");
+const { oidcConfigured, OIDC_ISSUER } = require("./lib/oidcToken");
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -118,10 +119,14 @@ app.use("/api", (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`HITT Ops API listening on port ${PORT}`);
-  console.log(`[auth] AUTH_MODE=${AUTH_MODE}  (Entra token validation ${entraConfigured() ? "configured" : "NOT configured — AAD_TENANT_ID / AAD_CLIENT_ID missing"})`);
-  if (AUTH_MODE === "bearer" && !entraConfigured()) {
-    console.error("[auth] AUTH_MODE=bearer but Entra is not configured — every request will 401. Set AAD_* env vars or AUTH_MODE=header.");
+  console.log(`Ops API listening on port ${PORT}`);
+  const providers = [
+    entraConfigured() && "Entra",
+    oidcConfigured() && `OIDC(${OIDC_ISSUER})`,
+  ].filter(Boolean);
+  console.log(`[auth] AUTH_MODE=${AUTH_MODE}  token validation: ${providers.length ? providers.join(" + ") : "NONE configured"}`);
+  if (AUTH_MODE === "bearer" && !providers.length) {
+    console.error("[auth] AUTH_MODE=bearer but no token provider is configured — every request will 401. Set AAD_* or OIDC_* env vars, or AUTH_MODE=header.");
   }
   if (AUTH_MODE === "header") {
     console.warn("[auth] AUTH_MODE=header — the API trusts the client-supplied X-HITT-User header. Use only for local/offline development.");

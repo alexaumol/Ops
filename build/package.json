@@ -5,10 +5,12 @@
   "description": "Dev-only tooling. Tailwind CSS build for public/pages/projects.html, and the source of the vendored MSAL browser library. Both produce static output committed under public/ — nothing here ships to employees or runs at runtime.",
   "scripts": {
     "build:css": "tailwindcss -c tailwind.config.js -i src.css -o ../public/css/projects-tailwind.css --minify",
-    "vendor:msal": "node -e \"require('fs').copyFileSync('node_modules/@azure/msal-browser/lib/msal-browser.min.js', '../public/vendor/msal-browser.min.js')\""
+    "vendor:msal": "node -e \"require('fs').copyFileSync('node_modules/@azure/msal-browser/lib/msal-browser.min.js', '../public/vendor/msal-browser.min.js')\"",
+    "vendor:oidc": "node -e \"require('fs').copyFileSync('node_modules/oidc-client-ts/dist/browser/oidc-client-ts.min.js', '../public/vendor/oidc-client-ts.min.js')\""
   },
   "devDependencies": {
     "tailwindcss": "^3.4.13",
-    "@azure/msal-browser": "^5.19.0"
+    "@azure/msal-browser": "^5.19.0",
+    "oidc-client-ts": "^3.5.0"
   }
 }

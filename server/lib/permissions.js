@@ -53,10 +53,11 @@
  */
 const { pool } = require("../config/db");
 const { entraConfigured, verifyEntraToken, identityFromClaims } = require("./entraToken");
+const { oidcConfigured, verifyOidcToken, identityFromOidcClaims, looksLikeOidc } = require("./oidcToken");
 
 const AUTH_MODE = (
   process.env.AUTH_MODE ||
-  (process.env.AAD_TENANT_ID && process.env.AAD_CLIENT_ID ? "bearer" : "header")
+  ((process.env.AAD_TENANT_ID && process.env.AAD_CLIENT_ID) || oidcConfigured() ? "bearer" : "header")
 ).toLowerCase();
 
 if (!["bearer", "hybrid", "header"].includes(AUTH_MODE)) {
@@ -131,14 +132,25 @@ async function attachHittUser(req, res, next) {
   let claims = null;
 
   // 1. Try the Bearer token (unless AUTH_MODE forces legacy header-only).
-  if (bearer && RESOLVED_AUTH_MODE !== "header" && entraConfigured()) {
+  //    Route to whichever verifier the token's issuer matches — OIDC (the
+  //    shared broker / a customer IdP) and Entra can both be live during a
+  //    cutover. Try OIDC first; fall back to Entra for anything that isn't
+  //    a JWT from the OIDC issuer.
+  if (bearer && RESOLVED_AUTH_MODE !== "header") {
+    const useOidc = oidcConfigured() && (looksLikeOidc(bearer) || !entraConfigured());
     try {
-      claims = await verifyEntraToken(bearer);
-      identity = identityFromClaims(claims);
-      authMethod = "bearer";
+      if (useOidc) {
+        claims = await verifyOidcToken(bearer);
+        identity = identityFromOidcClaims(claims);
+        authMethod = "bearer";
+      } else if (entraConfigured()) {
+        claims = await verifyEntraToken(bearer);
+        identity = identityFromClaims(claims);
+        authMethod = "bearer";
+      }
     } catch (err) {
       authError = err.message || "token verification failed";
-      console.warn(`[attachHittUser] Bearer token rejected: ${authError}`);
+      console.warn(`[attachHittUser] Bearer token rejected (${useOidc ? "oidc" : "entra"}): ${authError}`);
     }
   }
 

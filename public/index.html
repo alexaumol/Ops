@@ -253,6 +253,7 @@
   <script src="js/branding.js"></script>
   <script src="js/i18n-dict.js"></script>
   <script src="js/i18n.js"></script>
+  <script src="vendor/oidc-client-ts.min.js"></script>
   <script src="vendor/msal-browser.min.js"></script>
   <script src="js/auth.js"></script>
   <script src="js/api.js"></script>
@@ -278,6 +279,17 @@
       const stepMsal = document.getElementById("stepMsal");
       const btnMsal = document.getElementById("btnMsalSignIn");
       const msalError = document.getElementById("msalError");
+      const isOidc = (window.HITT_CONFIG?.AUTH?.provider || "entra").toLowerCase() === "oidc";
+      const btnLabel = btnMsal.querySelector("[data-i18n]");
+      // With the broker (OIDC), the provider buttons live on the broker's own
+      // page, so this one is just a generic "Sign in".
+      if (isOidc && btnLabel) {
+        btnLabel.removeAttribute("data-i18n");
+        btnLabel.textContent = "Sign in";
+        btnMsal.querySelector("svg")?.remove();
+      }
+      const busyText = "Signing in…";
+      const idleText = () => (btnLabel ? btnLabel.textContent : "Sign in");
 
       // On a normal visit this resolves to null almost immediately and we
       // just show the sign-in button below. On the page load that IS
@@ -288,7 +300,7 @@
       // already signing them in.
       (async () => {
         try {
-          const session = await HITT_AUTH.completeMsalRedirect();
+          const session = await HITT_AUTH.completeRedirect();
           if (session) {
             // Checked right here, right after credentials resolve — a
             // deactivated employee's session is cleared and they're kept
@@ -309,16 +321,17 @@
 
       btnMsal.addEventListener("click", async () => {
         msalError.classList.add("hidden");
+        const restore = idleText();
         btnMsal.disabled = true;
-        btnMsal.textContent = "Signing in…";
+        btnMsal.textContent = busyText;
         try {
-          await HITT_AUTH.signInWithMicrosoft(); // navigates away on success — nothing below runs
+          await HITT_AUTH.signIn(); // navigates away on success — nothing below runs
         } catch (err) {
-          console.error("MSAL sign-in failed:", err);
+          console.error("Sign-in failed:", err);
           msalError.textContent = `Could not sign in: ${err?.message || err}`;
           msalError.classList.remove("hidden");
           btnMsal.disabled = false;
-          btnMsal.textContent = "Sign in with Microsoft";
+          btnMsal.textContent = restore;
         }
       });
     }

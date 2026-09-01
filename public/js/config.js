@@ -30,6 +30,28 @@ window.HITT_CONFIG = {
   // back and add its origin to server/.env's CORS_ALLOWED_ORIGINS.
   API_BASE_URL: "https://ops.fhitt.org",
 
+  // Which sign-in provider js/auth.js uses:
+  //   "entra"  Microsoft Entra ID directly, via MSAL (the MSAL block below)
+  //   "oidc"   the shared identity broker / a customer IdP, via oidc-client-ts
+  //            (the OIDC block below)
+  // The API accepts tokens from BOTH while both are configured server-side
+  // (server/lib/permissions.js), so this can be flipped and rolled back
+  // without a flag day.
+  AUTH: {
+    provider: "entra",
+  },
+
+  // OIDC sign-in (Authorization Code + PKCE). `authority` is the issuer —
+  // oidc-client-ts reads {authority}/.well-known/openid-configuration.
+  // client id / issuer are public identifiers, not secrets. The redirect URI
+  // (this origin + /index.html) must be registered on the app in the broker.
+  OIDC: {
+    authority: "https://auth.theaumol.com",
+    clientId: "388838887646035969",
+    scopes: ["openid", "profile", "email", "offline_access"],
+    redirectUri: window.location.origin + "/index.html",
+  },
+
   // Microsoft Entra ID (Azure AD) app registration — used for M365 sign-in.
   // These are public identifiers, safe to ship in static files (a client ID
   // / tenant ID identifies an app registration, it doesn't authenticate one).
