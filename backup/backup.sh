@@ -62,6 +62,18 @@ HEALTHCHECK_STYLE="${HEALTHCHECK_STYLE:-healthchecks}"   # healthchecks | kuma
 # just a running mirror. Empty = skip.
 UPLOAD_DIRS="${UPLOAD_DIRS:-}"
 
+# Join RCLONE_REMOTE with path segments, tolerating a bare "remote:" (no
+# prefix, e.g. crypt remote already rooted at the bucket) as well as
+# "remote:some/prefix". So RCLONE_REMOTE="ionos-crypt:" -> ionos-crypt:ops-vps/...
+remote_path() {
+  local base="${RCLONE_REMOTE%/}" rest
+  rest="$(IFS=/; echo "$*")"
+  case "$base" in
+    *:) printf '%s%s\n' "$base" "$rest" ;;
+    *)  printf '%s/%s\n' "$base" "$rest" ;;
+  esac
+}
+
 RUN_DATE="$(date -u +%Y-%m-%d)"
 RUN_TS="$(date -u +%Y%m%dT%H%M%SZ)"
 RUN_DIR="$LOCAL_DIR/$HOSTLABEL/$RUN_DATE"
@@ -122,7 +134,7 @@ done
 log "dumped $dumped database(s), $(du -sh "$RUN_DIR" | cut -f1) total"
 
 if [ -n "$RCLONE_REMOTE" ]; then
-  dest="${RCLONE_REMOTE%/}/$HOSTLABEL/$RUN_DATE"
+  dest="$(remote_path "$HOSTLABEL" "$RUN_DATE")"
   log "upload -> $dest"
   rclone copy "$RUN_DIR" "$dest" --transfers 2 --checksum || die "rclone copy failed"
   # verify every local file made it, byte-for-byte
@@ -132,7 +144,7 @@ if [ -n "$RCLONE_REMOTE" ]; then
   # running mirror of on-disk upload dirs (not point-in-time)
   for d in $UPLOAD_DIRS; do
     [ -d "$d" ] || { log "  skip files mirror: $d (not a dir)"; continue; }
-    fdest="${RCLONE_REMOTE%/}/$HOSTLABEL/files/$(basename "$d")"
+    fdest="$(remote_path "$HOSTLABEL" files "$(basename "$d")")"
     log "  mirror $d -> $fdest"
     rclone sync "$d" "$fdest" --transfers 4 || log "WARNING: files mirror failed for $d (non-fatal)"
   done
@@ -147,7 +159,7 @@ fi
 # --- prune remote ---
 if [ -n "$RCLONE_REMOTE" ]; then
   log "prune remote older than ${REMOTE_KEEP_DAYS}d"
-  rclone delete "${RCLONE_REMOTE%/}/$HOSTLABEL" --min-age "${REMOTE_KEEP_DAYS}d" --rmdirs || \
+  rclone delete "$(remote_path "$HOSTLABEL")" --min-age "${REMOTE_KEEP_DAYS}d" --rmdirs || \
     log "WARNING: remote prune failed (non-fatal)"
 fi
 
