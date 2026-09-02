@@ -392,6 +392,14 @@ const HITT_API = (() => {
       return request(`/api/reports/stale-projects${qs ? `?${qs}` : ""}`);
     },
 
+    // Report builder ("My reports" tab)
+    getReportDatasets: () => request("/api/reports/datasets"),
+    runReport: (config) => request("/api/reports/run", { method: "POST", body: JSON.stringify(config) }),
+    getSavedReports: () => request("/api/reports/saved"),
+    createSavedReport: (payload) => request("/api/reports/saved", { method: "POST", body: JSON.stringify(payload) }),
+    updateSavedReport: (id, payload) => request(`/api/reports/saved/${id}`, { method: "PUT", body: JSON.stringify(payload) }),
+    deleteSavedReport: (id) => request(`/api/reports/saved/${id}`, { method: "DELETE" }),
+
     health: () => request("/api/health"),
 
     // Ops assistant (see js/chat.js). getChatStatus tells the widget

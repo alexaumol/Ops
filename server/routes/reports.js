@@ -45,6 +45,13 @@
 const express = require("express");
 const { pool } = require("../config/db");
 const { requireModuleAccess } = require("../lib/permissions");
+const { logAudit } = require("../lib/audit");
+const {
+  catalogForClient,
+  runReport,
+  buildReportQuery,
+  ReportConfigError,
+} = require("../lib/reportCatalog");
 
 const router = express.Router();
 
@@ -513,6 +520,135 @@ router.get("/stale-projects", requireModuleAccess("reports"), async (req, res) =
     });
   } catch (err) {
     console.error("[GET /api/reports/stale-projects] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
+/* ======================================================================
+ * "My reports" — self-service report builder
+ * ----------------------------------------------------------------------
+ * GET  /datasets          the curated field catalogue (no SQL)
+ * POST /run               { dataset, dimensions, measures, filters, sort, limit }
+ *                          -> { columns, rows } via a curated rpt_* view
+ * GET  /saved             this user's saved reports + shared (public) ones
+ * POST /saved             { name, config, ispublic }
+ * PUT  /saved/:id         owner-only
+ * DELETE /saved/:id       owner-only
+ * See server/lib/reportCatalog.js for the security model.
+ * ==================================================================== */
+
+router.get("/datasets", requireModuleAccess("reports"), (req, res) => {
+  res.json({ datasets: catalogForClient() });
+});
+
+router.post("/run", requireModuleAccess("reports"), async (req, res) => {
+  try {
+    const result = await runReport(req.body || {});
+    res.json(result);
+  } catch (err) {
+    if (err instanceof ReportConfigError) {
+      return res.status(400).json({ error: "report_config", message: err.message });
+    }
+    console.error("[POST /api/reports/run] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
+const SAVED_SELECT = `
+  SELECT s.id, s.name, s.config, s.ispublic, s.ownerid,
+         s.createdat, s.updatedat,
+         (s.ownerid = $1) AS mine,
+         COALESCE(NULLIF(TRIM(CONCAT(e.employeefirstname, ' ', e.employeelastname)), ''), 'Someone') AS "ownerName"
+  FROM savedreports s
+  LEFT JOIN employees e ON e.id = s.ownerid`;
+
+router.get("/saved", requireModuleAccess("reports"), async (req, res) => {
+  const me = req.hittUser?.employeeId ?? null;
+  try {
+    const { rows } = await pool.query(
+      `${SAVED_SELECT} WHERE s.ownerid = $1 OR s.ispublic = true ORDER BY LOWER(s.name)`,
+      [me]
+    );
+    res.json({ rows });
+  } catch (err) {
+    console.error("[GET /api/reports/saved] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
+function validateSavePayload(body) {
+  const name = String(body?.name || "").trim();
+  if (!name) throw new ReportConfigError("a report name is required");
+  if (name.length > 200) throw new ReportConfigError("name is too long (max 200)");
+  // buildReportQuery throws ReportConfigError if the config can't ever run
+  buildReportQuery(body?.config || {});
+  return { name, config: body.config, ispublic: !!body.ispublic };
+}
+
+router.post("/saved", requireModuleAccess("reports"), async (req, res) => {
+  const me = req.hittUser?.employeeId ?? null;
+  if (!me) return res.status(403).json({ error: "no_employee", message: "Your sign-in is not linked to an employee record." });
+  let payload;
+  try {
+    payload = validateSavePayload(req.body);
+  } catch (err) {
+    return res.status(400).json({ error: "report_config", message: err.message });
+  }
+  try {
+    const { rows } = await pool.query(
+      `INSERT INTO savedreports (ownerid, name, config, ispublic)
+       VALUES ($1, $2, $3::jsonb, $4) RETURNING id`,
+      [me, payload.name, JSON.stringify(payload.config), payload.ispublic]
+    );
+    const id = rows[0].id;
+    const { rows: full } = await pool.query(`${SAVED_SELECT} WHERE s.id = $2`, [me, id]);
+    res.status(201).json(full[0]);
+    logAudit(req, { kind: "report.save", desc: `Saved report "${payload.name}"${payload.ispublic ? " (public)" : ""}` });
+  } catch (err) {
+    console.error("[POST /api/reports/saved] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
+router.put("/saved/:id", requireModuleAccess("reports"), async (req, res) => {
+  const me = req.hittUser?.employeeId ?? null;
+  if (!me) return res.status(403).json({ error: "no_employee" });
+  let payload;
+  try {
+    payload = validateSavePayload(req.body);
+  } catch (err) {
+    return res.status(400).json({ error: "report_config", message: err.message });
+  }
+  try {
+    const { rows } = await pool.query(
+      `UPDATE savedreports SET name = $3, config = $4::jsonb, ispublic = $5, updatedat = now()
+       WHERE id = $1 AND ownerid = $2
+       RETURNING id`,
+      [req.params.id, me, payload.name, JSON.stringify(payload.config), payload.ispublic]
+    );
+    if (!rows.length) return res.status(404).json({ error: "not_found", message: "No report of yours with that id." });
+    const { rows: full } = await pool.query(`${SAVED_SELECT} WHERE s.id = $2`, [me, req.params.id]);
+    res.json(full[0]);
+    logAudit(req, { kind: "report.save", desc: `Updated report "${payload.name}"` });
+  } catch (err) {
+    console.error("[PUT /api/reports/saved/:id] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
+router.delete("/saved/:id", requireModuleAccess("reports"), async (req, res) => {
+  const me = req.hittUser?.employeeId ?? null;
+  if (!me) return res.status(403).json({ error: "no_employee" });
+  try {
+    const { rows } = await pool.query(
+      `DELETE FROM savedreports WHERE id = $1 AND ownerid = $2 RETURNING name`,
+      [req.params.id, me]
+    );
+    if (!rows.length) return res.status(404).json({ error: "not_found" });
+    res.status(204).end();
+    logAudit(req, { kind: "report.delete", desc: `Deleted report "${rows[0].name}"` });
+  } catch (err) {
+    console.error("[DELETE /api/reports/saved/:id] DB error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });
   }
 });
