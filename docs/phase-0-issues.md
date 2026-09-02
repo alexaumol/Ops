@@ -136,13 +136,16 @@ One command to stand up a new customer instance end to end. `provision <slug>
 **Blocks:** A (SMTP tasks)
 
 One-time-code logins and notifications must land, not spam-folder.
+Design + DNS state in `docs/email.md`.
 
-- [x] Set up a transactional sender — **Resend**, domain-authenticated for `theaumol.com`
-- [x] SPF + DKIM for `theaumol.com` — added as part of Resend domain verification
-- [x] Route Zitadel through it — Zitadel SMTP → Resend, verification-code delivery tested OK
-- [ ] Add a **DMARC** record (`_dmarc.theaumol.com`, start at `p=none` with `rua=`)
-- [ ] Route **invoice mail** (the Ops app's own sender) through Resend too, or confirm the per-entity SMTP/Graph transport is the intended path for customer instances
-- [ ] Score deliverability (mail-tester.com) and turn on Resend bounce / complaint webhooks
+- [x] Transactional sender — **Resend**, domain-authenticated (`send.theaumol.com` SPF, `resend._domainkey` DKIM)
+- [x] Route Zitadel through it — SMTP → Resend, `From: noreply@theaumol.com` (DKIM-aligned), delivery tested OK
+- [x] apex SPF for M365 (`include:spf.protection.outlook.com`)
+- [x] **Invoice mail** — decision recorded: per-entity SMTP/Graph is the default (customer's own domain); Resend is not in the invoice path
+- [ ] DMARC `rua=` — current record is inert (`p=none;`, no reporting address); point it at a digest service
+- [ ] Enable **M365 DKIM** (`selector1/2._domainkey` CNAMEs) — needed before DMARC `quarantine`
+- [ ] Walk the DMARC ramp: `p=none` (2–4 wk, watch reports) → `quarantine` → `reject`
+- [ ] mail-tester.com score on a Zitadel email (target 9–10/10); turn on Resend bounce/complaint alerts
 
 ---
 
