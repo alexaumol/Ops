@@ -17,6 +17,8 @@
  *                                        line chart's year dropdown.
  *   GET /projects-opened-by-month       Project counts by entrydate month,
  *                                        for a given year — line chart.
+ *   GET /invoiced-by-month             Total invoiced per month, this year
+ *                                        vs last — line chart.
  *   GET /projects-by-month-detail       The actual projects behind one
  *                                        line-chart point (click a dot).
  *   GET /project-timeline               Every logged project status
@@ -228,6 +230,53 @@ router.get("/projects-opened-by-month", requireModuleAccess("reports"), async (r
     res.json(rows);
   } catch (err) {
     console.error("[GET /api/reports/projects-opened-by-month] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
+// GET /api/reports/invoiced-by-month
+// Line-chart data: total invoiced amount per calendar month for the
+// current year and the previous one, so they can be compared Jan→Dec.
+// Sums invoicesdetails.amount by invoicedate (the issue date), excluding
+// cancelled invoices (status 6); corrective invoices carry a negative
+// amount and correctly reduce the month they land in. Amounts are summed
+// raw and shown as EUR — the app does no FX conversion (matches the
+// Invoicing dashboard's invoiced-total).
+router.get("/invoiced-by-month", requireModuleAccess("reports"), async (req, res) => {
+  const currentYear = new Date().getFullYear();
+  const previousYear = currentYear - 1;
+  try {
+    const { rows } = await pool.query(
+      `WITH inv AS (
+         SELECT EXTRACT(YEAR FROM d.invoicedate)::int AS y,
+                EXTRACT(MONTH FROM d.invoicedate)::int AS m,
+                d.amount
+         FROM invoices i
+         JOIN invoicesdetails d ON d.invoiceid = i.id
+         WHERE d.invoicedate IS NOT NULL
+           AND i.invoicestatusid IS DISTINCT FROM 6
+           AND EXTRACT(YEAR FROM d.invoicedate) IN ($1, $2)
+       )
+       SELECT g.month,
+              COALESCE(SUM(inv.amount) FILTER (WHERE inv.y = $1), 0) AS current,
+              COALESCE(SUM(inv.amount) FILTER (WHERE inv.y = $2), 0) AS previous
+       FROM generate_series(1, 12) AS g(month)
+       LEFT JOIN inv ON inv.m = g.month
+       GROUP BY g.month
+       ORDER BY g.month`,
+      [currentYear, previousYear]
+    );
+    res.json({
+      currentYear,
+      previousYear,
+      months: rows.map((r) => ({
+        month: r.month,
+        current: Number(r.current) || 0,
+        previous: Number(r.previous) || 0,
+      })),
+    });
+  } catch (err) {
+    console.error("[GET /api/reports/invoiced-by-month] DB error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });
   }
 });

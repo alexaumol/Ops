@@ -351,6 +351,7 @@ const HITT_API = (() => {
     getProjectYears: () => request("/api/reports/project-years"),
     getProjectsOpenedByMonth: (year) =>
       request(`/api/reports/projects-opened-by-month${year ? `?year=${encodeURIComponent(year)}` : ""}`),
+    getInvoicedByMonth: () => request("/api/reports/invoiced-by-month"),
     getProjectsByMonthDetail: (year, month, type) => {
       const params = new URLSearchParams({ month, type });
       if (year) params.set("year", year);

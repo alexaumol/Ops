@@ -71,6 +71,15 @@
 
     <!-- ============================ PROJECT STATS ============================ -->
     <div id="paneStats" class="page-pane">
+      <!-- Row 0: full width — invoiced per month, this year vs last -->
+      <div class="rpt-chart-card">
+        <div class="rpt-chart-head">
+          <h2 data-i18n="rpt.chart.invoicedByMonth">Invoiced per month — this year vs last</h2>
+          <button class="btn btn-secondary" id="btnInvoicedExport" data-i18n="rpt.exportCsv">Export CSV</button>
+        </div>
+        <div id="invoicedChart"></div>
+      </div>
+
       <!-- Row 1: full width -->
       <div class="rpt-chart-card">
         <div class="rpt-chart-head">

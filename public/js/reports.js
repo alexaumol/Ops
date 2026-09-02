@@ -286,12 +286,13 @@ let lastStatusEntityRows = [];
 let lastOpenedRows = [];
 let lastTimelineRows = [];
 let lastStaleRows = [];
+let lastInvoicedData = null;
 
 const statusYearSelect = document.getElementById("statusYearSelect");
 const statusMetricSelect = document.getElementById("statusMetricSelect");
 
 async function loadStats() {
-  await Promise.all([loadYearsThenCharts(), loadTimeline(), loadStaleProjects()]);
+  await Promise.all([loadInvoicedChart(), loadYearsThenCharts(), loadTimeline(), loadStaleProjects()]);
 }
 
 // Populates both year dropdowns (status chart + opened/closed chart) from
@@ -548,6 +549,84 @@ document.getElementById("btnOpenedExport").addEventListener("click", () => {
     `projects-opened-closed_${openedYearSelect.value || "all-years"}.csv`,
     [T('rpt.csv.month'), T('rpt.series.opened'), T('rpt.series.closed')],
     lastOpenedRows.map((r) => [MONTH_LABELS()[r.month - 1], r.openedCount, r.closedCount])
+  );
+});
+
+/* ---------- Line chart: invoiced per month, this year vs last ---------- */
+async function loadInvoicedChart() {
+  const el = document.getElementById("invoicedChart");
+  el.innerHTML = `<div class="rpt-chart-empty">${T('common.loading')}</div>`;
+  try {
+    lastInvoicedData = await HITT_API.getInvoicedByMonth();
+    renderInvoicedChart(lastInvoicedData);
+  } catch (err) {
+    console.error("[reports] failed to load invoiced-by-month:", err.message);
+    lastInvoicedData = null;
+    el.innerHTML = `<div class="rpt-chart-empty">${T('rpt.err.chart')}</div>`;
+    toast(T('rpt.toast.invoicedChartFail'), "red");
+  }
+}
+
+function renderInvoicedChart(data) {
+  const el = document.getElementById("invoicedChart");
+  const months = (data && data.months) || [];
+  const current = months.map((m) => Number(m.current) || 0);
+  const previous = months.map((m) => Number(m.previous) || 0);
+  const all = current.concat(previous);
+  const yMin = Math.min(0, ...all);
+  const yMax = niceCeilMagnitude(Math.max(1, ...all));
+  const span = yMax - yMin || 1;
+
+  // Wide viewBox (like the Projects-by-status chart) so this full-width
+  // card renders at a sensible height, not a tall square.
+  const W = 1160, H = 300, ML = 52, MR = 12, MT = 14, MB = 30;
+  const plotW = W - ML - MR, plotH = H - MT - MB;
+  const stepX = plotW / 11;
+  const yScale = (v) => plotH - ((v - yMin) / span) * plotH;
+
+  let svg = "";
+  for (let i = 0; i <= 4; i++) {
+    const val = yMin + (span * i) / 4;
+    const y = MT + yScale(val);
+    svg += `<line class="rpt-chart-gridline" x1="${ML}" y1="${y}" x2="${W - MR}" y2="${y}" />`;
+    svg += `<text class="rpt-chart-label" x="${ML - 8}" y="${y + 3}" text-anchor="end">${formatCompactCurrency(val)}</text>`;
+  }
+  svg += `<line class="rpt-chart-axis" x1="${ML}" y1="${MT}" x2="${ML}" y2="${MT + plotH}" />`;
+  const zeroY = MT + yScale(0);
+  svg += `<line class="rpt-chart-axis" x1="${ML}" y1="${zeroY}" x2="${W - MR}" y2="${zeroY}" />`;
+
+  const drawSeries = (values, lineClass, dotClass, label) => {
+    const pts = values.map((v, i) => ({ x: ML + i * stepX, y: MT + yScale(v), v, i }));
+    svg += `<polyline class="${lineClass}" points="${pts.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ")}" />`;
+    pts.forEach((p) => {
+      svg += `<circle class="${dotClass}" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3.5"><title>${escapeHtml(MONTH_LABELS()[p.i])} · ${escapeHtml(label)}: ${formatMoney(p.v)}</title></circle>`;
+    });
+  };
+  const curLabel = String((data && data.currentYear) || "");
+  const prevLabel = String((data && data.previousYear) || "");
+  drawSeries(previous, "rpt-chart-line rpt-chart-line--closed", "rpt-chart-dot rpt-chart-dot--closed", prevLabel);
+  drawSeries(current, "rpt-chart-line", "rpt-chart-dot", curLabel);
+
+  MONTH_LABELS().forEach((label, i) => {
+    svg += `<text class="rpt-chart-label" x="${(ML + i * stepX).toFixed(1)}" y="${MT + plotH + 20}" text-anchor="middle">${escapeHtml(label)}</text>`;
+  });
+
+  el.innerHTML = `
+    <svg class="rpt-chart-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Invoiced per month, ${escapeHtml(prevLabel)} vs ${escapeHtml(curLabel)}">${svg}</svg>
+    <div class="rpt-legend" style="margin-top:0.5rem;">
+      <span class="rpt-legend-item"><span class="rpt-swatch" style="width:14px; height:3px; border-radius:2px; background:var(--brand);"></span>${escapeHtml(curLabel)}</span>
+      <span class="rpt-legend-item"><span class="rpt-swatch" style="width:14px; height:3px; border-radius:2px; background:var(--hitt-amber);"></span>${escapeHtml(prevLabel)}</span>
+    </div>
+  `;
+}
+
+document.getElementById("btnInvoicedExport").addEventListener("click", () => {
+  const d = lastInvoicedData;
+  if (!d || !d.months || !d.months.length) { toast(T('rpt.nothingToExport'), "navy"); return; }
+  downloadCsv(
+    `invoiced-by-month_${d.previousYear}-${d.currentYear}.csv`,
+    [T('rpt.csv.month'), String(d.currentYear), String(d.previousYear)],
+    d.months.map((m) => [MONTH_LABELS()[m.month - 1], m.current, m.previous])
   );
 });
 
