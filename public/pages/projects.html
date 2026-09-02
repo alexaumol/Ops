@@ -167,6 +167,7 @@
 
     <div class="shrink-0 flex items-center gap-5 px-4 sm:px-5 border-b border-slate-200 bg-white">
       <button data-mtab="general" class="modal-tab kbd-focus py-2.5 text-sm font-semibold text-hitt-teal" aria-selected="true" data-i18n="bp.tab.general">General</button>
+      <button data-mtab="schedule" class="modal-tab kbd-focus py-2.5 text-sm font-semibold text-hitt-teal" aria-selected="false" data-i18n="proj.tab.schedule">Project schedule</button>
       <button data-mtab="budget" class="modal-tab kbd-focus py-2.5 text-sm font-semibold text-hitt-teal" aria-selected="false" data-i18n="proj.tab.budget">Budget &amp; expenses</button>
       <button data-mtab="resources" class="modal-tab kbd-focus py-2.5 text-sm font-semibold text-hitt-teal" aria-selected="false" data-i18n="proj.tab.resources">Resources</button>
       <div class="flex-1"></div>
@@ -236,29 +237,6 @@
             </div>
             <div id="mInvoicingPartnerHint" class="px-2.5 pb-2.5 text-[11px] text-slate-400" data-i18n="proj.f.bpHint">Assign a Contracting Business Partner first to pick who gets invoiced.</div>
           </section>
-
-          <section class="bg-white rounded-lg border border-slate-200 shadow-card overflow-hidden">
-            <div class="bg-hitt-teal px-3 py-1.5"><h3 class="text-white text-xs font-bold tracking-wide" data-i18n="proj.section.deliverables">PROJECT DELIVERABLES</h3></div>
-            <div class="overflow-x-auto">
-              <table class="w-full text-xs">
-                <thead>
-                  <tr class="bg-hitt-mist text-hitt-teal text-left">
-                    <th class="px-2.5 py-1.5 font-semibold w-32" data-i18n="proj.del.expected">Expected</th>
-                    <th class="px-2.5 py-1.5 font-semibold w-32" data-i18n="proj.del.effective">Effective</th>
-                    <th class="px-2.5 py-1.5 font-semibold" data-i18n="proj.del.name">Deliverable name</th>
-                    <th class="px-2.5 py-1.5 font-semibold w-16"></th>
-                  </tr>
-                </thead>
-                <tbody id="mDeliverables"></tbody>
-              </table>
-            </div>
-            <div class="px-2.5 py-2 border-t border-slate-100 flex flex-wrap items-center gap-1.5">
-              <input id="mNewDeliverableExpected" type="date" class="field-input" style="width:8.5rem;" title="Expected date" placeholder="Expected date" />
-              <input id="mNewDeliverableEffective" type="date" class="field-input" style="width:8.5rem;" title="Effective date" placeholder="Effective date" />
-              <input id="mNewDeliverableName" type="text" placeholder="New deliverable name…" class="field-input flex-1 italic text-hitt-teal" style="min-width:12rem;" data-i18n-placeholder="proj.del.newName" />
-              <button id="mAddDeliverable" class="shrink-0 bg-hitt-teal text-white text-[11px] font-semibold px-3 py-2 rounded-md hover:bg-hitt-ink transition" data-i18n="form.add">Add</button>
-            </div>
-          </section>
         </div>
 
         <div class="flex flex-col gap-4">
@@ -276,6 +254,31 @@
             </div>
           </section>
         </div>
+      </div>
+
+      <div id="paneSchedule" class="hidden p-4 sm:p-5 flex flex-col gap-4">
+        <section class="bg-white rounded-lg border border-slate-200 shadow-card overflow-hidden">
+          <div class="bg-hitt-teal px-3 py-1.5"><h3 class="text-white text-xs font-bold tracking-wide" data-i18n="proj.section.deliverables">PROJECT DELIVERABLES</h3></div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-xs">
+              <thead>
+                <tr class="bg-hitt-mist text-hitt-teal text-left">
+                  <th class="px-2.5 py-1.5 font-semibold w-32" data-i18n="proj.del.expected">Expected</th>
+                  <th class="px-2.5 py-1.5 font-semibold w-32" data-i18n="proj.del.effective">Effective</th>
+                  <th class="px-2.5 py-1.5 font-semibold" data-i18n="proj.del.name">Deliverable name</th>
+                  <th class="px-2.5 py-1.5 font-semibold w-16"></th>
+                </tr>
+              </thead>
+              <tbody id="mDeliverables"></tbody>
+            </table>
+          </div>
+          <div class="px-2.5 py-2 border-t border-slate-100 flex flex-wrap items-center gap-1.5">
+            <input id="mNewDeliverableExpected" type="date" class="field-input" style="width:8.5rem;" title="Expected date" placeholder="Expected date" />
+            <input id="mNewDeliverableEffective" type="date" class="field-input" style="width:8.5rem;" title="Effective date" placeholder="Effective date" />
+            <input id="mNewDeliverableName" type="text" placeholder="New deliverable name…" class="field-input flex-1 italic text-hitt-teal" style="min-width:12rem;" data-i18n-placeholder="proj.del.newName" />
+            <button id="mAddDeliverable" class="shrink-0 bg-hitt-teal text-white text-[11px] font-semibold px-3 py-2 rounded-md hover:bg-hitt-ink transition" data-i18n="form.add">Add</button>
+          </div>
+        </section>
       </div>
 
       <div id="paneBudget" class="hidden p-4 sm:p-5 flex flex-col gap-4">

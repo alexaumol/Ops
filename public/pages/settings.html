@@ -272,6 +272,8 @@
       <!-- ==================== AUDITING ==================== -->
       <section id="paneAudit" class="settings-pane hidden">
         <p class="settings-note" data-i18n="settings.audit.note">Sign in / out (with client IP and reported device) plus every data change across the app — projects (create, status, edits, deliverables, quotations, notes, resources, partner assignment), time tracking, business partners (create, edits, contacts, notes, tax companies), invoicing, time-off decisions, and these settings. Admins only.</p>
+        <div class="settings-audit-layout">
+        <div class="settings-audit-main">
         <div class="settings-toolbar" style="gap:0.6rem; flex-wrap:wrap;">
           <label class="settings-inline-field"><span data-i18n="settings.audit.user">User</span>
             <select id="auditUserFilter"><option value="" data-i18n="settings.audit.everyone">Everyone</option></select>
@@ -320,6 +322,18 @@
           <button class="btn btn-secondary" id="btnAuditPrev" data-i18n="form.prev">&larr; Prev</button>
           <button class="btn btn-secondary" id="btnAuditNext" data-i18n="form.next">Next &rarr;</button>
         </div>
+        </div><!-- /.settings-audit-main -->
+        <aside class="settings-audit-side">
+          <div class="settings-stat">
+            <span class="settings-stat__value" id="auditConnectedUsers">—</span>
+            <span class="settings-stat__label" data-i18n="settings.audit.connectedUsers">Connected users</span>
+          </div>
+          <div class="settings-stat">
+            <span class="settings-stat__value" id="auditActionsToday">—</span>
+            <span class="settings-stat__label" data-i18n="settings.audit.actionsToday">Actions logged today</span>
+          </div>
+        </aside>
+        </div><!-- /.settings-audit-layout -->
       </section>
     </div>
   </main>

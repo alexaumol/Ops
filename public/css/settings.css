@@ -53,6 +53,29 @@
 }
 .settings-pagination .btn { padding: 0.35rem 0.85rem; font-size: 0.82rem; }
 
+/* Auditing tab: main table + a stats side column */
+.settings-audit-layout { display: flex; align-items: flex-start; gap: 1.25rem; }
+.settings-audit-main { flex: 1; min-width: 0; }
+.settings-audit-side {
+  flex-shrink: 0; width: 210px;
+  display: flex; flex-direction: column; gap: 0.75rem;
+}
+@media (max-width: 900px) {
+  .settings-audit-layout { flex-direction: column; }
+  .settings-audit-side { width: 100%; flex-direction: row; }
+  .settings-audit-side .settings-stat { flex: 1; }
+}
+.settings-stat {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: 0.9rem 1rem;
+  display: flex; flex-direction: column; gap: 0.25rem;
+}
+.settings-stat__value { font-size: 1.6rem; font-weight: 800; color: var(--text-primary); line-height: 1.1; }
+.settings-stat__label { font-size: 0.76rem; color: var(--text-secondary); font-weight: 600; }
+
 .audit-table { font-size: 0.82rem; }
 .audit-table td { vertical-align: top; }
 .audit-action-chip {

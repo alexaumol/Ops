@@ -776,7 +776,9 @@ async function openProjectModal(id){
 
   document.querySelectorAll('[data-mtab]').forEach(b => b.setAttribute('aria-selected', b.dataset.mtab === 'general' ? 'true' : 'false'));
   document.getElementById('paneGeneral').classList.remove('hidden');
+  document.getElementById('paneSchedule').classList.add('hidden');
   document.getElementById('paneBudget').classList.add('hidden');
+  document.getElementById('paneResources').classList.add('hidden');
 
   modalPanel.querySelectorAll('input, select').forEach(el => {
     el.addEventListener('input', () => document.getElementById('mChangedBadge').classList.remove('hidden'), { once: true });
@@ -1437,6 +1439,7 @@ document.querySelectorAll('[data-mtab]').forEach(btn => {
     document.querySelectorAll('[data-mtab]').forEach(b => b.setAttribute('aria-selected', 'false'));
     btn.setAttribute('aria-selected', 'true');
     document.getElementById('paneGeneral').classList.toggle('hidden', btn.dataset.mtab !== 'general');
+    document.getElementById('paneSchedule').classList.toggle('hidden', btn.dataset.mtab !== 'schedule');
     document.getElementById('paneBudget').classList.toggle('hidden', btn.dataset.mtab !== 'budget');
     document.getElementById('paneResources').classList.toggle('hidden', btn.dataset.mtab !== 'resources');
   });

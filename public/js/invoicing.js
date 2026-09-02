@@ -389,7 +389,7 @@ document.querySelectorAll('.inv-view-tab').forEach(btn => {
 async function loadAllInvoices(){
   const tbody = document.getElementById('ivTableBody');
   const empty = document.getElementById('ivEmpty');
-  tbody.innerHTML = `<tr><td colspan="6" class="sub-empty">${T('common.loading')}</td></tr>`;
+  tbody.innerHTML = `<tr><td colspan="7" class="sub-empty">${T('common.loading')}</td></tr>`;
   empty.classList.add('hidden');
   if (usingDemoData) {
     ALL_INVOICES = [];
@@ -451,7 +451,7 @@ function ivMatches(inv){
   if (ivSearch) {
     const t = ivSearch.toLowerCase();
     const desc = String(inv.descriptionservice || '').replace(/<[^>]+>/g, ' ');
-    const hay = `${inv.invoicecode || ''} ${desc} ${inv.projectBpName || ''} ${inv.taxCompanyName || ''} ${inv.projectCode || ''} ${inv.projectName || ''}`.toLowerCase();
+    const hay = `${inv.invoicecode || ''} ${desc} ${inv.projectBpName || ''} ${inv.taxCompanyName || ''} ${inv.projectCode || ''} ${inv.projectName || ''} ${inv.entityLabel || ''}`.toLowerCase();
     if (!hay.includes(t)) return false;
   }
   return true;
@@ -460,6 +460,7 @@ function ivMatches(inv){
 function ivSortValue(inv, col){
   switch (col) {
     case 'code': return String(inv.invoicecode || '');
+    case 'entity': return String(inv.entityLabel || '');
     case 'taxco': return String(inv.taxCompanyName || '');
     case 'project': return String(inv.projectCode || '');
     case 'amount': return Number(inv.amount) || 0;
@@ -527,6 +528,7 @@ function renderInvoiceViewTable(){
           <div class="inv-iv-code"><a href="#" data-open>${escapeHtml(inv.invoicecode || T('inv.draft'))}</a>${corrective}</div>
           <div class="inv-iv-sub">${statusPill}${sent}</div>
         </td>
+        <td>${escapeHtml(inv.entityLabel || '—')}</td>
         <td>${tcCell}</td>
         <td>${projCell}</td>
         <td style="text-align:right;" class="inv-money${Number(inv.amount) < 0 ? ' inv-money--neg' : ''}">${formatMoney(inv.amount, inv.currency)}</td>

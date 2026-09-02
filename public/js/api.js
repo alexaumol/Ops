@@ -268,6 +268,7 @@ const HITT_API = (() => {
 
     getAuditUsers: () => request("/api/audit/users"),
     getAuditKinds: () => request("/api/audit/kinds"),
+    getAuditSummary: () => request("/api/audit/summary"),
     getAuditLogs: (filters = {}) => {
       const params = new URLSearchParams();
       if (filters.userId) params.set("userId", filters.userId);

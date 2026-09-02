@@ -351,7 +351,8 @@ router.get("/invoices", requireModuleAccess("invoicing"), async (req, res) => {
              d.updatedat AS "updatedAt",
              NULLIF(TRIM(CONCAT(ue.employeefirstname, ' ', ue.employeelastname)), '') AS "updatedByName",
              p.id::text AS "projectId", p.projectnumber AS "projectCode", p.projectname AS "projectName",
-             p.busspartnerid AS "projectBpId", pbp.bpname AS "projectBpName"
+             p.busspartnerid AS "projectBpId", pbp.bpname AS "projectBpName",
+             ent.entitydesc AS "entityLabel"
       FROM invoices i
       LEFT JOIN invoicesdetails d ON d.invoiceid = i.id
       LEFT JOIN invoicesstatus ist ON ist.id = i.invoicestatusid::bigint
@@ -360,6 +361,7 @@ router.get("/invoices", requireModuleAccess("invoicing"), async (req, res) => {
       LEFT JOIN taxcompanies tc ON tc.id = d.busspartnertoinvoiceid::bigint
       LEFT JOIN projects p ON p.id = i.projectid::bigint
       LEFT JOIN businesspartners pbp ON pbp.id = p.busspartnerid::bigint
+      LEFT JOIN entity ent ON ent.id = p.entityid::bigint
       LEFT JOIN employees ee ON ee.id = d.emailedby
       LEFT JOIN employees ue ON ue.id = d.updatedby
       ORDER BY d.updatedat DESC NULLS LAST,

@@ -385,6 +385,7 @@ document.querySelectorAll("[data-stab]").forEach((btn) => {
     if (tab === "audit" && !auditLoaded) {
       auditLoaded = true;
       Promise.all([loadAuditUsers(), loadAuditKinds()]).then(loadAudit);
+      loadAuditSummary();
     }
   });
 });
@@ -959,6 +960,16 @@ document.querySelectorAll(".audit-table th[data-sort]").forEach((th) => {
   });
 });
 
+async function loadAuditSummary() {
+  try {
+    const s = await HITT_API.getAuditSummary();
+    document.getElementById("auditConnectedUsers").textContent = s.connectedUsers;
+    document.getElementById("auditActionsToday").textContent = s.actionsToday;
+  } catch (err) {
+    console.error("[settings] audit summary:", err.message);
+  }
+}
+
 async function loadAudit() {
   const tbody = document.getElementById("auditTableBody");
   const empty = document.getElementById("auditEmpty");
@@ -977,6 +988,7 @@ async function loadAudit() {
   }
   updateAuditPagination();
   updateAuditSortIndicators();
+  loadAuditSummary();
 }
 
 function renderAudit(rows) {

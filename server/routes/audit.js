@@ -102,6 +102,37 @@ router.get("/logs", requireAdmin, async (req, res) => {
   }
 });
 
+// GET /api/audit/summary — the two counters for the Auditing side column.
+//  - connectedUsers: users whose most recent session event in the last 18h
+//    is a sign-in (not a sign-out) — a best-effort "currently signed in",
+//    from the audit trail (there's no server-side session store).
+//  - actionsToday: every audit row since local midnight.
+router.get("/summary", requireAdmin, async (req, res) => {
+  try {
+    await ensureAuditSchema();
+    const { rows } = await pool.query(`
+      SELECT
+        (SELECT COUNT(*) FROM actionsaudit
+          WHERE actionts >= date_trunc('day', now())) AS "actionsToday",
+        (SELECT COUNT(*) FROM (
+           SELECT DISTINCT ON (actionuserid) actionusername, actionkind
+           FROM actionsaudit
+           WHERE actionkind IN ('login', 'logout')
+             AND actionuserid IS NOT NULL
+             AND actionts >= now() - INTERVAL '18 hours'
+           ORDER BY actionuserid, actionts DESC
+         ) s WHERE actionkind = 'login') AS "connectedUsers"
+    `);
+    res.json({
+      connectedUsers: Number(rows[0].connectedUsers) || 0,
+      actionsToday: Number(rows[0].actionsToday) || 0,
+    });
+  } catch (err) {
+    console.error("[GET /api/audit/summary] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
 // GET /api/audit/kinds — distinct action codes present, for the filter.
 router.get("/kinds", requireAdmin, async (req, res) => {
   try {
