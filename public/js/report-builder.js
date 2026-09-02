@@ -398,11 +398,15 @@ window.HITT_REPORT_BUILDER = (function () {
   }
 
   function setViz(v) {
+    const wasChart = state.vizType !== "table";
     state.vizType = v;
     markDirty();
     updateVizUi();
     renderZones();
-    render();
+    // Charts want a smaller, aggregated result than a table — re-run when
+    // crossing the table<->chart boundary so we never try to plot 1000 rows.
+    if (wasChart !== (v !== "table")) run();
+    else render();
   }
 
   // --- drag & drop ---------------------------------------------------
@@ -435,7 +439,9 @@ window.HITT_REPORT_BUILDER = (function () {
         .map((f) => ({ field: f.field, op: f.op, value: f.value })),
       sort: state.sort,
       vizType: state.vizType,
-      limit: 1000,
+      // A chart with hundreds of categories is unreadable (and slow to
+      // build) — cap the query hard for chart modes.
+      limit: state.vizType === "table" ? 1000 : 500,
     };
   }
 
@@ -468,19 +474,29 @@ window.HITT_REPORT_BUILDER = (function () {
     render();
   }
 
+  function emptyResult(msgKey) {
+    els.result.innerHTML = `<div class="rpt-builder-empty">${escapeHtml(T(msgKey))}</div>`;
+  }
+
   function render() {
+    if (state.vizType !== "table" && (!state.dimensions.length || !state.measures.length)) {
+      emptyResult("rpt.rb.hint.chart");
+      return;
+    }
     if (!lastResult || !lastResult.columns.length) {
-      els.result.innerHTML = `<div class="rpt-builder-empty" id="rbEmpty">${escapeHtml(T("rpt.rb.empty"))}</div>`;
+      emptyResult("rpt.rb.empty");
       return;
     }
     if (!lastResult.rows.length) {
-      els.result.innerHTML = `<div class="rpt-builder-empty">${escapeHtml(T("rpt.rb.noRows"))}</div>`;
+      emptyResult("rpt.rb.noRows");
       return;
     }
     if (state.vizType === "bar") els.result.innerHTML = renderChart("bar");
     else if (state.vizType === "line") els.result.innerHTML = renderChart("line");
-    else els.result.innerHTML = renderTable();
-    if (state.vizType === "table") wireTableSort();
+    else {
+      els.result.innerHTML = renderTable();
+      wireTableSort();
+    }
   }
 
   // --- table ------------------------------------------------------
@@ -533,31 +549,65 @@ window.HITT_REPORT_BUILDER = (function () {
   }
 
   // --- charts ----------------------------------------------------
-  function chartSeries() {
+  const CHART_MAX_CATS = 40;
+  const CHART_MAX_SERIES = 12;
+
+  function chartSeries(kind) {
     // category = dimensions[0], optional series = dimensions[1], value = m0
     const catKey = state.dimensions[0];
     const seriesKey = state.dimensions[1] || null;
     const valueCol = lastResult.columns.find((c) => c.role === "measure");
     if (!catKey || !valueCol) return null;
-    const cats = [];
-    const seriesNames = [];
-    const cell = {}; // `${cat}||${series}` -> value
+
+    // First pass — accumulate every (cat, series) cell + running totals.
+    // Map/Set keep this O(rows), not O(rows²).
+    const cell = new Map(); // `${cat} ${series}` -> value
+    const catOrder = []; // first-seen order (matters for line charts)
+    const catSeen = new Set();
+    const catTotal = new Map();
+    const seriesTotal = new Map();
+    const defaultSeries = T("rpt.rb.role.value");
     lastResult.rows.forEach((r) => {
       const cat = String(r[catKey] ?? "—");
-      const sName = seriesKey ? String(r[seriesKey] ?? "—") : T("rpt.rb.role.value");
-      if (!cats.includes(cat)) cats.push(cat);
-      if (!seriesNames.includes(sName)) seriesNames.push(sName);
-      cell[`${cat}||${sName}`] = num(r[valueCol.key]);
+      const sName = seriesKey ? String(r[seriesKey] ?? "—") : defaultSeries;
+      const v = num(r[valueCol.key]);
+      if (!catSeen.has(cat)) { catSeen.add(cat); catOrder.push(cat); }
+      cell.set(`${cat} ${sName}`, v);
+      catTotal.set(cat, (catTotal.get(cat) || 0) + v);
+      seriesTotal.set(sName, (seriesTotal.get(sName) || 0) + v);
     });
-    return { cats, seriesNames, cell, valueLabel: valueCol.label };
+
+    // Keep the biggest series, then the biggest categories (bar) or the
+    // first N categories in row order (line — the x-axis is a sequence).
+    const seriesNames = [...seriesTotal.keys()]
+      .sort((a, b) => (seriesTotal.get(b) || 0) - (seriesTotal.get(a) || 0))
+      .slice(0, CHART_MAX_SERIES);
+    let cats;
+    if (kind === "bar") {
+      cats = [...catTotal.keys()]
+        .sort((a, b) => (catTotal.get(b) || 0) - (catTotal.get(a) || 0))
+        .slice(0, CHART_MAX_CATS);
+    } else {
+      cats = catOrder.slice(0, CHART_MAX_CATS);
+    }
+    const truncated = catOrder.length > cats.length || seriesTotal.size > seriesNames.length;
+    return {
+      cats,
+      seriesNames,
+      valueLabel: valueCol.label,
+      truncated,
+      totalCats: catOrder.length,
+      get: (c, sn) => cell.get(`${c} ${sn}`) || 0,
+    };
   }
 
   function renderChart(kind) {
-    const s = chartSeries();
-    if (!s) return `<div class="rpt-builder-empty">${escapeHtml(T("rpt.rb.hint.chart"))}</div>`;
-    const { cats, seriesNames, cell, valueLabel } = s;
+    const s = chartSeries(kind);
+    if (!s || !s.cats.length) return `<div class="rpt-builder-empty">${escapeHtml(T("rpt.rb.hint.chart"))}</div>`;
+    const { cats, seriesNames, valueLabel } = s;
+    const cellGet = (c, sn) => s.get(c, sn);
     let maxV = 0;
-    cats.forEach((c) => seriesNames.forEach((sn) => { maxV = Math.max(maxV, cell[`${c}||${sn}`] || 0); }));
+    cats.forEach((c) => seriesNames.forEach((sn) => { maxV = Math.max(maxV, cellGet(c, sn)); }));
     const yMax = niceMax(maxV);
 
     const W = 960, H = 380, ML = 56, MR = 12, MT = 16, MB = 92;
@@ -581,7 +631,7 @@ window.HITT_REPORT_BUILDER = (function () {
       cats.forEach((c, ci) => {
         const gx = ML + ci * stepX + (stepX - groupW) / 2;
         seriesNames.forEach((sn, si) => {
-          const v = cell[`${c}||${sn}`] || 0;
+          const v = cellGet(c, sn);
           const h = (v / yMax) * plotH;
           const x = gx + si * barW;
           svg += `<rect x="${x.toFixed(1)}" y="${yScale(v).toFixed(1)}" width="${Math.max(barW - 2, 1).toFixed(1)}" height="${Math.max(h, 0).toFixed(1)}" fill="${CHART_PALETTE[si % CHART_PALETTE.length]}" rx="2"><title>${escapeHtml(`${c} · ${sn}: ${fmtNum(v)}`)}</title></rect>`;
@@ -592,10 +642,10 @@ window.HITT_REPORT_BUILDER = (function () {
       // line — one polyline per series across categories in order
       const lx = (ci) => ML + ci * stepX + stepX / 2;
       seriesNames.forEach((sn, si) => {
-        const pts = cats.map((c, ci) => `${lx(ci).toFixed(1)},${yScale(cell[`${c}||${sn}`] || 0).toFixed(1)}`).join(" ");
+        const pts = cats.map((c, ci) => `${lx(ci).toFixed(1)},${yScale(cellGet(c, sn)).toFixed(1)}`).join(" ");
         svg += `<polyline points="${pts}" fill="none" stroke="${CHART_PALETTE[si % CHART_PALETTE.length]}" stroke-width="2" />`;
         cats.forEach((c, ci) => {
-          const v = cell[`${c}||${sn}`] || 0;
+          const v = cellGet(c, sn);
           svg += `<circle cx="${lx(ci).toFixed(1)}" cy="${yScale(v).toFixed(1)}" r="3" fill="${CHART_PALETTE[si % CHART_PALETTE.length]}"><title>${escapeHtml(`${c} · ${sn}: ${fmtNum(v)}`)}</title></circle>`;
         });
       });
@@ -607,9 +657,12 @@ window.HITT_REPORT_BUILDER = (function () {
     const legend = seriesNames
       .map((sn, si) => `<span class="rpt-legend-item"><span class="rpt-swatch" style="background:${CHART_PALETTE[si % CHART_PALETTE.length]}"></span>${escapeHtml(sn)}</span>`)
       .join("");
+    const note = s.truncated
+      ? `<div class="rpt-chart-note">${escapeHtml(T(kind === "bar" ? "rpt.rb.chart.topN" : "rpt.rb.chart.firstN", { n: cats.length, total: s.totalCats }))}</div>`
+      : "";
     return `<div class="rpt-chart-title">${escapeHtml(valueLabel)}</div>` +
       `<svg class="rpt-chart-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="${escapeHtml(valueLabel)}">${svg}</svg>` +
-      `<div class="rpt-legend">${legend}</div>`;
+      `<div class="rpt-legend">${legend}</div>${note}`;
   }
 
   // --- save / delete --------------------------------------------

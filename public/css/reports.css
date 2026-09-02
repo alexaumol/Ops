@@ -289,3 +289,4 @@
   font-size: 0.9rem;
 }
 .rpt-chart-title { font-size: 0.9rem; font-weight: 700; margin-bottom: 0.3rem; }
+.rpt-chart-note { margin-top: 0.4rem; font-size: 0.75rem; color: var(--text-secondary); }
