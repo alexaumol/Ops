@@ -14,7 +14,7 @@ rebuild-from-zero runbook.
 | **Where remote** | `<RCLONE_REMOTE>/<host>/<date>/` — kept `REMOTE_KEEP_DAYS` (31) |
 | **Encryption** | rclone `crypt` remote — dumps are encrypted on the box before upload; the bucket only ever sees ciphertext |
 | **Integrity** | per-file sha256 in `MANIFEST.txt`; `rclone check` after every upload |
-| **Alerting** | healthcheck ping (`<url>/start`, `<url>`, `<url>/fail`) + systemd `OnFailure=` |
+| **Alerting** | healthcheck ping (healthchecks.io or Uptime Kuma, `HEALTHCHECK_STYLE`) + systemd `OnFailure=` |
 
 New `ops_<slug>` silos need **no** backup config change — they're discovered
 from `pg_database` the same night they're provisioned.
@@ -126,11 +126,38 @@ currently `hostname -s` to `ubuntu`/similar and would collide in the bucket.
 
 ### 6. Healthcheck (dead-man's-switch)
 
-Create a check at <https://healthchecks.io> (free tier is fine) or your
-self-hosted Uptime Kuma: **period 1 day, grace 3 hours**. Put its ping URL in
-`HEALTHCHECK_URL`. If a night's backup doesn't run — timer broken, box down,
-script hung — the check goes red and pages you. Silence = alarm, which is the
-only alerting model that catches "cron silently stopped".
+If a night's backup doesn't run — timer broken, box down, script hung — the
+check goes red and pages you. Silence = alarm, the only model that catches
+"cron silently stopped". Two supported back-ends, selected by
+`HEALTHCHECK_STYLE`:
+
+**healthchecks.io / Better Stack** (`HEALTHCHECK_STYLE=healthchecks`, default) —
+create a check with **period 1 day, grace 3 hours**, set `HEALTHCHECK_URL` to
+its ping URL. The script hits `<url>/start`, `<url>`, `<url>/fail`.
+
+**Self-hosted Uptime Kuma** (`HEALTHCHECK_STYLE=kuma`):
+
+1. In Kuma: **Add New Monitor** → Monitor Type **Push**.
+2. Set **Heartbeat Interval** to `90000` seconds (25 h — one day plus a margin;
+   the max the UI accepts is 2 592 000) and **Retries** `0`, or set retries `1`
+   with a short retry interval. The point: it should expire ~1–2 h after a
+   normal 02:30 run would have pinged.
+3. Save. Kuma shows a **Push URL** like
+   `https://kuma.example.com/api/push/AbC12dEf34?status=up&msg=OK&ping=`.
+4. Put **only the base** in the config — drop the `?status=...` query string:
+   ```
+   HEALTHCHECK_STYLE="kuma"
+   HEALTHCHECK_URL="https://kuma.example.com/api/push/AbC12dEf34"
+   ```
+   `backup.sh` appends `?status=up&msg=OK` on success and
+   `?status=down&msg=backup%20failed%20on%20<host>` on failure. (Kuma has no
+   "start" ping, so that call is a no-op.)
+5. Add a **Notification** (email, ntfy, Telegram, …) to the monitor so a
+   missed heartbeat actually reaches you.
+
+Test it: `sudo systemctl start ops-backup.service`, then confirm the monitor
+flips to green in Kuma. To test the down path, run with a bad `PG_CLUSTERS`
+and confirm it goes red.
 
 Optionally edit `ops-backup-failed.service` (option A/B) so an *explicit*
 failure also mails you, covering the case where the script dies before it can

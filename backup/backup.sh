@@ -22,10 +22,24 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONFIG="${OPS_BACKUP_CONFIG:-$HERE/config.env}"
 
 log()  { printf '[%s] %s\n' "$(date -u +%FT%TZ)" "$*"; }
-ping_hc() {  # $1 = "" | start | fail   — no-op until HEALTHCHECK_URL is set
-  local url="${HEALTHCHECK_URL:-}"
+ping_hc() {  # $1 = "" (success) | start | fail   — no-op until HEALTHCHECK_URL is set
+  local url="${HEALTHCHECK_URL:-}" style="${HEALTHCHECK_STYLE:-healthchecks}" host="${HOSTLABEL:-$(hostname -s)}"
   [ -n "$url" ] || return 0
-  curl -fsS -m 15 --retry 3 -o /dev/null "${url}${1:+/$1}" || true
+  local target
+  case "$style" in
+    kuma)
+      # Uptime Kuma push monitor — query params, no "start" concept.
+      # HEALTHCHECK_URL must be the bare .../api/push/<token> with no query.
+      case "$1" in
+        start) return 0 ;;
+        fail)  target="${url}?status=down&msg=backup%20failed%20on%20${host}" ;;
+        *)     target="${url}?status=up&msg=OK" ;;
+      esac ;;
+    *)
+      # healthchecks.io / Better Stack — path suffix (/start, /fail, or none).
+      target="${url}${1:+/$1}" ;;
+  esac
+  curl -fsS -m 15 --retry 3 -o /dev/null "$target" || true
 }
 die()  { log "ERROR: $*"; ping_hc fail; exit 1; }
 
@@ -42,6 +56,7 @@ REMOTE_KEEP_DAYS="${REMOTE_KEEP_DAYS:-31}"
 RCLONE_REMOTE="${RCLONE_REMOTE:-}"
 HOSTLABEL="${HOSTLABEL:-$(hostname -s)}"
 HEALTHCHECK_URL="${HEALTHCHECK_URL:-}"
+HEALTHCHECK_STYLE="${HEALTHCHECK_STYLE:-healthchecks}"   # healthchecks | kuma
 # Space-separated dirs of on-disk files to mirror (expense evidence etc.).
 # Synced as-is to <remote>/<host>/files/<basename>/ — not point-in-time,
 # just a running mirror. Empty = skip.
