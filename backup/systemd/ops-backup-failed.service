@@ -1,0 +1,17 @@
+[Unit]
+Description=Ops backup failure notifier
+# Triggered via OnFailure= from ops-backup.service. Belt-and-braces on top of
+# the healthcheck ping: if backup.sh dies before it can ping <url>/fail (OOM,
+# kill, disk full), this still fires. Wire it to whatever you actually read.
+
+[Service]
+Type=oneshot
+# Option A — send mail (needs a working MTA / msmtp):
+# ExecStart=/bin/sh -c 'journalctl -u ops-backup.service -n 40 --no-pager | mail -s "[Ops] backup FAILED on %H" root'
+#
+# Option B — hit the healthcheck fail URL directly (edit in the UUID):
+# ExecStart=/usr/bin/curl -fsS -m 15 --retry 3 https://hc-ping.com/UUID/fail
+#
+# Option C — just make noise in the journal (default, so this unit is valid
+# out of the box; replace it):
+ExecStart=/bin/sh -c 'echo "ops-backup.service FAILED — see: journalctl -u ops-backup.service" >&2; exit 1'

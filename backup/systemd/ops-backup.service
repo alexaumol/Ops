@@ -1,0 +1,19 @@
+[Unit]
+Description=Ops nightly database backup
+Wants=network-online.target
+After=network-online.target postgresql.service
+# Don't let a failed run pass silently — journal + OnFailure hook.
+OnFailure=ops-backup-failed.service
+
+[Service]
+Type=oneshot
+User=root
+Environment=OPS_BACKUP_CONFIG=/etc/ops/backup.env
+ExecStart=/opt/ops/backup/backup.sh
+TimeoutStartSec=3600
+Nice=10
+IOSchedulingClass=idle
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

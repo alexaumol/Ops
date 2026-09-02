@@ -4,6 +4,10 @@ node_modules/
 # provision/config.example.json.
 provision/config.json
 
+# Per-host backup config. Copy from backup/config.env.example. No secrets in
+# it, but it's host-specific — the deployed copy lives at /etc/ops/backup.env.
+backup/config.env
+
 # Uploaded evidence files (expense documents, …) — stored on the API host,
 # never in the repo.
 server/uploads/

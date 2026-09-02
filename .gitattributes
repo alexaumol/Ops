@@ -1,0 +1,7 @@
+# These are deployed to / executed on Linux — always LF, never CRLF.
+*.sh            text eol=lf
+*.service       text eol=lf
+*.timer         text eol=lf
+*.tmpl          text eol=lf
+*.sql           text eol=lf
+backup/config.env.example  text eol=lf

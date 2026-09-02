@@ -119,11 +119,12 @@ One command to stand up a new customer instance end to end. `provision <slug>
 **Labels:** `phase-0`, `infra`, `security`
 **Blocks:** J
 
-- [ ] WAL archiving to IONOS Object Storage — pgBackRest or WAL-G
-- [ ] Nightly `pg_dump` per database with a retention policy, copied off-box
-- [ ] One full restore test to a scratch host — record the resulting RTO / RPO
-- [ ] Alert on backup failure
-- [ ] Write the rebuild-from-zero runbook
+- [x] Nightly `pg_dump` per database with a retention policy, copied off-box — `backup/backup.sh` + `ops-backup.timer`, client-side encrypted to object storage, auto-discovers new silos
+- [x] Alert on backup failure — healthcheck dead-man's-switch (`<url>/start|/fail`) + systemd `OnFailure=`
+- [x] Write the rebuild-from-zero runbook — `docs/backups.md`
+- [ ] One full restore test to a scratch host — record the resulting RTO / RPO *(script + drill procedure ready in `docs/backups.md`; needs a real run on the VPS)*
+- [ ] Upload object-storage bucket + rclone crypt remote on each VPS, install the timer *(operator task, steps in `docs/backups.md`)*
+- [ ] WAL archiving to object storage — pgBackRest or WAL-G *(fast-follow, Phase 1)*
 
 ---
 
