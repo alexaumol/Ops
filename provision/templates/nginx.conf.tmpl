@@ -4,8 +4,7 @@
 # is the shared /opt/ops/public tree; only /js/config.js is per-instance.
 
 server {
-    listen 443 ssl;
-    http2 on;
+    listen 443 ssl http2;
     server_name {{DOMAIN}};
 
     ssl_certificate     {{TLS_CERT}};
