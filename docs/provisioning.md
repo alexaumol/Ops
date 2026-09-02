@@ -26,7 +26,7 @@ nginx serves the shared `/opt/ops/public` tree and overrides only
 
 1. `sudo mkdir -p /opt/ops /srv/ops && sudo useradd --system --home /srv/ops ops`
 2. `git clone <repo> /opt/ops && cd /opt/ops/server && npm ci`
-3. Wildcard cert `*.ops.theaumol.com` (0E) at the path in `config.tls`
+3. Wildcard cert `*.ops.theaumol.com` (0E — see [tls.md](tls.md)) at the path in `config.tls`
 4. `cp provision/config.example.json provision/config.json` and fill it in
 5. Populate `provision/seed/reference-data.sql` (see its header — a
    `pg_dump --data-only` of the lookup tables from `test_ops`)

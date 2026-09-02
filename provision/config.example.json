@@ -19,8 +19,8 @@
   },
 
   "tls": {
-    "cert": "/etc/letsencrypt/live/ops.theaumol.com/fullchain.pem",
-    "key": "/etc/letsencrypt/live/ops.theaumol.com/privkey.pem"
+    "cert": "/etc/letsencrypt/live/ops/fullchain.pem",
+    "key": "/etc/letsencrypt/live/ops/privkey.pem"
   },
 
   "oidc": {
