@@ -4,4 +4,5 @@
 *.timer         text eol=lf
 *.tmpl          text eol=lf
 *.sql           text eol=lf
-backup/config.env.example  text eol=lf
+backup/config.env.example       text eol=lf
+provision/host-setup/*           text eol=lf

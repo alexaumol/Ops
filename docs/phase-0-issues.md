@@ -153,12 +153,15 @@ Design + DNS state in `docs/email.md`.
 
 **Labels:** `phase-0`, `security`
 
-- [ ] SSH key-only, password auth disabled, `fail2ban`
-- [ ] Unattended security upgrades enabled
-- [ ] One least-privilege DB role per instance — no shared superuser in any app `.env`
-- [ ] Disk encryption at rest (LUKS), or a written plan and date for it
-- [ ] Ship audit / syslog off-box
-- [ ] Provisioning secrets in a secret store, not plaintext in the repo
+Scripted in `provision/host-setup/`; full write-up in `docs/security-baseline.md`.
+
+- [x] Least-privilege DB role per instance — done in 0D (`ops_<slug>` owns only its DB; superuser only in root tooling)
+- [x] Disk encryption at rest — decision recorded: rely on IONOS volume encryption + client-side-encrypted backups (0F); no LUKS-on-root
+- [x] Provisioning secrets out of the repo — all gitignored; root-only `0600` files on the host (`docs/security-baseline.md` §7)
+- [ ] Run `provision/host-setup/harden.sh` on both VPSes — ufw default-deny, SSH key-only + no root password, fail2ban, unattended security upgrades
+- [ ] Confirm Zitadel (Docker) publishes only to `127.0.0.1`, not `0.0.0.0` (ufw can't see past Docker)
+- [ ] HITT host: switch its app `.env` off any superuser DB role
+- [ ] Ship logs off-box — journald → the other VPS (`docs/security-baseline.md` §6); before there are several customers
 
 ---
 
