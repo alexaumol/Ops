@@ -85,7 +85,10 @@ function sh(file, args, opts = {}) {
 }
 
 function psqlAdmin(sql) {
-  return sh("psql", [cfg.postgres.adminUrl, "-v", "ON_ERROR_STOP=1", "-Atqc", sql]);
+  return sh("psql", ["-w", cfg.postgres.adminUrl, "-v", "ON_ERROR_STOP=1", "-Atqc", sql]);
+}
+function psqlInstance(url, args) {
+  return sh("psql", ["-w", url, "-v", "ON_ERROR_STOP=1", ...args]);
 }
 
 function writeFile(p, content, mode) {
@@ -242,7 +245,7 @@ const steps = [
       psqlAdmin(`REVOKE ALL ON DATABASE ${DB_NAME} FROM PUBLIC`);
     },
     undo: () => {
-      try { sh("dropdb", ["--if-exists", "-h", cfg.postgres.host, "-p", String(cfg.postgres.port), DB_NAME], { stdio: "ignore" }); } catch {}
+      try { psqlAdmin(`DROP DATABASE IF EXISTS ${DB_NAME} WITH (FORCE)`); } catch {}
       try { psqlAdmin(`DROP ROLE IF EXISTS ${DB_ROLE}`); } catch {}
     },
   },
@@ -285,13 +288,12 @@ const steps = [
       });
       const ref = path.join(HERE, "seed", "reference-data.sql");
       if (!/\(reference data goes here\)/.test(fs.readFileSync(ref, "utf8"))) {
-        sh("psql", [url, "-v", "ON_ERROR_STOP=1", "-f", ref]); // sh() no-ops under --dry-run
+        psqlInstance(url, ["-f", ref]); // sh() no-ops under --dry-run
       } else {
         console.log("    ⚠ reference-data.sql is still a placeholder — instance will have empty lookup tables");
       }
       const [first, ...rest] = adminEmail.split("@")[0].split(/[._-]/);
-      sh("psql", [
-        url, "-v", "ON_ERROR_STOP=1",
+      psqlInstance(url, [
         "-v", `display_name=${displayName}`,
         "-v", `admin_email=${adminEmail}`,
         "-v", `admin_first=${cap(first)}`,
@@ -299,7 +301,7 @@ const steps = [
         "-f", path.join(HERE, "seed", "seed-instance.sql"),
       ]);
       // reference-data + seed insert explicit ids — resync the sequences.
-      sh("psql", [url, "-v", "ON_ERROR_STOP=1", "-f", path.join(HERE, "seed", "fix-sequences.sql")]);
+      psqlInstance(url, ["-f", path.join(HERE, "seed", "fix-sequences.sql")]);
     },
     undo: () => {}, // the DB drop in the earlier step covers this
   },

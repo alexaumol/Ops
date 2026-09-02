@@ -90,8 +90,8 @@ function sh(file, args, opts = {}) {
     console.log("  • --keep-db: database left in place");
   } else {
     console.log("  • drop database + role");
-    sh("dropdb", ["--if-exists", "-h", cfg.postgres.host, "-p", String(cfg.postgres.port), DB_NAME]);
-    sh("psql", [cfg.postgres.adminUrl, "-v", "ON_ERROR_STOP=1", "-c", `DROP ROLE IF EXISTS ${DB_ROLE}`]);
+    sh("psql", ["-w", cfg.postgres.adminUrl, "-v", "ON_ERROR_STOP=1", "-c", `DROP DATABASE IF EXISTS ${DB_NAME} WITH (FORCE)`]);
+    sh("psql", ["-w", cfg.postgres.adminUrl, "-v", "ON_ERROR_STOP=1", "-c", `DROP ROLE IF EXISTS ${DB_ROLE}`]);
   }
 
   console.log("  • remove instance directory");
