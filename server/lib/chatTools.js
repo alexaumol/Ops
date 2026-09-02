@@ -15,29 +15,13 @@
  * that" rather than a 500.
  * ---------------------------------------------------------------------------
  */
-const { readerPool } = require("../config/db");
-
-const STMT_TIMEOUT_MS = Number(process.env.PG_READONLY_TIMEOUT_MS) || 8000;
+const { runReadOnly } = require("./readOnlyQuery");
 
 // Every tool query runs inside a READ ONLY transaction with a per-statement
-// timeout. That holds even when readerPool has fallen back to the shared
-// read/write pool (no dedicated role yet) — SET LOCAL is scoped to this
-// transaction, and READ ONLY blocks writes regardless of the role's grants.
-async function q(text, params = []) {
-  const client = await readerPool.connect();
-  try {
-    await client.query("BEGIN READ ONLY");
-    await client.query(`SET LOCAL statement_timeout = ${STMT_TIMEOUT_MS}`);
-    const { rows } = await client.query(text, params);
-    await client.query("COMMIT");
-    return rows;
-  } catch (err) {
-    try { await client.query("ROLLBACK"); } catch { /* ignore */ }
-    throw err;
-  } finally {
-    client.release();
-  }
-}
+// timeout (lib/readOnlyQuery.js). That holds even when the dedicated
+// SELECT-only pool isn't configured or is unreachable — the fallback still
+// runs inside `BEGIN READ ONLY`, which blocks writes regardless of grants.
+const q = (text, params = []) => runReadOnly(text, params);
 
 const like = (s) => `%${String(s || "").trim()}%`;
 

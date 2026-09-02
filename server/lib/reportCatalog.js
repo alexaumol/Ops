@@ -12,14 +12,13 @@
  *   - Aggregates / operators / sort direction are whitelisted enums mapped
  *     to literal SQL fragments.
  *   - Every user value is a $n placeholder — never interpolated.
- *   - The statement runs on readerPool inside `BEGIN READ ONLY` with a
- *     per-statement timeout, so even a pathological config can't write or
- *     hang a connection.
+ *   - The statement runs inside `BEGIN READ ONLY` with a per-statement
+ *     timeout (see lib/readOnlyQuery.js), so even a pathological config
+ *     can't write or hang a connection.
  * ---------------------------------------------------------------------------
  */
-const { readerPool } = require("../config/db");
+const { runReadOnly } = require("./readOnlyQuery");
 
-const STMT_TIMEOUT_MS = Number(process.env.PG_READONLY_TIMEOUT_MS) || 8000;
 const MAX_ROWS = 5000;
 const MAX_DIMENSIONS = 6;
 const MAX_MEASURES = 6;
@@ -301,23 +300,6 @@ function buildReportQuery(config) {
     .join("\n");
 
   return { columns, text, params };
-}
-
-// --- read-only execution (mirrors server/lib/chatTools.js q()) ----------
-async function runReadOnly(text, params) {
-  const client = await readerPool.connect();
-  try {
-    await client.query("BEGIN READ ONLY");
-    await client.query(`SET LOCAL statement_timeout = ${STMT_TIMEOUT_MS}`);
-    const { rows } = await client.query(text, params);
-    await client.query("COMMIT");
-    return rows;
-  } catch (err) {
-    try { await client.query("ROLLBACK"); } catch { /* ignore */ }
-    throw err;
-  } finally {
-    client.release();
-  }
 }
 
 async function runReport(config) {
