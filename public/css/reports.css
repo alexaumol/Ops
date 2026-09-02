@@ -203,3 +203,89 @@
   font-size: 0.85rem;
   box-sizing: border-box;
 }
+
+/* ============================ My reports (builder) ======================== */
+.rpt-builder { display: flex; flex-direction: column; gap: 1rem; }
+.rpt-builder-toolbar {
+  display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.6rem;
+  padding-bottom: 0.85rem; border-bottom: 1px solid var(--border-subtle);
+}
+.rpt-builder-toolbar .btn { height: 34px; padding: 0 0.8rem; font-size: 0.82rem; }
+.rpt-builder-check {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  font-size: 0.78rem; color: var(--text-secondary); font-weight: 600;
+  padding-bottom: 0.35rem;
+}
+.rpt-builder-check input { margin: 0; }
+.rpt-builder-viz {
+  display: inline-flex; border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm); overflow: hidden;
+}
+.rpt-builder-viz button {
+  border: 0; background: var(--bg-surface); color: var(--text-secondary);
+  font: inherit; font-size: 0.8rem; font-weight: 600; padding: 0.45rem 0.8rem;
+  cursor: pointer;
+}
+.rpt-builder-viz button + button { border-left: 1px solid var(--border-subtle); }
+.rpt-builder-viz button.is-active { background: var(--brand); color: #fff; }
+
+.rpt-builder-body { display: grid; grid-template-columns: 230px 1fr; gap: 1rem; align-items: start; }
+@media (max-width: 900px) { .rpt-builder-body { grid-template-columns: 1fr; } }
+
+.rpt-builder-rail {
+  display: flex; flex-direction: column; gap: 0.85rem;
+  background: var(--bg-surface-alt); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg); padding: 0.85rem;
+}
+.rpt-builder-rail .rpt-field select { width: 100%; }
+.rpt-builder-fieldgroup h4,
+.rpt-builder-zone h4 {
+  margin: 0 0 0.4rem; font-size: 0.7rem; text-transform: uppercase;
+  letter-spacing: 0.04em; color: var(--text-secondary);
+}
+.rpt-builder-chips { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.rpt-chip {
+  border: 1px solid var(--border-subtle); background: var(--bg-surface);
+  color: var(--text-primary); font: inherit; font-size: 0.76rem;
+  padding: 0.2rem 0.5rem; border-radius: 999px; cursor: grab; user-select: none;
+}
+.rpt-chip:hover { border-color: var(--brand); color: var(--brand); }
+.rpt-chip:active { cursor: grabbing; }
+
+.rpt-builder-main { display: flex; flex-direction: column; gap: 0.85rem; min-width: 0; }
+.rpt-builder-zones { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; }
+@media (max-width: 720px) { .rpt-builder-zones { grid-template-columns: 1fr; } }
+.rpt-builder-dropzone {
+  min-height: 44px; border: 1px dashed var(--border-subtle);
+  border-radius: var(--radius-sm); padding: 0.4rem; background: var(--bg-surface);
+  display: flex; flex-wrap: wrap; gap: 0.3rem; align-content: flex-start;
+}
+.rpt-builder-dropzone.is-drop { border-color: var(--brand); background: var(--bg-surface-alt); }
+.rpt-zone-pill {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  background: var(--bg-surface-alt); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm); padding: 0.15rem 0.3rem 0.15rem 0.5rem;
+  font-size: 0.76rem; max-width: 100%;
+}
+.rpt-zone-pill > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rpt-zone-pill__role { color: var(--text-secondary); font-style: normal; font-size: 0.68rem; }
+.rpt-zone-pill select,
+.rpt-zone-pill input {
+  border: 1px solid var(--border-subtle); border-radius: 4px;
+  background: var(--bg-surface); color: var(--text-primary);
+  font: inherit; font-size: 0.72rem; padding: 0.1rem 0.25rem;
+}
+.rpt-zone-pill__val { width: 8.5rem; }
+.rpt-zone-pill__x {
+  border: 0; background: none; color: var(--text-secondary); cursor: pointer;
+  font-size: 0.7rem; line-height: 1; padding: 0.15rem;
+}
+.rpt-zone-pill__x:hover { color: var(--hitt-amber); }
+
+.rpt-builder-result { position: relative; min-height: 120px; }
+.rpt-builder-result.is-loading { opacity: 0.5; }
+.rpt-builder-empty {
+  padding: 2.5rem 1rem; text-align: center; color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+.rpt-chart-title { font-size: 0.9rem; font-weight: 700; margin-bottom: 0.3rem; }

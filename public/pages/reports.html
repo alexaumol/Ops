@@ -28,6 +28,7 @@
     <div class="page-tabs">
       <button data-rtab="stats" class="page-tab" aria-selected="true" data-i18n="rpt.tab.stats">Project stats</button>
       <button data-rtab="hours" class="page-tab" aria-selected="false" data-i18n="rpt.tab.hours">Project time tracking</button>
+      <button data-rtab="builder" class="page-tab" aria-selected="false" data-i18n="rpt.tab.myReports">My reports</button>
     </div>
 
     <!-- ============================ HOURS PER PROJECT ============================ -->
@@ -180,6 +181,77 @@
         </div>
       </div>
     </div>
+
+    <!-- ============================ MY REPORTS (builder) ============================ -->
+    <div id="paneBuilder" class="page-pane hidden">
+      <div class="rpt-builder">
+        <div class="rpt-builder-toolbar">
+          <label class="rpt-field">
+            <span data-i18n="rpt.rb.saved">Report</span>
+            <select id="rbSavedSelect"></select>
+          </label>
+          <label class="rpt-field">
+            <span data-i18n="rpt.rb.name">Name</span>
+            <input type="text" id="rbName" maxlength="200" data-i18n-placeholder="rpt.rb.namePh" placeholder="Report name" />
+          </label>
+          <button class="btn btn-secondary" id="rbSave" data-i18n="form.save">Save</button>
+          <button class="btn btn-secondary" id="rbSaveAs" data-i18n="rpt.rb.saveAs">Save as…</button>
+          <button class="btn btn-secondary" id="rbDelete" data-i18n="form.delete">Delete</button>
+          <label class="rpt-builder-check">
+            <input type="checkbox" id="rbPublic" />
+            <span data-i18n="rpt.rb.public">Shared</span>
+          </label>
+          <div class="rpt-spacer"></div>
+          <div class="rpt-builder-viz" id="rbVizToggle" role="tablist">
+            <button type="button" data-viz="table" class="is-active" data-i18n="rpt.rb.viz.table">Table</button>
+            <button type="button" data-viz="bar" data-i18n="rpt.rb.viz.bar">Bar</button>
+            <button type="button" data-viz="line" data-i18n="rpt.rb.viz.line">Line</button>
+          </div>
+          <button class="btn btn-secondary" id="rbExportCsv" data-i18n="rpt.exportCsv">Export CSV</button>
+          <button class="btn btn-secondary" id="rbScreenshot" data-i18n="rpt.rb.screenshot">Screenshot</button>
+        </div>
+
+        <div class="rpt-builder-body">
+          <aside class="rpt-builder-rail">
+            <label class="rpt-field">
+              <span data-i18n="rpt.rb.dataset">Data</span>
+              <select id="rbDataset"></select>
+            </label>
+            <div class="rpt-builder-fieldgroup">
+              <h4 data-i18n="rpt.rb.dimensions">Dimensions</h4>
+              <div id="rbDimFields" class="rpt-builder-chips"></div>
+            </div>
+            <div class="rpt-builder-fieldgroup">
+              <h4 data-i18n="rpt.rb.measures">Measures</h4>
+              <div id="rbMeasureFields" class="rpt-builder-chips"></div>
+            </div>
+          </aside>
+
+          <div class="rpt-builder-main">
+            <div class="rpt-builder-zones">
+              <div class="rpt-builder-zone">
+                <h4 id="rbZoneDimLabel" data-i18n="rpt.rb.zone.rows">Rows / group by</h4>
+                <div class="rpt-builder-dropzone" id="rbZoneDimensions" data-zone="dimensions"></div>
+              </div>
+              <div class="rpt-builder-zone">
+                <h4 id="rbZoneMeasureLabel" data-i18n="rpt.rb.zone.values">Values</h4>
+                <div class="rpt-builder-dropzone" id="rbZoneMeasures" data-zone="measures"></div>
+              </div>
+              <div class="rpt-builder-zone">
+                <h4 data-i18n="rpt.rb.zone.filters">Filters</h4>
+                <div class="rpt-builder-dropzone" id="rbZoneFilters" data-zone="filters"></div>
+              </div>
+            </div>
+
+            <p class="rpt-hint" id="rbHint" data-i18n="rpt.rb.hint">Drag fields from the left into the zones above.</p>
+
+            <div class="rpt-builder-result" id="rbResult">
+              <div class="rpt-builder-empty" id="rbEmpty" data-i18n="rpt.rb.empty">Your report will appear here.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </main>
 
   <!-- ============================ PROJECT HOURS DRILL-DOWN ============================ -->
@@ -237,6 +309,8 @@
   <script src="../js/avatar.js"></script>
   <script src="../js/usermenu.js"></script>
   <script src="../js/chat.js"></script>
+  <script src="../vendor/html2canvas.min.js"></script>
   <script src="../js/reports.js"></script>
+  <script src="../js/report-builder.js"></script>
 </body>
 </html>

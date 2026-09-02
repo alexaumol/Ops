@@ -81,8 +81,10 @@ document.querySelectorAll("[data-rtab]").forEach((btn) => {
     currentTab = btn.dataset.rtab;
     document.getElementById("paneHours").classList.toggle("hidden", currentTab !== "hours");
     document.getElementById("paneStats").classList.toggle("hidden", currentTab !== "stats");
+    document.getElementById("paneBuilder").classList.toggle("hidden", currentTab !== "builder");
     if (currentTab === "hours" && !hoursLoaded) { hoursLoaded = true; loadHours(); }
     if (currentTab === "stats" && !statsLoaded) { statsLoaded = true; loadStats(); }
+    if (currentTab === "builder") window.HITT_REPORT_BUILDER?.init();
   });
 });
 let statsLoaded = false;
@@ -1071,4 +1073,5 @@ loadStats();
 window.addEventListener("hitt:langchange", () => {
   if (currentTab === "hours" && hoursLoaded) loadHours();
   else if (currentTab === "stats" && statsLoaded) loadStats();
+  else if (currentTab === "builder") window.HITT_REPORT_BUILDER?.onLangChange();
 });
