@@ -122,9 +122,10 @@ One command to stand up a new customer instance end to end. `provision <slug>
 - [x] Nightly `pg_dump` per database with a retention policy, copied off-box — `backup/backup.sh` + `ops-backup.timer`, client-side encrypted to object storage, auto-discovers new silos
 - [x] Alert on backup failure — healthcheck dead-man's-switch (`<url>/start|/fail`) + systemd `OnFailure=`
 - [x] Write the rebuild-from-zero runbook — `docs/backups.md`
-- [x] Object-storage bucket + rclone crypt remote + timer on the Ops VPS — first `ops-backup.service` run OK, healthcheck green *(HITT VPS still to do)*
-- [ ] One full restore test — run `backup/restore.sh` against a dump, record RTO / RPO in `docs/backups.md` *(only remaining 0F blocker)*
-- [ ] Same backup setup on the HITT VPS
+- [x] Object-storage bucket + rclone crypt remote + timer on the Ops VPS — `ops-backup.service` runs green, healthcheck green
+- [x] Restore test — `backup/restore.sh` restored `zitadel` (local dump + from `rclone:`), verified by row count; RTO ~1s for a single DB, RPO ≤ 24h. Recorded in `docs/backups.md`
+- [ ] Same backup setup on the HITT VPS *(same steps, `docs/backups.md`)*
+- [ ] Full box-rebuild drill against the runbook — record real RTO
 - [ ] WAL archiving to object storage — pgBackRest or WAL-G *(fast-follow, Phase 1)*
 
 ---

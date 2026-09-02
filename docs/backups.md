@@ -242,11 +242,10 @@ count covers all of them. To point an instance at the restored DB, update
 - **RTO**: single DB restore is minutes. Full box loss = provision a new VPS +
   restore — target **< 4 h**, measured by the drill + the runbook below.
 
-Fill in real numbers after the first drill:
-
 | date | scope | dump age | restore time | notes |
 |---|---|---|---|---|
-| _tbd_ | | | | |
+| 2026-09-02 | single DB — `zitadel` (376 KB, 1 069 `eventstore.events2` rows) | < 1 h | ~1 s | Ops VPS; `restore.sh` from a local dump, then again from `rclone:` after decrypt. Verified by row count. |
+| _next_ | full box rebuild (drill) | | | run against the runbook below |
 
 ## Rebuild from zero — full VPS loss
 
