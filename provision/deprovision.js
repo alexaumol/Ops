@@ -39,6 +39,10 @@ const DOMAIN = entry.domain || `${slug}.${cfg.baseDomain}`;
 const NGINX_CONF = path.join(cfg.nginx.sitesAvailable, `ops-${slug}.conf`);
 const NGINX_LINK = path.join(cfg.nginx.sitesEnabled, `ops-${slug}.conf`);
 
+// admin conn string, re-pointed at an arbitrary db (adminUrl points at
+// `postgres`). Auth comes from ~/.pgpass or PGPASSWORD; -w never prompts.
+const adminUrlFor = (db) => cfg.postgres.adminUrl.replace(/\/[^/]*$/, `/${db}`);
+
 function sh(file, args, opts = {}) {
   if (DRY) return console.log(`    [dry-run] ${file} ${args.join(" ")}`), "";
   try { return execFileSync(file, args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], ...opts }); }
@@ -53,9 +57,13 @@ function sh(file, args, opts = {}) {
   console.log(`\n  Deprovisioning ${slug} ${DRY ? "— DRY RUN" : ""}\n`);
 
   if (!flags.has("--no-dump") && !flags.has("--keep-db")) {
-    const out = path.join(INSTANCE_DIR, `${slug}-final-${new Date().toISOString().slice(0, 10)}.dump`);
+    // outside INSTANCE_DIR — that gets removed at the end.
+    const dumpArg = argv.find((a, i) => argv[i - 1] === "--dump-to");
+    const archiveDir = dumpArg || path.join(cfg.instanceRoot, "_archive");
+    const out = path.join(archiveDir, `${slug}-final-${new Date().toISOString().slice(0, 10)}.dump`);
     console.log(`  • final dump -> ${out}`);
-    sh("pg_dump", ["-h", cfg.postgres.host, "-p", String(cfg.postgres.port), "-Fc", "-f", out, DB_NAME]);
+    if (!DRY) fs.mkdirSync(archiveDir, { recursive: true });
+    sh("pg_dump", ["-w", "-Fc", "-f", out, adminUrlFor(DB_NAME)]);
   }
 
   console.log("  • stop + disable unit");
