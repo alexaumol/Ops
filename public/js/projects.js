@@ -191,6 +191,7 @@ async function loadProjects() {
       hasBudget: !!p.hasBudget,
       ownerId: p.ownerId ?? null,
       ownerName: p.ownerName ?? null,
+      mine: !!p.mine,
     }));
     populateOwnerFilterOptions();
     usingDemoData = false;
@@ -332,10 +333,11 @@ function matchesSearch(p){
 // Filters panel state (search stays separate — the search box already has
 // its own always-visible input). ownerId filters against p.ownerId once
 // that's wired in (see the Project Owner follow-up).
-const FILTERS = { ownerId: '', notInvoiceable: false, noBudget: false, progressMin: null, progressMax: null };
+const FILTERS = { mine: false, ownerId: '', notInvoiceable: false, noBudget: false, progressMin: null, progressMax: null };
 
 function matchesFilters(p){
   if (!matchesSearch(p)) return false;
+  if (FILTERS.mine && !p.mine) return false;
   if (FILTERS.ownerId && String(p.ownerId ?? '') !== FILTERS.ownerId) return false;
   if (FILTERS.notInvoiceable && !p.notInvoiceable) return false;
   if (FILTERS.noBudget && p.hasBudget) return false;
@@ -1745,7 +1747,7 @@ window.addEventListener('resize', () => {
 
 function updateFilterCount(){
   const active = [
-    FILTERS.ownerId, FILTERS.notInvoiceable, FILTERS.noBudget,
+    FILTERS.mine, FILTERS.ownerId, FILTERS.notInvoiceable, FILTERS.noBudget,
     FILTERS.progressMin != null, FILTERS.progressMax != null,
   ].filter(Boolean).length;
   const badge = document.getElementById('filterCount');
@@ -1759,6 +1761,10 @@ function applyFilters(){
   updateTabCounts();
 }
 
+document.getElementById('filterMine').addEventListener('change', (e) => {
+  FILTERS.mine = e.target.checked;
+  applyFilters();
+});
 document.getElementById('filterOwner').addEventListener('change', (e) => {
   FILTERS.ownerId = e.target.value;
   applyFilters();
@@ -1780,11 +1786,13 @@ document.getElementById('filterProgressMax').addEventListener('input', (e) => {
   applyFilters();
 });
 document.getElementById('btnClearFilters').addEventListener('click', () => {
+  FILTERS.mine = false;
   FILTERS.ownerId = '';
   FILTERS.notInvoiceable = false;
   FILTERS.noBudget = false;
   FILTERS.progressMin = null;
   FILTERS.progressMax = null;
+  document.getElementById('filterMine').checked = false;
   document.getElementById('filterOwner').value = '';
   document.getElementById('filterNotInvoiceable').checked = false;
   document.getElementById('filterNoBudget').checked = false;

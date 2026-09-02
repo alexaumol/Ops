@@ -124,6 +124,10 @@ router.get("/", requireModuleAccess("projects"), async (req, res) => {
     // ?scope=alive drops Closed/Cancelled projects — used by the time
     // tracking picker (you can't log hours on a finished project).
     const aliveOnly = req.query.scope === "alive";
+    // "mine" = the signed-in employee is this project's owner (projectowners)
+    // or an assigned resource (projectresources). Powers the "Only show my
+    // projects" kanban toggle. Null employeeId (unresolved identity) → false.
+    const meId = req.hittUser?.employeeId ?? null;
     const { rows } = await pool.query(`
       SELECT p.id,
              p.projectnumber AS code,
@@ -136,7 +140,13 @@ router.get("/", requireModuleAccess("projects"), async (req, res) => {
              COALESCE(p.notinvoiceable, false) AS "notInvoiceable",
              (p.busspartnerid IS NOT NULL) AS "hasBusinessPartner",
              (latestq.finalquotation IS NOT NULL) AS "hasBudget",
-             owner."ownerId", owner."ownerName"
+             owner."ownerId", owner."ownerName",
+             ($1::bigint IS NOT NULL AND (
+               EXISTS (SELECT 1 FROM projectowners po2
+                        WHERE po2.projectid = p.id AND po2.projectownerid::bigint = $1::bigint)
+               OR EXISTS (SELECT 1 FROM projectresources pr
+                        WHERE pr.projectid = p.id AND pr.resourceid::bigint = $1::bigint)
+             )) AS mine
       FROM projects p
       LEFT JOIN projectstatus ps ON ps.id = p.projectstatusid::bigint
       ${LATEST_PROGRESS_SUBQUERY}
@@ -157,7 +167,7 @@ router.get("/", requireModuleAccess("projects"), async (req, res) => {
       ) owner ON true
       ${aliveOnly ? "WHERE LOWER(COALESCE(ps.projectstatusdesc, '')) NOT IN ('closed', 'cancelled')" : ""}
       ORDER BY p.projectnumber DESC
-    `);
+    `, [meId]);
     res.json(rows);
   } catch (err) {
     console.error("[GET /api/projects] DB error:", err.message);

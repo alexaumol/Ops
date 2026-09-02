@@ -35,7 +35,8 @@
   font-size: 0.75rem;
   color: var(--text-secondary);
 }
-.rpt-field input[type="date"] {
+.rpt-field input[type="date"],
+.rpt-field select {
   height: 38px;
   padding: 0 0.6rem;
   border-radius: var(--radius-sm);
@@ -45,6 +46,7 @@
   font-size: 0.85rem;
   box-sizing: border-box;
 }
+.rpt-toolbar .rpt-field select { min-width: 9rem; }
 .rpt-total { font-size: 0.9rem; font-weight: 700; color: var(--text-primary); }
 .rpt-hint { font-size: 0.78rem; color: var(--text-secondary); margin: -0.75rem 0 1rem; }
 

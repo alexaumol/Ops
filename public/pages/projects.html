@@ -66,6 +66,9 @@
              viewport whenever the button wasn't near the page's right
              edge (confirmed: any window narrower than full-desktop-wide). -->
         <div id="filterPanel" class="hidden fixed z-40 bg-white border border-slate-200 rounded-lg shadow-lift p-3 w-64 space-y-2.5">
+          <label class="flex items-center gap-2 text-xs font-medium text-hitt-ink">
+            <input type="checkbox" id="filterMine" class="w-3.5 h-3.5" /> <span data-i18n="proj.f.mine">Only show my projects</span>
+          </label>
           <div>
             <label class="field-label block mb-1" data-i18n="proj.f.owner">Project owner</label>
             <select id="filterOwner" class="field-input"><option value="" data-i18n="proj.f.anyOwner">Any owner</option></select>
