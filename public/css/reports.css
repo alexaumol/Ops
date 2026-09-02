@@ -79,6 +79,11 @@
 #hoursTableBody tr[data-project-id],
 #hoursTableBody tr[data-entity-id],
 #hoursTableBody tr[data-emp-id] { cursor: pointer; }
+
+.rpt-table th[data-sort-key] { cursor: pointer; user-select: none; }
+.rpt-table th[data-sort-key]:hover { color: var(--text-primary); }
+.rpt-table th[data-sort-key].sorted { color: var(--text-primary); }
+.rpt-table th .sort-arrow { font-size: 0.7em; }
 .rpt-table a { color: var(--brand); text-decoration: none; font-weight: 600; }
 .rpt-table a:hover { text-decoration: underline; }
 .rpt-proj-code { font-size: 0.78rem; color: var(--text-secondary); }

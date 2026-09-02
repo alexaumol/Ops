@@ -105,13 +105,35 @@ const hoursGroupBySelect = document.getElementById("hoursGroupBy");
 
 const num = (n) => Number(n || 0).toLocaleString();
 
-// Per-grouping table definition: header cells (label + optional right align),
-// row cells, CSV header + row.
-const RH = (label) => ({ label, right: true }); // right-aligned header
+// Client-side column sort shared by the hours table and its drill-down
+// modals. Header cells carry { key } (the row property to sort on) and
+// { num } (numeric vs. locale-string compare). State is a single
+// { key, dir } per table, reset to a sensible default on each (re)load.
+const RH = (label, key) => ({ label, right: true, key, num: true }); // right-aligned numeric header
+function defaultSortDir(headers, key) {
+  const h = headers.find((x) => x.key === key);
+  return h && h.num ? "desc" : "asc";
+}
+function sortRowsBy(rows, headers, key, dir) {
+  if (!key) return;
+  const h = headers.find((x) => x.key === key);
+  const mul = dir === "asc" ? 1 : -1;
+  rows.sort((a, b) => {
+    if (h && h.num) return (Number(a[key] || 0) - Number(b[key] || 0)) * mul;
+    return String(a[key] ?? "").localeCompare(String(b[key] ?? ""), undefined, { numeric: true }) * mul;
+  });
+}
+function sortableHeadHtml(headers, sort) {
+  return `<tr>${headers.map((h) => {
+    const active = h.key && h.key === sort.key;
+    const arrow = active ? (sort.dir === "asc" ? " ▲" : " ▼") : "";
+    return `<th${h.key ? ` data-sort-key="${h.key}"` : ""}${h.right ? ' style="text-align:right;"' : ""}${active ? ' class="sorted"' : ""}>${escapeHtml(h.label)}<span class="sort-arrow">${arrow}</span></th>`;
+  }).join("")}</tr>`;
+}
 function hoursTableSpec(groupBy) {
   if (groupBy === "entity") {
     return {
-      headers: [{ label: T("proj.f.entity") }, RH(T("rpt.col.projects")), RH(T("rpt.col.employees")), RH(T("rpt.col.totalHours")), RH(T("rpt.col.poHours")), RH(T("rpt.col.resHours"))],
+      headers: [{ label: T("proj.f.entity"), key: "entityLabel" }, RH(T("rpt.col.projects"), "projectCount"), RH(T("rpt.col.employees"), "employeeCount"), RH(T("rpt.col.totalHours"), "totalHours"), RH(T("rpt.col.poHours"), "poHours"), RH(T("rpt.col.resHours"), "resHours")],
       row: (r) => `
         <tr data-entity-id="${escapeHtml(String(r.entityId ?? ""))}" data-entity-label="${escapeHtml(r.entityLabel || "—")}" title="${T("rpt.tip.drill")}">
           <td>${escapeHtml(r.entityLabel || "—")}</td>
@@ -128,7 +150,7 @@ function hoursTableSpec(groupBy) {
   }
   if (groupBy === "employee") {
     return {
-      headers: [{ label: T("rpt.csv.employee") }, RH(T("rpt.col.projects")), RH(T("rpt.col.totalHours")), RH(T("rpt.col.poHours")), RH(T("rpt.col.resHours"))],
+      headers: [{ label: T("rpt.csv.employee"), key: "employeeName" }, RH(T("rpt.col.projects"), "projectCount"), RH(T("rpt.col.totalHours"), "totalHours"), RH(T("rpt.col.poHours"), "poHours"), RH(T("rpt.col.resHours"), "resHours")],
       row: (r) => `
         <tr data-emp-id="${escapeHtml(String(r.empId ?? ""))}" data-emp-name="${escapeHtml(r.employeeName || "—")}" title="${T("rpt.tip.drill")}">
           <td>${escapeHtml(r.employeeName || "—")}</td>
@@ -143,7 +165,7 @@ function hoursTableSpec(groupBy) {
     };
   }
   return {
-    headers: [{ label: T("bp.col.project") }, { label: T("proj.f.owner") }, { label: T("proj.f.entity") }, { label: T("form.status") }, RH(T("rpt.col.totalHours")), RH(T("rpt.col.poHours")), RH(T("rpt.col.resHours")), RH(T("proj.section.resources"))],
+    headers: [{ label: T("bp.col.project"), key: "name" }, { label: T("proj.f.owner"), key: "ownerName" }, { label: T("proj.f.entity"), key: "entityLabel" }, { label: T("form.status"), key: "statusLabel" }, RH(T("rpt.col.totalHours"), "totalHours"), RH(T("rpt.col.poHours"), "poHours"), RH(T("rpt.col.resHours"), "resHours"), RH(T("proj.section.resources"), "employeeCount")],
     row: (r) => `
       <tr data-project-id="${r.projectId}" data-project-name="${escapeHtml(r.name)}" title="${T('rpt.tip.drillRow')}">
         <td>
@@ -164,14 +186,16 @@ function hoursTableSpec(groupBy) {
   };
 }
 
+let hoursSort = { key: "totalHours", dir: "desc" };
+
 function renderHoursTable() {
   const spec = hoursTableSpec(lastHoursGroupBy);
   const head = document.getElementById("hoursTableHead");
   const tbody = document.getElementById("hoursTableBody");
   const empty = document.getElementById("hoursEmpty");
 
-  head.innerHTML = `<tr>${spec.headers.map((h) =>
-    `<th${h.right ? ' style="text-align:right;"' : ""}>${escapeHtml(h.label)}</th>`).join("")}</tr>`;
+  sortRowsBy(lastHoursRows, spec.headers, hoursSort.key, hoursSort.dir);
+  head.innerHTML = sortableHeadHtml(spec.headers, hoursSort);
 
   document.getElementById("hoursHint").textContent = T(
     lastHoursGroupBy === "entity" ? "rpt.hours.hintEntity"
@@ -193,6 +217,7 @@ function renderHoursTable() {
 
 async function loadHours() {
   lastHoursGroupBy = hoursGroupBySelect.value || "project";
+  hoursSort = { key: "totalHours", dir: "desc" };
   const spec = hoursTableSpec(lastHoursGroupBy);
   const tbody = document.getElementById("hoursTableBody");
   tbody.innerHTML = `<tr><td colspan="${spec.headers.length}" class="sub-empty">${T('common.loading')}</td></tr>`;
@@ -235,6 +260,16 @@ document.getElementById("btnHoursExport").addEventListener("click", () => {
   );
 });
 
+document.getElementById("hoursTableHead").addEventListener("click", (e) => {
+  const th = e.target.closest("th[data-sort-key]");
+  if (!th) return;
+  const key = th.dataset.sortKey;
+  const spec = hoursTableSpec(lastHoursGroupBy);
+  if (hoursSort.key === key) hoursSort.dir = hoursSort.dir === "asc" ? "desc" : "asc";
+  else hoursSort = { key, dir: defaultSortDir(spec.headers, key) };
+  renderHoursTable();
+});
+
 document.getElementById("hoursTableBody").addEventListener("click", (e) => {
   if (e.target.closest("a")) return; // let a project-name link navigate
   const row = e.target.closest("tr");
@@ -256,6 +291,7 @@ const drillOverlay = document.getElementById("drillOverlay");
 let lastDrillRows = [];
 let lastDrillKind = "project";
 let lastDrillTitle = "";
+let drillSort = { key: "totalHours", dir: "desc" };
 
 function drillSpec(kind) {
   const range = () => [hoursStartInput.value || null, hoursEndInput.value || null];
@@ -267,7 +303,7 @@ function drillSpec(kind) {
   if (kind === "entity") {
     return {
       fetch: (id) => HITT_API.getHoursByEntity(id, ...range()),
-      headers: [{ label: T("bp.col.project") }, { label: T("rpt.csv.employee") }, RH(T("rpt.metric.total")), RH("PO"), RH("RES")],
+      headers: [{ label: T("bp.col.project"), key: "name" }, { label: T("rpt.csv.employee"), key: "employeeName" }, RH(T("rpt.metric.total"), "totalHours"), RH("PO", "poHours"), RH("RES", "resHours")],
       row: (r) => `<tr>${projCell(r)}<td>${escapeHtml(r.employeeName || "—")}</td>${hoursCells(r)}</tr>`,
       csvHead: [T("rpt.csv.projectCode"), T("rpt.csv.projectName"), T("rpt.csv.employee"), T("rpt.csv.totalHours"), T("rpt.csv.poHours"), T("rpt.csv.resHours")],
       csvRow: (r) => [r.code, r.name, r.employeeName, r.totalHours, r.poHours, r.resHours],
@@ -276,7 +312,7 @@ function drillSpec(kind) {
   if (kind === "employee") {
     return {
       fetch: (id) => HITT_API.getHoursByEmployee(id, ...range()),
-      headers: [{ label: T("bp.col.project") }, RH(T("rpt.metric.total")), RH("PO"), RH("RES")],
+      headers: [{ label: T("bp.col.project"), key: "name" }, RH(T("rpt.metric.total"), "totalHours"), RH("PO", "poHours"), RH("RES", "resHours")],
       row: (r) => `<tr>${projCell(r)}${hoursCells(r)}</tr>`,
       csvHead: [T("rpt.csv.projectCode"), T("rpt.csv.projectName"), T("rpt.csv.totalHours"), T("rpt.csv.poHours"), T("rpt.csv.resHours")],
       csvRow: (r) => [r.code, r.name, r.totalHours, r.poHours, r.resHours],
@@ -284,35 +320,41 @@ function drillSpec(kind) {
   }
   return {
     fetch: (id) => HITT_API.getHoursPerProjectDetail(id, ...range()),
-    headers: [{ label: T("ta.col.employee") }, RH(T("rpt.metric.total")), RH("PO"), RH("RES")],
+    headers: [{ label: T("ta.col.employee"), key: "employeeName" }, RH(T("rpt.metric.total"), "totalHours"), RH("PO", "poHours"), RH("RES", "resHours")],
     row: (r) => `<tr><td>${escapeHtml(r.employeeName || "—")}</td>${hoursCells(r)}</tr>`,
     csvHead: [T("rpt.csv.employee"), T("rpt.csv.totalHours"), T("rpt.csv.poHours"), T("rpt.csv.resHours")],
     csvRow: (r) => [r.employeeName, r.totalHours, r.poHours, r.resHours],
   };
 }
 
+function renderDrillTable() {
+  const spec = drillSpec(lastDrillKind);
+  sortRowsBy(lastDrillRows, spec.headers, drillSort.key, drillSort.dir);
+  document.getElementById("drillTableHead").innerHTML = sortableHeadHtml(spec.headers, drillSort);
+  document.getElementById("drillTableBody").innerHTML = lastDrillRows.map(spec.row).join("");
+}
+
 async function openDrillDown(kind, id, title) {
   lastDrillKind = kind;
   lastDrillTitle = title || "";
+  drillSort = { key: "totalHours", dir: "desc" };
   const spec = drillSpec(kind);
   document.getElementById("drillTitle").textContent = lastDrillTitle;
-  document.getElementById("drillTableHead").innerHTML = `<tr>${spec.headers.map((h) =>
-    `<th${h.right ? ' style="text-align:right;"' : ""}>${escapeHtml(h.label)}</th>`).join("")}</tr>`;
+  document.getElementById("drillTableHead").innerHTML = sortableHeadHtml(spec.headers, drillSort);
   document.getElementById("drillTableBody").innerHTML = `<tr><td colspan="${spec.headers.length}" class="sub-empty">${T('common.loading')}</td></tr>`;
   document.getElementById("drillEmpty").classList.add("hidden");
   drillOverlay.classList.remove("hidden");
   try {
     const rows = await spec.fetch(id);
     lastDrillRows = rows;
-    const tbody = document.getElementById("drillTableBody");
     if (!rows.length) {
-      tbody.innerHTML = "";
+      document.getElementById("drillTableBody").innerHTML = "";
       const empty = document.getElementById("drillEmpty");
       empty.textContent = T('rpt.hours.empty');
       empty.classList.remove("hidden");
       return;
     }
-    tbody.innerHTML = rows.map(spec.row).join("");
+    renderDrillTable();
   } catch (err) {
     console.error("[reports] failed to load drill-down:", err.message);
     lastDrillRows = [];
@@ -322,6 +364,16 @@ async function openDrillDown(kind, id, title) {
     empty.classList.remove("hidden");
   }
 }
+
+document.getElementById("drillTableHead").addEventListener("click", (e) => {
+  const th = e.target.closest("th[data-sort-key]");
+  if (!th || !lastDrillRows.length) return;
+  const key = th.dataset.sortKey;
+  const spec = drillSpec(lastDrillKind);
+  if (drillSort.key === key) drillSort.dir = drillSort.dir === "asc" ? "desc" : "asc";
+  else drillSort = { key, dir: defaultSortDir(spec.headers, key) };
+  renderDrillTable();
+});
 
 function closeDrillDown() { drillOverlay.classList.add("hidden"); }
 document.getElementById("drillClose").addEventListener("click", closeDrillDown);
