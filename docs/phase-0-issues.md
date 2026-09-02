@@ -122,8 +122,9 @@ One command to stand up a new customer instance end to end. `provision <slug>
 - [x] Nightly `pg_dump` per database with a retention policy, copied off-box — `backup/backup.sh` + `ops-backup.timer`, client-side encrypted to object storage, auto-discovers new silos
 - [x] Alert on backup failure — healthcheck dead-man's-switch (`<url>/start|/fail`) + systemd `OnFailure=`
 - [x] Write the rebuild-from-zero runbook — `docs/backups.md`
-- [ ] One full restore test to a scratch host — record the resulting RTO / RPO *(script + drill procedure ready in `docs/backups.md`; needs a real run on the VPS)*
-- [ ] Upload object-storage bucket + rclone crypt remote on each VPS, install the timer *(operator task, steps in `docs/backups.md`)*
+- [x] Object-storage bucket + rclone crypt remote + timer on the Ops VPS — first `ops-backup.service` run OK, healthcheck green *(HITT VPS still to do)*
+- [ ] One full restore test — run `backup/restore.sh` against a dump, record RTO / RPO in `docs/backups.md` *(only remaining 0F blocker)*
+- [ ] Same backup setup on the HITT VPS
 - [ ] WAL archiving to object storage — pgBackRest or WAL-G *(fast-follow, Phase 1)*
 
 ---
@@ -135,10 +136,12 @@ One command to stand up a new customer instance end to end. `provision <slug>
 
 One-time-code logins and notifications must land, not spam-folder.
 
-- [ ] Add SPF, DKIM, and DMARC records for `theaumol.com`
-- [ ] Set up a transactional sender (SES / Postmark / Resend / IONOS SMTP) with domain authentication
-- [ ] Route Zitadel, invoice mail, and control-plane alerts through it
-- [ ] Score deliverability (mail-tester) and set up bounce / complaint monitoring
+- [x] Set up a transactional sender — **Resend**, domain-authenticated for `theaumol.com`
+- [x] SPF + DKIM for `theaumol.com` — added as part of Resend domain verification
+- [x] Route Zitadel through it — Zitadel SMTP → Resend, verification-code delivery tested OK
+- [ ] Add a **DMARC** record (`_dmarc.theaumol.com`, start at `p=none` with `rua=`)
+- [ ] Route **invoice mail** (the Ops app's own sender) through Resend too, or confirm the per-entity SMTP/Graph transport is the intended path for customer instances
+- [ ] Score deliverability (mail-tester.com) and turn on Resend bounce / complaint webhooks
 
 ---
 
