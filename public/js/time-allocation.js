@@ -562,7 +562,12 @@ function renderTimeOffTable(){
     <tr data-i="${i}">
       <td>${formatDateOnly(r.startdate)} – ${formatDateOnly(r.enddate)}</td>
       <td style="text-align:right;">${r.daysrequested}</td>
-      <td><span class="${statusPillClass(r.statusLabel)}">${r.statusLabel || T('common.unknown')}</span></td>
+      <td>
+        <span class="${statusPillClass(r.statusLabel)}">${r.statusLabel || T('common.unknown')}</span>
+        ${r.statusLabel === 'Rejected' && r.rejectcomment
+          ? `<div style="font-size:0.72rem; color:var(--text-secondary); margin-top:0.25rem; max-width:22rem;">${escapeHtml(r.rejectcomment)}</div>`
+          : ''}
+      </td>
       <td style="font-size:0.78rem; color:var(--text-secondary);">${formatDateOnly(r.submittedat)}</td>
       <td>${canWithdraw(r) ? `<button class="ta-remove-btn" data-withdraw title="${T('ta.tip.withdraw')}">${T('ta.withdraw')}</button>` : ''}</td>
     </tr>
@@ -693,19 +698,54 @@ function renderApprovalsTable(pending){
     });
   });
   tbody.querySelectorAll('[data-reject]').forEach((btn, i) => {
-    btn.addEventListener('click', async () => {
-      try {
-        await HITT_API.rejectTimeOffRequest(pending[i].id);
-        toast(T('ta.toast.rejected', { name: pending[i].employeeName }), 'navy');
-        await loadApprovals();
-        refreshTimeOffBadge();
-      } catch (err) {
-        console.error(err);
-        toast(T('ta.toast.rejectFail'), 'red');
-      }
-    });
+    btn.addEventListener('click', () => openRejectModal(pending[i]));
   });
 }
+
+/* ---------- Reject-reason modal (approvers must give a reason) ---------- */
+const rejectOverlay = document.getElementById('rejectReasonOverlay');
+let rejectingRequest = null;
+
+function openRejectModal(req){
+  rejectingRequest = req;
+  document.getElementById('rejectReasonText').value = '';
+  document.getElementById('rejectReasonHint').classList.add('hidden');
+  rejectOverlay.classList.remove('hidden');
+  setTimeout(() => document.getElementById('rejectReasonText').focus(), 50);
+}
+function closeRejectModal(){
+  rejectOverlay.classList.add('hidden');
+  rejectingRequest = null;
+}
+document.getElementById('rejectReasonClose').addEventListener('click', closeRejectModal);
+document.getElementById('rejectReasonCancel').addEventListener('click', closeRejectModal);
+rejectOverlay.addEventListener('click', (e) => { if (e.target === rejectOverlay) closeRejectModal(); });
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !rejectOverlay.classList.contains('hidden')) closeRejectModal();
+});
+document.getElementById('rejectReasonText').addEventListener('input', () => {
+  document.getElementById('rejectReasonHint').classList.add('hidden');
+});
+document.getElementById('rejectReasonSubmit').addEventListener('click', async () => {
+  if (!rejectingRequest) return;
+  const reason = document.getElementById('rejectReasonText').value.trim();
+  if (!reason) {
+    document.getElementById('rejectReasonHint').classList.remove('hidden');
+    document.getElementById('rejectReasonText').focus();
+    return;
+  }
+  const req = rejectingRequest;
+  try {
+    await HITT_API.rejectTimeOffRequest(req.id, reason);
+    closeRejectModal();
+    toast(T('ta.toast.rejected', { name: req.employeeName }), 'navy');
+    await loadApprovals();
+    refreshTimeOffBadge();
+  } catch (err) {
+    console.error(err);
+    toast(T('ta.toast.rejectFail'), 'red');
+  }
+});
 
 /* ---------- New request modal ---------- */
 const timeOffOverlay = document.getElementById('timeOffOverlay');

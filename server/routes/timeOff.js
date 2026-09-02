@@ -238,15 +238,18 @@ router.patch("/requests/:id/approve", requireTimeOffApprover(), async (req, res)
   }
 });
 
-// PATCH /api/time-off/requests/:id/reject   { comment?: string }
+// PATCH /api/time-off/requests/:id/reject   { comment: string (required) }
 router.patch("/requests/:id/reject", requireTimeOffApprover(), async (req, res) => {
-  const { comment } = req.body || {};
+  const comment = typeof req.body?.comment === "string" ? req.body.comment.trim() : "";
+  if (!comment) {
+    return res.status(400).json({ error: "validation_error", message: "A rejection reason is required." });
+  }
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
     await client.query(
       `UPDATE timeoffrequests SET rejectedby = $2, rejectedat = now(), rejectcomment = $3 WHERE id = $1`,
-      [req.params.id, req.hittUser.employeeId, comment || null]
+      [req.params.id, req.hittUser.employeeId, comment]
     );
 
     const existing = await client.query(

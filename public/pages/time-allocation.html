@@ -211,6 +211,27 @@
     </div>
   </div>
 
+  <!-- ============================ REJECT REASON MODAL ============================ -->
+  <div id="rejectReasonOverlay" class="modal-overlay hidden">
+    <div class="modal-panel modal-panel--sm">
+      <div class="modal-head">
+        <h2 style="flex:1; font-size:1rem; font-weight:700; color:#fff; margin:0;" data-i18n="ta.reject.title">Reject request</h2>
+        <button id="rejectReasonClose" class="modal-head-btn modal-head-btn--close" title="Close">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="field-section">
+          <label class="field-label" for="rejectReasonText" data-i18n="ta.reject.reasonLabel">Reason for rejection</label>
+          <textarea id="rejectReasonText" class="field-input" rows="3" data-i18n-placeholder="ta.reject.reasonPlaceholder" placeholder="Explain why this request is being rejected…"></textarea>
+          <p id="rejectReasonHint" class="hidden" style="color:var(--danger); font-size:0.78rem; margin:0.35rem 0 0;" data-i18n="ta.reject.required">A reason is required to reject a request.</p>
+        </div>
+      </div>
+      <div style="flex-shrink:0; border-top:1px solid var(--border-subtle); padding:0.75rem 1.1rem; display:flex; justify-content:flex-end; gap:0.5rem;">
+        <button id="rejectReasonCancel" class="btn btn-secondary" data-i18n="form.cancel">Cancel</button>
+        <button id="rejectReasonSubmit" class="btn btn-primary" data-i18n="ta.reject.confirm">Reject request</button>
+      </div>
+    </div>
+  </div>
+
   <script src="../js/config.js"></script>
   <script src="../js/branding.js"></script>
   <script src="../js/i18n-dict.js"></script>
