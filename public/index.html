@@ -282,11 +282,19 @@
       const isOidc = (window.HITT_CONFIG?.AUTH?.provider || "entra").toLowerCase() === "oidc";
       const btnLabel = btnMsal.querySelector("[data-i18n]");
       // With the broker (OIDC), the provider buttons live on the broker's own
-      // page, so this one is just a generic "Sign in".
-      if (isOidc && btnLabel) {
-        btnLabel.removeAttribute("data-i18n");
-        btnLabel.textContent = "Sign in";
+      // page — strip the Microsoft-specific chrome here.
+      if (isOidc) {
+        if (btnLabel) {
+          btnLabel.removeAttribute("data-i18n");
+          btnLabel.textContent = "Sign in";
+        }
         btnMsal.querySelector("svg")?.remove();
+        document.querySelector(".ms-badge")?.remove();
+        const sub = stepMsal.querySelector(".login-sub");
+        if (sub) {
+          sub.removeAttribute("data-i18n");
+          sub.textContent = "You'll continue to your organisation's sign-in page.";
+        }
       }
       const busyText = "Signing in…";
       const idleText = () => (btnLabel ? btnLabel.textContent : "Sign in");
