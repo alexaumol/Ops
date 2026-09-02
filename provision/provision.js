@@ -269,6 +269,9 @@ const steps = [
       };
       writeFile(path.join(INSTANCE_DIR, "env"), render("env.tmpl", vars), 0o640);
       writeFile(path.join(INSTANCE_DIR, "config.js"), render("config.js.tmpl", vars), 0o644);
+      // the systemd unit runs as cfg.runUser — it must read env (0640) and
+      // write uploads/. provision.js itself runs as root.
+      sh("chown", ["-R", `${cfg.runUser}:${cfg.runUser}`, INSTANCE_DIR]);
     },
     undo: () => {},
   },
