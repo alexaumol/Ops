@@ -344,6 +344,20 @@ const HITT_API = (() => {
       const qs = params.toString();
       return request(`/api/reports/hours-per-project/${projectId}${qs ? `?${qs}` : ""}`);
     },
+    getHoursByEntity: (entityId, startDate, endDate) => {
+      const params = new URLSearchParams();
+      if (startDate) params.set("startDate", startDate);
+      if (endDate) params.set("endDate", endDate);
+      const qs = params.toString();
+      return request(`/api/reports/hours-per-project/by-entity/${encodeURIComponent(entityId || "none")}${qs ? `?${qs}` : ""}`);
+    },
+    getHoursByEmployee: (empId, startDate, endDate) => {
+      const params = new URLSearchParams();
+      if (startDate) params.set("startDate", startDate);
+      if (endDate) params.set("endDate", endDate);
+      const qs = params.toString();
+      return request(`/api/reports/hours-per-project/by-employee/${encodeURIComponent(empId)}${qs ? `?${qs}` : ""}`);
+    },
     getCalendarLeaves: (startDate, endDate, opts = {}) =>
       request(`/api/time-off/calendar?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}${opts.deliverables ? "&deliverables=1" : ""}`),
 

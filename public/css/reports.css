@@ -76,6 +76,9 @@
 }
 .rpt-table tbody tr:last-child td { border-bottom: none; }
 .rpt-table tbody tr:hover { background: var(--bg-surface-alt); }
+#hoursTableBody tr[data-project-id],
+#hoursTableBody tr[data-entity-id],
+#hoursTableBody tr[data-emp-id] { cursor: pointer; }
 .rpt-table a { color: var(--brand); text-decoration: none; font-weight: 600; }
 .rpt-table a:hover { text-decoration: underline; }
 .rpt-proj-code { font-size: 0.78rem; color: var(--text-secondary); }

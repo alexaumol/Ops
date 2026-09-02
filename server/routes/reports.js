@@ -6,11 +6,16 @@
  * "Holidays"/work-calendar admin forms). Reports:
  *
  *   GET /hours-per-project              Sums projectstimetracking.
- *                                        projtimetrackhours per project
- *                                        over an optional date range.
- *   GET /hours-per-project/:projectId   Same sum, broken down per
- *                                        employee, for one project
- *                                        (row-click drill-down).
+ *                                        projtimetrackhours, rolled up by
+ *                                        project / entity / employee
+ *                                        (?groupBy=), over an optional date
+ *                                        range.
+ *   GET /hours-per-project/:projectId          Row-click drill-down for the
+ *                                        project view: per-employee breakdown.
+ *   GET /hours-per-project/by-entity/:entityId  Drill-down for the entity
+ *                                        view: per (project, employee).
+ *   GET /hours-per-project/by-employee/:empId   Drill-down for the employee
+ *                                        view: per project.
  *   GET /projects-by-status-entity      Project counts per status,
  *                                        broken down by entity — bar chart.
  *   GET /project-years                  Distinct entrydate years, for the
@@ -75,7 +80,8 @@ const HOURS_GROUP_SQL = {
     HAVING COALESCE(SUM(t.projtimetrackhours), 0) > 0
     ORDER BY "totalHours" DESC`,
   entity: `
-    SELECT COALESCE(ent.entitydesc, '—') AS "entityLabel",
+    SELECT ent.id::text AS "entityId",
+           COALESCE(ent.entitydesc, '—') AS "entityLabel",
            COUNT(DISTINCT p.id) AS "projectCount",
            COUNT(DISTINCT t.userid) AS "employeeCount",
            COALESCE(SUM(t.projtimetrackhours), 0) AS "totalHours",
@@ -86,7 +92,7 @@ const HOURS_GROUP_SQL = {
     LEFT JOIN entity ent ON ent.id = p.entityid::bigint
     WHERE ($1::date IS NULL OR t.projtimetrackdate >= $1::date)
       AND ($2::date IS NULL OR t.projtimetrackdate <= $2::date)
-    GROUP BY ent.entitydesc
+    GROUP BY ent.id, ent.entitydesc
     HAVING COALESCE(SUM(t.projtimetrackhours), 0) > 0
     ORDER BY "totalHours" DESC`,
   employee: `
@@ -143,6 +149,68 @@ router.get("/hours-per-project/:projectId", requireModuleAccess("reports"), asyn
     res.json(rows);
   } catch (err) {
     console.error("[GET /api/reports/hours-per-project/:projectId] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
+// GET /api/reports/hours-per-project/by-entity/:entityId?startDate=&endDate=
+// Drill-down for the "group by entity" view: one row per (project, employee)
+// pair within that entity. entityId "none" (or any non-numeric) targets the
+// unassigned bucket (projects with no entity).
+router.get("/hours-per-project/by-entity/:entityId", requireModuleAccess("reports"), async (req, res) => {
+  const { startDate, endDate } = req.query;
+  const entityId = /^\d+$/.test(req.params.entityId) ? req.params.entityId : null;
+  try {
+    const { rows } = await pool.query(
+      `SELECT p.id::text AS "projectId", p.projectnumber AS code, p.projectname AS name,
+              t.userid AS "empId",
+              COALESCE(NULLIF(TRIM(CONCAT(e.employeefirstname, ' ', e.employeelastname)), ''),
+                       'Employee #' || t.userid) AS "employeeName",
+              COALESCE(SUM(t.projtimetrackhours), 0) AS "totalHours",
+              COALESCE(SUM(t.projtimetrackhours) FILTER (WHERE t.po_res = 'PO'), 0) AS "poHours",
+              COALESCE(SUM(t.projtimetrackhours) FILTER (WHERE t.po_res = 'RES'), 0) AS "resHours"
+       FROM projectstimetracking t
+       JOIN projects p ON p.id = t.projectid::bigint
+       LEFT JOIN employees e ON e.id = t.userid::bigint
+       WHERE (($1::bigint IS NULL AND p.entityid IS NULL) OR p.entityid::bigint = $1::bigint)
+         AND ($2::date IS NULL OR t.projtimetrackdate >= $2::date)
+         AND ($3::date IS NULL OR t.projtimetrackdate <= $3::date)
+       GROUP BY p.id, p.projectnumber, p.projectname, t.userid, e.employeefirstname, e.employeelastname
+       HAVING COALESCE(SUM(t.projtimetrackhours), 0) > 0
+       ORDER BY p.projectnumber, "totalHours" DESC`,
+      [entityId, startDate || null, endDate || null]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error("[GET /api/reports/hours-per-project/by-entity/:entityId] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
+// GET /api/reports/hours-per-project/by-employee/:empId?startDate=&endDate=
+// Drill-down for the "group by employee" view: one row per project that
+// employee logged hours against.
+router.get("/hours-per-project/by-employee/:empId", requireModuleAccess("reports"), async (req, res) => {
+  const { startDate, endDate } = req.query;
+  try {
+    const { rows } = await pool.query(
+      `SELECT p.id::text AS "projectId", p.projectnumber AS code, p.projectname AS name,
+              COALESCE(SUM(t.projtimetrackhours), 0) AS "totalHours",
+              COALESCE(SUM(t.projtimetrackhours) FILTER (WHERE t.po_res = 'PO'), 0) AS "poHours",
+              COALESCE(SUM(t.projtimetrackhours) FILTER (WHERE t.po_res = 'RES'), 0) AS "resHours"
+       FROM projectstimetracking t
+       JOIN projects p ON p.id = t.projectid::bigint
+       WHERE t.userid::bigint = $1
+         AND ($2::date IS NULL OR t.projtimetrackdate >= $2::date)
+         AND ($3::date IS NULL OR t.projtimetrackdate <= $3::date)
+       GROUP BY p.id, p.projectnumber, p.projectname
+       HAVING COALESCE(SUM(t.projtimetrackhours), 0) > 0
+       ORDER BY "totalHours" DESC`,
+      [req.params.empId, startDate || null, endDate || null]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error("[GET /api/reports/hours-per-project/by-employee/:empId] DB error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });
   }
 });

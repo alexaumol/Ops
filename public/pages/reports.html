@@ -27,7 +27,7 @@
 
     <div class="page-tabs">
       <button data-rtab="stats" class="page-tab" aria-selected="true" data-i18n="rpt.tab.stats">Project stats</button>
-      <button data-rtab="hours" class="page-tab" aria-selected="false" data-i18n="rpt.tab.hours">Hours per project</button>
+      <button data-rtab="hours" class="page-tab" aria-selected="false" data-i18n="rpt.tab.hours">Project time tracking</button>
     </div>
 
     <!-- ============================ HOURS PER PROJECT ============================ -->
@@ -55,7 +55,7 @@
         <div class="rpt-spacer"></div>
         <span id="hoursTotal" class="rpt-total"></span>
       </div>
-      <p class="rpt-hint" id="hoursHint" data-i18n="rpt.hours.hint">Click a project row for a per-employee breakdown.</p>
+      <p class="rpt-hint" id="hoursHint">Click a row for a breakdown.</p>
 
       <div class="rpt-table-wrap">
         <table class="rpt-table">
@@ -184,22 +184,15 @@
 
   <!-- ============================ PROJECT HOURS DRILL-DOWN ============================ -->
   <div id="drillOverlay" class="modal-overlay hidden">
-    <div class="modal-panel modal-panel--sm">
+    <div class="modal-panel modal-panel--sm" style="max-width:640px;">
       <div class="modal-head">
-        <h2 id="drillTitle" style="flex:1; font-size:1rem; font-weight:700; color:#fff; margin:0;" data-i18n="bp.col.project">Project</h2>
+        <h2 id="drillTitle" style="flex:1; font-size:1rem; font-weight:700; color:#fff; margin:0;">Project</h2>
         <button id="drillExport" class="modal-head-btn" title="Export CSV" style="background: var(--hitt-charcoal);">⬇</button>
         <button id="drillClose" class="modal-head-btn modal-head-btn--close" title="Close">✕</button>
       </div>
       <div class="modal-body">
         <table class="rpt-table">
-          <thead>
-            <tr>
-              <th data-i18n="ta.col.employee">Employee</th>
-              <th style="text-align:right;" data-i18n="rpt.metric.total">Total</th>
-              <th style="text-align:right;">PO</th>
-              <th style="text-align:right;">RES</th>
-            </tr>
-          </thead>
+          <thead id="drillTableHead"></thead>
           <tbody id="drillTableBody"></tbody>
         </table>
         <div id="drillEmpty" class="bp-empty hidden" data-i18n="rpt.drill.empty">No hours logged by anyone for this project in this range.</div>

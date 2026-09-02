@@ -113,7 +113,7 @@ function hoursTableSpec(groupBy) {
     return {
       headers: [{ label: T("proj.f.entity") }, RH(T("rpt.col.projects")), RH(T("rpt.col.employees")), RH(T("rpt.col.totalHours")), RH(T("rpt.col.poHours")), RH(T("rpt.col.resHours"))],
       row: (r) => `
-        <tr>
+        <tr data-entity-id="${escapeHtml(String(r.entityId ?? ""))}" data-entity-label="${escapeHtml(r.entityLabel || "—")}" title="${T("rpt.tip.drill")}">
           <td>${escapeHtml(r.entityLabel || "—")}</td>
           <td style="text-align:right;">${num(r.projectCount)}</td>
           <td style="text-align:right;">${num(r.employeeCount)}</td>
@@ -130,7 +130,7 @@ function hoursTableSpec(groupBy) {
     return {
       headers: [{ label: T("rpt.csv.employee") }, RH(T("rpt.col.projects")), RH(T("rpt.col.totalHours")), RH(T("rpt.col.poHours")), RH(T("rpt.col.resHours"))],
       row: (r) => `
-        <tr>
+        <tr data-emp-id="${escapeHtml(String(r.empId ?? ""))}" data-emp-name="${escapeHtml(r.employeeName || "—")}" title="${T("rpt.tip.drill")}">
           <td>${escapeHtml(r.employeeName || "—")}</td>
           <td style="text-align:right;">${num(r.projectCount)}</td>
           <td style="text-align:right; font-weight:700;">${num(r.totalHours)}</td>
@@ -173,7 +173,10 @@ function renderHoursTable() {
   head.innerHTML = `<tr>${spec.headers.map((h) =>
     `<th${h.right ? ' style="text-align:right;"' : ""}>${escapeHtml(h.label)}</th>`).join("")}</tr>`;
 
-  document.getElementById("hoursHint").classList.toggle("hidden", lastHoursGroupBy !== "project");
+  document.getElementById("hoursHint").textContent = T(
+    lastHoursGroupBy === "entity" ? "rpt.hours.hintEntity"
+      : lastHoursGroupBy === "employee" ? "rpt.hours.hintEmployee"
+      : "rpt.hours.hint");
 
   if (!lastHoursRows.length) {
     tbody.innerHTML = "";
@@ -233,47 +236,90 @@ document.getElementById("btnHoursExport").addEventListener("click", () => {
 });
 
 document.getElementById("hoursTableBody").addEventListener("click", (e) => {
-  if (lastHoursGroupBy !== "project") return;
-  if (e.target.closest("a")) return; // let the project-name link navigate
-  const row = e.target.closest("tr[data-project-id]");
+  if (e.target.closest("a")) return; // let a project-name link navigate
+  const row = e.target.closest("tr");
   if (!row) return;
-  openDrillDown(row.dataset.projectId, row.dataset.projectName);
+  if (lastHoursGroupBy === "project" && row.dataset.projectId) {
+    openDrillDown("project", row.dataset.projectId, row.dataset.projectName);
+  } else if (lastHoursGroupBy === "entity" && row.hasAttribute("data-entity-id")) {
+    openDrillDown("entity", row.dataset.entityId || "none", row.dataset.entityLabel);
+  } else if (lastHoursGroupBy === "employee" && row.dataset.empId) {
+    openDrillDown("employee", row.dataset.empId, row.dataset.empName);
+  }
 });
 
-/* ---------- Per-employee drill-down modal ---------- */
+/* ---------- Hours drill-down modal ---------- */
+// Columns + fetch differ by the grouping the drill-down was opened from:
+//   project  → per employee     entity → per (project, employee)
+//   employee → per project
 const drillOverlay = document.getElementById("drillOverlay");
 let lastDrillRows = [];
-let lastDrillProjectName = "";
+let lastDrillKind = "project";
+let lastDrillTitle = "";
 
-async function openDrillDown(projectId, projectName) {
-  lastDrillProjectName = projectName;
-  document.getElementById("drillTitle").textContent = projectName;
-  document.getElementById("drillTableBody").innerHTML = `<tr><td colspan="4" class="sub-empty">${T('common.loading')}</td></tr>`;
+function drillSpec(kind) {
+  const range = () => [hoursStartInput.value || null, hoursEndInput.value || null];
+  const projCell = (r) => `<td><div>${escapeHtml(r.name || "—")}</div><div class="rpt-proj-code">${escapeHtml(r.code || "")}</div></td>`;
+  const hoursCells = (r) => `
+        <td style="text-align:right; font-weight:700;">${num(r.totalHours)}</td>
+        <td style="text-align:right; color:var(--text-secondary);">${num(r.poHours)}</td>
+        <td style="text-align:right; color:var(--text-secondary);">${num(r.resHours)}</td>`;
+  if (kind === "entity") {
+    return {
+      fetch: (id) => HITT_API.getHoursByEntity(id, ...range()),
+      headers: [{ label: T("bp.col.project") }, { label: T("rpt.csv.employee") }, RH(T("rpt.metric.total")), RH("PO"), RH("RES")],
+      row: (r) => `<tr>${projCell(r)}<td>${escapeHtml(r.employeeName || "—")}</td>${hoursCells(r)}</tr>`,
+      csvHead: [T("rpt.csv.projectCode"), T("rpt.csv.projectName"), T("rpt.csv.employee"), T("rpt.csv.totalHours"), T("rpt.csv.poHours"), T("rpt.csv.resHours")],
+      csvRow: (r) => [r.code, r.name, r.employeeName, r.totalHours, r.poHours, r.resHours],
+    };
+  }
+  if (kind === "employee") {
+    return {
+      fetch: (id) => HITT_API.getHoursByEmployee(id, ...range()),
+      headers: [{ label: T("bp.col.project") }, RH(T("rpt.metric.total")), RH("PO"), RH("RES")],
+      row: (r) => `<tr>${projCell(r)}${hoursCells(r)}</tr>`,
+      csvHead: [T("rpt.csv.projectCode"), T("rpt.csv.projectName"), T("rpt.csv.totalHours"), T("rpt.csv.poHours"), T("rpt.csv.resHours")],
+      csvRow: (r) => [r.code, r.name, r.totalHours, r.poHours, r.resHours],
+    };
+  }
+  return {
+    fetch: (id) => HITT_API.getHoursPerProjectDetail(id, ...range()),
+    headers: [{ label: T("ta.col.employee") }, RH(T("rpt.metric.total")), RH("PO"), RH("RES")],
+    row: (r) => `<tr><td>${escapeHtml(r.employeeName || "—")}</td>${hoursCells(r)}</tr>`,
+    csvHead: [T("rpt.csv.employee"), T("rpt.csv.totalHours"), T("rpt.csv.poHours"), T("rpt.csv.resHours")],
+    csvRow: (r) => [r.employeeName, r.totalHours, r.poHours, r.resHours],
+  };
+}
+
+async function openDrillDown(kind, id, title) {
+  lastDrillKind = kind;
+  lastDrillTitle = title || "";
+  const spec = drillSpec(kind);
+  document.getElementById("drillTitle").textContent = lastDrillTitle;
+  document.getElementById("drillTableHead").innerHTML = `<tr>${spec.headers.map((h) =>
+    `<th${h.right ? ' style="text-align:right;"' : ""}>${escapeHtml(h.label)}</th>`).join("")}</tr>`;
+  document.getElementById("drillTableBody").innerHTML = `<tr><td colspan="${spec.headers.length}" class="sub-empty">${T('common.loading')}</td></tr>`;
   document.getElementById("drillEmpty").classList.add("hidden");
   drillOverlay.classList.remove("hidden");
   try {
-    const rows = await HITT_API.getHoursPerProjectDetail(projectId, hoursStartInput.value || null, hoursEndInput.value || null);
+    const rows = await spec.fetch(id);
     lastDrillRows = rows;
     const tbody = document.getElementById("drillTableBody");
     if (!rows.length) {
       tbody.innerHTML = "";
-      document.getElementById("drillEmpty").classList.remove("hidden");
+      const empty = document.getElementById("drillEmpty");
+      empty.textContent = T('rpt.hours.empty');
+      empty.classList.remove("hidden");
       return;
     }
-    tbody.innerHTML = rows.map((r) => `
-      <tr>
-        <td>${escapeHtml(r.employeeName)}</td>
-        <td style="text-align:right; font-weight:700;">${Number(r.totalHours).toLocaleString()}</td>
-        <td style="text-align:right; color:var(--text-secondary);">${Number(r.poHours).toLocaleString()}</td>
-        <td style="text-align:right; color:var(--text-secondary);">${Number(r.resHours).toLocaleString()}</td>
-      </tr>
-    `).join("");
+    tbody.innerHTML = rows.map(spec.row).join("");
   } catch (err) {
-    console.error("[reports] failed to load project drill-down:", err.message);
+    console.error("[reports] failed to load drill-down:", err.message);
     lastDrillRows = [];
     document.getElementById("drillTableBody").innerHTML = "";
-    document.getElementById("drillEmpty").textContent = T('rpt.err.breakdown');
-    document.getElementById("drillEmpty").classList.remove("hidden");
+    const empty = document.getElementById("drillEmpty");
+    empty.textContent = T('rpt.err.breakdown');
+    empty.classList.remove("hidden");
   }
 }
 
@@ -285,10 +331,11 @@ document.addEventListener("keydown", (e) => {
 });
 document.getElementById("drillExport").addEventListener("click", () => {
   if (!lastDrillRows.length) { toast(T('rpt.nothingToExport'), "navy"); return; }
+  const spec = drillSpec(lastDrillKind);
   downloadCsv(
-    `hours_${lastDrillProjectName.replace(/[^\w-]+/g, "_")}.csv`,
-    [T('rpt.csv.employee'), T('rpt.csv.totalHours'), T('rpt.csv.poHours'), T('rpt.csv.resHours')],
-    lastDrillRows.map((r) => [r.employeeName, r.totalHours, r.poHours, r.resHours])
+    `hours_${(lastDrillTitle || lastDrillKind).replace(/[^\w-]+/g, "_")}.csv`,
+    spec.csvHead,
+    lastDrillRows.map(spec.csvRow)
   );
 });
 
