@@ -101,6 +101,12 @@ rclone config create ionos-crypt crypt \
 rclone lsd ionos-crypt:            # smoke test — should not error
 ```
 
+`ionos-crypt:` is now rooted at the bucket, so `RCLONE_REMOTE="ionos-crypt:"`
+(nothing after the colon) — the script appends `<host>/<date>` itself, and
+restore paths are `rclone:ionos-crypt:<host>/<date>`. Don't repeat the bucket
+name in `RCLONE_REMOTE` or you get a redundant `ops-backups/ops-backups/…`
+nesting.
+
 > **The crypt password + salt are the only way to read the backups.** They're
 > stored obscured (not encrypted) in `/root/.config/rclone/rclone.conf`. Copy
 > that file — or the two plaintext values — into your password manager / offline
@@ -180,8 +186,8 @@ sudo systemctl list-timers ops-backup.timer          # confirm next run
 sudo systemctl start ops-backup.service               # run it now
 journalctl -u ops-backup.service -f                   # watch
 ls -R /var/backups/ops/                               # local dumps + MANIFEST
-sudo rclone tree ionos-crypt:                         # decrypted listing of the bucket
-sudo rclone cat ionos-s3:ops-backups 2>/dev/null | head -c 64 | xxd   # raw = ciphertext
+sudo rclone tree ionos-crypt:                         # decrypted listing (host/date/*.dump)
+sudo rclone lsf ionos-s3:ops-backups --recursive | head   # raw = encrypted names
 ```
 
 Then do a real restore (next section) before you call 0F done.
@@ -192,21 +198,30 @@ Then do a real restore (next section) before you call 0F done.
 and real recovery.
 
 ```bash
-# from a local dump:
+# from a local dump file:
 sudo /opt/ops/backup/restore.sh \
-  /var/backups/ops/ops-vps/2026-09-02/ops-vps__127.0.0.1_5432__ops_demo__*.dump \
+  /var/backups/ops/ops-vps/2026-09-02/ops-vps__127.0.0.1_5432__ops_demo__20260902T023012Z.dump \
   ops_demo_restore
 
-# straight from object storage (rclone: prefix, decrypts via the crypt remote):
+# straight from object storage — a date dir with exactly one dump:
 sudo /opt/ops/backup/restore.sh \
   rclone:ionos-crypt:ops-vps/2026-09-02 \
+  ops_demo_restore
+
+# ...or point at one object when the dir holds several DBs (restore.sh lists
+# them for you if you give it just the dir):
+sudo /opt/ops/backup/restore.sh \
+  rclone:ionos-crypt:ops-vps/2026-09-02/ops-vps__127.0.0.1_5432__ops_demo__20260902T023012Z.dump \
   ops_demo_restore
 ```
 
 It creates the target DB (refuses if it exists unless `--force`), runs
-`pg_restore --no-owner --no-privileges --exit-on-error`, and prints the table
-count. To point an instance at the restored DB, update `PG*` in
-`/srv/ops/<slug>/env` and `systemctl restart ops@<slug>`.
+`pg_restore --no-owner --no-privileges --exit-on-error`, then prints table
+counts per schema and **exits non-zero if the restored DB has no user tables**
+(so a broken/empty dump fails the drill loudly). The Ops DBs land in `public`;
+the `zitadel` DB lands in `eventstore` / `projections` / `auth` / … — the
+count covers all of them. To point an instance at the restored DB, update
+`PG*` in `/srv/ops/<slug>/env` and `systemctl restart ops@<slug>`.
 
 ### Monthly restore drill
 
