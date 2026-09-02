@@ -18,6 +18,8 @@
   box-shadow: var(--shadow-sm);
 }
 .ta-banner label { font-size: 0.78rem; font-weight: 600; color: var(--text-secondary); }
+.ta-cal-toggle { display: inline-flex; align-items: center; gap: 0.4rem; cursor: pointer; }
+.ta-cal-toggle input { margin: 0; }
 
 /* ---------- Page-level tabs (Project time tracking / Time off) ---------- */
 .page-tabs {
@@ -246,6 +248,7 @@
 .rpt-swatch { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
 .rpt-swatch-holiday { background: var(--hitt-amber); }
 .rpt-swatch-birthday { background: var(--hitt-teal, #5C757C); }
+.rpt-swatch-deliverable { background: #7C5C9C; }
 .rpt-swatch-approved { background: var(--brand); }
 .rpt-swatch-pending { background: var(--bg-surface); border: 1.5px dashed var(--text-secondary); }
 
@@ -350,6 +353,17 @@
   font-weight: 600;
   color: var(--text-primary);
   background: rgba(92,117,124,0.16);
+  padding: 0.1rem 0.35rem;
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rpt-cal-deliverable {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #fff;
+  background: #7C5C9C;
   padding: 0.1rem 0.35rem;
   border-radius: var(--radius-sm);
   white-space: nowrap;

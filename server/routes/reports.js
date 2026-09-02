@@ -43,40 +43,76 @@ const { requireModuleAccess } = require("../lib/permissions");
 
 const router = express.Router();
 
-// GET /api/reports/hours-per-project?startDate=&endDate=
-// Both optional — omitted means no lower/upper bound on projtimetrackdate.
+// GET /api/reports/hours-per-project?startDate=&endDate=&groupBy=project|entity|employee
+// Dates optional (no lower/upper bound on projtimetrackdate when omitted).
+// `groupBy` (default "project") picks how the tracked hours are rolled up.
+// Returns { groupBy, rows } — the row shape depends on the grouping.
+const HOURS_GROUP_SQL = {
+  project: `
+    SELECT p.id::text AS "projectId", p.projectnumber AS code, p.projectname AS name,
+           ps.projectstatusdesc AS "statusLabel",
+           ent.entitydesc AS "entityLabel",
+           owner."ownerName",
+           COALESCE(SUM(t.projtimetrackhours), 0) AS "totalHours",
+           COALESCE(SUM(t.projtimetrackhours) FILTER (WHERE t.po_res = 'PO'), 0) AS "poHours",
+           COALESCE(SUM(t.projtimetrackhours) FILTER (WHERE t.po_res = 'RES'), 0) AS "resHours",
+           COUNT(DISTINCT t.userid) AS "employeeCount"
+    FROM projectstimetracking t
+    JOIN projects p ON p.id = t.projectid::bigint
+    LEFT JOIN projectstatus ps ON ps.id = p.projectstatusid::bigint
+    LEFT JOIN entity ent ON ent.id = p.entityid::bigint
+    LEFT JOIN LATERAL (
+      SELECT TRIM(CONCAT(e.employeefirstname, ' ', e.employeelastname)) AS "ownerName"
+      FROM projectowners po
+      JOIN employees e ON e.id = po.projectownerid::bigint
+      WHERE po.projectid = p.id
+      ORDER BY po.id DESC
+      LIMIT 1
+    ) owner ON true
+    WHERE ($1::date IS NULL OR t.projtimetrackdate >= $1::date)
+      AND ($2::date IS NULL OR t.projtimetrackdate <= $2::date)
+    GROUP BY p.id, p.projectnumber, p.projectname, ps.projectstatusdesc, ent.entitydesc, owner."ownerName"
+    HAVING COALESCE(SUM(t.projtimetrackhours), 0) > 0
+    ORDER BY "totalHours" DESC`,
+  entity: `
+    SELECT COALESCE(ent.entitydesc, '—') AS "entityLabel",
+           COUNT(DISTINCT p.id) AS "projectCount",
+           COUNT(DISTINCT t.userid) AS "employeeCount",
+           COALESCE(SUM(t.projtimetrackhours), 0) AS "totalHours",
+           COALESCE(SUM(t.projtimetrackhours) FILTER (WHERE t.po_res = 'PO'), 0) AS "poHours",
+           COALESCE(SUM(t.projtimetrackhours) FILTER (WHERE t.po_res = 'RES'), 0) AS "resHours"
+    FROM projectstimetracking t
+    JOIN projects p ON p.id = t.projectid::bigint
+    LEFT JOIN entity ent ON ent.id = p.entityid::bigint
+    WHERE ($1::date IS NULL OR t.projtimetrackdate >= $1::date)
+      AND ($2::date IS NULL OR t.projtimetrackdate <= $2::date)
+    GROUP BY ent.entitydesc
+    HAVING COALESCE(SUM(t.projtimetrackhours), 0) > 0
+    ORDER BY "totalHours" DESC`,
+  employee: `
+    SELECT t.userid::text AS "empId",
+           COALESCE(NULLIF(TRIM(CONCAT(e.employeefirstname, ' ', e.employeelastname)), ''),
+                    'Employee #' || t.userid) AS "employeeName",
+           COUNT(DISTINCT p.id) AS "projectCount",
+           COALESCE(SUM(t.projtimetrackhours), 0) AS "totalHours",
+           COALESCE(SUM(t.projtimetrackhours) FILTER (WHERE t.po_res = 'PO'), 0) AS "poHours",
+           COALESCE(SUM(t.projtimetrackhours) FILTER (WHERE t.po_res = 'RES'), 0) AS "resHours"
+    FROM projectstimetracking t
+    JOIN projects p ON p.id = t.projectid::bigint
+    LEFT JOIN employees e ON e.id = t.userid::bigint
+    WHERE ($1::date IS NULL OR t.projtimetrackdate >= $1::date)
+      AND ($2::date IS NULL OR t.projtimetrackdate <= $2::date)
+    GROUP BY t.userid, e.employeefirstname, e.employeelastname
+    HAVING COALESCE(SUM(t.projtimetrackhours), 0) > 0
+    ORDER BY "totalHours" DESC`,
+};
+
 router.get("/hours-per-project", requireModuleAccess("reports"), async (req, res) => {
   const { startDate, endDate } = req.query;
+  const groupBy = HOURS_GROUP_SQL[req.query.groupBy] ? req.query.groupBy : "project";
   try {
-    const { rows } = await pool.query(
-      `SELECT p.id AS "projectId", p.projectnumber AS code, p.projectname AS name,
-              ps.projectstatusdesc AS "statusLabel",
-              ent.entitydesc AS "entityLabel",
-              owner."ownerName",
-              COALESCE(SUM(t.projtimetrackhours), 0) AS "totalHours",
-              COALESCE(SUM(t.projtimetrackhours) FILTER (WHERE t.po_res = 'PO'), 0) AS "poHours",
-              COALESCE(SUM(t.projtimetrackhours) FILTER (WHERE t.po_res = 'RES'), 0) AS "resHours",
-              COUNT(DISTINCT t.userid) AS "employeeCount"
-       FROM projectstimetracking t
-       JOIN projects p ON p.id = t.projectid::bigint
-       LEFT JOIN projectstatus ps ON ps.id = p.projectstatusid::bigint
-       LEFT JOIN entity ent ON ent.id = p.entityid::bigint
-       LEFT JOIN LATERAL (
-         SELECT TRIM(CONCAT(e.employeefirstname, ' ', e.employeelastname)) AS "ownerName"
-         FROM projectowners po
-         JOIN employees e ON e.id = po.projectownerid::bigint
-         WHERE po.projectid = p.id
-         ORDER BY po.id DESC
-         LIMIT 1
-       ) owner ON true
-       WHERE ($1::date IS NULL OR t.projtimetrackdate >= $1::date)
-         AND ($2::date IS NULL OR t.projtimetrackdate <= $2::date)
-       GROUP BY p.id, p.projectnumber, p.projectname, ps.projectstatusdesc, ent.entitydesc, owner."ownerName"
-       HAVING COALESCE(SUM(t.projtimetrackhours), 0) > 0
-       ORDER BY "totalHours" DESC`,
-      [startDate || null, endDate || null]
-    );
-    res.json(rows);
+    const { rows } = await pool.query(HOURS_GROUP_SQL[groupBy], [startDate || null, endDate || null]);
+    res.json({ groupBy, rows });
   } catch (err) {
     console.error("[GET /api/reports/hours-per-project] DB error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });

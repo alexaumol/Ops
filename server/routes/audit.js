@@ -102,29 +102,37 @@ router.get("/logs", requireAdmin, async (req, res) => {
   }
 });
 
-// GET /api/audit/summary — the two counters for the Auditing side column.
-//  - connectedUsers: users whose most recent session event in the last 18h
-//    is a sign-in (not a sign-out) — a best-effort "currently signed in",
-//    from the audit trail (there's no server-side session store).
+// GET /api/audit/summary — the counters for the Auditing side column.
+//  - connectedUsers / connectedUserNames: users whose most recent session
+//    event in the last 18h is a sign-in (not a sign-out) — a best-effort
+//    "currently signed in", from the audit trail (there's no server-side
+//    session store).
 //  - actionsToday: every audit row since local midnight.
 router.get("/summary", requireAdmin, async (req, res) => {
   try {
     await ensureAuditSchema();
     const { rows } = await pool.query(`
+      WITH last_session AS (
+        SELECT DISTINCT ON (a.actionuserid)
+               a.actionuserid, a.actionkind,
+               COALESCE(NULLIF(TRIM(CONCAT(e.employeefirstname, ' ', e.employeelastname)), ''),
+                        a.actionusername, 'Employee #' || a.actionuserid) AS name
+        FROM actionsaudit a
+        LEFT JOIN employees e ON e.id = a.actionuserid
+        WHERE a.actionkind IN ('login', 'logout')
+          AND a.actionuserid IS NOT NULL
+          AND a.actionts >= now() - INTERVAL '18 hours'
+        ORDER BY a.actionuserid, a.actionts DESC
+      )
       SELECT
-        (SELECT COUNT(*) FROM actionsaudit
-          WHERE actionts >= date_trunc('day', now())) AS "actionsToday",
-        (SELECT COUNT(*) FROM (
-           SELECT DISTINCT ON (actionuserid) actionusername, actionkind
-           FROM actionsaudit
-           WHERE actionkind IN ('login', 'logout')
-             AND actionuserid IS NOT NULL
-             AND actionts >= now() - INTERVAL '18 hours'
-           ORDER BY actionuserid, actionts DESC
-         ) s WHERE actionkind = 'login') AS "connectedUsers"
+        (SELECT COUNT(*) FROM actionsaudit WHERE actionts >= date_trunc('day', now())) AS "actionsToday",
+        (SELECT COUNT(*) FROM last_session WHERE actionkind = 'login') AS "connectedUsers",
+        (SELECT COALESCE(json_agg(name ORDER BY name), '[]'::json)
+           FROM last_session WHERE actionkind = 'login') AS "connectedUserNames"
     `);
     res.json({
       connectedUsers: Number(rows[0].connectedUsers) || 0,
+      connectedUserNames: rows[0].connectedUserNames || [],
       actionsToday: Number(rows[0].actionsToday) || 0,
     });
   } catch (err) {

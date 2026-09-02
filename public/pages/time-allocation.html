@@ -126,10 +126,15 @@
         <button class="btn btn-secondary" id="btnNextMonth" title="Next month">&rarr;</button>
         <button class="btn btn-secondary" id="btnThisMonth" data-i18n="rpt.today">Today</button>
         <button class="btn btn-secondary" id="btnLeavesExport" data-i18n="rpt.exportCsv">Export CSV</button>
+        <label class="ta-cal-toggle">
+          <input type="checkbox" id="calShowDeliverables" />
+          <span data-i18n="ta.cal.showDeliverables">Show deliverable deadlines</span>
+        </label>
         <div class="ta-spacer"></div>
         <div class="rpt-legend">
           <span class="rpt-legend-item"><span class="rpt-swatch rpt-swatch-holiday"></span><span data-i18n="rpt.legend.holiday">Holiday</span></span>
           <span class="rpt-legend-item"><span class="rpt-swatch rpt-swatch-birthday"></span><span data-i18n="ta.cal.birthday">Birthday</span></span>
+          <span class="rpt-legend-item" id="calDeliverableLegend" hidden><span class="rpt-swatch rpt-swatch-deliverable"></span><span data-i18n="ta.cal.deliverable">Deliverable</span></span>
           <span class="rpt-legend-item"><span class="rpt-swatch rpt-swatch-approved"></span><span data-i18n="rpt.legend.approved">Approved leave</span></span>
           <span class="rpt-legend-item"><span class="rpt-swatch rpt-swatch-pending"></span><span data-i18n="rpt.legend.pending">Pending leave</span></span>
         </div>

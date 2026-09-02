@@ -791,6 +791,14 @@ calendarMonth.setDate(1);
 let lastCalData = null;
 let lastCalMonthLabel = '';
 
+const CAL_DELIV_KEY = 'hitt.taCal.deliverables';
+const calDelivToggle = document.getElementById('calShowDeliverables');
+try { calDelivToggle.checked = localStorage.getItem(CAL_DELIV_KEY) === '1'; } catch { /* storage blocked */ }
+calDelivToggle.addEventListener('change', () => {
+  try { localStorage.setItem(CAL_DELIV_KEY, calDelivToggle.checked ? '1' : '0'); } catch { /* ignore */ }
+  loadCalendarMonth();
+});
+
 function calGridRange(monthStart){
   const year = monthStart.getFullYear();
   const month = monthStart.getMonth();
@@ -815,13 +823,16 @@ async function loadCalendarMonth(){
     return;
   }
 
+  const showDeliverables = calDelivToggle.checked;
+  document.getElementById('calDeliverableLegend').hidden = !showDeliverables;
+
   const { gridStart, gridEnd } = calGridRange(calendarMonth);
   cal.innerHTML = `${weekdays}<div class="sub-empty" style="padding:2rem; text-align:center; color:var(--text-secondary);">${T('common.loading')}</div>`;
   list.innerHTML = `<div class="rpt-leaves-empty">${T('common.loading')}</div>`;
 
   let data;
   try {
-    data = await HITT_API.getCalendarLeaves(toISODate(gridStart), toISODate(gridEnd));
+    data = await HITT_API.getCalendarLeaves(toISODate(gridStart), toISODate(gridEnd), { deliverables: showDeliverables });
     lastCalData = data;
   } catch (err) {
     console.error('[time-allocation] failed to load the calendar:', err.message);
@@ -891,6 +902,13 @@ function renderCalendarGrid(gridStart, gridEnd, data){
     birthdaysByMD.get(key).push(b.name);
   });
 
+  const deliverablesByDate = new Map();
+  (data.deliverables || []).forEach((d) => {
+    const key = toISODate(new Date(d.date));
+    if (!deliverablesByDate.has(key)) deliverablesByDate.set(key, []);
+    deliverablesByDate.get(key).push(d);
+  });
+
   const leavesByDate = new Map();
   (data.timeOff || []).forEach((t) => {
     let cur = startOfDay(new Date(t.startDate));
@@ -916,6 +934,7 @@ function renderCalendarGrid(gridStart, gridEnd, data){
       const isToday = key === today;
       const holidayDesc = holidaysByDate.get(key);
       const birthdays = birthdaysByMD.get(`${day.getMonth() + 1}-${day.getDate()}`) || [];
+      const deliverables = deliverablesByDate.get(key) || [];
       const leaves = leavesByDate.get(key) || [];
       const shown = leaves.slice(0, 3);
       const more = leaves.length - shown.length;
@@ -925,6 +944,7 @@ function renderCalendarGrid(gridStart, gridEnd, data){
           <div class="rpt-cal-daynum">${day.getDate()}</div>
           ${holidayDesc ? `<div class="rpt-cal-holiday" title="${escapeHtml(holidayDesc)}">${escapeHtml(holidayDesc)}</div>` : ''}
           ${birthdays.map((n) => `<div class="rpt-cal-birthday" title="${escapeHtml(T('ta.cal.birthdayOf', { name: n }))}">🎂 ${escapeHtml(String(n).split(' ')[0])}</div>`).join('')}
+          ${deliverables.map((d) => { const nm = d.name || d.projectName || d.projectCode || ''; return `<div class="rpt-cal-deliverable" title="${escapeHtml(`${d.projectCode || ''} ${d.projectName || ''}`.trim() + (nm ? ` — ${nm}` : ''))}">◎ ${escapeHtml(d.projectCode || nm)}</div>`; }).join('')}
           ${shown.map((l) => `<div class="rpt-cal-leave ${l.isApproved ? 'is-approved' : 'is-pending'}" title="${escapeHtml(l.name)}${l.isApproved ? '' : escapeHtml(T('rpt.pendingSuffix'))}">${escapeHtml(l.name)}</div>`).join('')}
           ${more > 0 ? `<div class="rpt-cal-more">${T('rpt.moreCount', { n: more })}</div>` : ''}
         </div>`;
@@ -950,7 +970,7 @@ document.getElementById('btnThisMonth').addEventListener('click', () => {
 });
 document.getElementById('btnLeavesExport').addEventListener('click', () => {
   const d = lastCalData;
-  if (!d || (!(d.holidays || []).length && !(d.timeOff || []).length && !(d.birthdays || []).length)) {
+  if (!d || (!(d.holidays || []).length && !(d.timeOff || []).length && !(d.birthdays || []).length && !(d.deliverables || []).length)) {
     toast(T('rpt.nothingToExport'), 'navy');
     return;
   }
@@ -962,6 +982,10 @@ document.getElementById('btnLeavesExport').addEventListener('click', () => {
     ...(d.birthdays || []).map((b) => {
       const iso = `${CAL_MONTHS()[Number(b.month) - 1] || b.month} ${pad2(Number(b.day))}`;
       return [T('ta.cal.birthday'), iso, iso, b.name, ''];
+    }),
+    ...(d.deliverables || []).map((x) => {
+      const iso = toISODate(new Date(x.date));
+      return [T('ta.cal.deliverable'), iso, iso, `${x.projectCode || ''} ${x.projectName || ''}`.trim() + (x.name ? ` — ${x.name}` : ''), ''];
     }),
     ...(d.timeOff || []).map((t) => [
       T('rpt.csv.leave'),

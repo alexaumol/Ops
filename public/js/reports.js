@@ -100,22 +100,51 @@ function setThisYearRange() {
 setThisYearRange();
 
 let lastHoursRows = [];
+let lastHoursGroupBy = "project";
+const hoursGroupBySelect = document.getElementById("hoursGroupBy");
 
-async function loadHours() {
-  const tbody = document.getElementById("hoursTableBody");
-  const empty = document.getElementById("hoursEmpty");
-  tbody.innerHTML = `<tr><td colspan="8" class="sub-empty">${T('common.loading')}</td></tr>`;
-  empty.classList.add("hidden");
-  try {
-    const rows = await HITT_API.getHoursPerProject(hoursStartInput.value || null, hoursEndInput.value || null);
-    lastHoursRows = rows;
-    if (!rows.length) {
-      tbody.innerHTML = "";
-      empty.classList.remove("hidden");
-      document.getElementById("hoursTotal").textContent = "";
-      return;
-    }
-    tbody.innerHTML = rows.map((r) => `
+const num = (n) => Number(n || 0).toLocaleString();
+
+// Per-grouping table definition: header cells (label + optional right align),
+// row cells, CSV header + row.
+const RH = (label) => ({ label, right: true }); // right-aligned header
+function hoursTableSpec(groupBy) {
+  if (groupBy === "entity") {
+    return {
+      headers: [{ label: T("proj.f.entity") }, RH(T("rpt.col.projects")), RH(T("rpt.col.employees")), RH(T("rpt.col.totalHours")), RH(T("rpt.col.poHours")), RH(T("rpt.col.resHours"))],
+      row: (r) => `
+        <tr>
+          <td>${escapeHtml(r.entityLabel || "—")}</td>
+          <td style="text-align:right;">${num(r.projectCount)}</td>
+          <td style="text-align:right;">${num(r.employeeCount)}</td>
+          <td style="text-align:right; font-weight:700;">${num(r.totalHours)}</td>
+          <td style="text-align:right; color:var(--text-secondary);">${num(r.poHours)}</td>
+          <td style="text-align:right; color:var(--text-secondary);">${num(r.resHours)}</td>
+        </tr>`,
+      csvHead: [T("rpt.csv.entity"), T("rpt.col.projects"), T("rpt.col.employees"), T("rpt.csv.totalHours"), T("rpt.csv.poHours"), T("rpt.csv.resHours")],
+      csvRow: (r) => [r.entityLabel || "", r.projectCount, r.employeeCount, r.totalHours, r.poHours, r.resHours],
+      totalKey: "rpt.hours.totalEntities",
+    };
+  }
+  if (groupBy === "employee") {
+    return {
+      headers: [{ label: T("rpt.csv.employee") }, RH(T("rpt.col.projects")), RH(T("rpt.col.totalHours")), RH(T("rpt.col.poHours")), RH(T("rpt.col.resHours"))],
+      row: (r) => `
+        <tr>
+          <td>${escapeHtml(r.employeeName || "—")}</td>
+          <td style="text-align:right;">${num(r.projectCount)}</td>
+          <td style="text-align:right; font-weight:700;">${num(r.totalHours)}</td>
+          <td style="text-align:right; color:var(--text-secondary);">${num(r.poHours)}</td>
+          <td style="text-align:right; color:var(--text-secondary);">${num(r.resHours)}</td>
+        </tr>`,
+      csvHead: [T("rpt.csv.employee"), T("rpt.col.projects"), T("rpt.csv.totalHours"), T("rpt.csv.poHours"), T("rpt.csv.resHours")],
+      csvRow: (r) => [r.employeeName || "", r.projectCount, r.totalHours, r.poHours, r.resHours],
+      totalKey: "rpt.hours.totalEmployees",
+    };
+  }
+  return {
+    headers: [{ label: T("bp.col.project") }, { label: T("proj.f.owner") }, { label: T("proj.f.entity") }, { label: T("form.status") }, RH(T("rpt.col.totalHours")), RH(T("rpt.col.poHours")), RH(T("rpt.col.resHours")), RH(T("proj.section.resources"))],
+    row: (r) => `
       <tr data-project-id="${r.projectId}" data-project-name="${escapeHtml(r.name)}" title="${T('rpt.tip.drillRow')}">
         <td>
           <div><a href="projects.html?projectId=${encodeURIComponent(r.projectId)}">${escapeHtml(r.name)}</a></div>
@@ -124,18 +153,57 @@ async function loadHours() {
         <td>${escapeHtml(r.ownerName || "—")}</td>
         <td>${escapeHtml(r.entityLabel || "—")}</td>
         <td>${statusChipHtml(r.statusLabel)}</td>
-        <td style="text-align:right; font-weight:700;">${Number(r.totalHours).toLocaleString()}</td>
-        <td style="text-align:right; color:var(--text-secondary);">${Number(r.poHours).toLocaleString()}</td>
-        <td style="text-align:right; color:var(--text-secondary);">${Number(r.resHours).toLocaleString()}</td>
-        <td style="text-align:right;">${r.employeeCount}</td>
-      </tr>
-    `).join("");
-    const total = rows.reduce((sum, r) => sum + Number(r.totalHours), 0);
-    document.getElementById("hoursTotal").textContent = T('rpt.hours.total', { hours: total.toLocaleString(), projects: rows.length });
+        <td style="text-align:right; font-weight:700;">${num(r.totalHours)}</td>
+        <td style="text-align:right; color:var(--text-secondary);">${num(r.poHours)}</td>
+        <td style="text-align:right; color:var(--text-secondary);">${num(r.resHours)}</td>
+        <td style="text-align:right;">${num(r.employeeCount)}</td>
+      </tr>`,
+    csvHead: [T("rpt.csv.projectCode"), T("rpt.csv.projectName"), T("rpt.csv.projectOwner"), T("rpt.csv.entity"), T("rpt.csv.status"), T("rpt.csv.totalHours"), T("rpt.csv.poHours"), T("rpt.csv.resHours"), T("rpt.csv.resources")],
+    csvRow: (r) => [r.code, r.name, r.ownerName || "", r.entityLabel || "", r.statusLabel || "", r.totalHours, r.poHours, r.resHours, r.employeeCount],
+    totalKey: "rpt.hours.total",
+  };
+}
+
+function renderHoursTable() {
+  const spec = hoursTableSpec(lastHoursGroupBy);
+  const head = document.getElementById("hoursTableHead");
+  const tbody = document.getElementById("hoursTableBody");
+  const empty = document.getElementById("hoursEmpty");
+
+  head.innerHTML = `<tr>${spec.headers.map((h) =>
+    `<th${h.right ? ' style="text-align:right;"' : ""}>${escapeHtml(h.label)}</th>`).join("")}</tr>`;
+
+  document.getElementById("hoursHint").classList.toggle("hidden", lastHoursGroupBy !== "project");
+
+  if (!lastHoursRows.length) {
+    tbody.innerHTML = "";
+    empty.classList.remove("hidden");
+    document.getElementById("hoursTotal").textContent = "";
+    return;
+  }
+  empty.classList.add("hidden");
+  tbody.innerHTML = lastHoursRows.map(spec.row).join("");
+  const total = lastHoursRows.reduce((s, r) => s + Number(r.totalHours), 0);
+  document.getElementById("hoursTotal").textContent =
+    T(spec.totalKey, { hours: total.toLocaleString(), projects: lastHoursRows.length, count: lastHoursRows.length });
+}
+
+async function loadHours() {
+  lastHoursGroupBy = hoursGroupBySelect.value || "project";
+  const spec = hoursTableSpec(lastHoursGroupBy);
+  const tbody = document.getElementById("hoursTableBody");
+  tbody.innerHTML = `<tr><td colspan="${spec.headers.length}" class="sub-empty">${T('common.loading')}</td></tr>`;
+  document.getElementById("hoursEmpty").classList.add("hidden");
+  try {
+    const res = await HITT_API.getHoursPerProject(hoursStartInput.value || null, hoursEndInput.value || null, lastHoursGroupBy);
+    lastHoursRows = res.rows || [];
+    lastHoursGroupBy = res.groupBy || lastHoursGroupBy;
+    renderHoursTable();
   } catch (err) {
     console.error("[reports] failed to load hours-per-project:", err.message);
     lastHoursRows = [];
     tbody.innerHTML = "";
+    const empty = document.getElementById("hoursEmpty");
     empty.textContent = T('rpt.err.report');
     empty.classList.remove("hidden");
     toast(T('rpt.toast.hoursFail'), "red");
@@ -144,6 +212,7 @@ async function loadHours() {
 
 hoursStartInput.addEventListener("change", loadHours);
 hoursEndInput.addEventListener("change", loadHours);
+hoursGroupBySelect.addEventListener("change", loadHours);
 document.getElementById("btnHoursThisYear").addEventListener("click", () => { setThisYearRange(); loadHours(); });
 document.getElementById("btnHoursAllTime").addEventListener("click", () => {
   hoursStartInput.value = "";
@@ -152,17 +221,19 @@ document.getElementById("btnHoursAllTime").addEventListener("click", () => {
 });
 document.getElementById("btnHoursExport").addEventListener("click", () => {
   if (!lastHoursRows.length) { toast(T('rpt.nothingToExport'), "navy"); return; }
+  const spec = hoursTableSpec(lastHoursGroupBy);
   const range = hoursStartInput.value || hoursEndInput.value
     ? `${hoursStartInput.value || "start"}_to_${hoursEndInput.value || "end"}`
     : "all-time";
   downloadCsv(
-    `hours-per-project_${range}.csv`,
-    [T('rpt.csv.projectCode'), T('rpt.csv.projectName'), T('rpt.csv.projectOwner'), T('rpt.csv.entity'), T('rpt.csv.status'), T('rpt.csv.totalHours'), T('rpt.csv.poHours'), T('rpt.csv.resHours'), T('rpt.csv.resources')],
-    lastHoursRows.map((r) => [r.code, r.name, r.ownerName || "", r.entityLabel || "", r.statusLabel || "", r.totalHours, r.poHours, r.resHours, r.employeeCount])
+    `hours-by-${lastHoursGroupBy}_${range}.csv`,
+    spec.csvHead,
+    lastHoursRows.map(spec.csvRow)
   );
 });
 
 document.getElementById("hoursTableBody").addEventListener("click", (e) => {
+  if (lastHoursGroupBy !== "project") return;
   if (e.target.closest("a")) return; // let the project-name link navigate
   const row = e.target.closest("tr[data-project-id]");
   if (!row) return;

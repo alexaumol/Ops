@@ -321,7 +321,9 @@ router.get("/balance", async (req, res) => {
 // Company holidays + everyone's approved/submitted/pending time-off
 // overlapping the range. (Was GET /api/reports/resource-leaves — moved
 // here when the calendar became a Time allocation tab.) Plus team
-// birthdays, for employees who opted in via their Profile.
+// birthdays, for employees who opted in via their Profile. With
+// ?deliverables=1, also the project deliverable deadlines landing in the
+// range (the "Show deliverable deadlines" calendar toggle).
 router.get("/calendar", requireModuleAccess("time-allocation"), async (req, res) => {
   const { startDate, endDate } = req.query;
   if (!startDate || !endDate) {
@@ -366,7 +368,25 @@ router.get("/calendar", requireModuleAccess("time-allocation"), async (req, res)
        ORDER BY name`
     );
 
-    res.json({ holidays: holidays.rows, timeOff: timeOff.rows, birthdays: birthdays.rows });
+    let deliverables = { rows: [] };
+    if (req.query.deliverables) {
+      deliverables = await pool.query(
+        `SELECT d.id, d.deliverablename AS name, d.deliverydate AS date,
+                p.id::text AS "projectId", p.projectnumber AS "projectCode", p.projectname AS "projectName"
+         FROM projectdeliverables d
+         JOIN projects p ON p.id = d.projectid::bigint
+         WHERE d.deliverydate::date BETWEEN $1::date AND $2::date
+         ORDER BY d.deliverydate, p.projectnumber`,
+        [startDate, endDate]
+      );
+    }
+
+    res.json({
+      holidays: holidays.rows,
+      timeOff: timeOff.rows,
+      birthdays: birthdays.rows,
+      deliverables: deliverables.rows,
+    });
   } catch (err) {
     console.error("[GET /api/time-off/calendar] DB error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });

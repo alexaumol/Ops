@@ -965,6 +965,8 @@ async function loadAuditSummary() {
     const s = await HITT_API.getAuditSummary();
     document.getElementById("auditConnectedUsers").textContent = s.connectedUsers;
     document.getElementById("auditActionsToday").textContent = s.actionsToday;
+    document.getElementById("auditConnectedUserNames").textContent =
+      (s.connectedUserNames || []).join(", ");
   } catch (err) {
     console.error("[settings] audit summary:", err.message);
   }

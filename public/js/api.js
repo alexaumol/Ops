@@ -329,10 +329,11 @@ const HITT_API = (() => {
     updateProject: (id, payload) =>
       request(`/api/projects/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
 
-    getHoursPerProject: (startDate, endDate) => {
+    getHoursPerProject: (startDate, endDate, groupBy) => {
       const params = new URLSearchParams();
       if (startDate) params.set("startDate", startDate);
       if (endDate) params.set("endDate", endDate);
+      if (groupBy) params.set("groupBy", groupBy);
       const qs = params.toString();
       return request(`/api/reports/hours-per-project${qs ? `?${qs}` : ""}`);
     },
@@ -343,8 +344,8 @@ const HITT_API = (() => {
       const qs = params.toString();
       return request(`/api/reports/hours-per-project/${projectId}${qs ? `?${qs}` : ""}`);
     },
-    getCalendarLeaves: (startDate, endDate) =>
-      request(`/api/time-off/calendar?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`),
+    getCalendarLeaves: (startDate, endDate, opts = {}) =>
+      request(`/api/time-off/calendar?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}${opts.deliverables ? "&deliverables=1" : ""}`),
 
     getProjectsByStatusEntity: (year) =>
       request(`/api/reports/projects-by-status-entity${year ? `?year=${encodeURIComponent(year)}` : ""}`),

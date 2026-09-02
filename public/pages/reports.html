@@ -41,28 +41,25 @@
           <span data-i18n="exp.f.to">To</span>
           <input type="date" id="hoursEndDate" />
         </label>
+        <label class="rpt-field">
+          <span data-i18n="rpt.groupBy">Group by</span>
+          <select id="hoursGroupBy">
+            <option value="project" selected data-i18n="rpt.groupBy.project">Project</option>
+            <option value="entity" data-i18n="rpt.groupBy.entity">Entity</option>
+            <option value="employee" data-i18n="rpt.groupBy.employee">Employee</option>
+          </select>
+        </label>
         <button class="btn btn-secondary" id="btnHoursThisYear" data-i18n="rpt.thisYear">This year</button>
         <button class="btn btn-secondary" id="btnHoursAllTime" data-i18n="rpt.allTime">All time</button>
         <button class="btn btn-secondary" id="btnHoursExport" data-i18n="rpt.exportCsv">Export CSV</button>
         <div class="rpt-spacer"></div>
         <span id="hoursTotal" class="rpt-total"></span>
       </div>
-      <p class="rpt-hint" data-i18n="rpt.hours.hint">Click a project row for a per-employee breakdown.</p>
+      <p class="rpt-hint" id="hoursHint" data-i18n="rpt.hours.hint">Click a project row for a per-employee breakdown.</p>
 
       <div class="rpt-table-wrap">
         <table class="rpt-table">
-          <thead>
-            <tr>
-              <th data-i18n="bp.col.project">Project</th>
-              <th data-i18n="proj.f.owner">Project owner</th>
-              <th data-i18n="proj.f.entity">Entity</th>
-              <th data-i18n="form.status">Status</th>
-              <th style="text-align:right;" data-i18n="rpt.col.totalHours">Total hours</th>
-              <th style="text-align:right;" data-i18n="rpt.col.poHours">PO hours</th>
-              <th style="text-align:right;" data-i18n="rpt.col.resHours">RES hours</th>
-              <th style="text-align:right;" data-i18n="proj.section.resources">Resources</th>
-            </tr>
-          </thead>
+          <thead id="hoursTableHead"></thead>
           <tbody id="hoursTableBody"></tbody>
         </table>
         <div id="hoursEmpty" class="bp-empty hidden" data-i18n="rpt.hours.empty">No hours logged in this range.</div>
