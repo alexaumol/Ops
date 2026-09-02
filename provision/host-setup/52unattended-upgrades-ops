@@ -1,0 +1,21 @@
+// Ops unattended-upgrades overrides (0H) — /etc/apt/apt.conf.d/52unattended-upgrades-ops
+// Security updates only. Kernel/library updates that need a restart are
+// applied but the REBOOT is left to a human — one VPS, many customers.
+
+Unattended-Upgrade::Origins-Pattern {
+    "origin=Ubuntu,archive=${distro_codename}-security,label=Ubuntu";
+    "site=security.ubuntu.com";
+};
+
+Unattended-Upgrade::Package-Blacklist {
+};
+
+Unattended-Upgrade::Automatic-Reboot "false";
+// If you decide unattended reboots are worth the blip, flip the line above to
+// "true" and set a low-traffic time:
+// Unattended-Upgrade::Automatic-Reboot-Time "04:30";
+
+Unattended-Upgrade::Remove-Unused-Kernel-Packages "true";
+Unattended-Upgrade::Remove-Unused-Dependencies "true";
+Unattended-Upgrade::Mail "";
+// Set Mail to an address to get failure reports (needs a working MTA).

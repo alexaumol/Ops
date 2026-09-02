@@ -1,0 +1,17 @@
+# Ops fail2ban config (0H) — installed to /etc/fail2ban/jail.d/ops.local
+# Ubuntu 24.04 fail2ban reads the systemd journal by default; no logpath needed.
+
+[DEFAULT]
+bantime  = 1h
+findtime = 10m
+maxretry = 4
+# escalate repeat offenders
+bantime.increment = true
+bantime.factor    = 2
+bantime.maxtime   = 1w
+# never ban yourself — add your admin IP(s) here
+ignoreip = 127.0.0.1/8 ::1
+
+[sshd]
+enabled = true
+mode    = aggressive
