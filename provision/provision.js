@@ -284,8 +284,8 @@ const steps = [
         env: { ...process.env, OPS_ENV_FILE: path.join(INSTANCE_DIR, "env") },
       });
       const ref = path.join(HERE, "seed", "reference-data.sql");
-      if (!DRY && !/\(reference data goes here\)/.test(fs.readFileSync(ref, "utf8"))) {
-        sh("psql", [url, "-v", "ON_ERROR_STOP=1", "-f", ref]);
+      if (!/\(reference data goes here\)/.test(fs.readFileSync(ref, "utf8"))) {
+        sh("psql", [url, "-v", "ON_ERROR_STOP=1", "-f", ref]); // sh() no-ops under --dry-run
       } else {
         console.log("    ⚠ reference-data.sql is still a placeholder — instance will have empty lookup tables");
       }
