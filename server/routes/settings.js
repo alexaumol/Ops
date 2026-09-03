@@ -81,7 +81,8 @@ function ensureSettingsSchema() {
 //   group  : "sync" (default) | "presence" — which Settings tab it renders on
 //   type   : "text" (default) | "boolean" ("on"/"") | "multi" (CSV of `options`)
 //   options (multi only) : [{ value, label }]
-//   master : a boolean that gates the rest of its group in the UI + engine
+//   master  : a boolean that gates the rest of its group in the UI + engine
+//   hideWhen: { key, equals } — grey this row out when that key holds `equals`
 const CONFIG_KEYS = {
   // --- Sync tab: external-storage backup ---------------------------------
   "sync.enabled": {
@@ -93,15 +94,9 @@ const CONFIG_KEYS = {
   },
   "sync.projects_location": {
     group: "sync",
-    label: "Projects — external storage location",
-    hint: "A folder in the company OneDrive (or a SharePoint/OneDrive share link). The app keeps one folder per project here, named \"PROJECTNUMBER_ENTITYID PROJECT NAME\". Leave empty to keep using the GRAPH_ONEDRIVE_FOLDER default.",
+    label: "Create project folder on a remote location",
+    hint: "A folder in the company OneDrive (or a SharePoint/OneDrive share link). When a project is created the app adds a subfolder here named \"PROJECTNUMBER_ENTITYID PROJECT NAME\". Leave empty to keep using the GRAPH_ONEDRIVE_FOLDER default.",
     placeholder: "Clients/Projects   or   https://…sharepoint.com/…",
-  },
-  "sync.other_docs_location": {
-    group: "sync",
-    label: "Other documents — backup location",
-    hint: "Base folder (OneDrive path or share link) where the document types selected below are backed up.",
-    placeholder: "Clients/Backups   or   https://…sharepoint.com/…",
   },
   "sync.backup_doc_types": {
     group: "sync",
@@ -117,7 +112,14 @@ const CONFIG_KEYS = {
     group: "sync",
     type: "boolean",
     label: "File backups under each document's project folder",
-    hint: "On: a document is stored under its project's folder. Off: documents are grouped by type (Tickets / Invoices).",
+    hint: "On: a document goes inside its project's folder (under the project location above), so a separate backup location isn't needed. Off: documents are grouped by type at the location below.",
+  },
+  "sync.other_docs_location": {
+    group: "sync",
+    label: "Backup other documents",
+    hint: "Base folder (OneDrive path or share link) where the selected document types are backed up, grouped by type (Tickets / Invoices).",
+    placeholder: "Clients/Backups   or   https://…sharepoint.com/…",
+    hideWhen: { key: "sync.backup_under_project", equals: "on" },
   },
 
   // --- Presence tab: working-time register ------------------------------

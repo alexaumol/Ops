@@ -398,20 +398,26 @@ document.querySelectorAll("[data-stab]").forEach((btn) => {
 // One renderer for both tabs. Each key's `type` (from the server) decides the
 // control: "text" (a box + Save), "boolean" (a checkbox, saves "on"/""),
 // "multi" (a checkbox per option, saves a comma-separated list). "group"
-// decides which tab it belongs to; "master" is a boolean that gates the rest
-// of its group (see loadConfigGroup).
+// decides which tab it belongs to; "master" is a boolean that gates the whole
+// group; "hideWhen" {key,equals} greys this row out while another key holds a
+// value (see loadConfigGroup / refreshGroupState).
 function renderConfigItem(k, i) {
   const key = escapeHtml(k.key);
   const label = escapeHtml(k.label || k.key);
   const hint = k.hint ? `<p class="path-hint">${escapeHtml(k.hint)}</p>` : "";
+  const hw = k.hideWhen
+    ? ` data-hide-when-key="${escapeHtml(k.hideWhen.key)}" data-hide-when-eq="${escapeHtml(k.hideWhen.equals)}"`
+    : "";
+  const wrap = (inner, extraClass = "") =>
+    `<div class="path-item${extraClass}" data-key="${key}"${hw}>${inner}</div>`;
+
   if (k.type === "boolean") {
-    return `<div class="path-item${k.master ? " path-item--master" : ""}" data-key="${key}">
+    return wrap(`
       <label class="settings-checkline">
         <input type="checkbox" data-config-bool ${k.value === "on" ? "checked" : ""} />
         <span>${label}</span>
       </label>
-      ${hint}
-    </div>`;
+      ${hint}`, k.master ? " path-item--master" : "");
   }
   if (k.type === "multi") {
     const set = new Set(String(k.value || "").split(",").map((s) => s.trim()).filter(Boolean));
@@ -420,20 +426,18 @@ function renderConfigItem(k, i) {
         <input type="checkbox" data-config-multi value="${escapeHtml(o.value)}" ${set.has(o.value) ? "checked" : ""} />
         <span>${escapeHtml(o.label)}</span>
       </label>`).join("");
-    return `<div class="path-item" data-key="${key}">
+    return wrap(`
       <label>${label}</label>
       <div class="settings-checkgroup">${opts}</div>
-      ${hint}
-    </div>`;
+      ${hint}`);
   }
-  return `<div class="path-item" data-key="${key}">
+  return wrap(`
     <label for="cfg_${i}">${label}</label>
     <div class="path-row">
       <input id="cfg_${i}" type="text" value="${escapeHtml(k.value || "")}" placeholder="${escapeHtml(k.placeholder || "")}" />
       <button type="button" class="btn btn-primary" data-save-path>Save</button>
     </div>
-    ${hint}
-  </div>`;
+    ${hint}`);
 }
 
 async function loadConfigGroup(group, hostId) {
@@ -464,6 +468,27 @@ async function loadConfigGroup(group, hostId) {
     }
   };
 
+  const masterItem = host.querySelector(".path-item--master");
+  const masterCb = masterItem && masterItem.querySelector("[data-config-bool]");
+  const boolValue = (key) => {
+    const cb = host.querySelector(`.path-item[data-key="${key}"] [data-config-bool]`);
+    return cb ? (cb.checked ? "on" : "") : "";
+  };
+  // Each row's enabled state depends on the master switch AND its own hideWhen.
+  function refreshGroupState() {
+    const masterOn = !masterCb || masterCb.checked;
+    host.classList.toggle("config-group--disabled", !masterOn);
+    host.querySelectorAll(".path-item").forEach((item) => {
+      if (item === masterItem) return;
+      let disabled = !masterOn;
+      if (!disabled && item.dataset.hideWhenKey) {
+        disabled = boolValue(item.dataset.hideWhenKey) === item.dataset.hideWhenEq;
+      }
+      item.classList.toggle("is-disabled", disabled);
+      item.querySelectorAll("input, button, select, textarea").forEach((el) => { el.disabled = disabled; });
+    });
+  }
+
   host.querySelectorAll("[data-save-path]").forEach((btn) => {
     btn.addEventListener("click", () => {
       const item = btn.closest(".path-item");
@@ -473,6 +498,7 @@ async function loadConfigGroup(group, hostId) {
   host.querySelectorAll("[data-config-bool]").forEach((cb) => {
     cb.addEventListener("change", () => {
       save(cb.closest(".path-item").dataset.key, cb.checked ? "on" : "", cb);
+      refreshGroupState();
     });
   });
   host.querySelectorAll(".path-item").forEach((item) => {
@@ -484,22 +510,7 @@ async function loadConfigGroup(group, hostId) {
     }));
   });
 
-  // A "master" boolean greys out + disables every other control in the group
-  // when off (the sync section's on/off switch).
-  const masterItem = host.querySelector(".path-item--master");
-  if (masterItem) {
-    const masterCb = masterItem.querySelector("[data-config-bool]");
-    const applyMaster = () => {
-      const on = masterCb.checked;
-      host.classList.toggle("config-group--disabled", !on);
-      host.querySelectorAll(".path-item:not(.path-item--master)").forEach((item) => {
-        item.classList.toggle("is-disabled", !on);
-        item.querySelectorAll("input, button, select, textarea").forEach((el) => { el.disabled = !on; });
-      });
-    };
-    masterCb.addEventListener("change", applyMaster);
-    applyMaster();
-  }
+  refreshGroupState();
 }
 
 /* ===================== CATEGORIES TAB (id/name catalogs) ============== */
