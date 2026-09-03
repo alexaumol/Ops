@@ -1,0 +1,10 @@
+[Unit]
+Description=Run the Ops Veri*Factu AEAT status poll every 15 minutes
+
+[Timer]
+OnCalendar=*:00/15
+RandomizedDelaySec=90
+Persistent=true
+
+[Install]
+WantedBy=timers.target

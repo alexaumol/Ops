@@ -33,6 +33,39 @@ class IssueError extends Error {
   }
 }
 
+/** Is the "pre-check recipient NIF with the AEAT on issue" option on? */
+async function idCheckEnabled() {
+  try {
+    const { rows } = await pool.query(`SELECT configvalue FROM appconfig WHERE configkey = 'verifactu.id_check'`);
+    return rows[0] && rows[0].configvalue === "true";
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Contrast the recipient NIF + name against the AEAT (BOLD /id_check).
+ * Only meaningful for a Spanish NIF recipient. Resolves silently on a match
+ * or an outage; throws IssueError(422) on a genuine mismatch.
+ */
+async function runRecipientCheck(ops, cfg) {
+  if (!cfg || !cfg.enabled) return;
+  const rec = ops.recipient;
+  if (!rec || (rec.fiscalIdType && rec.fiscalIdType !== "nif")) return; // foreign — /id_check doesn't apply
+  const irsId = normalizeFiscalId(rec.fiscalId);
+  if (!irsId || !rec.name) return;
+  try {
+    await cfg.provider.idCheck({ irsId, name: rec.name }, { apiKey: cfg.apiKey });
+  } catch (err) {
+    if (err instanceof VerifactuError) {
+      if (err.retryable) return; // AEAT/BOLD unreachable — don't block issuing
+      throw new IssueError(422, "recipient_check_failed",
+        `The AEAT could not confirm the recipient "${rec.name}" (${irsId}). Check the tax company's name and NIF. (${err.message})`);
+    }
+    throw err;
+  }
+}
+
 /** ISO date (YYYY-MM-DD) for a JS date or DB timestamp, in Europe/Madrid. */
 function madridDate(d = new Date()) {
   // en-CA gives YYYY-MM-DD; the timeZone pins us to Spain regardless of host TZ.
@@ -227,6 +260,14 @@ async function issueInvoice(invoiceId, opts = {}) {
     // dry run with the provisional number to surface data problems early
     buildAltaPayload(ops);
 
+    const cfg = r.entity ? configForEntity(r.entity) : { enabled: false, reason: "no entity" };
+
+    // Optional AEAT recipient pre-check (Settings → Veri*Factu). Runs before
+    // a number is assigned, so a bad recipient leaves the invoice a draft.
+    if (cfg.enabled && (await idCheckEnabled())) {
+      await runRecipientCheck(ops, cfg);
+    }
+
     const year = Number(ops.issuedDate.slice(0, 4));
     const series = r.entity && r.entity.invoice_series ? r.entity.invoice_series : null;
     // Serialise fiscal-number assignment for this entity (+ the legacy pool
@@ -256,7 +297,6 @@ async function issueInvoice(invoiceId, opts = {}) {
     }
 
     // Register — outside the number-assignment transaction (network call).
-    const cfg = r.entity ? configForEntity(r.entity) : { enabled: false, reason: "no entity" };
     if (autosubmit && cfg.enabled) {
       ops.number = code;
       const payload = buildAltaPayload(ops);
@@ -467,10 +507,41 @@ async function retryRecord(invoiceId, opts = {}) {
   return rec;
 }
 
+/**
+ * Manually contrast an invoice's recipient with the AEAT (the "Check
+ * recipient" button). Never throws for a mismatch — returns { valid, message }.
+ */
+async function checkRecipient(invoiceId) {
+  const client = await pool.connect();
+  let r;
+  try {
+    r = await loadInvoiceRows(client, invoiceId);
+  } finally {
+    client.release();
+  }
+  const cfg = r.entity ? configForEntity(r.entity) : { enabled: false, reason: "no entity" };
+  if (!cfg.enabled) return { valid: null, message: cfg.reason || "Veri*Factu is not enabled for this entity" };
+
+  const ops = toOpsInvoice(r);
+  const rec = ops.recipient;
+  if (!rec) return { valid: null, message: "This invoice has no recipient tax company." };
+  if (rec.fiscalIdType && rec.fiscalIdType !== "nif") {
+    return { valid: null, message: "The recipient is identified by a non-Spanish document — the AEAT NIF check doesn't apply." };
+  }
+  try {
+    await runRecipientCheck(ops, cfg);
+    return { valid: true, message: `The AEAT confirmed "${rec.name}".` };
+  } catch (err) {
+    if (err instanceof IssueError) return { valid: false, message: err.message };
+    throw err;
+  }
+}
+
 module.exports = {
   issueInvoice,
   cancelInvoice,
   retryRecord,
+  checkRecipient,
   toOpsInvoice,
   nextInvoiceNumber,
   madridDate,

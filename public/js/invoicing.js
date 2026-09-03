@@ -1442,6 +1442,7 @@ function applyVerifactuToModal(vf, isExisting){
   const issueBtn = document.getElementById('invIssue');
   const retryBtn = document.getElementById('invRetryVf');
   const refreshBtn = document.getElementById('invRefreshVf');
+  const checkBtn = document.getElementById('invCheckRecipient');
   const cancelBtn = document.getElementById('invCancelInv');
   const saveBtn = document.getElementById('invSave');
   const delBtn = document.getElementById('invDelete');
@@ -1452,6 +1453,7 @@ function applyVerifactuToModal(vf, isExisting){
     issueBtn.classList.add('hidden');
     retryBtn.classList.add('hidden');
     refreshBtn.classList.add('hidden');
+    checkBtn.classList.add('hidden');
     cancelBtn.classList.add('hidden');
     return;
   }
@@ -1468,13 +1470,15 @@ function applyVerifactuToModal(vf, isExisting){
   issueBtn.disabled = false;
   retryBtn.disabled = false;
   refreshBtn.disabled = false;
+  checkBtn.disabled = false;
   cancelBtn.disabled = false;
   saveBtn.classList.toggle('hidden', issued);
   delBtn.classList.toggle('hidden', issued || !isExisting);
   // Retry: an alta error, or a failed cancel. Refresh: a queued alta or cancel
-  // (poll the AEAT for the outcome).
+  // (poll the AEAT for the outcome). Check recipient: a draft, pre-issue.
   retryBtn.classList.toggle('hidden', !(issued && vf && (vf.state === 'error' || vf.cancelState === 'error')));
   refreshBtn.classList.toggle('hidden', !(issued && vf && (vf.state === 'pending' || cancelPending)));
+  checkBtn.classList.toggle('hidden', !isDraftExisting);
   cancelBtn.classList.toggle('hidden', !(issued && !cancelled && !cancelPending));
 
   setModalLocked(issued);
@@ -1533,6 +1537,23 @@ document.getElementById('invRefreshVf').addEventListener('click', async () => {
   const id = activeInvoiceId;
   await refreshVerifactuFlow(id);
   if (INVOICES.find((x) => x.id === id)) openInvoiceModal(id); else closeInvoiceModal();
+});
+
+document.getElementById('invCheckRecipient').addEventListener('click', async () => {
+  if (!activeInvoiceId) return;
+  const btn = document.getElementById('invCheckRecipient');
+  btn.disabled = true;
+  try {
+    const r = await HITT_API.checkInvoiceRecipient(activeInvoiceId);
+    if (r.valid === true) toast(r.message || T('inv.vf.checkOk'), 'green');
+    else if (r.valid === false) toast(r.message || T('inv.vf.checkBad'), 'red');
+    else toast(r.message || T('inv.vf.checkNa'), 'navy');
+  } catch (err) {
+    console.error(err);
+    toast(err.message || T('inv.vf.checkFail'), 'red');
+  } finally {
+    btn.disabled = false;
+  }
 });
 document.getElementById('invClose').addEventListener('click', closeInvoiceModal);
 document.getElementById('invCancel').addEventListener('click', closeInvoiceModal);

@@ -1,0 +1,19 @@
+[Unit]
+Description=Ops — Veri*Factu AEAT status poll (refresh sent records, resend queued ones)
+Wants=network-online.target
+After=network-online.target postgresql.service
+
+[Service]
+Type=oneshot
+User=root
+# Reads the same DB + VERIFACTU_* env the API uses. No-op when
+# FEATURE_VERIFACTU is not "true".
+EnvironmentFile=/opt/ops/server/.env
+WorkingDirectory=/opt/ops/server
+ExecStart=/usr/bin/npm run verifactu:poll
+TimeoutStartSec=900
+Nice=10
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
