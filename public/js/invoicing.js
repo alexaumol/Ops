@@ -1090,7 +1090,7 @@ function renderInvItems(){
   } else {
     tbody.innerHTML = invLineItems.map((li, i) => `
       <tr data-i="${i}">
-        <td><input type="text" class="field-input" data-li-desc value="${escapeHtml(li.description || '')}" placeholder="${T('inv.items.descPlaceholder')}" /></td>
+        <td><textarea class="field-input inv-item-desc" rows="1" data-li-desc placeholder="${T('inv.items.descPlaceholder')}">${escapeHtml(li.description || '')}</textarea></td>
         <td><input type="number" class="field-input" step="1" min="0" data-li-qty value="${li.quantity ?? ''}" /></td>
         <td><input type="number" class="field-input" step="0.01" min="0" data-li-price value="${li.unitPrice ?? ''}" /></td>
         <td class="inv-items-sub" data-li-sub>${formatMoney(invItemSubtotal(li), invCurCode())}</td>
