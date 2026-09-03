@@ -121,7 +121,6 @@ document.getElementById("showDeactivated").addEventListener("change", render);
 
 /* ---------- Add / edit user ---------- */
 let editingUserId = null;
-let oneDriveDocsBase = "";
 const userModal = document.getElementById("userModal");
 
 // modal field id -> employeesinfo column
@@ -155,22 +154,6 @@ function paintUserAvatar() {
   });
 }
 
-function updateDocPathPreview() {
-  const username = document.getElementById("userUsername").value.trim();
-  const el = document.getElementById("userDocPath");
-  const hint = document.getElementById("userDocPathHint");
-  if (oneDriveDocsBase && username) {
-    el.value = `${oneDriveDocsBase.replace(/[/\\]+$/, "")}/${username}`;
-    hint.textContent = "Saved automatically as the base folder (Paths tab) plus the username.";
-  } else {
-    el.value = "";
-    hint.textContent = oneDriveDocsBase
-      ? "Set a username to generate the documents folder."
-      : "Set the base folder on the Paths tab to generate this.";
-  }
-}
-document.getElementById("userUsername").addEventListener("input", updateDocPathPreview);
-
 function fillUserModal(detail) {
   const emp = detail || {};
   document.getElementById("userModalTitle").textContent =
@@ -188,7 +171,6 @@ function fillUserModal(detail) {
   userAvatarImage = info.avatarimage || null;
   userAvatarUsePhoto = !!info.avatarusephoto;
   paintUserAvatar();
-  updateDocPathPreview();
 }
 
 async function openUserModal(empId) {
@@ -285,9 +267,6 @@ async function loadEmployees() {
     document.getElementById("settingsBlocked").classList.add("hidden");
     document.getElementById("settingsContent").classList.remove("hidden");
     render();
-    // Prime the OneDrive base so the user modal's folder preview works
-    // before the Paths tab is opened.
-    HITT_API.getAppConfig().then((d) => applyOneDriveBase(d.keys)).catch(() => {});
   } catch (err) {
     console.error("[settings] failed to load employees:", err.message);
     document.getElementById("settingsContent").classList.add("hidden");
@@ -356,7 +335,8 @@ document.getElementById("empTableBody").addEventListener("change", async (e) => 
 /* ============================== TABS ================================== */
 let calendarLoaded = false; // covers both holidays + work calendar
 let auditLoaded = false;
-let pathsLoaded = false;
+let presenceLoaded = false;
+let syncLoaded = false;
 let expCatsLoaded = false;
 let currenciesLoaded = false;
 let entitiesLoaded = false;
@@ -369,7 +349,8 @@ document.querySelectorAll("[data-stab]").forEach((btn) => {
     const tab = btn.dataset.stab;
     document.getElementById("paneUserPerms").classList.toggle("hidden", tab !== "permissions");
     document.getElementById("paneCalendar").classList.toggle("hidden", tab !== "calendar");
-    document.getElementById("panePaths").classList.toggle("hidden", tab !== "paths");
+    document.getElementById("panePresence").classList.toggle("hidden", tab !== "presence");
+    document.getElementById("paneSync").classList.toggle("hidden", tab !== "sync");
     document.getElementById("paneExpCats").classList.toggle("hidden", tab !== "expcats");
     document.getElementById("paneCurrencies").classList.toggle("hidden", tab !== "currencies");
     document.getElementById("paneEntities").classList.toggle("hidden", tab !== "entities");
@@ -380,9 +361,13 @@ document.querySelectorAll("[data-stab]").forEach((btn) => {
       loadHolidayYears().then(loadHolidays);
       loadWorkCalendar();
     }
-    if (tab === "paths" && !pathsLoaded) {
-      pathsLoaded = true;
-      loadPaths();
+    if (tab === "presence" && !presenceLoaded) {
+      presenceLoaded = true;
+      loadConfigGroup("presence", "presenceList");
+    }
+    if (tab === "sync" && !syncLoaded) {
+      syncLoaded = true;
+      loadConfigGroup("sync", "syncList");
     }
     if (tab === "expcats" && !expCatsLoaded) {
       expCatsLoaded = true;
@@ -409,14 +394,49 @@ document.querySelectorAll("[data-stab]").forEach((btn) => {
   });
 });
 
-/* ============================== PATHS ================================== */
-function applyOneDriveBase(keys) {
-  const k = (keys || []).find((x) => x.key === "onedrive.employee_docs_base");
-  oneDriveDocsBase = k?.value || "";
+/* ===================== CONFIG GROUPS (Presence / Sync tabs) =========== */
+// One renderer for both tabs. Each key's `type` (from the server) decides the
+// control: "text" (a box + Save), "boolean" (a checkbox, saves "on"/""),
+// "multi" (a checkbox per option, saves a comma-separated list). "group"
+// decides which tab it belongs to.
+function renderConfigItem(k, i) {
+  const key = escapeHtml(k.key);
+  const label = escapeHtml(k.label || k.key);
+  const hint = k.hint ? `<p class="path-hint">${escapeHtml(k.hint)}</p>` : "";
+  if (k.type === "boolean") {
+    return `<div class="path-item" data-key="${key}">
+      <label class="settings-checkline">
+        <input type="checkbox" data-config-bool ${k.value === "on" ? "checked" : ""} />
+        <span>${label}</span>
+      </label>
+      ${hint}
+    </div>`;
+  }
+  if (k.type === "multi") {
+    const set = new Set(String(k.value || "").split(",").map((s) => s.trim()).filter(Boolean));
+    const opts = (k.options || []).map((o) => `
+      <label class="settings-checkline">
+        <input type="checkbox" data-config-multi value="${escapeHtml(o.value)}" ${set.has(o.value) ? "checked" : ""} />
+        <span>${escapeHtml(o.label)}</span>
+      </label>`).join("");
+    return `<div class="path-item" data-key="${key}">
+      <label>${label}</label>
+      <div class="settings-checkgroup">${opts}</div>
+      ${hint}
+    </div>`;
+  }
+  return `<div class="path-item" data-key="${key}">
+    <label for="cfg_${i}">${label}</label>
+    <div class="path-row">
+      <input id="cfg_${i}" type="text" value="${escapeHtml(k.value || "")}" placeholder="${escapeHtml(k.placeholder || "")}" />
+      <button type="button" class="btn btn-primary" data-save-path>Save</button>
+    </div>
+    ${hint}
+  </div>`;
 }
 
-async function loadPaths() {
-  const host = document.getElementById("pathsList");
+async function loadConfigGroup(group, hostId) {
+  const host = document.getElementById(hostId);
   host.innerHTML = `<div class="settings-emp-sub">Loading…</div>`;
   let data;
   try {
@@ -426,33 +446,41 @@ async function loadPaths() {
     host.innerHTML = `<div class="settings-pane-empty">Could not load the configuration.</div>`;
     return;
   }
-  applyOneDriveBase(data.keys);
-  host.innerHTML = data.keys.map((k, i) => `
-    <div class="path-item" data-key="${escapeHtml(k.key)}">
-      <label for="pathInput${i}">${escapeHtml(k.label)}</label>
-      <div class="path-row">
-        <input id="pathInput${i}" type="text" value="${escapeHtml(k.value || "")}" placeholder="${escapeHtml(k.placeholder || "")}" />
-        <button type="button" class="btn btn-primary" data-save-path>Save</button>
-      </div>
-      ${k.hint ? `<p class="path-hint">${escapeHtml(k.hint)}</p>` : ""}
-    </div>
-  `).join("");
+  const items = data.keys.filter((k) => (k.group || "sync") === group);
+  host.innerHTML = items.length
+    ? items.map(renderConfigItem).join("")
+    : `<div class="settings-pane-empty">Nothing to configure here.</div>`;
+
+  const save = async (key, value, ctrl) => {
+    if (ctrl) ctrl.disabled = true;
+    try {
+      await HITT_API.setAppConfig(key, value);
+      toast("Saved.", "green");
+    } catch (err) {
+      toast(`Couldn't save: ${err.message}`, "red");
+    } finally {
+      if (ctrl) ctrl.disabled = false;
+    }
+  };
+
   host.querySelectorAll("[data-save-path]").forEach((btn) => {
-    btn.addEventListener("click", async () => {
+    btn.addEventListener("click", () => {
       const item = btn.closest(".path-item");
-      const key = item.dataset.key;
-      const value = item.querySelector("input").value.trim();
-      btn.disabled = true;
-      try {
-        await HITT_API.setAppConfig(key, value);
-        if (key === "onedrive.employee_docs_base") oneDriveDocsBase = value;
-        toast("Saved.", "green");
-      } catch (err) {
-        toast(`Couldn't save: ${err.message}`, "red");
-      } finally {
-        btn.disabled = false;
-      }
+      save(item.dataset.key, item.querySelector("input").value.trim(), btn);
     });
+  });
+  host.querySelectorAll("[data-config-bool]").forEach((cb) => {
+    cb.addEventListener("change", () => {
+      save(cb.closest(".path-item").dataset.key, cb.checked ? "on" : "", cb);
+    });
+  });
+  host.querySelectorAll(".path-item").forEach((item) => {
+    const multi = item.querySelectorAll("[data-config-multi]");
+    if (!multi.length) return;
+    multi.forEach((cb) => cb.addEventListener("change", () => {
+      const vals = [...item.querySelectorAll("[data-config-multi]:checked")].map((x) => x.value);
+      save(item.dataset.key, vals.join(","), cb);
+    }));
   });
 }
 

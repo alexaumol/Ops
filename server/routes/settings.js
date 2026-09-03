@@ -75,70 +75,88 @@ function ensureSettingsSchema() {
   return schemaReady;
 }
 
-// Configurable paths / values, surfaced on the Settings → Paths tab. The
+// Configurable values, surfaced on the Settings → Sync and Presence tabs. The
 // server owns this list so the frontend never writes an arbitrary key.
+//
+//   group : "sync" (default) | "presence" — which Settings tab it renders on
+//   type  : "text" (default) | "boolean" ("on"/"") | "multi" (CSV of `options`)
+//   options (multi only) : [{ value, label }]
 const CONFIG_KEYS = {
-  "onedrive.employee_docs_base": {
-    label: "OneDrive — employee documents base folder",
-    hint: "Each employee's document folder is this path plus their username. Used to fill employeesinfo.employeedocumentpath when a user is added or edited.",
-    placeholder: "/HITT Shared/HR/Employees",
+  // --- Sync tab: external-storage backup ---------------------------------
+  "sync.projects_location": {
+    group: "sync",
+    label: "Projects — external storage location",
+    hint: "A folder in the company OneDrive (or a SharePoint/OneDrive share link). The app keeps one folder per project here, named \"PROJECTNUMBER_ENTITYID PROJECT NAME\". Leave empty to keep using the GRAPH_ONEDRIVE_FOLDER default.",
+    placeholder: "Clients/Projects   or   https://…sharepoint.com/…",
   },
-  // Presence register (Time allocation → Presence). Also editable by a
-  // "Presence admin" via PUT /api/presence/config.
+  "sync.other_docs_location": {
+    group: "sync",
+    label: "Other documents — backup location",
+    hint: "Base folder (OneDrive path or share link) where the document types selected below are backed up.",
+    placeholder: "Clients/Backups   or   https://…sharepoint.com/…",
+  },
+  "sync.backup_doc_types": {
+    group: "sync",
+    type: "multi",
+    label: "Back up these document types",
+    hint: "Which documents are copied to the backup location.",
+    options: [
+      { value: "tickets", label: "Expense tickets" },
+      { value: "invoices", label: "Invoices" },
+    ],
+  },
+  "sync.backup_under_project": {
+    group: "sync",
+    type: "boolean",
+    label: "File backups under each document's project folder",
+    hint: "On: a document is stored under its project's folder. Off: documents are grouped by type (Tickets / Invoices).",
+  },
+
+  // --- Presence tab: working-time register ------------------------------
+  // Also editable by a "Presence admin" via PUT /api/presence/config.
   "presence.timezone": {
+    group: "presence",
     label: "Presence — timezone",
     hint: "IANA timezone the working-day is recorded in (Spanish law: local wall-clock). Default Europe/Madrid.",
     placeholder: "Europe/Madrid",
   },
   "presence.default_daily_minutes": {
+    group: "presence",
     label: "Presence — default working minutes per day",
     hint: "Used when an employee has no specific working-time contract row. 480 = 8 h.",
     placeholder: "480",
   },
   "presence.workdays": {
+    group: "presence",
     label: "Presence — default working weekdays",
     hint: "ISO day numbers, comma-separated. 1 = Monday … 7 = Sunday. Default 1,2,3,4,5.",
     placeholder: "1,2,3,4,5",
   },
   "presence.method_doc": {
+    group: "presence",
     label: "Presence — register method (consultation record)",
     hint: "The collective agreement / company agreement / employer decision (after consulting worker representatives) that establishes this register. Text or a link. Printed on the exported PDF.",
     placeholder: "Acuerdo de empresa de DD/MM/AAAA",
   },
   "presence.retention_months": {
+    group: "presence",
     label: "Presence — retention (months)",
     hint: "Records are kept this long, then hard-deleted by `npm run presence:purge`. Legal minimum is 48 (four years).",
     placeholder: "48",
   },
   "presence.legal_hold": {
+    group: "presence",
     label: "Presence — legal hold",
     hint: "Set to 'on' during a labour dispute or inspection to stop the retention purge from deleting anything. 'off' otherwise.",
     placeholder: "off",
   },
   "presence.privacy_notice": {
+    group: "presence",
     label: "Presence — privacy notice",
     hint: "Short text shown to employees from the Presence tab (purpose, legal basis, retention, rights). Optional.",
     placeholder: "",
   },
 };
-
-async function getConfig(key) {
-  try {
-    const { rows } = await pool.query(`SELECT configvalue FROM appconfig WHERE configkey = $1`, [key]);
-    return rows[0]?.configvalue ?? null;
-  } catch {
-    return null;
-  }
-}
-
-// <base>/<username> with the base's trailing slashes trimmed. Null unless
-// both parts are present.
-function employeeDocPath(base, username) {
-  const b = (base || "").trim().replace(/[/\\]+$/, "");
-  const u = (username || "").trim();
-  if (!b || !u) return null;
-  return `${b}/${u}`;
-}
 
 // Shared projection for an employee row as the Settings table wants it —
 // profile fields + role/approver/module-restriction state. Callers append
@@ -264,8 +282,7 @@ router.post("/employees", async (req, res) => {
       [firstName.trim(), lastName.trim(), username?.trim() || null, email?.trim() || null]
     );
     const newId = rows[0].id;
-    const docPath = employeeDocPath(await getConfig("onedrive.employee_docs_base"), username);
-    await upsertEmployeeInfo(newId, info || {}, docPath);
+    await upsertEmployeeInfo(newId, info || {});
 
     const row = await employeeRow(newId);
     res.status(201).json({ ...row, info: await employeeInfoRow(newId) });
@@ -305,8 +322,7 @@ router.patch("/employees/:id/profile", async (req, res) => {
     );
     if (!rowCount) return res.status(404).json({ error: "not_found", message: "Employee not found." });
 
-    const docPath = employeeDocPath(await getConfig("onedrive.employee_docs_base"), username);
-    await upsertEmployeeInfo(employeeId, info || {}, docPath);
+    await upsertEmployeeInfo(employeeId, info || {});
 
     const row = await employeeRow(employeeId);
     res.json({ ...row, info: await employeeInfoRow(employeeId) });
@@ -320,7 +336,7 @@ router.patch("/employees/:id/profile", async (req, res) => {
   }
 });
 
-/* ============================== APP CONFIG (Paths tab) ================= */
+/* ==================== APP CONFIG (Sync + Presence tabs) ============== */
 
 // GET /api/settings/config — the configurable values, with their metadata.
 router.get("/config", async (req, res) => {

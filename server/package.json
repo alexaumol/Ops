@@ -12,7 +12,8 @@
     "migrate:down": "node scripts/migrate.js down",
     "migrate:create": "node-pg-migrate create -m migrations --migration-file-language sql --",
     "presence:verify": "node scripts/presence-verify.js",
-    "presence:purge": "node scripts/presence-purge.js"
+    "presence:purge": "node scripts/presence-purge.js",
+    "sync:external": "node scripts/sync-external.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

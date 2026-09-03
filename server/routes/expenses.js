@@ -27,6 +27,8 @@ const express = require("express");
 const { pool } = require("../config/db");
 const { requireModuleAccess } = require("../lib/permissions");
 const { logAudit } = require("../lib/audit");
+const { UPLOAD_DIR } = require("../lib/expenseFiles");
+const externalSync = require("../lib/externalSync");
 
 // multer is only needed for evidence uploads. If it's missing (server not
 // `npm install`ed yet) the module still runs — list + no-file CRUD work,
@@ -38,9 +40,6 @@ catch { console.error("[expenses] multer not installed — evidence uploads disa
 const router = express.Router();
 router.use(requireModuleAccess("expenses"));
 
-const UPLOAD_DIR = process.env.UPLOAD_DIR
-  ? path.resolve(process.env.UPLOAD_DIR, "expenses")
-  : path.join(__dirname, "..", "uploads", "expenses");
 let uploadsReady = false;
 try {
   fs.mkdirSync(UPLOAD_DIR, { recursive: true });
@@ -352,6 +351,7 @@ router.post("/", acceptDocument, async (req, res) => {
       desc: `Added expense${row.category ? ` (${row.category})` : ""} EUR ${b.amount}` +
         (row.projectCode ? ` on project ${row.projectCode}` : b.isInternal ? " (internal)" : ""),
     });
+    if (req.file) externalSync.syncExpenseDoc(pool, rows[0].id).catch(() => {});
   } catch (err) {
     removeFileQuietly(req.file?.filename);
     console.error("[POST /api/expenses] DB error:", err.message);
@@ -401,6 +401,7 @@ router.patch("/:id", acceptDocument, async (req, res) => {
       desc: `${req.file ? "Replaced the evidence on" : "Edited"} expense #${req.params.id}` +
         (row.category ? ` (${row.category})` : ""),
     });
+    if (req.file) externalSync.syncExpenseDoc(pool, req.params.id).catch(() => {});
   } catch (err) {
     removeFileQuietly(req.file?.filename);
     console.error("[PATCH /api/expenses/:id] DB error:", err.message);

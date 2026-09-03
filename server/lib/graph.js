@@ -67,44 +67,157 @@ async function getToken({ tenantId, clientId, clientSecret }) {
   return data.access_token;
 }
 
-const getAccessToken = () => getToken(ONEDRIVE_CREDS); // OneDrive folder creation
+const getAccessToken = () => getToken(ONEDRIVE_CREDS); // OneDrive / drive access
+
+const GRAPH = "https://graph.microsoft.com/v1.0";
 
 // Percent-encodes each segment of a OneDrive path while keeping the
 // literal "/" separators Graph's root:/path: addressing needs.
 function encodeDrivePath(path) {
-  return path.split("/").map(encodeURIComponent).join("/");
+  return String(path || "").split("/").filter(Boolean).map(encodeURIComponent).join("/");
+}
+const trimSlashes = (s) => String(s || "").replace(/^[/\\]+|[/\\]+$/g, "").replace(/\\/g, "/");
+
+async function graphFetch(url, init = {}) {
+  const token = await getAccessToken();
+  return fetch(url, { ...init, headers: { Authorization: `Bearer ${token}`, ...(init.headers || {}) } });
 }
 
-// Creates {folderName} as a subfolder of GRAPH_ONEDRIVE_FOLDER in
-// GRAPH_ONEDRIVE_USER's OneDrive. Renames on a name collision instead of
-// failing (@microsoft.graph.conflictBehavior) — shouldn't normally happen
-// given project codes are unique, but this is a best-effort side effect,
-// not something worth erroring the caller over.
-async function createProjectFolder(folderName) {
-  if (!graphConfigured()) {
-    throw new Error("Graph integration not configured (missing GRAPH_* env vars)");
+/* ========================================================================
+ * Settings → Sync: back up documents into a configurable drive location.
+ * The location is either a plain path under GRAPH_ONEDRIVE_USER's drive
+ * (like GRAPH_ONEDRIVE_FOLDER) or a SharePoint/OneDrive share URL.
+ * ===================================================================== */
+
+// Same env as the folder feature — the token creds plus a user whose drive
+// path-based locations resolve against. A caller with a share URL only
+// strictly needs the token creds, but requiring ONEDRIVE_USER keeps the
+// "is this configured at all" check simple.
+function syncConfigured() {
+  return !!(TENANT_ID && CLIENT_ID && CLIENT_SECRET && ONEDRIVE_USER);
+}
+
+const b64url = (s) =>
+  Buffer.from(s, "utf8").toString("base64").replace(/=+$/, "").replace(/\//g, "_").replace(/\+/g, "-");
+
+// Turn a location string into a Graph addressing prefix + a helper that
+// builds the URL for any sub-path beneath it. Memoised per location string
+// for the life of the process (a share URL costs one Graph call to resolve).
+const locationCache = new Map();
+async function resolveLocation(location) {
+  const loc = String(location || "").trim();
+  if (!loc) throw new Error("no sync location configured");
+  if (locationCache.has(loc)) return locationCache.get(loc);
+
+  let resolved;
+  if (/^https?:\/\//i.test(loc)) {
+    const res = await graphFetch(`${GRAPH}/shares/u!${b64url(loc)}/driveItem?$select=id,parentReference,webUrl`);
+    if (!res.ok) throw new Error(`resolve share link failed: ${res.status} ${await res.text().catch(() => "")}`);
+    const item = await res.json();
+    const driveId = item.parentReference && item.parentReference.driveId;
+    if (!driveId || !item.id) throw new Error("share link did not resolve to a drive item");
+    resolved = { kind: "item", prefix: `drives/${driveId}/items/${item.id}` };
+  } else {
+    resolved = { kind: "path", prefix: `users/${encodeURIComponent(ONEDRIVE_USER)}/drive/root`, base: trimSlashes(loc) };
   }
-  const token = await getAccessToken();
-  const parentPath = encodeDrivePath(ONEDRIVE_FOLDER);
-  const res = await fetch(
-    `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(ONEDRIVE_USER)}/drive/root:/${parentPath}:/children`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        name: folderName,
-        folder: {},
-        "@microsoft.graph.conflictBehavior": "rename",
-      }),
+  locationCache.set(loc, resolved);
+  return resolved;
+}
+
+// Graph URL for `subPath` (a "/"-joined relative path, may be "") under a
+// resolved location.
+function itemUrl(resolved, subPath) {
+  const parts = trimSlashes(subPath).split("/").filter(Boolean);
+  if (resolved.kind === "item") {
+    const enc = parts.map(encodeURIComponent).join("/");
+    return enc ? `${GRAPH}/${resolved.prefix}:/${enc}:` : `${GRAPH}/${resolved.prefix}`;
+  }
+  const full = [resolved.base, ...parts].filter(Boolean);
+  const enc = full.map(encodeURIComponent).join("/");
+  return enc ? `${GRAPH}/${resolved.prefix}:/${enc}:` : `${GRAPH}/${resolved.prefix}`;
+}
+
+// mkdir -p: ensure every segment of `folderPath` exists under the resolved
+// location. Returns the leaf folder's { id, webUrl }.
+async function ensureFolderPath(resolved, folderPath) {
+  const segs = trimSlashes(folderPath).split("/").filter(Boolean);
+  let leaf = null;
+  for (let i = 0; i < segs.length; i++) {
+    const sub = segs.slice(0, i + 1).join("/");
+    const getRes = await graphFetch(`${itemUrl(resolved, sub)}?$select=id,webUrl,folder`);
+    if (getRes.ok) { leaf = await getRes.json(); continue; }
+    if (getRes.status !== 404) {
+      throw new Error(`folder lookup failed (${sub}): ${getRes.status} ${await getRes.text().catch(() => "")}`);
     }
-  );
-  if (!res.ok) {
-    throw new Error(`Graph folder creation failed: ${res.status} ${await res.text().catch(() => "")}`);
+    const parent = segs.slice(0, i).join("/");
+    const mk = await graphFetch(`${itemUrl(resolved, parent)}/children`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: segs[i], folder: {}, "@microsoft.graph.conflictBehavior": "fail" }),
+    });
+    if (mk.ok) { leaf = await mk.json(); continue; }
+    // A racing create is fine — re-fetch.
+    if (mk.status === 409) {
+      const again = await graphFetch(`${itemUrl(resolved, sub)}?$select=id,webUrl,folder`);
+      if (again.ok) { leaf = await again.json(); continue; }
+    }
+    throw new Error(`folder create failed (${sub}): ${mk.status} ${await mk.text().catch(() => "")}`);
   }
-  return res.json();
+  return leaf;
+}
+
+// Upload a file to `<location>/<folderPath>/<filename>`, overwriting any
+// existing file of that name. Simple PUT up to 4 MiB, a resumable upload
+// session above that. Returns { id, webUrl }.
+const SIMPLE_MAX = 4 * 1024 * 1024;
+const CHUNK = 5 * 320 * 1024; // 1.6 MiB, a multiple of 320 KiB as Graph requires
+
+async function uploadFile(resolved, folderPath, filename, buffer, contentType) {
+  await ensureFolderPath(resolved, folderPath);
+  const dest = [trimSlashes(folderPath), filename].filter(Boolean).join("/");
+
+  if (buffer.length <= SIMPLE_MAX) {
+    const res = await graphFetch(
+      `${itemUrl(resolved, dest)}/content?@microsoft.graph.conflictBehavior=replace`,
+      { method: "PUT", headers: { "Content-Type": contentType || "application/octet-stream" }, body: buffer }
+    );
+    if (!res.ok) throw new Error(`upload failed: ${res.status} ${await res.text().catch(() => "")}`);
+    return res.json();
+  }
+
+  const sess = await graphFetch(`${itemUrl(resolved, dest)}/createUploadSession`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ item: { "@microsoft.graph.conflictBehavior": "replace" } }),
+  });
+  if (!sess.ok) throw new Error(`create upload session failed: ${sess.status} ${await sess.text().catch(() => "")}`);
+  const { uploadUrl } = await sess.json();
+
+  const total = buffer.length;
+  for (let start = 0; start < total; start += CHUNK) {
+    const end = Math.min(start + CHUNK, total);
+    const part = buffer.subarray(start, end);
+    const res = await fetch(uploadUrl, {
+      method: "PUT",
+      headers: { "Content-Length": String(part.length), "Content-Range": `bytes ${start}-${end - 1}/${total}` },
+      body: part,
+    });
+    if (res.status === 200 || res.status === 201) return res.json();
+    if (res.status !== 202) throw new Error(`chunk upload failed: ${res.status} ${await res.text().catch(() => "")}`);
+  }
+  throw new Error("upload session ended without a completed file");
+}
+
+// Ensure a single project folder exists directly under `location`
+// (defaults to GRAPH_ONEDRIVE_FOLDER). Idempotent: existing folder is
+// reused, not renamed. Returns { id, webUrl, name }.
+async function createProjectFolder(folderName, location) {
+  if (!syncConfigured()) throw new Error("Graph integration not configured (missing GRAPH_* env vars)");
+  const loc = String(location || "").trim() || ONEDRIVE_FOLDER;
+  if (!loc) throw new Error("no project folder location (set sync.projects_location or GRAPH_ONEDRIVE_FOLDER)");
+  const resolved = await resolveLocation(loc);
+  const folder = await ensureFolderPath(resolved, folderName);
+  return { id: folder.id, webUrl: folder.webUrl, name: folderName };
 }
 
 /* ========================================================================
@@ -187,4 +300,14 @@ async function sendMail({ from, to, cc, subject, text, html, attachments = [], r
   return { sender };
 }
 
-module.exports = { graphConfigured, createProjectFolder, graphMailConfigured, sendMail };
+module.exports = {
+  graphConfigured,
+  createProjectFolder,
+  graphMailConfigured,
+  sendMail,
+  // Settings → Sync backup engine
+  syncConfigured,
+  resolveLocation,
+  ensureFolderPath,
+  uploadFile,
+};
