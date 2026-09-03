@@ -15,3 +15,9 @@ server/uploads/
 # Internal-only notes (real infra details, real client/project names) —
 # never goes to the public repo. See README.md for the public-facing docs.
 INTERNAL.md
+
+# Stray lockfiles npm drops when run from the wrong directory. The real
+# ones live in server/ and build/ — npm belongs there, not the repo root
+# or public/.
+/package-lock.json
+/public/package-lock.json
