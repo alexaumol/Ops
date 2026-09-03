@@ -322,6 +322,11 @@ const HITT_API = (() => {
         method: "PATCH",
         body: JSON.stringify({ stage, employeeId }),
       }),
+    updateProjectOwner: (id, ownerId, employeeId) =>
+      request(`/api/projects/${id}/owner`, {
+        method: "PATCH",
+        body: JSON.stringify({ ownerId: ownerId || null, employeeId }),
+      }),
     assignProjectBusinessPartner: (id, businessPartnerId) =>
       request(`/api/projects/${id}/business-partner`, {
         method: "PATCH",

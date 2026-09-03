@@ -89,6 +89,10 @@ let EMPLOYEES = []; // not-deactivated employees — GET /api/employees already 
 let usingDemoData = false;
 let currentTab = 'alive';
 let searchTerm = '';
+// 'status' — the classic stage columns · 'po' — group cards by project owner.
+// Persisted best-effort; a dodgy stored value falls back to 'status'.
+let viewMode = 'status';
+try { if (localStorage.getItem('hitt.kanban.viewMode') === 'po') viewMode = 'po'; } catch { /* storage blocked */ }
 let activeProjectId = null;
 let activeBusinessPartnerId = null;
 let npBusinessPartnerId = null; // draft BP pick for the New Project modal — see assignBusinessPartner()
@@ -359,6 +363,12 @@ function renderBoard(){
   // Any re-render ends a drag (drop / tab switch) — clear the dragging
   // state so the quick-drop column hides and the insights panel comes back.
   document.getElementById('kanbanBody')?.classList.remove('is-dragging');
+  document.getElementById('kanbanBody')?.classList.toggle('view-po', viewMode === 'po');
+  if (viewMode === 'po') renderByPo(board);
+  else renderByStatus(board);
+}
+
+function renderByStatus(board){
   const visibleStages = STAGES.filter(s => s.set === currentTab);
 
   visibleStages.forEach(stage => {
@@ -389,11 +399,72 @@ function renderBoard(){
       items.forEach(p => body.appendChild(renderCard(p, stage)));
     }
 
-    attachDropZone(body);
+    attachDropZone(body, (id) => moveProject(id, Number(body.dataset.stage)));
     board.appendChild(col);
   });
 
   renderQuickDrop();
+}
+
+// "View by PO": one column per project owner (among the projects currently in
+// view), plus a trailing "No owner" column. Dragging a card between columns
+// reassigns the owner (see moveProjectOwner).
+function renderByPo(board){
+  const inTab = PROJECTS.filter(p => STAGE_BY_ID[p.stage]?.set === currentTab && matchesFilters(p));
+
+  const groups = new Map(); // ownerKey ("" for none) -> { id, name, items:[] }
+  inTab.forEach(p => {
+    const key = p.ownerId ? String(p.ownerId) : '';
+    if (!groups.has(key)) groups.set(key, { id: p.ownerId || null, name: p.ownerName || null, items: [] });
+    groups.get(key).items.push(p);
+  });
+  // Show every non-deactivated employee as a column even when they own
+  // nothing in view, so you can drop a card onto them.
+  EMPLOYEES.forEach(e => {
+    const key = String(e.id);
+    if (!groups.has(key)) groups.set(key, { id: e.id, name: e.name, items: [] });
+    else if (!groups.get(key).name) groups.get(key).name = e.name;
+  });
+
+  const cols = [...groups.entries()]
+    .sort((a, b) => {
+      if (a[0] === '') return 1;            // "No owner" last
+      if (b[0] === '') return -1;
+      return String(a[1].name || '').localeCompare(String(b[1].name || ''));
+    });
+
+  cols.forEach(([key, g]) => {
+    const items = g.items.sort((a, b) => String(a.code + a.name).localeCompare(String(b.code + b.name)));
+    const color = g.id ? ownerColor(g.id) : '#8A8676';
+    const label = g.name || T('proj.col.noOwner');
+
+    const col = document.createElement('div');
+    col.className = 'flex flex-col bg-white rounded-xl border border-slate-200 shadow-card h-full overflow-hidden';
+    col.dataset.owner = key;
+
+    col.innerHTML = `
+      <div class="shrink-0 px-3 pt-3 pb-2.5 border-b border-slate-100" style="border-top:3px solid ${color}">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2 min-w-0">
+            <span class="w-7 h-7 rounded-full flex items-center justify-center shrink-0 text-white font-bold" style="background:${color}; font-size:10px;">${g.id ? ownerInitials(label) : '—'}</span>
+            <h2 class="font-semibold text-sm text-hitt-ink truncate" title="${escapeHtml(label)}">${escapeHtml(label)}</h2>
+          </div>
+          <span class="font-mono text-xs font-bold text-white rounded-full px-2 py-0.5 shrink-0" style="background:${color}">${items.length}</span>
+        </div>
+      </div>
+      <div class="col-body flex-1 overflow-y-auto px-2 py-2 space-y-2 fade-mask" data-owner="${key}" style="min-height:80px"></div>
+    `;
+
+    const body = col.querySelector('.col-body');
+    if (items.length === 0) {
+      body.innerHTML = `<div class="text-xs text-slate-400 text-center py-8 select-none">${searchTerm ? T('proj.col.emptySearch') : T('proj.col.empty')}</div>`;
+    } else {
+      items.forEach(p => body.appendChild(renderCard(p, STAGE_BY_ID[p.stage], { poView: true })));
+    }
+
+    attachDropZone(body, (id) => moveProjectOwner(id, body.dataset.owner || null));
+    board.appendChild(col);
+  });
 }
 
 // Quick-drop targets, appended as the last column of the board so they sit
@@ -404,6 +475,7 @@ function renderBoard(){
 // while on Closed/Cancelled — so a card can jump between the two without
 // switching tabs first.
 function renderQuickDrop(){
+  if (viewMode === 'po') return; // no stage columns to jump between in this view
   const board = document.getElementById('board');
   if (!board) return;
   const targetSet = currentTab === 'alive' ? 'closed' : 'alive';
@@ -443,7 +515,8 @@ function setKanbanDragging(on){
   if (!on) document.querySelectorAll('.kb-quickdrop-zone').forEach(z => z.classList.remove('drag-over'));
 }
 
-function renderCard(p, stage){
+function renderCard(p, stage, opts = {}){
+  const poView = !!opts.poView;
   const card = document.createElement('div');
   card.className = 'card pop-in group bg-white border border-slate-200 hover:border-slate-300 rounded-lg shadow-card hover:shadow-cardHover cursor-grab select-none overflow-hidden';
   card.draggable = true;
@@ -452,6 +525,12 @@ function renderCard(p, stage){
   card.tabIndex = 0;
   card.setAttribute('role', 'button');
   card.setAttribute('aria-label', T('proj.card.aria', { code: p.code, name: p.name, stage: stage.label }));
+
+  // In "By PO" the column is the owner, so the owner avatar is redundant —
+  // show a stage pill instead so the lifecycle stage stays visible.
+  const cornerHtml = poView
+    ? `<span class="rounded px-1.5 py-0.5 text-white font-semibold whitespace-nowrap" style="background:${stage.color}; font-size:9px; line-height:1.3;">${escapeHtml(stage.label)}</span>`
+    : (p.ownerName ? `<span class="w-5 h-5 rounded-full flex items-center justify-center text-white font-bold" style="background:${ownerColor(p.ownerId)}; font-size:8px; line-height:1;" title="${escapeHtml(p.ownerName)}">${ownerInitials(p.ownerName)}</span>` : '');
 
   card.innerHTML = `
     <div class="flex">
@@ -462,9 +541,9 @@ function renderCard(p, stage){
             <span class="font-mono text-[10px] font-bold text-hitt-teal tracking-tight">${escapeHtml(p.code)}</span>
             ${cardBadgesHtml(p)}
           </div>
-          <div class="flex flex-col items-center gap-0.5 shrink-0">
+          <div class="flex flex-col items-end gap-0.5 shrink-0">
             <span class="text-[10px] font-mono text-slate-400">${p.progress ?? 0}%</span>
-            ${p.ownerName ? `<span class="w-5 h-5 rounded-full flex items-center justify-center text-white font-bold" style="background:${ownerColor(p.ownerId)}; font-size:8px; line-height:1;" title="${escapeHtml(p.ownerName)}">${ownerInitials(p.ownerName)}</span>` : ''}
+            ${cornerHtml}
           </div>
         </div>
         <p class="text-[13px] leading-snug font-medium text-hitt-ink mt-0.5 truncate" title="${escapeHtml(p.name)}">${escapeHtml(p.name)}</p>
@@ -502,7 +581,7 @@ function renderCard(p, stage){
   return card;
 }
 
-function attachDropZone(body){
+function attachDropZone(body, onDrop){
   body.addEventListener('dragover', (e) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
@@ -514,12 +593,45 @@ function attachDropZone(body){
     body.classList.remove('drag-over');
     // Not Number(): PROJECTS[].id is deliberately kept as the raw
     // stringified-bigint the API returns (see the INIT deep-link comment
-    // below), and moveProject()'s PROJECTS.find(x => x.id === id) needs
-    // the same type — Number() here made every drop silently no-op.
+    // below), and the PROJECTS.find(x => x.id === id) in the move handlers
+    // needs the same type — Number() here made every drop silently no-op.
     const id = e.dataTransfer.getData('text/plain');
-    const targetStage = Number(body.dataset.stage);
-    if (id) moveProject(id, targetStage);
+    if (id) onDrop(id);
   });
+}
+
+async function moveProjectOwner(id, ownerId){
+  const p = PROJECTS.find(x => x.id === id);
+  if (!p) return;
+  const targetId = ownerId ? String(ownerId) : null;
+  if (String(p.ownerId ?? '') === String(targetId ?? '')) return;
+
+  const prev = { ownerId: p.ownerId, ownerName: p.ownerName, mine: p.mine };
+  const newName = targetId ? (EMPLOYEES.find(e => String(e.id) === targetId)?.name ?? null) : null;
+  p.ownerId = targetId;
+  p.ownerName = newName;
+  if (targetId && currentEmployeeId != null) p.mine = String(targetId) === String(currentEmployeeId) || p.mine;
+
+  renderBoard();
+  populateOwnerFilterOptions();
+  toast(
+    targetId
+      ? T('proj.toast.ownerSet', { code: `<span class="font-mono text-xs opacity-80">${escapeHtml(p.code)}</span>`, name: `<b>${escapeHtml(newName || '')}</b>` })
+      : T('proj.toast.ownerCleared', { code: `<span class="font-mono text-xs opacity-80">${escapeHtml(p.code)}</span>` }),
+    'green'
+  );
+
+  if (!usingDemoData) {
+    try {
+      await HITT_API.updateProjectOwner(id, targetId, currentEmployeeId);
+    } catch (err) {
+      console.error('Failed to persist owner change:', err);
+      Object.assign(p, prev);
+      renderBoard();
+      populateOwnerFilterOptions();
+      toast(T('proj.toast.ownerFail', { code: `<span class="font-mono text-xs">${escapeHtml(p.code)}</span>` }), 'red');
+    }
+  }
 }
 
 async function moveProject(id, targetStageId){
@@ -1684,6 +1796,21 @@ document.querySelectorAll('[data-tab]').forEach(btn => {
     renderBoard();
   });
 });
+
+function syncViewButtons(){
+  document.querySelectorAll('[data-view]').forEach(b =>
+    b.setAttribute('aria-selected', String(b.dataset.view === viewMode)));
+}
+document.querySelectorAll('[data-view]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    if (viewMode === btn.dataset.view) return;
+    viewMode = btn.dataset.view;
+    try { localStorage.setItem('hitt.kanban.viewMode', viewMode); } catch { /* storage blocked */ }
+    syncViewButtons();
+    renderBoard();
+  });
+});
+syncViewButtons();
 
 const searchBox = document.getElementById('searchBox');
 const clearBtn = document.getElementById('clearSearch');

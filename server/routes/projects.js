@@ -461,6 +461,70 @@ router.patch("/:id/business-partner", async (req, res) => {
   }
 });
 
+// PATCH /api/projects/:id/owner — set (or clear) the project owner, from the
+// kanban's "View by PO" drag-and-drop. `ownerId` null/"" removes the owner.
+// projectowners is a separate table treated as a single owner (see GET / and
+// PATCH /:id). Applies immediately, same convention as /:id/stage.
+router.patch("/:id/owner", async (req, res) => {
+  const { id } = req.params;
+  const rawOwner = req.body?.ownerId;
+  const ownerId = rawOwner === undefined || rawOwner === null || rawOwner === "" ? null : rawOwner;
+  const employeeId = req.body?.employeeId ?? null;
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const { rows } = await client.query(
+      `SELECT po.projectownerid, TRIM(CONCAT(e.employeefirstname, ' ', e.employeelastname)) AS "ownerName"
+       FROM projectowners po
+       LEFT JOIN employees e ON e.id = po.projectownerid::bigint
+       WHERE po.projectid = $1
+       ORDER BY po.id DESC LIMIT 1`,
+      [id]
+    );
+    const cur = rows[0] || {};
+    if (String(ownerId || "") === String(cur.projectownerid || "")) {
+      await client.query("ROLLBACK");
+      return res.status(204).end();
+    }
+
+    await client.query(`DELETE FROM projectowners WHERE projectid = $1`, [id]);
+    let newOwnerName = null;
+    if (ownerId) {
+      await client.query(`INSERT INTO projectowners (projectid, projectownerid) VALUES ($1, $2)`, [id, ownerId]);
+      const r = await client.query(
+        `SELECT TRIM(CONCAT(employeefirstname, ' ', employeelastname)) AS name FROM employees WHERE id = $1`,
+        [ownerId]
+      );
+      newOwnerName = r.rows[0]?.name ?? null;
+    }
+    await client.query(
+      `UPDATE projects SET lastupdated = now(), lastupdatedby = $1 WHERE id = $2`,
+      [employeeId || null, id]
+    );
+
+    const summary = cur.projectownerid && ownerId
+      ? `Owner changed from ${cur.ownerName || "—"} to ${newOwnerName || "—"}`
+      : ownerId
+        ? `Owner assigned: ${newOwnerName || "—"}`
+        : `Owner removed (was ${cur.ownerName || "—"})`;
+    await client.query(
+      `INSERT INTO projectchangelog (projectid, changedat, changedby, summary) VALUES ($1, now(), $2, $3)`,
+      [id, employeeId || null, summary]
+    );
+
+    await client.query("COMMIT");
+    res.status(204).end();
+    const ctx = await projectAuditContext(id);
+    logAudit(req, { kind: "project.assign-owner", desc: `Project ${ctx.code}: ${summary}` });
+  } catch (err) {
+    await client.query("ROLLBACK");
+    console.error("[PATCH /api/projects/:id/owner] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  } finally {
+    client.release();
+  }
+});
+
 // PATCH /api/projects/:id/invoicing-partner — set which of the
 // contracting business partner's tax companies to invoice (Access's
 // cmbTaxCompanies combo, scoped to the assigned BP). Applies
