@@ -190,7 +190,7 @@ async function insertRecord(client, invoiceId, { environment, kind = "alta", emp
         error_code, error_text, qr_png, verify_url, chain_hash, record_xml,
         submit_attempts, submitted_at, submitted_by)
      VALUES ($1,$2,'bold',$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,1,now(),$13)
-     RETURNING id, aeat_state, queue_id, verify_url, error_text`,
+     RETURNING id, aeat_state, queue_id, verify_url, error_text, error_code`,
     [
       invoiceId, kind, environment,
       datos ? String(datos.queueId ?? "") || null : null,
@@ -307,15 +307,131 @@ async function registerNow(invoiceId, payload, cfg, employeeId, { isFix = false 
   }
 }
 
+// Codes BOLD returns when the invoice is, in effect, already cancelled at
+// the AEAT (the queueId was already anulled, or is itself an anulación).
+const ALREADY_CANCELLED_CODES = new Set(["000102", "000103"]);
+
+/** Call BOLD's cancel and persist one 'anulacion' verifactu_records row. */
+async function sendCancel(invoiceId, queueId, cfg, employeeId) {
+  let datos = null;
+  let vErr = null;
+  try {
+    datos = await cfg.provider.cancel(queueId, { apiKey: cfg.apiKey, issuerNif: cfg.issuerNif });
+  } catch (e) {
+    if (!(e instanceof VerifactuError)) throw e;
+    vErr = e;
+  }
+  const client = await pool.connect();
+  try {
+    const row = await insertRecord(client, invoiceId, { environment: cfg.environment, kind: "anulacion", employeeId }, datos, vErr);
+    return {
+      recordId: row.id,
+      state: row.aeat_state,
+      code: row.error_code || null,
+      queueId: row.queue_id || null,
+      message: row.error_text || null,
+    };
+  } finally {
+    client.release();
+  }
+}
+
 /**
- * Resend the latest alta record for an invoice (recovers a `pending` or
- * `error` registration). Uses isFix so BOLD accepts the same number.
+ * Cancel (anular) an issued invoice.
+ *   - status → 6 (cancelled), always (local)
+ *   - when Veri*Factu is on and the invoice has a registered queueId, an
+ *     anulación is sent to the AEAT; an outage queues it (retry later), a
+ *     hard rejection (other than "already cancelled") leaves the invoice
+ *     NOT cancelled and surfaces the error.
+ * @param {object} opts { employeeId, req? }
+ * @returns {Promise<object>} { cancelled, invoicecode, verifactu?: {...} }
+ */
+async function cancelInvoice(invoiceId, opts = {}) {
+  const client = await pool.connect();
+  let r;
+  try {
+    await client.query("BEGIN");
+    await client.query(`SELECT 1 FROM invoices WHERE id = $1 FOR UPDATE`, [invoiceId]);
+    r = await loadInvoiceRows(client, invoiceId);
+    if (!r._issuedAt) throw new IssueError(409, "not_issued", "only an issued invoice can be cancelled");
+
+    const prior = await client.query(
+      `SELECT aeat_state FROM verifactu_records
+        WHERE invoiceid = $1 AND kind = 'anulacion'
+        ORDER BY created_at DESC, id DESC LIMIT 1`,
+      [invoiceId]
+    );
+    if (prior.rows[0] && prior.rows[0].aeat_state === "sent") {
+      throw new IssueError(409, "already_cancelled", "this invoice has already been cancelled");
+    }
+    await client.query("COMMIT");
+  } catch (err) {
+    await client.query("ROLLBACK").catch(() => {});
+    client.release();
+    throw err;
+  }
+  client.release();
+
+  const cfg = r.entity ? configForEntity(r.entity) : { enabled: false, reason: "no entity" };
+
+  let queueId = null;
+  if (cfg.enabled) {
+    const c2 = await pool.connect();
+    try {
+      const alta = await c2.query(
+        `SELECT queue_id FROM verifactu_records
+          WHERE invoiceid = $1 AND kind = 'alta' AND queue_id IS NOT NULL
+          ORDER BY created_at DESC, id DESC LIMIT 1`,
+        [invoiceId]
+      );
+      queueId = alta.rows[0] ? alta.rows[0].queue_id : null;
+    } finally {
+      c2.release();
+    }
+  }
+
+  let vfRec = null;
+  if (cfg.enabled && queueId) {
+    vfRec = await sendCancel(invoiceId, queueId, cfg, opts.employeeId);
+    // A genuine hard rejection (not "already cancelled") blocks the cancel.
+    if (vfRec.state === "error" && !ALREADY_CANCELLED_CODES.has(vfRec.code)) {
+      return { cancelled: false, invoicecode: r.invoice.invoicecode, verifactu: vfRec };
+    }
+  } else if (featureEnabled() && cfg.enabled) {
+    vfRec = { state: "skipped", message: "no AEAT registration to cancel" };
+  }
+
+  await pool.query(`UPDATE invoices SET invoicestatusid = 6 WHERE id = $1`, [invoiceId]);
+
+  if (opts.req) {
+    logAudit(opts.req, { kind: "invoice.cancel", desc: `Cancelled invoice ${r.invoice.invoicecode}`, level: 2 });
+    if (vfRec && vfRec.state && vfRec.state !== "skipped") {
+      logAudit(opts.req, {
+        kind: vfRec.state === "error" ? "verifactu.error" : "verifactu.cancel",
+        desc: `Veri*Factu cancel ${vfRec.state} for ${r.invoice.invoicecode}` + (vfRec.message ? ` — ${vfRec.message}` : ""),
+        level: vfRec.state === "error" ? 2 : 1,
+      });
+    }
+  }
+  return { cancelled: true, invoicecode: r.invoice.invoicecode, verifactu: vfRec || undefined };
+}
+
+/**
+ * Resend the latest verifactu_records row for an invoice — recovers a
+ * `pending` / `error` alta (isFix) or anulación.
  */
 async function retryRecord(invoiceId, opts = {}) {
   const client = await pool.connect();
   let r;
+  let latest;
   try {
     r = await loadInvoiceRows(client, invoiceId);
+    const q = await client.query(
+      `SELECT kind, queue_id FROM verifactu_records
+        WHERE invoiceid = $1 ORDER BY created_at DESC, id DESC LIMIT 1`,
+      [invoiceId]
+    );
+    latest = q.rows[0] || null;
   } finally {
     client.release();
   }
@@ -323,10 +439,24 @@ async function retryRecord(invoiceId, opts = {}) {
   const cfg = r.entity ? configForEntity(r.entity) : { enabled: false, reason: "no entity" };
   if (!cfg.enabled) throw new IssueError(422, "verifactu_disabled", cfg.reason || "Veri*Factu is not enabled for this entity");
 
-  const ops = toOpsInvoice(r);
-  ops.number = r.invoice.invoicecode;
-  const payload = buildAltaPayload(ops);
-  const rec = await registerNow(invoiceId, payload, cfg, opts.employeeId, { isFix: true });
+  let rec;
+  if (latest && latest.kind === "anulacion") {
+    const alta = await pool.query(
+      `SELECT queue_id FROM verifactu_records
+        WHERE invoiceid = $1 AND kind = 'alta' AND queue_id IS NOT NULL
+        ORDER BY created_at DESC, id DESC LIMIT 1`,
+      [invoiceId]
+    );
+    const queueId = alta.rows[0] ? alta.rows[0].queue_id : null;
+    if (!queueId) throw new IssueError(422, "nothing_to_retry", "no registered invoice to cancel");
+    rec = await sendCancel(invoiceId, queueId, cfg, opts.employeeId);
+  } else {
+    const ops = toOpsInvoice(r);
+    ops.number = r.invoice.invoicecode;
+    const payload = buildAltaPayload(ops);
+    rec = await registerNow(invoiceId, payload, cfg, opts.employeeId, { isFix: true });
+  }
+
   if (opts.req) {
     logAudit(opts.req, {
       kind: rec.state === "error" ? "verifactu.error" : "verifactu.register",
@@ -339,9 +469,11 @@ async function retryRecord(invoiceId, opts = {}) {
 
 module.exports = {
   issueInvoice,
+  cancelInvoice,
   retryRecord,
   toOpsInvoice,
   nextInvoiceNumber,
   madridDate,
+  featureEnabled,
   IssueError,
 };

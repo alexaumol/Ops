@@ -71,7 +71,7 @@ const { graphMailConfigured, sendMail } = require("../lib/graph");
 const { smtpConfigured, sendSmtpMail } = require("../lib/mailer");
 const { logAudit } = require("../lib/audit");
 const externalSync = require("../lib/externalSync");
-const { issueInvoice, retryRecord, IssueError } = require("../lib/verifactu/issue");
+const { issueInvoice, cancelInvoice, retryRecord, featureEnabled: verifactuOn, IssueError } = require("../lib/verifactu/issue");
 const { VerifactuError } = require("../lib/verifactu/errors");
 
 const router = express.Router();
@@ -345,7 +345,8 @@ router.get("/projects/:projectId/invoices/verifactu", requireModuleAccess("invoi
               vf.aeat_state          AS "state",
               vf.error_text          AS "error",
               vf.verify_url          AS "verifyUrl",
-              vf.queue_id            AS "queueId"
+              vf.queue_id            AS "queueId",
+              an.aeat_state          AS "cancelState"
          FROM invoices i
          LEFT JOIN invoicesdetails d ON d.invoiceid = i.id
          LEFT JOIN LATERAL (
@@ -355,6 +356,13 @@ router.get("/projects/:projectId/invoices/verifactu", requireModuleAccess("invoi
             ORDER BY created_at DESC, id DESC
             LIMIT 1
          ) vf ON true
+         LEFT JOIN LATERAL (
+           SELECT aeat_state
+             FROM verifactu_records
+            WHERE invoiceid = i.id AND kind = 'anulacion'
+            ORDER BY created_at DESC, id DESC
+            LIMIT 1
+         ) an ON true
         WHERE i.projectid = $1::double precision`,
       [req.params.projectId]
     );
@@ -367,6 +375,7 @@ router.get("/projects/:projectId/invoices/verifactu", requireModuleAccess("invoi
         error: r.error || null,
         verifyUrl: r.verifyUrl || null,
         queueId: r.queueId || null,
+        cancelState: r.cancelState || null,
       };
     }
     res.json({ states });
@@ -772,7 +781,16 @@ router.post("/projects/:projectId/invoices", async (req, res) => {
     if (items && items.length) await writeLineItems(client, invoiceId, items);
 
     if (isCorrective && sourceInvoiceId) {
-      await client.query(`UPDATE invoices SET invoicestatusid = 6 WHERE id = $1`, [sourceInvoiceId]);
+      // Legacy behaviour: a corrective auto-cancels its source. A Veri*Factu
+      // rectificativa "por diferencias" instead leaves the original valid —
+      // cancelling it is a separate AEAT event (POST /invoices/:id/cancel).
+      // So skip the auto-cancel only when the source is an issued Veri*Factu
+      // invoice. SELECT * so a pre-migration DB just reads issued_at = undefined.
+      const src = await client.query(`SELECT * FROM invoicesdetails WHERE invoiceid = $1`, [sourceInvoiceId]);
+      const sourceIssued = !!src.rows[0]?.issued_at;
+      if (!(verifactuOn() && sourceIssued)) {
+        await client.query(`UPDATE invoices SET invoicestatusid = 6 WHERE id = $1`, [sourceInvoiceId]);
+      }
     }
 
     await client.query("COMMIT");
@@ -958,9 +976,23 @@ router.post("/invoices/:id/issue", requireModuleAccess("invoicing"), async (req,
   }
 });
 
+// POST /api/invoicing/invoices/:id/cancel
+// Cancel (anular) an issued invoice: status → 6, and — when Veri*Factu is on
+// and the invoice was registered — send an anulación to the AEAT (an outage
+// queues it; a genuine rejection blocks the cancel and is surfaced).
+router.post("/invoices/:id/cancel", requireModuleAccess("invoicing"), async (req, res) => {
+  try {
+    const result = await cancelInvoice(req.params.id, { employeeId: req.hittUser?.employeeId || null, req });
+    res.json(result);
+    if (result.cancelled) externalSync.syncInvoiceDoc(pool, Number(req.params.id)).catch(() => {});
+  } catch (err) {
+    sendIssueError(res, err, "POST /api/invoicing/invoices/:id/cancel");
+  }
+});
+
 // POST /api/invoicing/invoices/:id/verifactu/retry
-// Re-send a pending / errored registration (uses isFix so BOLD accepts the
-// same number). Used after a data fix, or a BOLD/AEAT outage.
+// Re-send a pending / errored registration or anulación. An alta retry uses
+// isFix so BOLD accepts the same number. Used after a data fix, or an outage.
 router.post("/invoices/:id/verifactu/retry", requireModuleAccess("invoicing"), async (req, res) => {
   try {
     const rec = await retryRecord(req.params.id, { employeeId: req.hittUser?.employeeId || null, req });
@@ -994,10 +1026,17 @@ router.get("/invoices/:id/verifactu", requireModuleAccess("invoicing"), async (r
         ORDER BY created_at DESC, id DESC`,
       [req.params.id]
     );
-    res.json({ issuedAt, autosubmit, records: rows, latest: rows[0] || null });
+    res.json({
+      issuedAt, autosubmit, records: rows,
+      latest: rows[0] || null,
+      alta: rows.find((x) => x.kind === "alta") || null,
+      anulacion: rows.find((x) => x.kind === "anulacion") || null,
+    });
   } catch (err) {
     // Table missing (migration not run) → feature simply not available yet.
-    if (err && err.code === "42P01") return res.json({ issuedAt, autosubmit, records: [], latest: null });
+    if (err && err.code === "42P01") {
+      return res.json({ issuedAt, autosubmit, records: [], latest: null, alta: null, anulacion: null });
+    }
     console.error("[GET /api/invoicing/invoices/:id/verifactu] error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });
   }
