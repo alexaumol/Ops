@@ -103,6 +103,11 @@ const bool = (v) => v === true || v === "true" || v === "1" || v === 1;
 function expenseBody(req) {
   const b = req.body || {};
   const isInternal = bool(b.isInternal);
+  // The desktop form always sends `paidBy` (possibly "" for "— none —"), so
+  // this fallback only ever kicks in for a caller that omits the field
+  // entirely — the mobile capture flow, which doesn't ask an employee to
+  // pick themselves from a list.
+  const paidBy = b.paidBy !== undefined ? num(b.paidBy) : (req.hittUser?.employeeId ?? null);
   return {
     expenseDate: b.expenseDate || null,
     categoryId: num(b.categoryId),
@@ -110,7 +115,7 @@ function expenseBody(req) {
     amount: num(b.amount),
     projectId: isInternal ? null : num(b.projectId),
     isInternal,
-    paidBy: num(b.paidBy),
+    paidBy,
     invoiceable: b.invoiceable === undefined ? null : bool(b.invoiceable),
   };
 }
@@ -280,6 +285,40 @@ router.get("/categories", async (req, res) => {
     res.json(rows);
   } catch (err) {
     console.error("[GET /api/expenses/categories] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
+// GET /api/expenses/my-projects — the project picker for the mobile "snap a
+// receipt" capture flow. An admin gets every alive (non Closed/Cancelled)
+// project, same as the "Alive" toggle on the desktop side panel; anyone
+// else only gets the alive projects they're the owner of or an assigned
+// resource on (projectowners / projectresources) — mirrors the "mine" flag
+// computed by GET /api/projects, but pre-filtered here since the mobile
+// picker has no "show everything" fallback to filter client-side.
+router.get("/my-projects", async (req, res) => {
+  try {
+    const employeeId = req.hittUser?.employeeId ?? null;
+    const mineOnly = !req.hittUser?.isAdmin;
+    const { rows } = await pool.query(
+      `SELECT p.id, p.projectnumber AS code, p.projectname AS name,
+              ps.projectstatusdesc AS "statusLabel"
+       FROM projects p
+       LEFT JOIN projectstatus ps ON ps.id = p.projectstatusid::bigint
+       WHERE LOWER(COALESCE(ps.projectstatusdesc, '')) NOT IN ('closed', 'cancelled')
+         AND (
+           $2::boolean IS NOT TRUE
+           OR ($1::bigint IS NOT NULL AND (
+             EXISTS (SELECT 1 FROM projectowners po WHERE po.projectid = p.id AND po.projectownerid::bigint = $1::bigint)
+             OR EXISTS (SELECT 1 FROM projectresources pr WHERE pr.projectid = p.id AND pr.resourceid::bigint = $1::bigint)
+           ))
+         )
+       ORDER BY p.projectnumber DESC`,
+      [employeeId, mineOnly]
+    );
+    res.json({ rows, mineOnly });
+  } catch (err) {
+    console.error("[GET /api/expenses/my-projects] DB error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });
   }
 });

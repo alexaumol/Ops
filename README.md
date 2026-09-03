@@ -24,6 +24,15 @@ independently while the rest keeps working as static placeholder pages.
 - **Invoicing** — proceed-to-invoice release settings per project, invoice
   create/edit with auto-derived status and VAT, and PDF generation matching
   the real HITT invoice template.
+- **Expenses** — company expenses (travel, meals, materials) bound to a
+  project or marked internal, each with one evidence document. Includes a
+  phone-first **mobile capture** page (`pages/mobile-expenses.html`,
+  installable to a home screen via `manifest.json` — the first slice of a
+  gradually-growing mobile app): photograph a receipt, bind it to an alive
+  project, and it's created under your own name. The project picker there
+  is pre-filtered server-side (`GET /api/expenses/my-projects`) to alive
+  projects you're assigned to as owner/resource; an admin sees every alive
+  project instead.
 - **Reports** — hours logged per project (with a per-employee drill-down),
   a calendar view of company holidays and employee leaves, portfolio
   charts (projects by status/entity, projects opened by month), a project

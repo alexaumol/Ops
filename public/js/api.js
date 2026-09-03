@@ -243,6 +243,10 @@ const HITT_API = (() => {
       return request(`/api/expenses${qs ? `?${qs}` : ""}`);
     },
     getExpenseCategories: () => request("/api/expenses/categories"),
+    // { rows: [{id, code, name, statusLabel}], mineOnly } — alive projects
+    // for the mobile capture flow. mineOnly is true unless the caller is an
+    // admin (see server/routes/expenses.js).
+    getExpenseMyProjects: () => request("/api/expenses/my-projects"),
     // payload: FormData (with optional `document` file) or a plain object.
     createExpense: (payload) =>
       request("/api/expenses", { method: "POST", body: payload instanceof FormData ? payload : JSON.stringify(payload) }),

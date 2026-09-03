@@ -1,0 +1,214 @@
+/* ==========================================================================
+   Mobile expense capture — a phone-first single-task screen: photograph a
+   receipt, fill in a few fields, bind it to a project you're assigned to.
+   Shares design tokens with styles.css; this file only adds the
+   touch-sized layout on top of it.
+   ========================================================================== */
+
+.mx-header {
+  padding: 0 0.85rem;
+}
+.mx-header__back {
+  color: rgba(255,255,255,0.85);
+  text-decoration: none;
+  font-size: 0.92rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+.mx-header__back:hover { color: #fff; }
+
+.mx-shell {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 1rem 1rem calc(6.5rem + env(safe-area-inset-bottom));
+}
+.mx-title {
+  font-size: 1.3rem;
+  font-weight: 800;
+  margin: 0 0 0.2rem;
+}
+.mx-sub {
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+  margin: 0 0 1.1rem;
+  line-height: 1.4;
+}
+
+/* ---------- Photo capture ---------- */
+.mx-photo {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+.mx-photo-drop {
+  border: 2px dashed var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 1.5rem 1rem;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+}
+.mx-photo-drop__icon { font-size: 2.2rem; line-height: 1; }
+.mx-photo-drop__hint {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  margin: 0;
+}
+.mx-photo-buttons {
+  display: flex;
+  gap: 0.6rem;
+  width: 100%;
+}
+.mx-btn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  min-height: 48px;
+  padding: 0.7rem 0.9rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface-alt);
+  color: var(--text-primary);
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.mx-btn:active { transform: translateY(1px); }
+.mx-btn--primary {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: #fff;
+}
+.mx-btn--primary:hover { background: var(--brand-hover); }
+.mx-photo input[type="file"] { display: none; }
+
+.mx-photo-preview {
+  position: relative;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--bg-app);
+}
+.mx-photo-preview img {
+  width: 100%;
+  max-height: 320px;
+  object-fit: contain;
+  display: block;
+  background: repeating-conic-gradient(#0000 0 25%, rgba(0,0,0,.04) 0 50%) 0 0 / 20px 20px;
+}
+.mx-photo-preview__pdf {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 2rem 1rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+.mx-photo-preview__actions {
+  display: flex;
+  gap: 0.6rem;
+  margin-top: 0.7rem;
+}
+
+/* ---------- Form ---------- */
+.mx-section {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: 1rem;
+  margin-bottom: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+.mx-field label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  margin-bottom: 0.35rem;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.mx-field input,
+.mx-field select,
+.mx-field textarea {
+  width: 100%;
+  font-size: 1rem;
+  padding: 0.75rem 0.8rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  min-height: 48px;
+}
+.mx-field textarea { min-height: 72px; resize: vertical; }
+.mx-field input:focus-visible,
+.mx-field select:focus-visible,
+.mx-field textarea:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+.mx-row2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+.mx-hint {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin: 0.35rem 0 0;
+}
+.mx-hint.mx-hint--warn { color: var(--warning); }
+
+.mx-check {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-size: 0.9rem;
+  min-height: 44px;
+}
+.mx-check input {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+}
+
+/* ---------- Sticky footer action bar ---------- */
+.mx-footer {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  background: var(--bg-surface);
+  border-top: 1px solid var(--border-subtle);
+  padding: 0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom));
+  box-shadow: 0 -4px 12px rgba(23,23,23,0.08);
+  z-index: 40;
+}
+.mx-footer .btn {
+  width: 100%;
+  min-height: 52px;
+  font-size: 1rem;
+}
+
+.mx-viewall {
+  display: block;
+  text-align: center;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-top: 0.5rem;
+}
+
+@media (min-width: 560px) {
+  .mx-shell { padding-top: 1.5rem; }
+}

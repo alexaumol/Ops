@@ -1,0 +1,14 @@
+{
+  "name": "HITT Ops",
+  "short_name": "Ops",
+  "description": "HITT Ops on the go — capture expense receipts and, gradually, more of the portfolio.",
+  "start_url": "pages/mobile-expenses.html",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F7F6F1",
+  "theme_color": "#171717",
+  "icons": [
+    { "src": "assets/ops-mark.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

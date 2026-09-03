@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Quick expense · HITT Ops</title>
+<meta name="theme-color" content="#171717" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Ops" />
+<link rel="manifest" href="../manifest.json" />
+<link rel="apple-touch-icon" href="../assets/ops-mark.svg" />
+<link rel="icon" href="../assets/ops-mark.svg" />
+<link rel="stylesheet" href="../css/styles.css" />
+<link rel="stylesheet" href="../css/business-partners.css" />
+<link rel="stylesheet" href="../css/mobile-expenses.css" />
+</head>
+<body>
+  <header class="app-header mx-header">
+    <a class="mx-header__back" href="../welcome.html">‹ <span data-i18n="nav.home">Home</span></a>
+    <span style="font-weight:800; letter-spacing:0.03em;">Ops</span>
+    <div class="app-header__user">
+      <div class="avatar" id="userAvatar">?</div>
+    </div>
+  </header>
+
+  <main class="mx-shell">
+    <h1 class="mx-title" data-i18n="exp.modal.new">New expense</h1>
+    <p class="mx-sub" data-i18n="mx.sub">Snap a photo of your receipt, fill in the details, and bind it to the project.</p>
+
+    <section class="mx-photo">
+      <div id="mxPhotoDrop" class="mx-photo-drop">
+        <div class="mx-photo-drop__icon" aria-hidden="true">🧾</div>
+        <div class="mx-photo-buttons">
+          <button type="button" class="mx-btn mx-btn--primary" id="mxTakePhoto">
+            <span aria-hidden="true">📷</span> <span data-i18n="mx.photo.take">Take photo</span>
+          </button>
+          <button type="button" class="mx-btn" id="mxChooseFile">
+            <span aria-hidden="true">🖼️</span> <span data-i18n="mx.photo.choose">Choose file</span>
+          </button>
+        </div>
+        <p class="mx-photo-drop__hint" data-i18n="exp.doc.hint">Image or PDF, up to 15 MB.</p>
+      </div>
+      <div id="mxPhotoPreview" class="mx-photo-preview hidden">
+        <img id="mxPhotoImg" alt="" />
+        <div id="mxPhotoPdf" class="mx-photo-preview__pdf hidden">📄 <span id="mxPhotoPdfName"></span></div>
+        <div class="mx-photo-preview__actions">
+          <button type="button" class="mx-btn" id="mxRetake" data-i18n="mx.photo.retake">Retake photo</button>
+        </div>
+      </div>
+      <input type="file" id="mxFileCamera" accept="image/*" capture="environment" />
+      <input type="file" id="mxFileGallery" accept="image/*,application/pdf" />
+    </section>
+
+    <div class="mx-section">
+      <div class="mx-row2">
+        <div class="mx-field">
+          <label for="mxDate" data-i18n="form.date">Date</label>
+          <input type="date" id="mxDate" />
+        </div>
+        <div class="mx-field">
+          <label for="mxCategory" data-i18n="exp.f.category">Category</label>
+          <select id="mxCategory"></select>
+        </div>
+      </div>
+      <div class="mx-field">
+        <label for="mxAmount" data-i18n="exp.f.amountEur">Amount (EUR)</label>
+        <input type="number" id="mxAmount" inputmode="decimal" step="0.01" min="0" />
+      </div>
+      <div class="mx-field">
+        <label for="mxDescription" data-i18n="form.description">Description</label>
+        <input type="text" id="mxDescription" placeholder="What was it for?" data-i18n-placeholder="exp.f.descPlaceholder" />
+      </div>
+    </div>
+
+    <div class="mx-section">
+      <label class="mx-check">
+        <input type="checkbox" id="mxInternal" /> <span data-i18n="exp.f.internal">Internal expense (not tied to a project)</span>
+      </label>
+      <div class="mx-field" id="mxProjectField">
+        <label for="mxProject" data-i18n="bp.col.project">Project</label>
+        <select id="mxProject"></select>
+        <p class="mx-hint" id="mxProjectHint"></p>
+      </div>
+      <label class="mx-check" id="mxInvoiceableRow">
+        <input type="checkbox" id="mxInvoiceable" /> <span data-i18n="exp.f.reinvoiceable">Re-invoiceable to the client</span>
+      </label>
+    </div>
+
+    <a class="mx-viewall" href="expenses.html" data-i18n="mx.viewAll">View all expenses →</a>
+  </main>
+
+  <div class="mx-footer">
+    <button type="button" class="btn btn-primary" id="mxSave" data-i18n="exp.save">Save expense</button>
+  </div>
+
+  <div id="toastHost" class="toast-host"></div>
+
+  <script src="../js/config.js"></script>
+  <script src="../js/branding.js"></script>
+  <script src="../js/i18n-dict.js"></script>
+  <script src="../js/i18n.js"></script>
+  <script src="../vendor/oidc-client-ts.min.js"></script>
+  <script src="../vendor/msal-browser.min.js"></script>
+  <script src="../js/auth.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/permissions.js"></script>
+  <script src="../js/avatar.js"></script>
+  <script src="../js/mobile-expenses.js"></script>
+</body>
+</html>

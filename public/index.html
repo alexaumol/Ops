@@ -316,7 +316,7 @@
             // welcome.html at all.
             const blocked = await HITT_PERMS.redirectIfDeactivated("index.html");
             if (blocked) return;
-            window.location.href = "welcome.html";
+            window.location.href = HITT_AUTH.consumePostLoginReturnTo() || "welcome.html";
             return;
           }
         } catch (err) {
@@ -380,7 +380,7 @@
       HITT_AUTH.fakeSignIn(usernameInput.value.trim());
       const blocked = await HITT_PERMS.redirectIfDeactivated("index.html");
       if (blocked) return;
-      window.location.href = "welcome.html";
+      window.location.href = HITT_AUTH.consumePostLoginReturnTo() || "welcome.html";
     });
   </script>
 </body>

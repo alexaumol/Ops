@@ -34,6 +34,7 @@
 
 const HITT_AUTH = (() => {
   const SESSION_KEY = "hitt.session";
+  const RETURN_TO_KEY = "hitt.postLoginReturnTo";
 
   function provider() {
     return (window.HITT_CONFIG?.AUTH?.provider || "entra").toLowerCase();
@@ -70,10 +71,38 @@ const HITT_AUTH = (() => {
   function requireSession(redirectTo = "index.html") {
     const session = getSession();
     if (!session) {
+      // Remember what was being opened (e.g. a bookmarked module page, or
+      // the mobile expense-capture shortcut added to a phone's home screen)
+      // so index.html can send the user straight back here after they sign
+      // in, instead of always landing on welcome.html — see
+      // consumePostLoginReturnTo().
+      try {
+        const file = window.location.pathname.split("/").pop();
+        if (file) {
+          const inPages = window.location.pathname.includes("/pages/");
+          sessionStorage.setItem(RETURN_TO_KEY, (inPages ? "pages/" : "") + file + (window.location.search || ""));
+        }
+      } catch {}
       window.location.href = redirectTo;
       return null;
     }
     return session;
+  }
+
+  // Reads + clears the path requireSession() stashed before bouncing an
+  // unauthenticated visit to sign-in. Only trusts a same-app relative
+  // "welcome.html" or "pages/<name>.html" path (optionally with a query
+  // string) — never an absolute/external URL — since this value round-trips
+  // through sessionStorage across the Microsoft/OIDC redirect. Returns null
+  // when there's nothing stashed or it doesn't look safe.
+  function consumePostLoginReturnTo() {
+    let path = null;
+    try {
+      path = sessionStorage.getItem(RETURN_TO_KEY);
+      sessionStorage.removeItem(RETURN_TO_KEY);
+    } catch {}
+    if (!path || !/^(pages\/[\w-]+\.html|welcome\.html)(\?[\w=&%.-]*)?$/.test(path)) return null;
+    return path;
   }
 
   function initials(session) {
@@ -346,6 +375,7 @@ const HITT_AUTH = (() => {
     getApiToken,
     getSession,
     requireSession,
+    consumePostLoginReturnTo,
     signOut,
     initials,
     fakeSignIn,
