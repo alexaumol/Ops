@@ -102,6 +102,9 @@ window.HITT_CONFIG = {
     // if the server reports GET /api/chat/status as configured — so this
     // can ship on before Azure OpenAI is wired up.
     chatEnabled: true,
+    // Veri*Factu (Spain e-invoicing). Off here — HITT is not on it yet.
+    // Mirror server FEATURE_VERIFACTU when turning it on.
+    verifactu: false,
   },
 
   APP_VERSION: "0.1.0-prototype",

@@ -200,6 +200,17 @@
       </div>
       <div class="modal-body">
         <p id="invUpdatedInfo" class="modal-updated-info hidden"></p>
+
+        <!-- Veri*Factu (Spain) — shown only when FEATURES.verifactu is on -->
+        <div id="invVerifactuBox" class="inv-vf-box hidden"></div>
+        <label id="invAutosubmitRow" class="inv-vf-autosubmit hidden">
+          <input id="invAutosubmit" type="checkbox" checked />
+          <span>
+            <span data-i18n="inv.vf.autosubmit">Register with the AEAT (Veri*Factu) when this invoice is issued</span>
+            <small data-i18n="inv.vf.autosubmitHint">Leave checked. Unchecking issues the invoice without sending it — you can register it later.</small>
+          </span>
+        </label>
+
         <div class="field-section">
           <div class="field-grid">
             <div class="span-2">
@@ -319,10 +330,12 @@
           <button id="invDelete" class="btn btn-secondary hidden" style="color:var(--danger);" data-i18n="inv.deleteInvoice">Delete invoice</button>
           <button id="invViewPdf" class="btn btn-secondary hidden" data-i18n="inv.viewPdf">View PDF</button>
           <button id="invEmail" class="btn btn-secondary hidden" data-i18n="inv.emailInvoice">Email invoice</button>
+          <button id="invRetryVf" class="btn btn-secondary hidden" data-i18n="inv.vf.retry">Retry AEAT</button>
         </div>
         <div style="display:flex; gap:0.5rem; margin-left:auto;">
           <button id="invCancel" class="btn btn-secondary" data-i18n="form.cancel">Cancel</button>
           <button id="invSave" class="btn btn-primary" data-i18n="inv.saveInvoice">Save invoice</button>
+          <button id="invIssue" class="btn btn-primary hidden" data-i18n="inv.vf.issue">Issue invoice</button>
         </div>
       </div>
     </div>
