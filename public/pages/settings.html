@@ -39,6 +39,7 @@
         <button data-stab="expcats" class="settings-tab" role="tab" aria-selected="false" data-i18n="settings.tab.expcats">Categories</button>
         <button data-stab="currencies" class="settings-tab" role="tab" aria-selected="false" data-i18n="settings.tab.currencies">Currencies</button>
         <button data-stab="entities" class="settings-tab" role="tab" aria-selected="false" data-i18n="settings.tab.entities">Entities</button>
+        <button data-stab="verifactu" class="settings-tab" role="tab" aria-selected="false" data-i18n="settings.tab.verifactu">Veri*Factu</button>
         <button data-stab="customizations" class="settings-tab" role="tab" aria-selected="false" data-i18n="settings.tab.customizations">Customizations</button>
         <button data-stab="audit" class="settings-tab" role="tab" aria-selected="false" data-i18n="settings.tab.audit">Auditing</button>
       </div>
@@ -233,6 +234,78 @@
           </div>
         </div>
       </section>
+
+      <!-- ==================== VERI*FACTU (Spain) ==================== -->
+      <section id="paneVerifactu" class="settings-pane hidden">
+        <p class="settings-note" data-i18n="vf.note">Bridges invoices issued by Ops to the Agencia Tributaria via BOLD Software, so Ops itself is not certified. Turn it on per billing entity and give each one its own API key. It stays off until the server has <code>FEATURE_VERIFACTU=true</code>.</p>
+
+        <div id="vfStatusBanner" class="vf-status-banner"></div>
+
+        <div class="settings-table-wrap">
+          <table class="settings-table">
+            <thead>
+              <tr>
+                <th data-i18n="vf.col.entity">Entity</th>
+                <th data-i18n="vf.col.nif">NIF</th>
+                <th data-i18n="vf.col.enabled">Enabled</th>
+                <th data-i18n="vf.col.env">Environment</th>
+                <th data-i18n="vf.col.series">Series</th>
+                <th data-i18n="vf.col.key">API key</th>
+                <th data-i18n="vf.col.records">Records</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="vfEntityBody"></tbody>
+          </table>
+          <div id="vfEmpty" class="settings-pane-empty hidden" data-i18n="vf.empty">No billing entities yet — add one under Entities first.</div>
+        </div>
+
+        <div class="settings-field-row" style="margin-top:1rem;">
+          <label class="field-label" for="vfDeclUrl" data-i18n="vf.declUrl">Ops' declaración responsable — public URL</label>
+          <input type="url" id="vfDeclUrl" class="field-input" placeholder="https://…" />
+          <p class="settings-note" data-i18n="vf.declUrlHint">The self-declaration page Ops publishes for the part of the SIF it controls. Shown here for reference.</p>
+        </div>
+      </section>
+
+      <!-- Veri*Factu per-entity config modal -->
+      <div id="verifactuModal" class="modal-overlay hidden">
+        <div class="modal-panel" style="max-width:520px;">
+          <div class="modal-head">
+            <h2 id="vfModalTitle" style="flex:1; font-size:1rem; font-weight:700; color:#fff; margin:0;">Veri*Factu</h2>
+            <button id="vfModalClose" class="modal-head-btn modal-head-btn--close" title="Close">✕</button>
+          </div>
+          <div class="modal-body">
+            <label style="display:flex; align-items:center; gap:0.5rem; font-size:0.9rem; margin-bottom:1rem;">
+              <input type="checkbox" id="vfEnabled" /> <span data-i18n="vf.f.enabled">Issue Veri*Factu invoices for this entity</span>
+            </label>
+            <div class="settings-field-row">
+              <label class="field-label" for="vfEnv" data-i18n="vf.f.env">Environment</label>
+              <select id="vfEnv" class="field-input">
+                <option value="sandbox" data-i18n="vf.env.sandbox">Sandbox (test)</option>
+                <option value="production" data-i18n="vf.env.production">Production</option>
+              </select>
+            </div>
+            <div class="settings-field-row">
+              <label class="field-label" for="vfSeries" data-i18n="vf.f.series">Invoice series prefix</label>
+              <input type="text" id="vfSeries" class="field-input" maxlength="16" placeholder="HITT" />
+              <p class="settings-note" data-i18n="vf.f.seriesHint">Prepended to this entity's fiscal numbers, e.g. <code>HITT-2026-014</code>. Leave blank to keep the shared legacy numbering.</p>
+            </div>
+            <div class="settings-field-row">
+              <label class="field-label" for="vfApiKey" data-i18n="vf.f.apiKey">BOLD API key</label>
+              <input type="password" id="vfApiKey" class="field-input" autocomplete="off" placeholder="••••••••" />
+              <p class="settings-note">
+                <span id="vfKeyStatus"></span>
+                <button type="button" id="vfClearKey" class="btn btn-secondary" style="margin-left:0.5rem; padding:0.1rem 0.5rem; font-size:0.75rem;" data-i18n="vf.f.clearKey">Clear key</button>
+              </p>
+            </div>
+            <p id="vfModalError" class="settings-note" style="color:var(--danger);"></p>
+          </div>
+          <div style="flex-shrink:0; border-top:1px solid var(--border-subtle); padding:0.75rem 1.1rem; display:flex; justify-content:flex-end; gap:0.5rem;">
+            <button id="vfModalCancel" class="btn btn-secondary" data-i18n="form.cancel">Cancel</button>
+            <button id="vfModalSave" class="btn btn-primary" data-i18n="form.save">Save</button>
+          </div>
+        </div>
+      </div>
 
       <!-- ==================== CUSTOMIZATIONS ==================== -->
       <section id="paneCustomizations" class="settings-pane hidden">

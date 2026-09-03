@@ -226,6 +226,13 @@ const HITT_API = (() => {
       request(`/api/entities/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
     deleteEntity: (id) => request(`/api/entities/${id}`, { method: "DELETE" }),
 
+    // Veri*Factu settings (Settings → Veri*Factu, admin only)
+    getVerifactu: () => request("/api/verifactu"),
+    patchVerifactuEntity: (id, payload) =>
+      request(`/api/verifactu/entities/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
+    setVerifactuOption: (key, value) =>
+      request(`/api/verifactu/options/${encodeURIComponent(key)}`, { method: "PUT", body: JSON.stringify({ value }) }),
+
     getInvoiceCurrencies: () => request("/api/settings/currencies"),
     createInvoiceCurrency: (payload) =>
       request("/api/settings/currencies", { method: "POST", body: JSON.stringify(payload) }),
