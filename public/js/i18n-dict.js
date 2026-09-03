@@ -284,6 +284,7 @@ window.HITT_I18N_DICT = {
     "mx.project.allAdmin": "All alive projects (admin)",
     "mx.project.empty": "You're not assigned as a resource on any alive project yet — ask an admin, or mark this as internal.",
     "mx.project.loadFail": "Could not load your projects.",
+    "mx.photo.tooLarge": "That file is too large (max 15 MB) — try retaking the photo.",
     "mx.addAnother": "Save & add another",
     "mx.viewAll": "View all expenses →",
 
@@ -1400,6 +1401,7 @@ window.HITT_I18N_DICT = {
     "mx.project.allAdmin": "Todos los proyectos vivos (admin)",
     "mx.project.empty": "Todavía no estás asignado como recurso a ningún proyecto vivo — pídeselo a un admin, o márcalo como interno.",
     "mx.project.loadFail": "No se han podido cargar tus proyectos.",
+    "mx.photo.tooLarge": "Ese archivo es demasiado grande (máx. 15 MB) — prueba a repetir la foto.",
     "mx.addAnother": "Guardar y añadir otro",
     "mx.viewAll": "Ver todos los gastos →",
 
@@ -2507,6 +2509,7 @@ window.HITT_I18N_DICT = {
     "mx.project.allAdmin": "Tots els projectes vius (admin)",
     "mx.project.empty": "Encara no estàs assignat com a recurs a cap projecte viu — demana-ho a un admin, o marca-ho com a intern.",
     "mx.project.loadFail": "No s'han pogut carregar els teus projectes.",
+    "mx.photo.tooLarge": "Aquest arxiu és massa gran (màx. 15 MB) — prova de repetir la foto.",
     "mx.addAnother": "Desar i afegir-ne una altra",
     "mx.viewAll": "Veure totes les despeses →",
 
