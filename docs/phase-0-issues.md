@@ -160,6 +160,7 @@ Scripted in `provision/host-setup/`; full write-up in `docs/security-baseline.md
 - [x] Provisioning secrets out of the repo — all gitignored; root-only `0600` files on the host (`docs/security-baseline.md` §7)
 - [ ] Run `provision/host-setup/harden.sh` on both VPSes — ufw default-deny, SSH key-only + no root password, fail2ban, unattended security upgrades
 - [ ] Confirm Zitadel (Docker) publishes only to `127.0.0.1`, not `0.0.0.0` (ufw can't see past Docker)
+- [ ] Webmin (10000): tunnel it or restrict to admin IP (`ADMIN_IP=… harden.sh`); listen on 127.0.0.1; enable Webmin 2FA
 - [ ] HITT host: switch its app `.env` off any superuser DB role
 - [ ] Ship logs off-box — journald → the other VPS (`docs/security-baseline.md` §6); before there are several customers
 
