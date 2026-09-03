@@ -322,6 +322,8 @@ const HITT_API = (() => {
     getInvoiceVerifactu: (id) => request(`/api/invoicing/invoices/${id}/verifactu`),
     issueInvoice: (id, payload = {}) =>
       request(`/api/invoicing/invoices/${id}/issue`, { method: "POST", body: JSON.stringify(payload) }),
+    cancelInvoice: (id) =>
+      request(`/api/invoicing/invoices/${id}/cancel`, { method: "POST" }),
     retryInvoiceVerifactu: (id) =>
       request(`/api/invoicing/invoices/${id}/verifactu/retry`, { method: "POST" }),
     createProject: (payload) =>

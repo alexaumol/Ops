@@ -387,10 +387,17 @@ gated on `FEATURES.verifactu`:
 > per case (roadmap §4.4).
 
 ### Phase V3 — Cancel & rectify
-- [ ] "Cancel invoice" → `POST /invoice_cancel(queueId)` → `status 6` + cancellation record + audit
-- [ ] Rectificativa → `type R1` + `creditNote.ids`; register as own record; stop the silent
-      source-cancel (make it explicit per policy)
-- [ ] Rejected-registration → `isFix: true` resend path
+- [x] "Cancel invoice" — `POST /api/invoicing/invoices/:id/cancel` → `issue.js` `cancelInvoice`:
+      status → 6, and (feature + registered) `POST /invoice_cancel(queueId)` → `anulacion`
+      `verifactu_records` row + audit. An outage queues it; a genuine AEAT rejection (not
+      "already cancelled") blocks the cancel and is surfaced. UI: "Cancel invoice" button on an
+      issued invoice + a "Cancelled at the AEAT" / "cancel pending" chip.
+- [x] Rectificativa — `type R1` + `creditNote` was already produced by V2a's `toOpsInvoice`;
+      V3 stops the **silent source auto-cancel** when the source is an issued Veri\*Factu
+      invoice (a rectificativa "por diferencias" leaves the original valid). Legacy / draft /
+      non-Veri\*Factu path unchanged.
+- [x] Rejected-registration → `isFix: true` resend (`retryRecord`, from V2a; V3 extends it to
+      also retry a queued/failed `anulacion`).
 
 ### Phase V4 — Visibility
 - [ ] Invoice PDF: QR + verification URL + legend (from stored record)

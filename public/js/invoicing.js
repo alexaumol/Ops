@@ -878,6 +878,8 @@ function vfChipHtml(invId){
   if (!VF_ON) return '';
   const s = VF_STATES[invId];
   if (!s || !s.issuedAt) return '';
+  if (s.cancelState === 'sent')    return `<span class="inv-vf-chip inv-vf-chip--issued">${escapeHtml(T('inv.vf.state.cancelled'))}</span>`;
+  if (s.cancelState === 'pending') return `<span class="inv-vf-chip inv-vf-chip--pending">${escapeHtml(T('inv.vf.state.cancelPending'))}</span>`;
   const map = {
     sent:    ['sent',    T('inv.vf.state.sent')],
     pending: ['pending', T('inv.vf.state.pending')],
@@ -928,6 +930,26 @@ async function retryVerifactuFlow(invoiceId){
   } catch (err) {
     console.error(err);
     toast(err.message || T('inv.toast.vf.retryFail'), 'red');
+  }
+}
+
+async function cancelInvoiceFlow(invoiceId){
+  const inv = INVOICES.find(x => x.id === invoiceId);
+  const code = inv?.invoicecode || T('inv.draft');
+  if (!confirm(T('inv.vf.confirmCancel', { code }))) return;
+  try {
+    const r = await HITT_API.cancelInvoice(invoiceId);
+    if (r.cancelled === false) {
+      toast(T('inv.vf.cancelBlocked', { msg: (r.verifactu && r.verifactu.message) || '' }), 'red');
+    } else {
+      const st = r.verifactu && r.verifactu.state;
+      toast(st === 'pending' ? T('inv.toast.vf.cancelPending') : T('inv.toast.cancelled'),
+            st === 'pending' ? 'navy' : 'green');
+    }
+    await refreshAfterInvoiceChange();
+  } catch (err) {
+    console.error(err);
+    toast(err.message || T('inv.toast.cancelFail'), 'red');
   }
 }
 
@@ -1253,13 +1275,16 @@ async function openInvoiceModal(invoiceId){
   if (VF_ON && inv) {
     HITT_API.getInvoiceVerifactu(inv.id).then((vf) => {
       if (activeInvoiceId !== invoiceId) return;
+      const a = vf.alta || vf.latest || null;
       modalVf = {
         issuedAt: vf.issuedAt || null,
         autosubmit: vf.autosubmit == null ? true : !!vf.autosubmit,
-        state: vf.latest ? vf.latest.state : null,
-        error: vf.latest ? vf.latest.errorText : null,
-        verifyUrl: vf.latest ? vf.latest.verifyUrl : null,
-        queueId: vf.latest ? vf.latest.queueId : null,
+        state: a ? a.state : null,
+        error: a ? a.errorText : null,
+        verifyUrl: a ? a.verifyUrl : null,
+        queueId: a ? a.queueId : null,
+        cancelState: vf.anulacion ? vf.anulacion.state : null,
+        cancelError: vf.anulacion ? vf.anulacion.errorText : null,
       };
       applyVerifactuToModal(modalVf, true);
     }).catch((err) => console.warn('Could not load invoice Veri*Factu state:', err));
@@ -1396,6 +1421,7 @@ function applyVerifactuToModal(vf, isExisting){
   const autoRow = document.getElementById('invAutosubmitRow');
   const issueBtn = document.getElementById('invIssue');
   const retryBtn = document.getElementById('invRetryVf');
+  const cancelBtn = document.getElementById('invCancelInv');
   const saveBtn = document.getElementById('invSave');
   const delBtn = document.getElementById('invDelete');
 
@@ -1404,11 +1430,14 @@ function applyVerifactuToModal(vf, isExisting){
     autoRow.classList.add('hidden');
     issueBtn.classList.add('hidden');
     retryBtn.classList.add('hidden');
+    cancelBtn.classList.add('hidden');
     return;
   }
 
   const issued = !!(vf && vf.issuedAt);
   const isDraftExisting = isExisting && !issued;
+  const cancelled = issued && vf && vf.cancelState === 'sent';
+  const cancelPending = issued && vf && vf.cancelState === 'pending';
 
   autoRow.classList.toggle('hidden', !isDraftExisting);
   document.getElementById('invAutosubmit').checked = vf ? vf.autosubmit !== false : true;
@@ -1416,26 +1445,34 @@ function applyVerifactuToModal(vf, isExisting){
   issueBtn.classList.toggle('hidden', !isDraftExisting);
   issueBtn.disabled = false;
   retryBtn.disabled = false;
+  cancelBtn.disabled = false;
   saveBtn.classList.toggle('hidden', issued);
   delBtn.classList.toggle('hidden', issued || !isExisting);
-  retryBtn.classList.toggle('hidden', !(issued && vf && vf.state === 'error'));
+  // Retry: an alta error, or a queued/failed cancel.
+  retryBtn.classList.toggle('hidden', !(issued && vf && (vf.state === 'error' || cancelPending || vf.cancelState === 'error')));
+  cancelBtn.classList.toggle('hidden', !(issued && !cancelled && !cancelPending));
 
   setModalLocked(issued);
 
   if (!issued) { box.classList.add('hidden'); box.innerHTML = ''; return; }
 
-  const stateKey = vf.state || 'issued';
+  const stateKey = cancelled ? 'cancelled' : (cancelPending ? 'cancelPending' : (vf.state || 'issued'));
   const stateLabel = ({
     sent: T('inv.vf.state.sent'), pending: T('inv.vf.state.pending'),
     error: T('inv.vf.state.error'), issued: T('inv.vf.state.issued'),
+    cancelled: T('inv.vf.state.cancelled'), cancelPending: T('inv.vf.state.cancelPending'),
   })[stateKey] || stateKey;
-  box.classList.toggle('inv-vf-box--error', stateKey === 'error');
+  const errClass = stateKey === 'error' || (vf.cancelState === 'error');
+  box.classList.toggle('inv-vf-box--error', errClass);
+  const chipCls = stateKey === 'error' ? 'error' : (stateKey === 'sent' ? 'sent' : 'issued');
   box.innerHTML = `
     <h4>${T('inv.vf.boxTitle')}</h4>
-    <div><strong>${escapeHtml(stateLabel)}</strong>${vf.queueId ? ` · <span class="inv-vf-chip inv-vf-chip--${stateKey === 'error' ? 'error' : (stateKey === 'sent' ? 'sent' : 'issued')}">#${escapeHtml(String(vf.queueId))}</span>` : ''}</div>
+    <div><strong>${escapeHtml(stateLabel)}</strong>${vf.queueId ? ` · <span class="inv-vf-chip inv-vf-chip--${chipCls}">#${escapeHtml(String(vf.queueId))}</span>` : ''}</div>
     ${vf.verifyUrl ? `<div style="margin-top:0.3rem;"><a href="${escapeHtml(vf.verifyUrl)}" target="_blank" rel="noopener">${T('inv.vf.verifyLink')}</a></div>` : ''}
-    ${vf.state === 'error' && vf.error ? `<div class="inv-vf-err">${escapeHtml(vf.error)}</div>` : ''}
-    ${vf.state === 'pending' ? `<div style="margin-top:0.3rem; color:var(--text-secondary);">${T('inv.vf.pendingHint')}</div>` : ''}
+    ${!cancelled && !cancelPending && vf.state === 'error' && vf.error ? `<div class="inv-vf-err">${escapeHtml(vf.error)}</div>` : ''}
+    ${!cancelled && !cancelPending && vf.state === 'pending' ? `<div style="margin-top:0.3rem; color:var(--text-secondary);">${T('inv.vf.pendingHint')}</div>` : ''}
+    ${cancelPending ? `<div style="margin-top:0.3rem; color:var(--text-secondary);">${T('inv.vf.cancelPendingHint')}</div>` : ''}
+    ${vf.cancelState === 'error' && vf.cancelError ? `<div class="inv-vf-err">${escapeHtml(vf.cancelError)}</div>` : ''}
   `;
   box.classList.remove('hidden');
 }
@@ -1454,6 +1491,14 @@ document.getElementById('invRetryVf').addEventListener('click', async () => {
   const id = activeInvoiceId;
   await retryVerifactuFlow(id);
   // reopen so the refreshed status shows
+  if (INVOICES.find((x) => x.id === id)) openInvoiceModal(id); else closeInvoiceModal();
+});
+
+document.getElementById('invCancelInv').addEventListener('click', async () => {
+  if (!activeInvoiceId) return;
+  document.getElementById('invCancelInv').disabled = true;
+  const id = activeInvoiceId;
+  await cancelInvoiceFlow(id);
   if (INVOICES.find((x) => x.id === id)) openInvoiceModal(id); else closeInvoiceModal();
 });
 document.getElementById('invClose').addEventListener('click', closeInvoiceModal);
