@@ -8,9 +8,16 @@
  *   VERIFACTU_API_KEY=sk_sandbox_xxx npm run verifactu:smoke     # from server/
  *
  * Optional env:
- *   VERIFACTU_ISSUER_NIF   default B13674197 (BOLD's sandbox test NIF)
+ *   VERIFACTU_ISSUER_NIF   the NIF of your assigned sandbox company. Ours is
+ *                          "EMPRESA DE PRUEBAS (PI4)" — set its NIF here, or
+ *                          leave unset to skip the Verify-Issuer-Id guard.
+ *                          Default B13674197 (the NIF in BOLD's own examples).
  *   VERIFACTU_BASE_URL     default https://vf1.boldsoftware.es/v1
  *   VERIFACTU_SMOKE_NUMBER default SMOKE-<timestamp>
+ *
+ * Note: in sandbox BOLD auto-prefixes every invoice number with your test
+ * company code — ours is "PI4-". So a number sent as "SMOKE-123" comes back
+ * (in chainInfo / verifactuUrl) as "PI4-SMOKE-123". Expected.
  * ---------------------------------------------------------------------------
  */
 require("../lib/loadEnv");

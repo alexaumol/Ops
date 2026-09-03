@@ -64,7 +64,7 @@ JSON and stores what comes back.
 |---|---|
 | Base URL | `https://vf1.boldsoftware.es/v1` |
 | Auth | header `API-Key: <key>`; optional `Verify-Issuer-Id: <NIF>` — rejects the call (`000007`) if the key's company NIF doesn't match. **Send this on every call** as a guard. |
-| Sandbox vs production | Separate by **API-Key**. Sandbox key issued on signup (we have one). Production needs a signed agreement + POA ("justificante de alta") — until then calls fail `953444`. |
+| Sandbox vs production | Separate by **API-Key**. Sandbox key issued on signup (we have one — assigned company *EMPRESA DE PRUEBAS (PI4)*; sandbox auto-prefixes every invoice number with `PI4-`). Production needs a signed agreement + POA ("justificante de alta") — until then calls fail `953444`. |
 | Error convention | **Everything is HTTP 400** with `{code, message, requestId}`. No 401/403/500. `503` (+ `ServiceUnavailableError`) only for maintenance / DB issues. Malformed JSON on `/invoice_cancel` returns a different shape (`{error:"invalid_json"}`). |
 | Webhooks | **None.** AEAT acceptance is discovered by polling `POST /invoice_state/{id}`. |
 | Company / NIF scope | One API-Key ↔ one company (NIF). **Multiple billing entities almost certainly need one key each** — confirm with BOLD. |
@@ -175,10 +175,11 @@ Surface on the BP → tax-company form. Optionally pre-validate with `/id_check`
 One Ops invoice = one rate today. BOLD wants `vatLines[]` with `vatOperation` + `vatKey`.
 
 **Fix:** extend `invoices_vattypes` with `verifactu_vatoperation` (`S1`/`S2`/`N1`/`N2`/`E1..E6`),
-`verifactu_vatkey` (default `01`), and `verifactu_exemption_note`. Seed sensible defaults;
-let an admin adjust them in Settings → Categories (or the new tab). Build one `vatLine` per
-invoice from the invoice's VAT type + net amount. **Every mapping needs advisor sign-off**
-(esp. exemptions, exports, intra-community, reverse charge).
+`verifactu_vatkey` (default `01`), and `verifactu_exemption_note`. Seed defaults; let an admin
+adjust them in Settings → Categories (or the new tab). Build one `vatLine` per invoice from the
+invoice's VAT type + net amount. **Settled (2026-09-03):** taxed → `S1`/`01`, 0% → `E1`
+(Art. 20 Ley 37/1992) — no advisor sign-off needed. Exports, intra-community supplies and
+reverse charge get their own `vatOperation`/`vatKey` per case when those actually arise.
 
 ### 4.5 Corrective / cancellation semantics
 
@@ -355,11 +356,28 @@ credentials are treated.
       *(carried into V2 — it touches the issue path)*
 
 ### Phase V2 — Issue flow
-- [ ] `draft` / `issued` lifecycle + `issued_at`; "Issue invoice" action in the modal
-- [ ] On issue: build payload → `POST /invoice` → persist `verifactu_records` row → audit
-- [ ] Block `PATCH` / `DELETE` on issued invoices (409 + guidance)
-- [ ] Failure UX: keep as draft/failed, show BOLD `message`, "Retry" (+ `isFix` when needed)
-- [ ] Timezone hardening for `issuedTime` / `operationDate`
+
+**V2a — backend** (`server/lib/verifactu/issue.js`, migration `1788449400114_verifactu-issue-flow.sql`):
+- [x] `draft` / `issued` lifecycle — `issued_at`; `POST /api/invoicing/invoices/:id/issue`
+- [x] On issue: assign the fiscal number, lock, then (feature + entity on, autosubmit true)
+      build payload → `POST /invoice` → persist `verifactu_records` → audit
+- [x] Block `PATCH` / `DELETE` on issued invoices (409 `invoice_issued` + guidance)
+- [x] Failure UX (API): local `buildAltaPayload` validation keeps a bad invoice a **draft**
+      (422); a BOLD outage issues anyway with a `pending` record; a hard BOLD rejection issues
+      with an `error` record + message. `POST /invoices/:id/verifactu/retry` (isFix).
+- [x] Timezone hardening — `issuedDate` / `operationDate` via `Intl` pinned to `Europe/Madrid`
+- [x] **Per-entity numbering** — `invoices.entityid` + `entity.invoice_series` prefix (e.g.
+      `HITT-2026-014`), gap-free per (entity, year, corrective). Legacy pooled numbering is
+      unchanged for an entity with no series set. *(Finance sign-off on the prefixes + cutover
+      date still pending — V0.)*
+
+**V2b — frontend** (follow-up PR): "Issue" button on a draft invoice, the auto-submit checkbox
+in the modal, issued-lock in the UI (hide edit/delete), and a state chip. Touches
+`public/js/invoicing.js` / `invoicing.html` / i18n.
+
+> VAT-exemption classification (0% → `E1`) is **settled — no advisor sign-off needed**
+> (confirmed 2026-09-03). Exports / reverse charge / intra-community still get their code
+> per case (roadmap §4.4).
 
 ### Phase V3 — Cancel & rectify
 - [ ] "Cancel invoice" → `POST /invoice_cancel(queueId)` → `status 6` + cancellation record + audit
