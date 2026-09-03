@@ -351,6 +351,17 @@
 }
 .settings-checkline input { margin: 0; width: auto; flex: none; }
 
+/* master on/off switch for a section (Sync) + the greyed-out state it drives */
+.path-item--master {
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.path-item--master .settings-checkline { font-weight: 800; font-size: 0.92rem; }
+.path-item--master .settings-checkline input { width: 1.05rem; height: 1.05rem; }
+.path-item.is-disabled { opacity: 0.45; }
+.path-item.is-disabled input,
+.path-item.is-disabled button { cursor: not-allowed; }
+
 .settings-note {
   font-size: 0.85rem;
   color: var(--text-secondary);

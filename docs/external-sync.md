@@ -3,10 +3,17 @@
 Ops can copy documents it holds into the company's Microsoft 365 storage
 (OneDrive / SharePoint) as a backup. Configure it in **Settings → Sync**.
 
+The whole feature is **off by default** — flip **Sync documents to an external
+storage** (`sync.enabled`) on. While it's off, the app never contacts
+OneDrive / SharePoint, the catch-up job exits immediately, and the rest of the
+section is greyed out. (Existing deployments that relied on the automatic
+project-folder creation on project creation must turn this on.)
+
 ## What it does
 
 | Setting | Meaning |
 |---|---|
+| **Sync documents to an external storage** (`sync.enabled`) | Master on/off switch for everything below. |
 | **Projects — external storage location** (`sync.projects_location`) | Ops keeps one folder per project here, named `PROJECTNUMBER_ENTITYID PROJECT NAME` (entity id zero-padded to 3 digits). Created when a project is created and by the catch-up job. Falls back to the `GRAPH_ONEDRIVE_FOLDER` env var when empty. |
 | **Other documents — backup location** (`sync.other_docs_location`) | Base folder for the document-type backup below. |
 | **Back up these document types** (`sync.backup_doc_types`) | `tickets` = every expense's evidence file · `invoices` = the rendered invoice PDF. |

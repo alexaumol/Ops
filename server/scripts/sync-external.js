@@ -31,6 +31,11 @@ async function pending(sql, params = []) {
 
 (async () => {
   const cfg = await externalSync.getSyncConfig(pool);
+  if (!cfg.enabled) {
+    console.log("[sync:external] disabled (Settings → Sync master switch is off) — nothing to do.");
+    await pool.end();
+    return;
+  }
   if (!graph.syncConfigured()) {
     console.log("[sync:external] Graph integration not configured (GRAPH_* env vars) — nothing to do.");
     await pool.end();

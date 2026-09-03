@@ -398,13 +398,14 @@ document.querySelectorAll("[data-stab]").forEach((btn) => {
 // One renderer for both tabs. Each key's `type` (from the server) decides the
 // control: "text" (a box + Save), "boolean" (a checkbox, saves "on"/""),
 // "multi" (a checkbox per option, saves a comma-separated list). "group"
-// decides which tab it belongs to.
+// decides which tab it belongs to; "master" is a boolean that gates the rest
+// of its group (see loadConfigGroup).
 function renderConfigItem(k, i) {
   const key = escapeHtml(k.key);
   const label = escapeHtml(k.label || k.key);
   const hint = k.hint ? `<p class="path-hint">${escapeHtml(k.hint)}</p>` : "";
   if (k.type === "boolean") {
-    return `<div class="path-item" data-key="${key}">
+    return `<div class="path-item${k.master ? " path-item--master" : ""}" data-key="${key}">
       <label class="settings-checkline">
         <input type="checkbox" data-config-bool ${k.value === "on" ? "checked" : ""} />
         <span>${label}</span>
@@ -482,6 +483,23 @@ async function loadConfigGroup(group, hostId) {
       save(item.dataset.key, vals.join(","), cb);
     }));
   });
+
+  // A "master" boolean greys out + disables every other control in the group
+  // when off (the sync section's on/off switch).
+  const masterItem = host.querySelector(".path-item--master");
+  if (masterItem) {
+    const masterCb = masterItem.querySelector("[data-config-bool]");
+    const applyMaster = () => {
+      const on = masterCb.checked;
+      host.classList.toggle("config-group--disabled", !on);
+      host.querySelectorAll(".path-item:not(.path-item--master)").forEach((item) => {
+        item.classList.toggle("is-disabled", !on);
+        item.querySelectorAll("input, button, select, textarea").forEach((el) => { el.disabled = !on; });
+      });
+    };
+    masterCb.addEventListener("change", applyMaster);
+    applyMaster();
+  }
 }
 
 /* ===================== CATEGORIES TAB (id/name catalogs) ============== */
