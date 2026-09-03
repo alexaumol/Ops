@@ -239,9 +239,18 @@
 .tc-address-grid.hidden { display: none; }
 .tc-address-grid .tc-span-2 { grid-column: 1 / -1; }
 .tc-form-actions { display: flex; gap: 0.4rem; }
+
+/* Veri*Factu recipient identification (shown only when the feature is on) */
+.tc-fiscal-row { margin: 0.5rem 0; }
+.tc-fiscal-row.hidden { display: none; }
+.tc-fiscal-grid { display: grid; grid-template-columns: 2fr 0.7fr; gap: 0.5rem; }
+.tc-fiscal-grid input:disabled { opacity: 0.55; }
+.tc-fiscal-hint { font-size: 0.7rem; color: var(--text-secondary); margin: 0.3rem 0 0; }
+
 @media (max-width: 560px) {
   .tc-form-grid { grid-template-columns: 1fr; }
   .tc-address-grid { grid-template-columns: 1fr; }
+  .tc-fiscal-grid { grid-template-columns: 1fr; }
 }
 
 .mini-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }

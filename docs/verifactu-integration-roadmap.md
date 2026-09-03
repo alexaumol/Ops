@@ -422,9 +422,13 @@ gated on `FEATURES.verifactu`:
 - [x] `verifactu.declaracion_url` option (Ops' *declaración responsable* URL)
 - [x] Whole tab + modal removed on the client when `FEATURES.verifactu` is off; i18n ×3
 
-**V5b — BP fiscal-id fields** (follow-up PR): `taxcompanies.fiscalidtype` + `fiscalcountry`
-(columns exist) on the BP → tax-company form, so foreign recipients map to the `id` + `idType`
-+ `country` form. Until then only Spanish-NIF recipients register cleanly.
+**V5b — BP fiscal-id fields** (`businessPartners.js`, `business-partners.html` / `.js` /
+`.css` / i18n ×3):
+- [x] `taxcompanies.fiscalidtype` + `fiscalcountry` in the tax-company CRUD (GET / POST / PATCH)
+- [x] "How the AEAT identifies this client" select (NIF / EU VAT / passport / official doc /
+      residence cert / other / non-census NIF) + a 2-letter country field on the tax-company
+      form, shown only when `FEATURES.verifactu`; country required for a non-NIF type
+- `toOpsInvoice` now produces the `{ id, idType, country }` recipient form for foreign clients
 
 **V5c — go-live** (follow-up):
 - [ ] `/id_check` recipient pre-flight on issue (`verifactu.id_check` option already defined)
