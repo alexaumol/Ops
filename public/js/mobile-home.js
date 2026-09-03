@@ -16,9 +16,10 @@ if (session) {
   document.getElementById("userAvatar").textContent = HITT_AUTH.initials(session);
 }
 
-function markRestricted() {
-  const tile = document.getElementById("mhExpensesTile");
-  const status = document.getElementById("mhExpensesStatus");
+function markRestricted(tileId, statusId) {
+  const tile = document.getElementById(tileId);
+  const status = document.getElementById(statusId);
+  if (!tile || !status) return;
   tile.classList.add("mh-tile--restricted");
   tile.removeAttribute("href");
   tile.setAttribute("aria-disabled", "true");
@@ -35,13 +36,17 @@ HITT_PERMS.redirectIfDeactivated("index.html").then((blocked) => {
   if (blocked) return;
   HITT_PERMS.applyRealName().then((perms) => {
     if (!perms) return;
-    if (!perms.isAdmin && perms.restrictedModules.includes("expenses")) markRestricted();
+    if (perms.isAdmin) return;
+    if (perms.restrictedModules.includes("expenses")) markRestricted("mhExpensesTile", "mhExpensesStatus");
+    if (perms.restrictedModules.includes("presence")) markRestricted("mhPresenceTile", "mhPresenceStatus");
   }).catch((err) => {
     console.error("[mobile-home] permissions check failed, showing all tiles:", err.message);
   });
 });
 
 window.addEventListener("hitt:langchange", () => {
-  const status = document.getElementById("mhExpensesStatus");
-  if (!status.classList.contains("hidden")) status.textContent = T("welcome.status.restricted");
+  ["mhExpensesStatus", "mhPresenceStatus"].forEach((id) => {
+    const status = document.getElementById(id);
+    if (status && !status.classList.contains("hidden")) status.textContent = T("welcome.status.restricted");
+  });
 });

@@ -290,6 +290,17 @@ window.HITT_I18N_DICT = {
     "mx.photo.tooLarge": "That file is too large (max 15 MB) — try retaking the photo.",
     "mx.addAnother": "Save & add another",
 
+    // mobile presence (fichaje)
+    "mp.title": "Presence",
+    "mp.expected": "Expected today",
+    "mp.committed": "Done so far",
+    "mp.left": "Left",
+    "mp.complete": "Day complete",
+    "mp.overtime": "+{hours} over",
+    "mp.clockedIn": "Clocked in.",
+    "mp.clockedOut": "Clocked out.",
+    "mp.foot": "Times are recorded on the server in the company time zone. Entries can't be edited here — use a computer to review or correct your register.",
+
     // time allocation
     "ta.tab.tracking": "Project time tracking",
     "ta.tab.timeoff": "Time off requests",
@@ -1409,6 +1420,17 @@ window.HITT_I18N_DICT = {
     "mx.photo.tooLarge": "Ese archivo es demasiado grande (máx. 15 MB) — prueba a repetir la foto.",
     "mx.addAnother": "Guardar y añadir otro",
 
+    // mobile presence (fichaje)
+    "mp.title": "Fichaje",
+    "mp.expected": "Previsto hoy",
+    "mp.committed": "Trabajado",
+    "mp.left": "Restante",
+    "mp.complete": "Jornada completa",
+    "mp.overtime": "+{hours} de más",
+    "mp.clockedIn": "Entrada registrada.",
+    "mp.clockedOut": "Salida registrada.",
+    "mp.foot": "Las horas se registran en el servidor con la zona horaria de la empresa. Aquí no se pueden editar los fichajes — usa un ordenador para revisar o corregir tu registro.",
+
     "ta.tab.tracking": "Imputación de horas por proyecto",
     "ta.tab.timeoff": "Solicitudes de ausencia",
     "ta.tab.calendar": "Calendario",
@@ -2518,6 +2540,17 @@ window.HITT_I18N_DICT = {
     "mx.project.loadFail": "No s'han pogut carregar els teus projectes.",
     "mx.photo.tooLarge": "Aquest arxiu és massa gran (màx. 15 MB) — prova de repetir la foto.",
     "mx.addAnother": "Desar i afegir-ne una altra",
+
+    // mobile presence (fitxatge)
+    "mp.title": "Fitxatge",
+    "mp.expected": "Previst avui",
+    "mp.committed": "Treballat",
+    "mp.left": "Restant",
+    "mp.complete": "Jornada completa",
+    "mp.overtime": "+{hours} de més",
+    "mp.clockedIn": "Entrada registrada.",
+    "mp.clockedOut": "Sortida registrada.",
+    "mp.foot": "Les hores es registren al servidor amb la zona horària de l'empresa. Aquí no es poden editar els fitxatges — fes servir un ordinador per revisar o corregir el teu registre.",
 
     "ta.tab.tracking": "Imputació d'hores per projecte",
     "ta.tab.timeoff": "Sol·licituds d'absència",
