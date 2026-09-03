@@ -1,8 +1,8 @@
 {
   "name": "HITT Ops",
   "short_name": "Ops",
-  "description": "HITT Ops on the go — capture expense receipts and, gradually, more of the portfolio.",
-  "start_url": "pages/mobile-expenses.html",
+  "description": "HITT Ops on the go — a growing menu of mobile-ready features, starting with expense receipt capture.",
+  "start_url": "mobile.html",
   "scope": ".",
   "display": "standalone",
   "orientation": "portrait",

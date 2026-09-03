@@ -40,6 +40,9 @@ window.HITT_I18N_DICT = {
     "welcome.status.soon": "Coming soon",
     "welcome.status.admin": "Admin",
     "welcome.status.restricted": "Restricted",
+    "mhome.title": "What do you need?",
+    "mhome.scanTickets": "Scan tickets",
+    "mhome.clockInOut": "Clock in / out",
     "module.projects.title": "Projects",
     "module.projects.desc": "Portfolio kanban, project lifecycle stages, quotations and deliverables.",
     "module.businessPartners.title": "Business partners",
@@ -276,6 +279,7 @@ window.HITT_I18N_DICT = {
     "exp.noneOption": "— none —",
 
     // mobile expense capture
+    "mx.backToMenu": "Menu",
     "mx.sub": "Snap a photo of your receipt, fill in the details, and bind it to the project.",
     "mx.photo.take": "Take photo",
     "mx.photo.choose": "Choose file",
@@ -1099,6 +1103,9 @@ window.HITT_I18N_DICT = {
     "welcome.status.soon": "Próximamente",
     "welcome.status.admin": "Administración",
     "welcome.status.restricted": "Restringido",
+    "mhome.title": "¿Qué necesitas?",
+    "mhome.scanTickets": "Escanear tickets",
+    "mhome.clockInOut": "Fichar entrada / salida",
     "module.projects.title": "Proyectos",
     "module.projects.desc": "Kanban de cartera, fases del ciclo de vida del proyecto, presupuestos y entregables.",
     "module.businessPartners.title": "Socios comerciales",
@@ -1331,6 +1338,7 @@ window.HITT_I18N_DICT = {
     "exp.noneOption": "— ninguna —",
 
     // captura de gastos móvil
+    "mx.backToMenu": "Menú",
     "mx.sub": "Haz una foto del ticket, rellena los datos y vincúlalo al proyecto.",
     "mx.photo.take": "Hacer foto",
     "mx.photo.choose": "Elegir archivo",
@@ -2145,6 +2153,9 @@ window.HITT_I18N_DICT = {
     "welcome.status.soon": "Ben aviat",
     "welcome.status.admin": "Administració",
     "welcome.status.restricted": "Restringit",
+    "mhome.title": "Què necessites?",
+    "mhome.scanTickets": "Escanejar tiquets",
+    "mhome.clockInOut": "Fitxar entrada / sortida",
     "module.projects.title": "Projectes",
     "module.projects.desc": "Kanban de cartera, fases del cicle de vida del projecte, pressupostos i lliurables.",
     "module.businessPartners.title": "Socis comercials",
@@ -2377,6 +2388,7 @@ window.HITT_I18N_DICT = {
     "exp.noneOption": "— cap —",
 
     // captura de despeses mòbil
+    "mx.backToMenu": "Menú",
     "mx.sub": "Fes una foto del tiquet, omple les dades i vincula'l al projecte.",
     "mx.photo.take": "Fer foto",
     "mx.photo.choose": "Triar arxiu",
