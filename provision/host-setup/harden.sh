@@ -31,7 +31,7 @@ ufw allow 80/tcp             >/dev/null
 ufw allow 443/tcp            >/dev/null
 ufw default deny incoming    >/dev/null
 ufw default allow outgoing   >/dev/null
-yes | ufw enable             >/dev/null
+ufw --force enable           >/dev/null   # --force = no interactive y/n prompt
 ufw status verbose
 echo "  NOTE: a Docker container that publishes 0.0.0.0:<port> bypasses ufw."
 echo "        Zitadel must publish to 127.0.0.1 only (nginx proxies it)."
