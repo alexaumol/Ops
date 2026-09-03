@@ -1,0 +1,18 @@
+[Unit]
+Description=Ops — external-storage document sync (Settings → Sync backfill + retry)
+Wants=network-online.target
+After=network-online.target postgresql.service
+
+[Service]
+Type=oneshot
+User=root
+# Reads the same DB + GRAPH_* env the API uses.
+EnvironmentFile=/opt/ops/server/.env
+WorkingDirectory=/opt/ops/server
+ExecStart=/usr/bin/npm run sync:external
+TimeoutStartSec=3600
+Nice=10
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
