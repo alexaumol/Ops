@@ -91,17 +91,18 @@ const HITT_AUTH = (() => {
 
   // Reads + clears the path requireSession() stashed before bouncing an
   // unauthenticated visit to sign-in. Only trusts a same-app relative
-  // "welcome.html" or "pages/<name>.html" path (optionally with a query
-  // string) — never an absolute/external URL — since this value round-trips
-  // through sessionStorage across the Microsoft/OIDC redirect. Returns null
-  // when there's nothing stashed or it doesn't look safe.
+  // "welcome.html", "mobile.html", or "pages/<name>.html" path (optionally
+  // with a query string) — never an absolute/external URL — since this
+  // value round-trips through sessionStorage across the Microsoft/OIDC
+  // redirect. Returns null when there's nothing stashed or it doesn't look
+  // safe.
   function consumePostLoginReturnTo() {
     let path = null;
     try {
       path = sessionStorage.getItem(RETURN_TO_KEY);
       sessionStorage.removeItem(RETURN_TO_KEY);
     } catch {}
-    if (!path || !/^(pages\/[\w-]+\.html|welcome\.html)(\?[\w=&%.-]*)?$/.test(path)) return null;
+    if (!path || !/^(pages\/[\w-]+\.html|welcome\.html|mobile\.html)(\?[\w=&%.-]*)?$/.test(path)) return null;
     return path;
   }
 

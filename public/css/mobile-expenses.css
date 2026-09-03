@@ -8,6 +8,16 @@
 .mx-header {
   padding: 0 0.85rem;
 }
+.mx-header__back {
+  color: rgba(255,255,255,0.85);
+  text-decoration: none;
+  font-size: 0.92rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+.mx-header__back:hover { color: #fff; }
 
 .mx-shell {
   max-width: 480px;

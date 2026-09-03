@@ -1,0 +1,77 @@
+/* ==========================================================================
+   Mobile landing — the phone home screen icon's actual destination: a small
+   menu of mobile-ready features, each its own dedicated screen (see
+   mobile-expenses.css for the capture screen itself). Shares design tokens
+   with styles.css.
+   ========================================================================== */
+
+.mh-shell {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 2rem 1rem calc(2rem + env(safe-area-inset-bottom));
+}
+.mh-title {
+  font-size: 1.3rem;
+  font-weight: 800;
+  margin: 0 0 1.25rem;
+  text-align: center;
+}
+
+.mh-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+@media (max-width: 380px) {
+  .mh-grid { grid-template-columns: 1fr; }
+}
+
+.mh-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  min-height: 140px;
+  padding: 1.25rem 1rem;
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-sm);
+  text-decoration: none;
+  color: var(--text-primary);
+  text-align: center;
+  -webkit-tap-highlight-color: transparent;
+}
+.mh-tile:active { transform: translateY(1px); }
+.mh-tile__icon { font-size: 2.4rem; line-height: 1; }
+.mh-tile__label { font-size: 0.95rem; font-weight: 700; }
+
+.mh-tile__status {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+}
+.mh-tile__status.hidden { display: none; }
+.mh-tile__status--soon {
+  background: rgba(188,154,28,0.16);
+  color: #8A6E12;
+}
+.mh-tile__status--restricted {
+  background: rgba(178,74,58,0.14);
+  color: var(--danger);
+}
+
+.mh-tile--soon {
+  opacity: 0.72;
+  cursor: default;
+}
+.mh-tile--restricted {
+  opacity: 0.55;
+  cursor: default;
+  pointer-events: none;
+}
