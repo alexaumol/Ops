@@ -286,7 +286,6 @@ window.HITT_I18N_DICT = {
     "mx.project.loadFail": "Could not load your projects.",
     "mx.photo.tooLarge": "That file is too large (max 15 MB) — try retaking the photo.",
     "mx.addAnother": "Save & add another",
-    "mx.viewAll": "View all expenses →",
 
     // time allocation
     "ta.tab.tracking": "Project time tracking",
@@ -1342,7 +1341,6 @@ window.HITT_I18N_DICT = {
     "mx.project.loadFail": "No se han podido cargar tus proyectos.",
     "mx.photo.tooLarge": "Ese archivo es demasiado grande (máx. 15 MB) — prueba a repetir la foto.",
     "mx.addAnother": "Guardar y añadir otro",
-    "mx.viewAll": "Ver todos los gastos →",
 
     "ta.tab.tracking": "Imputación de horas por proyecto",
     "ta.tab.timeoff": "Solicitudes de ausencia",
@@ -2389,7 +2387,6 @@ window.HITT_I18N_DICT = {
     "mx.project.loadFail": "No s'han pogut carregar els teus projectes.",
     "mx.photo.tooLarge": "Aquest arxiu és massa gran (màx. 15 MB) — prova de repetir la foto.",
     "mx.addAnother": "Desar i afegir-ne una altra",
-    "mx.viewAll": "Veure totes les despeses →",
 
     "ta.tab.tracking": "Imputació d'hores per projecte",
     "ta.tab.timeoff": "Sol·licituds d'absència",
