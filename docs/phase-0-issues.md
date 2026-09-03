@@ -170,14 +170,19 @@ Scripted in `provision/host-setup/`; full write-up in `docs/security-baseline.md
 
 **Labels:** `phase-0`, `legal`
 
-- [ ] DPA template with the Art. 28(3) clauses — drafted, then reviewed by a Spanish data-protection lawyer
-- [ ] Public sub-processor list page
-- [ ] Privacy policy — including the Zitadel account-data controller note
-- [ ] Your Records of Processing, plus a customer-facing ROPA template
-- [ ] Written breach-response procedure + breach register (24 h internal clock)
-- [ ] SaaS subscription agreement / Terms of Service
-- [ ] Pricing v1 — two or three flat tiers by headcount band, written down
-- [ ] One-page security & privacy overview for procurement
+Drafts in `docs/legal/` (see its README for draft vs lawyer-review status).
+
+- [x] DPA template with the Art. 28(3) clauses — drafted (`docs/legal/dpa.md`); **lawyer review pending**
+- [x] Public sub-processor list — drafted (`docs/legal/subprocessors.md`); **publish at a stable URL**
+- [x] Privacy policy — skeleton + identity-broker controller note (`docs/legal/privacy-policy.md`); **lawyer review pending**
+- [x] RoPA — processor record + customer controller template (`docs/legal/ropa.md`)
+- [x] Breach-response procedure + register (24h controller-notice clock) (`docs/legal/breach-response.md`)
+- [x] SaaS subscription agreement / ToS — clause checklist + drafting notes (`docs/legal/terms-of-service.md`); **lawyer draft pending**
+- [x] Pricing v1 — tiered proposal (`docs/legal/pricing-v1.md`); **your numbers to finalise**
+- [x] One-page security & privacy overview (`docs/legal/security-overview.md`)
+- [ ] Fill placeholders (`[PROVIDER LEGAL NAME]`, contacts…); create `privacy@` / `security@` mailboxes
+- [ ] One lawyer engagement: DPA + privacy policy + ToS, localised for Spain / AEPD
+- [ ] Publish sub-processor list + privacy policy at `theaumol.com/legal/…`
 
 ---
 
