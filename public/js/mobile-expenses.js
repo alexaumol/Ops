@@ -66,21 +66,56 @@ document.getElementById("mxRetake").addEventListener("click", () => {
   previewEl.classList.add("hidden");
 });
 
-function handleFile(file) {
+// A phone camera photo easily runs 8-20+ MB — well past the server's 15 MB
+// evidence-upload cap (server/routes/expenses.js) and slow over cellular
+// data for what's just a receipt. Downscale + re-encode as JPEG before it
+// ever leaves the phone; a 1920px-long-edge JPEG is plenty to read a ticket
+// and typically lands under 1 MB. Falls back to the original file untouched
+// if decoding fails (e.g. a format the browser's <img> can't open) so a
+// photo is never silently dropped.
+function compressImage(file, { maxDim = 1920, quality = 0.82 } = {}) {
+  return new Promise((resolve) => {
+    if (!/^image\//.test(file.type)) { resolve(file); return; }
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const scale = Math.min(1, maxDim / Math.max(img.naturalWidth, img.naturalHeight));
+      const w = Math.round(img.naturalWidth * scale) || img.naturalWidth;
+      const h = Math.round(img.naturalHeight * scale) || img.naturalHeight;
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+      canvas.toBlob((blob) => {
+        if (!blob || blob.size >= file.size) { resolve(file); return; }
+        const name = (file.name || "receipt").replace(/\.\w+$/, "") + ".jpg";
+        resolve(new File([blob], name, { type: "image/jpeg" }));
+      }, "image/jpeg", quality);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+    img.src = url;
+  });
+}
+
+const MAX_UPLOAD_BYTES = 15 * 1024 * 1024;
+
+async function handleFile(file) {
   if (!file) return;
-  selectedFile = file;
   dropEl.classList.add("hidden");
   previewEl.classList.remove("hidden");
   if (file.type === "application/pdf") {
+    selectedFile = file;
     imgEl.classList.add("hidden");
     pdfEl.classList.remove("hidden");
     pdfNameEl.textContent = file.name;
-  } else {
-    pdfEl.classList.add("hidden");
-    imgEl.classList.remove("hidden");
-    if (imgEl.src) URL.revokeObjectURL(imgEl.src);
-    imgEl.src = URL.createObjectURL(file);
+    return;
   }
+  pdfEl.classList.add("hidden");
+  imgEl.classList.remove("hidden");
+  if (imgEl.src) URL.revokeObjectURL(imgEl.src);
+  imgEl.src = URL.createObjectURL(file); // preview the original right away — no need to wait on compression
+  selectedFile = await compressImage(file);
 }
 function clearPhoto() {
   selectedFile = null;
@@ -109,6 +144,7 @@ function resetForAnother() {
 document.getElementById("mxSave").addEventListener("click", async () => {
   const amount = document.getElementById("mxAmount").value;
   if (amount === "" || Number.isNaN(Number(amount))) { toast(T("exp.toast.enterAmount"), "red"); return; }
+  if (selectedFile && selectedFile.size > MAX_UPLOAD_BYTES) { toast(T("mx.photo.tooLarge"), "red"); return; }
   const internal = internalCheckbox.checked;
 
   const fields = {
