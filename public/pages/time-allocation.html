@@ -30,6 +30,7 @@
       <button data-ptab="tracking" class="page-tab" aria-selected="true" data-i18n="ta.tab.tracking">Project time tracking</button>
       <button data-ptab="timeoff" class="page-tab" aria-selected="false"><span data-i18n="ta.tab.timeoff">Time off requests</span> <span class="notif-badge hidden" id="timeoffTabBadge"></span></button>
       <button data-ptab="calendar" class="page-tab" aria-selected="false" data-i18n="ta.tab.calendar">Calendar</button>
+      <button data-ptab="presence" class="page-tab" aria-selected="false" data-i18n="ta.tab.presence">Presence</button>
     </div>
 
     <div class="ta-layout">
@@ -148,6 +149,68 @@
         </aside>
       </div>
     </div>
+
+    <!-- ============================ PRESENCE (registro de jornada) ============================ -->
+    <div id="panePresence" class="page-pane hidden">
+      <p class="ta-pr-legal" data-i18n="ta.pr.legal">Working-time register kept under art. 34.9 of the Estatuto de los Trabajadores (RDL 8/2019). <a id="prPrivacyLink" href="#" hidden data-i18n="ta.pr.privacyLink">Privacy notice</a></p>
+
+      <div class="ta-pr-clock" id="prClockCard">
+        <div class="ta-pr-clock-state">
+          <span class="ta-pr-clock-dot" id="prDot"></span>
+          <span id="prClockState" data-i18n="ta.pr.loading">Loading…</span>
+        </div>
+        <div class="ta-pr-clock-actions">
+          <label class="ta-pr-loc">
+            <span data-i18n="ta.pr.location">Location</span>
+            <select id="prLocation">
+              <option value="" data-i18n="ta.pr.loc.none">—</option>
+              <option value="office" data-i18n="ta.pr.loc.office">Office</option>
+              <option value="remote" data-i18n="ta.pr.loc.remote">Remote</option>
+              <option value="client" data-i18n="ta.pr.loc.client">Client site</option>
+            </select>
+          </label>
+          <button class="btn btn-primary" id="prClockBtn" data-i18n="ta.pr.clockIn">Clock in</button>
+        </div>
+        <div class="ta-pr-today" id="prToday"></div>
+      </div>
+
+      <div class="ta-banner">
+        <button class="btn btn-secondary" id="prPrevMonth" title="Previous month">&larr;</button>
+        <span id="prMonthLabel" class="rpt-month-label"></span>
+        <button class="btn btn-secondary" id="prNextMonth" title="Next month">&rarr;</button>
+        <button class="btn btn-secondary" id="prThisMonth" data-i18n="rpt.today">Today</button>
+        <div class="ta-spacer"></div>
+        <label class="ta-cal-toggle ta-pr-emp" id="prEmpWrap" hidden>
+          <span data-i18n="ta.pr.employee">Employee</span>
+          <select id="prEmployee"></select>
+        </label>
+        <button class="btn btn-secondary" id="prAddEntry" data-i18n="ta.pr.addEntry">Add / correct</button>
+        <button class="btn btn-secondary" id="prExportCsv" data-i18n="ta.pr.exportCsv">Export CSV</button>
+        <button class="btn btn-secondary" id="prExportPdf" data-i18n="ta.pr.exportPdf">Export PDF</button>
+      </div>
+
+      <div class="ta-pr-summary" id="prSummary"></div>
+
+      <div class="ta-table-wrap">
+        <table class="ta-table ta-pr-table">
+          <thead>
+            <tr>
+              <th data-i18n="ta.pr.col.day">Day</th>
+              <th data-i18n="ta.pr.col.in">In</th>
+              <th data-i18n="ta.pr.col.out">Out</th>
+              <th data-i18n="ta.pr.col.segments">Segments</th>
+              <th style="text-align:right;" data-i18n="ta.pr.col.worked">Worked</th>
+              <th style="text-align:right;" data-i18n="ta.pr.col.expected">Expected</th>
+              <th style="text-align:right;" data-i18n="ta.pr.col.balance">Balance</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="prTableBody"></tbody>
+        </table>
+      </div>
+
+      <div class="ta-pr-overview" id="prOverview" hidden></div>
+    </div>
     </div><!-- /.ta-main -->
 
     <aside class="ta-side" id="taSide">
@@ -232,6 +295,37 @@
     </div>
   </div>
 
+  <!-- ============================ PRESENCE ENTRY / CORRECTION MODAL ============================ -->
+  <div id="prEntryOverlay" class="modal-overlay hidden">
+    <div class="modal-panel modal-panel--sm">
+      <div class="modal-head">
+        <h2 id="prEntryTitle" style="flex:1; font-size:1rem; font-weight:700; color:#fff; margin:0;" data-i18n="ta.pr.entry.title">Add / correct clock entries</h2>
+        <button id="prEntryClose" class="modal-head-btn modal-head-btn--close" title="Close">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="field-section">
+          <label class="field-label" data-i18n="ta.pr.entry.date">Day</label>
+          <input id="prEntryDate" type="date" class="field-input" />
+          <p id="prEntryCorrectNote" class="hidden" style="font-size:0.78rem; color:var(--text-secondary); margin:0.35rem 0 0;"></p>
+        </div>
+        <div class="field-section" id="prEntryRowsSection">
+          <label class="field-label" data-i18n="ta.pr.entry.times">Clock times</label>
+          <div id="prEntryRows"></div>
+          <button type="button" class="btn btn-secondary" id="prEntryAddRow" style="margin-top:0.4rem;" data-i18n="ta.pr.entry.addRow">+ Add a time</button>
+        </div>
+        <div class="field-section">
+          <label class="field-label" for="prEntryNote" data-i18n="ta.pr.entry.reason">Reason (required)</label>
+          <textarea id="prEntryNote" class="field-input" rows="2" data-i18n-placeholder="ta.pr.entry.reasonPh" placeholder="e.g. forgot to clock out"></textarea>
+          <p id="prEntryHint" class="hidden" style="color:var(--danger); font-size:0.78rem; margin:0.35rem 0 0;" data-i18n="ta.pr.entry.needReason">A reason is required.</p>
+        </div>
+      </div>
+      <div style="flex-shrink:0; border-top:1px solid var(--border-subtle); padding:0.75rem 1.1rem; display:flex; justify-content:flex-end; gap:0.5rem;">
+        <button id="prEntryCancel" class="btn btn-secondary" data-i18n="form.cancel">Cancel</button>
+        <button id="prEntrySubmit" class="btn btn-primary" data-i18n="form.save">Save</button>
+      </div>
+    </div>
+  </div>
+
   <script src="../js/config.js"></script>
   <script src="../js/branding.js"></script>
   <script src="../js/i18n-dict.js"></script>
@@ -245,6 +339,7 @@
   <script src="../js/usermenu.js"></script>
   <script src="../js/notifications.js"></script>
   <script src="../js/chat.js"></script>
+  <script src="../js/presence.js"></script>
   <script src="../js/time-allocation.js"></script>
 </body>
 </html>

@@ -132,6 +132,7 @@ document.querySelectorAll('[data-ptab]').forEach(btn => {
     document.getElementById('paneTracking').classList.toggle('hidden', currentPageTab !== 'tracking');
     document.getElementById('paneTimeOff').classList.toggle('hidden', currentPageTab !== 'timeoff');
     document.getElementById('paneCalendar').classList.toggle('hidden', currentPageTab !== 'calendar');
+    document.getElementById('panePresence').classList.toggle('hidden', currentPageTab !== 'presence');
     // Opening the Time off tab counts as "seen" — clears the status-change
     // side of the badge (approvers still see their pending count).
     if (currentPageTab === 'timeoff') HITT_NOTIFY.markTimeOffSeen();
@@ -143,6 +144,7 @@ function refreshActiveTab(){
   renderSideReport();
   if (currentPageTab === 'tracking') loadWeek();
   else if (currentPageTab === 'calendar') loadCalendarMonth();
+  else if (currentPageTab === 'presence') window.HITT_PRESENCE?.init();
   else loadTimeOff();
 }
 
@@ -1054,5 +1056,6 @@ document.getElementById('btnLeavesExport').addEventListener('click', () => {
 /* Re-render dynamic content when the UI language changes. */
 window.addEventListener("hitt:langchange", () => {
   if (typeof setDataSourcePill === "function") setDataSourcePill();
+  if (currentPageTab === "presence") { window.HITT_PRESENCE?.onLangChange(); return; }
   if (typeof refreshActiveTab === "function") refreshActiveTab();
 });

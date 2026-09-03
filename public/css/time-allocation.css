@@ -386,3 +386,71 @@
   font-style: italic;
 }
 .rpt-cal-more { font-size: 0.65rem; color: var(--text-secondary); }
+
+/* ============================ Presence (registro de jornada) ============= */
+.ta-pr-legal { font-size: 0.78rem; color: var(--text-secondary); margin: 0 0 0.9rem; }
+.ta-pr-legal a { color: var(--brand); }
+
+.ta-pr-clock {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.85rem 1.25rem;
+  background: var(--bg-surface); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg); padding: 1rem 1.15rem; margin-bottom: 1.1rem;
+  box-shadow: var(--shadow-sm);
+}
+.ta-pr-clock.hidden { display: none; }
+.ta-pr-clock-state { display: flex; align-items: center; gap: 0.55rem; font-size: 0.95rem; font-weight: 600; }
+.ta-pr-clock-dot { width: 11px; height: 11px; border-radius: 999px; background: var(--text-secondary); flex-shrink: 0; }
+.ta-pr-clock-dot.is-in { background: #6E8F5A; box-shadow: 0 0 0 3px rgba(110,143,90,0.25); }
+.ta-pr-clock-actions { display: flex; align-items: flex-end; gap: 0.6rem; margin-left: auto; }
+.ta-pr-loc { display: flex; flex-direction: column; gap: 0.2rem; font-size: 0.72rem; color: var(--text-secondary); font-weight: 600; }
+.ta-pr-loc select {
+  height: 34px; padding: 0 0.5rem; border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle); background: var(--bg-surface); color: var(--text-primary); font-size: 0.85rem;
+}
+.ta-pr-clock-actions .btn { height: 34px; }
+.ta-pr-today { flex-basis: 100%; font-size: 0.82rem; color: var(--text-secondary); }
+.ta-pr-today-label { font-weight: 600; }
+.ta-pr-seg { display: inline-block; background: var(--bg-surface-alt); border-radius: var(--radius-sm); padding: 0.05rem 0.4rem; margin-right: 0.25rem; }
+
+.ta-pr-emp { flex-direction: row; align-items: center; gap: 0.4rem; }
+.ta-pr-emp select {
+  height: 32px; padding: 0 0.4rem; border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle); background: var(--bg-surface); color: var(--text-primary); font-size: 0.8rem; max-width: 14rem;
+}
+
+.ta-pr-summary { font-size: 0.85rem; margin: 0.4rem 0 0.9rem; color: var(--text-primary); }
+.ta-pr-summary .btn { height: 28px; padding: 0 0.7rem; font-size: 0.78rem; margin-left: 0.3rem; }
+.ta-pr-ack-done { color: #4C6B3A; font-weight: 600; }
+
+.ta-pr-table th { white-space: nowrap; }
+.ta-pr-table td { font-size: 0.85rem; }
+.ta-pr-row-today td { background: var(--bg-surface-alt); }
+.ta-pr-segcell { color: var(--text-secondary); font-size: 0.8rem; }
+.ta-pr-open { color: #6E8F5A; font-weight: 600; }
+.ta-pr-m {
+  display: inline-block; font-size: 0.62rem; font-weight: 700; color: #fff; background: #7C5C9C;
+  border-radius: 3px; padding: 0 0.25rem; vertical-align: middle;
+}
+.ta-pr-badge {
+  display: inline-block; font-size: 0.7rem; font-weight: 600; border-radius: var(--radius-sm);
+  padding: 0.05rem 0.4rem;
+}
+.ta-pr-badge.is-holiday { background: rgba(188,154,28,0.18); color: #8A6E12; }
+.ta-pr-badge.is-leave { background: rgba(110,143,90,0.18); color: #4C6B3A; }
+
+.ta-pr-entry-row { display: flex; gap: 0.4rem; align-items: center; margin-bottom: 0.4rem; }
+.ta-pr-entry-row .ta-pr-entry-kind { width: 6.5rem; }
+.ta-pr-entry-row .ta-pr-entry-time { width: 8rem; }
+
+.ta-pr-overview {
+  margin-top: 1.4rem; background: var(--bg-surface-alt); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg); padding: 0.9rem 1.05rem;
+}
+.ta-pr-ov-title { margin: 0 0 0.3rem; font-size: 0.9rem; }
+.ta-pr-ov-sum { margin: 0 0 0.6rem; font-size: 0.82rem; color: var(--text-secondary); }
+.ta-pr-ov-list { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.ta-pr-ov-chip {
+  border: 1px solid var(--danger); color: var(--danger); background: var(--bg-surface);
+  border-radius: 999px; font: inherit; font-size: 0.76rem; padding: 0.15rem 0.6rem; cursor: pointer;
+}
+.ta-pr-ov-ok { color: #4C6B3A; font-size: 0.82rem; margin: 0; }
