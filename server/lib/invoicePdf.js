@@ -230,12 +230,53 @@ function renderInvoicePdf(doc, data) {
   doc.font("Helvetica").fontSize(9).text(data.bicSwift || "", left, bY + 14);
   doc.text(`${L("txtDipositInfo", "When paying by bank transfer, please state invoice number")} ${data.invoicecode || ""}`, left, bY + 30);
 
+  // ---------- Veri*Factu QR + legend (Spain) ----------
+  // Rendered from the stored AEAT registration record (data.verifactuQr /
+  // data.verifactuUrl). Absent on a non-Spanish instance or a draft.
+  renderVerifactuBlock(doc, data, { left, right, width, L });
+
   // ---------- Footer ----------
   if (letter.footer) {
     const footerY = 780;
     doc.rect(left, footerY, width, 30).stroke(BRAND.blue);
     doc.font("Helvetica").fontSize(7).fillColor(BRAND.blue)
       .text(letter.footer, left + 6, footerY + 6, { width: width - 12, align: "center" });
+  }
+}
+
+// Bottom-left QR + the "verifiable invoice" legend the Reglamento requires
+// on a Veri*Factu invoice. No-op when the invoice carries no QR.
+function renderVerifactuBlock(doc, data, { left, right, L }) {
+  const qr = dataUrlToBuffer(data.verifactuQr);
+  const url = data.verifactuUrl || "";
+  if (!qr && !url) return;
+
+  const y = 690;
+  const qrSize = 74;
+  let textX = left;
+  if (qr) {
+    try {
+      doc.image(qr, left, y, { width: qrSize, height: qrSize });
+      textX = left + qrSize + 10;
+    } catch {
+      /* unreadable QR data — fall through to the text-only legend */
+    }
+  }
+
+  const legend = L(
+    "txtVerifactuLegend",
+    "Factura verificable en la Sede Electrónica de la AEAT o en la app «Comprueba»."
+  );
+  doc.font("Helvetica-Bold").fontSize(8).fillColor(BRAND.ink)
+    .text("VERI*FACTU", textX, y, { width: right - textX });
+  doc.font("Helvetica").fontSize(7.5).fillColor(BRAND.gray)
+    .text(legend, textX, y + 12, { width: right - textX });
+  if (url) {
+    doc.fontSize(6.5).fillColor(BRAND.blue)
+      .text(url, textX, y + 12 + doc.heightOfString(legend, { width: right - textX }) + 3, {
+        width: right - textX,
+        link: url,
+      });
   }
 }
 

@@ -52,6 +52,7 @@ let invoicesDefaultTcPrev = '';               // last real value of the Invoices
 // behind the "Project view" tab.
 let currentView = 'invoice';                   // 'project' | 'invoice'
 let ALL_INVOICES = [];
+let ALL_VF_STATES = {}; // invoiceId → verifactu state, for the flat "Invoice view"
 let allInvoicesLoaded = false;
 const ivStatusSel = new Set();                // selected invoice-status labels; empty = all
 let ivSearch = '';
@@ -411,6 +412,10 @@ async function loadAllInvoices(){
     ALL_INVOICES = [];
     toast(T('inv.toast.invoicesLoadFail'), 'red');
   }
+  if (VF_ON) {
+    try { ALL_VF_STATES = (await HITT_API.getAllInvoiceVerifactu()).states || {}; }
+    catch (err) { console.warn('Could not load Veri*Factu states:', err); ALL_VF_STATES = {}; }
+  }
   populateIvStatusOptions();
   renderInvoiceViewTable();
 }
@@ -531,7 +536,7 @@ function renderInvoiceViewTable(){
       <tr data-i="${i}">
         <td>
           <div class="inv-iv-code"><a href="#" data-open>${escapeHtml(inv.invoicecode || T('inv.draft'))}</a>${corrective}</div>
-          <div class="inv-iv-sub">${statusPill}${sent}</div>
+          <div class="inv-iv-sub">${statusPill}${sent}${vfChipHtmlFlat(inv.id)}</div>
         </td>
         <td>${escapeHtml(inv.entityLabel || '—')}</td>
         <td>${tcCell}</td>
@@ -874,10 +879,8 @@ async function loadVerifactuStates(){
 // Chip for an invoice's Veri*Factu lifecycle, from its VF_STATES entry.
 // '' when the feature is off or the invoice is still an unissued draft with
 // nothing to show.
-function vfChipHtml(invId){
-  if (!VF_ON) return '';
-  const s = VF_STATES[invId];
-  if (!s || !s.issuedAt) return '';
+function vfChipFrom(s){
+  if (!VF_ON || !s || !s.issuedAt) return '';
   if (s.cancelState === 'sent')    return `<span class="inv-vf-chip inv-vf-chip--issued">${escapeHtml(T('inv.vf.state.cancelled'))}</span>`;
   if (s.cancelState === 'pending') return `<span class="inv-vf-chip inv-vf-chip--pending">${escapeHtml(T('inv.vf.state.cancelPending'))}</span>`;
   const map = {
@@ -889,6 +892,8 @@ function vfChipHtml(invId){
   const title = s.state === 'error' && s.error ? ` title="${escapeHtml(s.error)}"` : '';
   return `<span class="inv-vf-chip inv-vf-chip--${cls}"${title}>${escapeHtml(label)}</span>`;
 }
+function vfChipHtml(invId){ return vfChipFrom(VF_STATES[invId]); }
+function vfChipHtmlFlat(invId){ return vfChipFrom(ALL_VF_STATES[invId]); }
 function vfIsDraft(invId){ return VF_ON && !(VF_STATES[invId] && VF_STATES[invId].issuedAt); }
 
 // A one-line summary of an issue/retry result for a toast.
@@ -930,6 +935,21 @@ async function retryVerifactuFlow(invoiceId){
   } catch (err) {
     console.error(err);
     toast(err.message || T('inv.toast.vf.retryFail'), 'red');
+  }
+}
+
+async function refreshVerifactuFlow(invoiceId){
+  try {
+    const r = await HITT_API.refreshInvoiceVerifactu(invoiceId);
+    const st = r && r.state;
+    toast(st === 'sent' ? T('inv.toast.vf.sent')
+        : st === 'error' ? T('inv.toast.vf.error', { msg: '' })
+        : T('inv.toast.vf.stillPending'),
+        st === 'error' ? 'red' : st === 'sent' ? 'green' : 'navy');
+    await refreshAfterInvoiceChange();
+  } catch (err) {
+    console.error(err);
+    toast(err.message || T('inv.toast.vf.refreshFail'), 'red');
   }
 }
 
@@ -1421,6 +1441,7 @@ function applyVerifactuToModal(vf, isExisting){
   const autoRow = document.getElementById('invAutosubmitRow');
   const issueBtn = document.getElementById('invIssue');
   const retryBtn = document.getElementById('invRetryVf');
+  const refreshBtn = document.getElementById('invRefreshVf');
   const cancelBtn = document.getElementById('invCancelInv');
   const saveBtn = document.getElementById('invSave');
   const delBtn = document.getElementById('invDelete');
@@ -1430,6 +1451,7 @@ function applyVerifactuToModal(vf, isExisting){
     autoRow.classList.add('hidden');
     issueBtn.classList.add('hidden');
     retryBtn.classList.add('hidden');
+    refreshBtn.classList.add('hidden');
     cancelBtn.classList.add('hidden');
     return;
   }
@@ -1445,11 +1467,14 @@ function applyVerifactuToModal(vf, isExisting){
   issueBtn.classList.toggle('hidden', !isDraftExisting);
   issueBtn.disabled = false;
   retryBtn.disabled = false;
+  refreshBtn.disabled = false;
   cancelBtn.disabled = false;
   saveBtn.classList.toggle('hidden', issued);
   delBtn.classList.toggle('hidden', issued || !isExisting);
-  // Retry: an alta error, or a queued/failed cancel.
-  retryBtn.classList.toggle('hidden', !(issued && vf && (vf.state === 'error' || cancelPending || vf.cancelState === 'error')));
+  // Retry: an alta error, or a failed cancel. Refresh: a queued alta or cancel
+  // (poll the AEAT for the outcome).
+  retryBtn.classList.toggle('hidden', !(issued && vf && (vf.state === 'error' || vf.cancelState === 'error')));
+  refreshBtn.classList.toggle('hidden', !(issued && vf && (vf.state === 'pending' || cancelPending)));
   cancelBtn.classList.toggle('hidden', !(issued && !cancelled && !cancelPending));
 
   setModalLocked(issued);
@@ -1499,6 +1524,14 @@ document.getElementById('invCancelInv').addEventListener('click', async () => {
   document.getElementById('invCancelInv').disabled = true;
   const id = activeInvoiceId;
   await cancelInvoiceFlow(id);
+  if (INVOICES.find((x) => x.id === id)) openInvoiceModal(id); else closeInvoiceModal();
+});
+
+document.getElementById('invRefreshVf').addEventListener('click', async () => {
+  if (!activeInvoiceId) return;
+  document.getElementById('invRefreshVf').disabled = true;
+  const id = activeInvoiceId;
+  await refreshVerifactuFlow(id);
   if (INVOICES.find((x) => x.id === id)) openInvoiceModal(id); else closeInvoiceModal();
 });
 document.getElementById('invClose').addEventListener('click', closeInvoiceModal);

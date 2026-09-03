@@ -621,6 +621,9 @@ window.HITT_I18N_DICT = {
     "inv.toast.cancelled": "Invoice cancelled",
     "inv.toast.cancelFail": "Could not cancel the invoice.",
     "inv.toast.vf.cancelPending": "Cancelled — AEAT notification queued (service unreachable), will retry",
+    "inv.vf.refresh": "Refresh AEAT status",
+    "inv.toast.vf.stillPending": "Still pending at the AEAT — check again shortly",
+    "inv.toast.vf.refreshFail": "Could not check the AEAT status.",
 
     // projects
     "proj.search": "Type to start searching…",
@@ -1786,6 +1789,9 @@ window.HITT_I18N_DICT = {
     "inv.toast.cancelled": "Factura anulada",
     "inv.toast.cancelFail": "No se pudo anular la factura.",
     "inv.toast.vf.cancelPending": "Anulada — notificación a la AEAT en cola (servicio no disponible), se reintentará",
+    "inv.vf.refresh": "Actualizar estado AEAT",
+    "inv.toast.vf.stillPending": "Todavía pendiente en la AEAT — vuelve a comprobar en un momento",
+    "inv.toast.vf.refreshFail": "No se pudo comprobar el estado en la AEAT.",
 
     "proj.search": "Escribe para empezar a buscar…",
     "proj.tab.closed": "Cerrados/Cancelados",
@@ -2944,6 +2950,9 @@ window.HITT_I18N_DICT = {
     "inv.toast.cancelled": "Factura anul·lada",
     "inv.toast.cancelFail": "No s'ha pogut anul·lar la factura.",
     "inv.toast.vf.cancelPending": "Anul·lada — notificació a l'AEAT en cua (servei no disponible), es reintentarà",
+    "inv.vf.refresh": "Actualitzar estat AEAT",
+    "inv.toast.vf.stillPending": "Encara pendent a l'AEAT — torna a comprovar-ho d'aquí a una estona",
+    "inv.toast.vf.refreshFail": "No s'ha pogut comprovar l'estat a l'AEAT.",
 
     "proj.search": "Escriu per començar a cercar…",
     "proj.tab.closed": "Tancats/Cancel·lats",

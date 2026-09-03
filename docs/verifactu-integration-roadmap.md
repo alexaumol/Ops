@@ -400,10 +400,16 @@ gated on `FEATURES.verifactu`:
       also retry a queued/failed `anulacion`).
 
 ### Phase V4 — Visibility
-- [ ] Invoice PDF: QR + verification URL + legend (from stored record)
-- [ ] Invoice list + detail: Veri\*Factu state badge (pending / sent / error), error text, resubmit
-- [ ] "Refresh AEAT status" (manual) + optional interval poll of `pending` via `/invoice_state`
-- [ ] Optional `/id_check` pre-flight in the invoice modal
+- [x] Invoice PDF: QR image + verification URL + `VERI*FACTU` legend, from the stored `alta`
+      record (`invoicePdf.js` `renderVerifactuBlock`; `loadInvoiceForPdf` loads `qr_png` /
+      `verify_url` best-effort)
+- [x] Invoice list + detail: state chip already from V2b/V3; the **cross-project "Invoice
+      view"** now shows it too (`GET /api/invoicing/invoices/verifactu`)
+- [x] "Refresh AEAT status" button + `POST /invoices/:id/verifactu/refresh`, and the fleet job
+      `npm run verifactu:poll` (`lib/verifactu/poll.js`): re-reads `sent` records via
+      `/invoice_state` (catches a late AEAT rejection) and re-sends `pending` submissions that
+      never reached BOLD. ~15-min systemd timer on a Spanish instance.
+- [ ] Optional `/id_check` pre-flight in the invoice modal — deferred to V5
 
 ### Phase V5 — Settings tab + go-live
 - [ ] Settings → Veri\*Factu tab (§7) + `server/routes/verifactu.js` + entity API-key field + i18n ×3
