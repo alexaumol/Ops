@@ -57,14 +57,21 @@ function projectFolderName(code, entityId, name) {
 
 const typeFolder = (type) => (type === "invoices" ? "Invoices" : "Tickets");
 
-// Folder (relative to sync.other_docs_location) a document goes in.
-function destFolder(cfg, type, project) {
+// Where a document's backup goes: { location, folder }.
+//   underProject ON  -> inside the project's folder, under the project
+//                       location (same place the folders are created). No
+//                       project -> a "_Unassigned/<Type>" folder there.
+//   underProject OFF -> a per-type folder at sync.other_docs_location.
+function backupTarget(cfg, type, project) {
   if (cfg.underProject) {
-    return project && project.code
-      ? projectFolderName(project.code, project.entityId, project.name)
-      : `_Unassigned/${typeFolder(type)}`;
+    return {
+      location: cfg.projectsLocation,
+      folder: project && project.code
+        ? projectFolderName(project.code, project.entityId, project.name)
+        : `_Unassigned/${typeFolder(type)}`,
+    };
   }
-  return typeFolder(type);
+  return { location: cfg.otherLocation, folder: typeFolder(type) };
 }
 
 async function record(db, kind, refId, fields) {
@@ -96,7 +103,7 @@ async function record(db, kind, refId, fields) {
 
 async function syncExpenseDoc(db, expenseId) {
   const cfg = await getSyncConfig(db);
-  if (!cfg.enabled || !graph.syncConfigured() || !cfg.otherLocation || !cfg.docTypes.has("tickets")) return { skipped: true };
+  if (!cfg.enabled || !graph.syncConfigured() || !cfg.docTypes.has("tickets")) return { skipped: true };
 
   let e;
   try {
@@ -115,22 +122,23 @@ async function syncExpenseDoc(db, expenseId) {
   if (!e || !e.ticketurl) return { skipped: true };
 
   const project = e.projectid ? { code: e.code, entityId: e.entityId, name: e.name } : null;
-  const folder = destFolder(cfg, "tickets", project);
+  const { location, folder } = backupTarget(cfg, "tickets", project);
+  if (!location) return { skipped: true };
   const ext = path.extname(e.ticketurl) || path.extname(e.picturetitle || "");
   const base = sanitize((e.picturetitle || "ticket").replace(/\.[^.]+$/, ""));
   const filename = `ticket_${e.id}_${base}${ext}`;
 
   try {
     const buffer = await fs.promises.readFile(expenseFilePath(e.ticketurl));
-    const resolved = await graph.resolveLocation(cfg.otherLocation);
+    const resolved = await graph.resolveLocation(location);
     const up = await graph.uploadFile(resolved, folder, filename, buffer, mimeForName(e.ticketurl));
     await record(db, "expense_doc", e.id, {
-      sourceSig: e.ticketurl, target: cfg.otherLocation,
+      sourceSig: e.ticketurl, target: location,
       remoteId: up.id, remoteUrl: up.webUrl, remotePath: `${folder}/${filename}`, status: "ok",
     });
     return { ok: true };
   } catch (err) {
-    await record(db, "expense_doc", e.id, { sourceSig: e.ticketurl, target: cfg.otherLocation, status: "error", error: err.message });
+    await record(db, "expense_doc", e.id, { sourceSig: e.ticketurl, target: location, status: "error", error: err.message });
     return { error: err.message };
   }
 }
@@ -139,7 +147,7 @@ async function syncExpenseDoc(db, expenseId) {
 
 async function syncInvoiceDoc(db, invoiceId) {
   const cfg = await getSyncConfig(db);
-  if (!cfg.enabled || !graph.syncConfigured() || !cfg.otherLocation || !cfg.docTypes.has("invoices")) return { skipped: true };
+  if (!cfg.enabled || !graph.syncConfigured() || !cfg.docTypes.has("invoices")) return { skipped: true };
 
   let head;
   try {
@@ -171,20 +179,21 @@ async function syncInvoiceDoc(db, invoiceId) {
   }
 
   const project = head.projectid ? { code: head.code, entityId: head.entityId, name: head.name } : null;
-  const folder = destFolder(cfg, "invoices", project);
+  const { location, folder } = backupTarget(cfg, "invoices", project);
+  if (!location) return { skipped: true };
   const filename = `invoice_${sanitize(head.invoicecode || `#${head.id}`)}.pdf`;
   const sig = crypto.createHash("sha256").update(buffer).digest("hex").slice(0, 16);
 
   try {
-    const resolved = await graph.resolveLocation(cfg.otherLocation);
+    const resolved = await graph.resolveLocation(location);
     const up = await graph.uploadFile(resolved, folder, filename, buffer, "application/pdf");
     await record(db, "invoice_doc", head.id, {
-      sourceSig: sig, target: cfg.otherLocation,
+      sourceSig: sig, target: location,
       remoteId: up.id, remoteUrl: up.webUrl, remotePath: `${folder}/${filename}`, status: "ok",
     });
     return { ok: true };
   } catch (err) {
-    await record(db, "invoice_doc", head.id, { sourceSig: sig, target: cfg.otherLocation, status: "error", error: err.message });
+    await record(db, "invoice_doc", head.id, { sourceSig: sig, target: location, status: "error", error: err.message });
     return { error: err.message };
   }
 }
@@ -214,7 +223,7 @@ async function syncProjectFolder(db, project) {
 module.exports = {
   getSyncConfig,
   projectFolderName,
-  destFolder,
+  backupTarget,
   syncExpenseDoc,
   syncInvoiceDoc,
   syncProjectFolder,

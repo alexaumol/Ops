@@ -43,6 +43,9 @@ async function pending(sql, params = []) {
   }
 
   const work = { project_folder: [], expense_doc: [], invoice_doc: [] };
+  // "under project" mode files backups in the project location; otherwise the
+  // dedicated other-docs location. Either must be set for doc backups to run.
+  const docLocation = cfg.underProject ? cfg.projectsLocation : cfg.otherLocation;
 
   if (cfg.projectsLocation) {
     work.project_folder = await pending(
@@ -54,7 +57,7 @@ async function pending(sql, params = []) {
         ORDER BY p.id
         LIMIT $1`, [LIMIT]);
   }
-  if (cfg.otherLocation && cfg.docTypes.has("tickets")) {
+  if (docLocation && cfg.docTypes.has("tickets")) {
     work.expense_doc = await pending(
       `SELECT x.id FROM expenses x
          LEFT JOIN external_sync s ON s.kind = 'expense_doc' AND s.ref_id = x.id
@@ -63,7 +66,7 @@ async function pending(sql, params = []) {
         ORDER BY x.id
         LIMIT $1`, [LIMIT]);
   }
-  if (cfg.otherLocation && cfg.docTypes.has("invoices")) {
+  if (docLocation && cfg.docTypes.has("invoices")) {
     work.invoice_doc = await pending(
       `SELECT i.id FROM invoices i
          LEFT JOIN external_sync s ON s.kind = 'invoice_doc' AND s.ref_id = i.id

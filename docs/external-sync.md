@@ -14,10 +14,10 @@ project-folder creation on project creation must turn this on.)
 | Setting | Meaning |
 |---|---|
 | **Sync documents to an external storage** (`sync.enabled`) | Master on/off switch for everything below. |
-| **Projects — external storage location** (`sync.projects_location`) | Ops keeps one folder per project here, named `PROJECTNUMBER_ENTITYID PROJECT NAME` (entity id zero-padded to 3 digits). Created when a project is created and by the catch-up job. Falls back to the `GRAPH_ONEDRIVE_FOLDER` env var when empty. |
-| **Other documents — backup location** (`sync.other_docs_location`) | Base folder for the document-type backup below. |
+| **Create project folder on a remote location** (`sync.projects_location`) | When a project is created, Ops adds a subfolder here named `PROJECTNUMBER_ENTITYID PROJECT NAME` (entity id zero-padded to 3 digits). The catch-up job backfills any project missing one. Falls back to the `GRAPH_ONEDRIVE_FOLDER` env var when empty. |
 | **Back up these document types** (`sync.backup_doc_types`) | `tickets` = every expense's evidence file · `invoices` = the rendered invoice PDF. |
-| **File backups under each document's project folder** (`sync.backup_under_project`) | **Off** — documents are grouped by type: `<location>/Tickets/…`, `<location>/Invoices/…`. **On** — a document goes under its project's folder: `<location>/PROJECTNUMBER_ENTITYID NAME/…` (documents with no project go to `<location>/_Unassigned/Tickets|Invoices/…`). File names carry a `ticket_<id>_…` / `invoice_<code>.pdf` prefix so the two are still distinguishable. |
+| **File backups under each document's project folder** (`sync.backup_under_project`) | **On** — a document is filed inside its project's folder (under the project location above): `<projects location>/PROJECTNUMBER_ENTITYID NAME/…`; documents with no project go to `<projects location>/_Unassigned/Tickets\|Invoices/…`. A separate backup location isn't used, so **"Backup other documents" is hidden**. **Off** — documents are grouped by type at the backup location below: `<backup location>/Tickets/…`, `<backup location>/Invoices/…`. Either way file names carry a `ticket_<id>_…` / `invoice_<code>.pdf` prefix. |
+| **Backup other documents** (`sync.other_docs_location`) | Base folder for the by-type backup. Only used when "file under project folder" is **off**. |
 
 A **location** is either a plain folder path in `GRAPH_ONEDRIVE_USER`'s drive
 (like `GRAPH_ONEDRIVE_FOLDER`, e.g. `Clients/Backups`) **or** a full
