@@ -29,6 +29,27 @@ apt-get install -y -qq ufw
 ufw allow OpenSSH            >/dev/null
 ufw allow 80/tcp             >/dev/null
 ufw allow 443/tcp            >/dev/null
+
+# Webmin (port 10000). It's a known target (past pre-auth RCEs), so prefer
+# restricting it to your admin IP — or better, tunnel it and don't open it:
+#   ssh -L 10000:127.0.0.1:10000 root@host   then  https://localhost:10000
+#
+#   ADMIN_IP=1.2.3.4  sudo bash harden.sh   -> allow 10000 from that IP only
+#   OPEN_WEBMIN=any   sudo bash harden.sh   -> allow 10000 from anywhere
+WEBMIN_PORT="${WEBMIN_PORT:-10000}"
+if [ -n "${ADMIN_IP:-}" ]; then
+  ufw allow from "$ADMIN_IP" to any port "$WEBMIN_PORT" proto tcp >/dev/null
+  # drop any pre-existing open rule for the port
+  ufw delete allow "$WEBMIN_PORT/tcp" >/dev/null 2>&1 || true
+  echo "  webmin: $WEBMIN_PORT allowed from $ADMIN_IP only"
+elif [ "${OPEN_WEBMIN:-}" = "any" ]; then
+  ufw allow "$WEBMIN_PORT/tcp" >/dev/null
+  echo "  webmin: $WEBMIN_PORT open to ANYWHERE — restrict it (ADMIN_IP=<ip>) or tunnel instead"
+else
+  echo "  webmin: $WEBMIN_PORT NOT opened. Re-run with ADMIN_IP=<your ip> (recommended)"
+  echo "          or OPEN_WEBMIN=any, or tunnel: ssh -L 10000:127.0.0.1:10000 root@host"
+fi
+
 ufw default deny incoming    >/dev/null
 ufw default allow outgoing   >/dev/null
 ufw --force enable           >/dev/null   # --force = no interactive y/n prompt
@@ -63,10 +84,29 @@ step "3/4  fail2ban"
 apt-get install -y -qq fail2ban
 install -m 644 "$HERE/fail2ban-ops.local" /etc/fail2ban/jail.d/ops.local
 echo "  → edit /etc/fail2ban/jail.d/ops.local and add your admin IP to ignoreip"
+
+# Webmin jail — only if its log is where we expect (a missing logpath makes
+# fail2ban refuse to start).
+WEBMIN_LOG=/var/log/webmin/miniserv.log
+if [ -f "$WEBMIN_LOG" ]; then
+  cat > /etc/fail2ban/jail.d/webmin.local <<EOF
+[webmin-auth]
+enabled  = true
+port     = ${WEBMIN_PORT:-10000}
+logpath  = $WEBMIN_LOG
+maxretry = 4
+EOF
+  echo "  webmin-auth jail enabled ($WEBMIN_LOG)"
+else
+  rm -f /etc/fail2ban/jail.d/webmin.local
+  echo "  webmin jail skipped — no $WEBMIN_LOG"
+fi
+
 systemctl enable --now fail2ban >/dev/null
 systemctl restart fail2ban
 sleep 1
 fail2ban-client status sshd || true
+if [ -f "$WEBMIN_LOG" ]; then fail2ban-client status webmin-auth || true; fi
 
 # ---------------------------------------------------------------------------
 step "4/4  unattended-upgrades"

@@ -39,6 +39,19 @@ What it sets:
   host then `127.0.0.1`). Set `listen_addresses = 'localhost'` in
   `postgresql.conf` so the DB isn't on a public interface at all — the tunnel
   and all local tooling (provision, migrate, backup) still work.
+- **Webmin** (port 10000) — used for console access. It has a history of
+  pre-auth RCEs, so don't leave it open to the world. In order of preference:
+  1. **Tunnel it** — `ssh -L 10000:127.0.0.1:10000 root@host`, then
+     `https://localhost:10000`; set Webmin to listen on `127.0.0.1` only
+     (`/etc/webmin/miniserv.conf` → `bind=127.0.0.1`) and don't open the port.
+  2. **Restrict to your IP** — `ADMIN_IP=<ip> sudo bash harden.sh` (adds a
+     `ufw allow from <ip> to any port 10000`).
+  3. `OPEN_WEBMIN=any` — open to all; only as a stopgap.
+
+  Regardless: keep Webmin updated (it auto-updates from its own repo), use a
+  strong password + enable its two-factor auth. `harden.sh` adds a fail2ban
+  `webmin-auth` jail when `/var/log/webmin/miniserv.log` is present. Once
+  key-based SSH works you may not need Webmin for console at all.
 - **sshd** (`/etc/ssh/sshd_config.d/10-ops-hardening.conf`) — `PasswordAuthentication no`,
   `PermitRootLogin prohibit-password`, `MaxAuthTries 3`, `LoginGraceTime 30`.
   TCP forwarding stays **on** (pgAdmin/psql tunnel to Postgres). The script
