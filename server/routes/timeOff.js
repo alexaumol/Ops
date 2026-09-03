@@ -81,8 +81,15 @@ router.get("/notifications", requireModuleAccess("time-allocation"), async (req,
     if (empId) {
       isApprover = await isTimeOffApprover(empId);
       if (isApprover) {
+        // Join timeoffrequests so this matches the /requests/pending queue
+        // exactly — a bare COUNT on timeoffrequeststatus also counts orphan
+        // status rows (requests deleted, or imported without their parent),
+        // leaving the badge stuck above zero while the queue is empty.
         const { rows } = await pool.query(
-          `SELECT COUNT(*)::int AS n FROM timeoffrequeststatus WHERE statusid IN (2, 3)`
+          `SELECT COUNT(*)::int AS n
+             FROM timeoffrequests r
+             JOIN timeoffrequeststatus s ON s.timeoffreqid = r.id
+            WHERE s.statusid IN (2, 3)`
         );
         pendingApprovals = rows[0].n;
       }
