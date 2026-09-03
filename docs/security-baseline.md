@@ -34,6 +34,11 @@ What it sets:
   rules. **Zitadel must publish only to `127.0.0.1`** (`127.0.0.1:8080:8080`
   in the compose/run args) — nginx is the only thing that should reach it.
   Check: `ss -tlnp | grep -v 127.0.0.1` should show only 22/80/443.
+- **Postgres** — direct access from outside is intentionally closed. Reach the
+  DB over an **SSH tunnel** (pgAdmin → connection → *SSH Tunnel* tab; Postgres
+  host then `127.0.0.1`). Set `listen_addresses = 'localhost'` in
+  `postgresql.conf` so the DB isn't on a public interface at all — the tunnel
+  and all local tooling (provision, migrate, backup) still work.
 - **sshd** (`/etc/ssh/sshd_config.d/10-ops-hardening.conf`) — `PasswordAuthentication no`,
   `PermitRootLogin prohibit-password`, `MaxAuthTries 3`, `LoginGraceTime 30`.
   TCP forwarding stays **on** (pgAdmin/psql tunnel to Postgres). The script
