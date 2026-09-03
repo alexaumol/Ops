@@ -38,8 +38,8 @@
 const express = require("express");
 const { pool } = require("../config/db");
 const { requireModuleAccess } = require("../lib/permissions");
-const { graphConfigured, createProjectFolder } = require("../lib/graph");
 const { logAudit } = require("../lib/audit");
+const externalSync = require("../lib/externalSync");
 
 const router = express.Router();
 
@@ -358,21 +358,21 @@ router.post("/", requireModuleAccess("projects"), async (req, res) => {
   }
   client.release();
 
-  // Best-effort OneDrive folder creation (see lib/graph.js) — never lets a
-  // Graph hiccup roll back or fail project creation, which has already
-  // committed by this point. Needs entityId (folder naming: "code_entity
-  // name") and the GRAPH_* env vars to actually be set; skipped silently
-  // otherwise. The frontend surfaces oneDriveFolder in its toast so a
-  // failure here isn't silent to the person creating the project.
+  // Best-effort external-storage folder for the project (see
+  // lib/externalSync.js + Settings → Sync). Never rolls back or fails the
+  // project create, which has already committed. Skipped silently when
+  // there's no entityId or the sync location / GRAPH_* env vars aren't set.
+  // The frontend surfaces oneDriveFolder in its toast so a failure here
+  // isn't silent to the person creating the project.
   let oneDriveFolder = null;
-  if (entityId && graphConfigured()) {
-    const folderName = `${project.code}_${String(entityId).padStart(3, "0")} ${project.name}`;
-    try {
-      const created = await createProjectFolder(folderName);
-      oneDriveFolder = { created: true, name: created.name, webUrl: created.webUrl };
-    } catch (err) {
-      console.error("[POST /api/projects] OneDrive folder creation failed:", err.message);
-      oneDriveFolder = { created: false, error: err.message };
+  if (entityId) {
+    const r = await externalSync.syncProjectFolder(pool, {
+      id: project.id, code: project.code, entityId, name: project.name,
+    });
+    if (r && !r.skipped) {
+      oneDriveFolder = r.error
+        ? { created: false, error: r.error }
+        : { created: true, name: r.name, webUrl: r.webUrl };
     }
   }
 

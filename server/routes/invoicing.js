@@ -70,6 +70,7 @@ const { ensureEntitySchema } = require("../lib/entitySchema");
 const { graphMailConfigured, sendMail } = require("../lib/graph");
 const { smtpConfigured, sendSmtpMail } = require("../lib/mailer");
 const { logAudit } = require("../lib/audit");
+const externalSync = require("../lib/externalSync");
 
 const router = express.Router();
 
@@ -734,6 +735,7 @@ router.post("/projects/:projectId/invoices", async (req, res) => {
           (effectiveAmount != null ? `, ${invCurrency} ${Number(effectiveAmount).toLocaleString()}` : ""),
       })
     );
+    externalSync.syncInvoiceDoc(pool, invoiceId).catch(() => {});
   } catch (err) {
     await client.query("ROLLBACK");
     console.error("[POST /api/invoicing/projects/:projectId/invoices] DB error:", err.message);
@@ -812,6 +814,7 @@ router.patch("/invoices/:id", async (req, res) => {
       kind: "invoice.update",
       desc: `Updated invoice ${codeRows[0]?.invoicecode || `#${id}`}`,
     });
+    externalSync.syncInvoiceDoc(pool, id).catch(() => {});
   } catch (err) {
     await client.query("ROLLBACK");
     console.error("[PATCH /api/invoicing/invoices/:id] DB error:", err.message);
@@ -845,3 +848,6 @@ router.delete("/invoices/:id", async (req, res) => {
 });
 
 module.exports = router;
+// Consumed by lib/externalSync.js (invoice-PDF backup) via a lazy require,
+// to avoid a load-time cycle with the externalSync import above.
+module.exports._loadInvoiceForPdf = loadInvoiceForPdf;
