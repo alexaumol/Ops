@@ -25,9 +25,12 @@ UPDATE public.invoices i
 
 CREATE INDEX invoices_entityid_year_idx ON public.invoices (entityid, invoiceyear, iscorrective);
 
--- A fiscal number, once assigned, is unique. Drafts (invoicecode IS NULL
--- once the V2 create path lands) are exempt.
-CREATE UNIQUE INDEX invoices_invoicecode_uidx
+-- Lookup index on the fiscal number. NOT unique: legacy Access data + the
+-- old pooled numbering left some duplicate `invoicecode` values, and it is
+-- not this migration's place to renumber historical invoices. New
+-- Veri*Factu numbers are kept collision-free by the per-entity advisory
+-- lock + MAX(invoiceseq)+1 in server/lib/verifactu/issue.js (nextInvoiceNumber).
+CREATE INDEX invoices_invoicecode_idx
   ON public.invoices (invoicecode)
   WHERE invoicecode IS NOT NULL;
 
@@ -40,6 +43,7 @@ ALTER TABLE public.taxcompanies ADD COLUMN fiscalcountry varchar(2);
 -- Down Migration
 
 ALTER TABLE public.taxcompanies DROP COLUMN IF EXISTS fiscalcountry;
-DROP INDEX IF EXISTS public.invoices_invoicecode_uidx;
+DROP INDEX IF EXISTS public.invoices_invoicecode_idx;
+DROP INDEX IF EXISTS public.invoices_invoicecode_uidx;  -- older name, if a pre-fix run created it
 DROP INDEX IF EXISTS public.invoices_entityid_year_idx;
 ALTER TABLE public.invoices DROP COLUMN IF EXISTS entityid;
