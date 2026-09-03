@@ -34,7 +34,8 @@
       <div class="settings-tabs" role="tablist">
         <button data-stab="permissions" class="settings-tab" role="tab" aria-selected="true" data-i18n="settings.tab.permissions">User permissions</button>
         <button data-stab="calendar" class="settings-tab" role="tab" aria-selected="false" data-i18n="settings.tab.calendar">Calendar</button>
-        <button data-stab="paths" class="settings-tab" role="tab" aria-selected="false" data-i18n="settings.tab.paths">Paths</button>
+        <button data-stab="presence" class="settings-tab" role="tab" aria-selected="false" data-i18n="settings.tab.presence">Presence</button>
+        <button data-stab="sync" class="settings-tab" role="tab" aria-selected="false" data-i18n="settings.tab.sync">Sync</button>
         <button data-stab="expcats" class="settings-tab" role="tab" aria-selected="false" data-i18n="settings.tab.expcats">Categories</button>
         <button data-stab="currencies" class="settings-tab" role="tab" aria-selected="false" data-i18n="settings.tab.currencies">Currencies</button>
         <button data-stab="entities" class="settings-tab" role="tab" aria-selected="false" data-i18n="settings.tab.entities">Entities</button>
@@ -120,9 +121,14 @@
       </section>
 
       <!-- ==================== PATHS ==================== -->
-      <section id="panePaths" class="settings-pane hidden">
-        <p class="settings-note" data-i18n="settings.paths.note">Configurable file paths used elsewhere in the app. Changes take effect on the next add/edit that uses them (existing records aren't rewritten automatically).</p>
-        <div id="pathsList" class="paths-list"></div>
+      <section id="panePresence" class="settings-pane hidden">
+        <p class="settings-note" data-i18n="settings.presence.note">Working-time register (Time allocation → Presence) defaults. A Presence admin can also change these from the Presence tab.</p>
+        <div id="presenceList" class="paths-list"></div>
+      </section>
+
+      <section id="paneSync" class="settings-pane hidden">
+        <p class="settings-note" data-i18n="settings.sync.note">Back up app documents to the company's external storage (OneDrive / SharePoint under the customer tenant). Copies happen on the next upload and on the hourly catch-up job; existing files are backfilled on the job's first run.</p>
+        <div id="syncList" class="paths-list"></div>
       </section>
 
       <!-- ==================== CATEGORIES (expense / spectrum / project type) ==================== -->
@@ -392,10 +398,6 @@
             <input type="checkbox" id="userShowBirthday" />
             <span data-i18n="settings.user.showBirthday">Show this birthday in the team calendar</span>
           </label>
-          <label class="settings-field" style="margin-top:0.6rem;"><span data-i18n="settings.user.docsFolder">Documents folder</span>
-            <input type="text" id="userDocPath" readonly placeholder="Set the base folder on the Paths tab" data-i18n-placeholder="settings.user.docsPlaceholder" />
-          </label>
-          <p class="settings-emp-sub" id="userDocPathHint" style="margin:0.3rem 0 0;"></p>
         </div>
 
         <div class="settings-modal-section">

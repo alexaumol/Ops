@@ -326,13 +326,13 @@
 }
 .settings-toggle input { margin: 0; }
 
-/* ---------- Paths tab ---------- */
+/* ---------- Presence / Sync config tabs ---------- */
 .paths-list { display: flex; flex-direction: column; gap: 1.25rem; max-width: 640px; }
 .path-item { display: flex; flex-direction: column; gap: 0.35rem; }
-.path-item label { font-size: 0.85rem; font-weight: 700; color: var(--text-primary); }
+.path-item > label { font-size: 0.85rem; font-weight: 700; color: var(--text-primary); }
 .path-item .path-hint { font-size: 0.78rem; color: var(--text-secondary); margin: 0; }
 .path-item .path-row { display: flex; gap: 0.5rem; align-items: center; }
-.path-item input {
+.path-item .path-row input {
   flex: 1;
   padding: 0.5rem 0.6rem;
   border: 1px solid var(--border-subtle);
@@ -342,6 +342,14 @@
   font-size: 0.88rem;
 }
 .path-item .btn { padding: 0.45rem 0.9rem; font-size: 0.82rem; }
+
+/* boolean / multi config rows */
+.settings-checkgroup { display: flex; flex-direction: column; gap: 0.35rem; }
+.settings-checkline {
+  display: flex; align-items: center; gap: 0.5rem;
+  font-size: 0.85rem; font-weight: 600; color: var(--text-primary);
+}
+.settings-checkline input { margin: 0; width: auto; flex: none; }
 
 .settings-note {
   font-size: 0.85rem;
