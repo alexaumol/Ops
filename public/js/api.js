@@ -184,6 +184,8 @@ const HITT_API = (() => {
       request(`/api/settings/employees/${id}/role`, { method: "PATCH", body: JSON.stringify({ isAdmin }) }),
     setEmployeeTimeOffApprover: (id, isTimeOffApprover) =>
       request(`/api/settings/employees/${id}/timeoff-approver`, { method: "PATCH", body: JSON.stringify({ isTimeOffApprover }) }),
+    setEmployeePresenceRole: (id, role, granted) =>
+      request(`/api/settings/employees/${id}/presence-role`, { method: "PATCH", body: JSON.stringify({ role, granted }) }),
     setEmployeeModuleAccess: (id, moduleKey, hasAccess) =>
       request(`/api/settings/employees/${id}/module-access`, { method: "PATCH", body: JSON.stringify({ moduleKey, hasAccess }) }),
     setEmployeeStatus: (id, isDeactivated) =>
@@ -395,6 +397,42 @@ const HITT_API = (() => {
       const qs = params.toString();
       return request(`/api/reports/stale-projects${qs ? `?${qs}` : ""}`);
     },
+
+    // Presence register ("Presence" tab — registro de jornada)
+    getPresenceConfig: () => request("/api/presence/config"),
+    setPresenceConfig: (payload) => request("/api/presence/config", { method: "PUT", body: JSON.stringify(payload) }),
+    getPresenceToday: () => request("/api/presence/me/today"),
+    getPresenceRegister: (from, to, employeeId) => {
+      const p = new URLSearchParams();
+      if (from) p.set("from", from);
+      if (to) p.set("to", to);
+      const path = employeeId ? `/api/presence/employees/${encodeURIComponent(employeeId)}` : "/api/presence/me";
+      const qs = p.toString();
+      return request(`${path}${qs ? `?${qs}` : ""}`);
+    },
+    presenceClock: (payload) => request("/api/presence/clock", { method: "POST", body: JSON.stringify(payload) }),
+    presenceManual: (payload) => request("/api/presence/manual", { method: "POST", body: JSON.stringify(payload) }),
+    getPresenceMonthly: (year, month, employeeId, regenerate) => {
+      const p = new URLSearchParams();
+      if (year) p.set("year", year);
+      if (month) p.set("month", month);
+      if (employeeId) p.set("employeeId", employeeId);
+      if (regenerate) p.set("regenerate", "1");
+      const qs = p.toString();
+      return request(`/api/presence/monthly${qs ? `?${qs}` : ""}`);
+    },
+    acknowledgePresenceMonthly: (id) => request(`/api/presence/monthly/${id}/acknowledge`, { method: "POST" }),
+    // Presence export as a blob — carries the auth header a plain link can't.
+    fetchPresenceExport: async (from, to, format, employeeId) => {
+      const p = new URLSearchParams({ from, to, format });
+      if (employeeId) p.set("employeeId", employeeId);
+      const res = await fetch(`${base()}/api/presence/export?${p.toString()}`, { headers: { ...(await authHeaders()) } });
+      if (!res.ok) throw new Error("No se pudo generar el registro.");
+      return res.blob();
+    },
+    getPresenceOverview: (date) => request(`/api/presence/overview${date ? `?date=${encodeURIComponent(date)}` : ""}`),
+    getPresenceContract: (employeeId) => request(`/api/presence/contract/${encodeURIComponent(employeeId)}`),
+    addPresenceContract: (employeeId, payload) => request(`/api/presence/contract/${encodeURIComponent(employeeId)}`, { method: "POST", body: JSON.stringify(payload) }),
 
     // Report builder ("My reports" tab)
     getReportDatasets: () => request("/api/reports/datasets"),

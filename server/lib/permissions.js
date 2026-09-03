@@ -65,7 +65,7 @@ if (!["bearer", "hybrid", "header"].includes(AUTH_MODE)) {
 }
 const RESOLVED_AUTH_MODE = ["bearer", "hybrid", "header"].includes(AUTH_MODE) ? AUTH_MODE : "header";
 
-const MODULE_KEYS = ["projects", "business-partners", "time-allocation", "invoicing", "expenses", "reports", "chat"];
+const MODULE_KEYS = ["projects", "business-partners", "time-allocation", "invoicing", "expenses", "reports", "presence", "chat"];
 
 // Resolves the X-HITT-User header (a stub-mode short username OR a real
 // MSAL UPN/email — this app supports both auth modes) to an employees row.
@@ -98,6 +98,26 @@ async function isAdmin(employeeId) {
 async function isTimeOffApprover(employeeId) {
   if (!employeeId) return false;
   const { rows } = await pool.query(`SELECT 1 FROM timeoffapprovers WHERE employeeid = $1`, [employeeId]);
+  return rows.length > 0;
+}
+
+// Presence register (registro de jornada) — two access tiers on top of the
+// employee's own register:
+//   presence admin  — configure the register + act on an employee's behalf
+//   presence viewer — read + export EVERY employee's register (worker legal
+//                     representatives / Inspección de Trabajo), no edit
+// Admins implicitly have both. Managed as allow-lists in Settings → Users.
+async function isPresenceAdmin(employeeId) {
+  if (!employeeId) return false;
+  if (await isAdmin(employeeId)) return true;
+  const { rows } = await pool.query(`SELECT 1 FROM presence_admins WHERE employee_id = $1`, [employeeId]);
+  return rows.length > 0;
+}
+
+async function isPresenceViewer(employeeId) {
+  if (!employeeId) return false;
+  if (await isPresenceAdmin(employeeId)) return true;
+  const { rows } = await pool.query(`SELECT 1 FROM presence_viewers WHERE employee_id = $1`, [employeeId]);
   return rows.length > 0;
 }
 
@@ -242,16 +262,39 @@ function requireTimeOffApprover() {
   };
 }
 
+function requirePresenceRole(check, label) {
+  return async (req, res, next) => {
+    if (req.hittUser?.isDeactivated) {
+      return res.status(403).json({ error: "forbidden", message: "Your account has been deactivated." });
+    }
+    try {
+      if (!(await check(req.hittUser?.employeeId))) {
+        return res.status(403).json({ error: "forbidden", message: label });
+      }
+      next();
+    } catch (err) {
+      console.error("[requirePresenceRole] DB error:", err.message);
+      res.status(502).json({ error: "database_unreachable", message: err.message });
+    }
+  };
+}
+const requirePresenceAdmin = () => requirePresenceRole(isPresenceAdmin, "Presence admin role required.");
+const requirePresenceViewer = () => requirePresenceRole(isPresenceViewer, "You don't have access to other employees' registers.");
+
 module.exports = {
   MODULE_KEYS,
   AUTH_MODE: RESOLVED_AUTH_MODE,
   resolveEmployee,
   isAdmin,
   isTimeOffApprover,
+  isPresenceAdmin,
+  isPresenceViewer,
   canAccessModule,
   attachHittUser,
   requireAuth,
   requireModuleAccess,
   requireAdmin,
   requireTimeOffApprover,
+  requirePresenceAdmin,
+  requirePresenceViewer,
 };
