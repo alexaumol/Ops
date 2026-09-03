@@ -30,6 +30,7 @@ async function getSyncConfig(db) {
     m = Object.fromEntries(rows.map((r) => [r.configkey, r.configvalue]));
   } catch { /* table missing / DB down — treat as unconfigured */ }
   return {
+    enabled: m["sync.enabled"] === "on",
     projectsLocation: (m["sync.projects_location"] || "").trim() || ENV_PROJECT_FOLDER,
     otherLocation: (m["sync.other_docs_location"] || "").trim(),
     docTypes: new Set(String(m["sync.backup_doc_types"] || "").split(",").map((s) => s.trim()).filter(Boolean)),
@@ -95,7 +96,7 @@ async function record(db, kind, refId, fields) {
 
 async function syncExpenseDoc(db, expenseId) {
   const cfg = await getSyncConfig(db);
-  if (!graph.syncConfigured() || !cfg.otherLocation || !cfg.docTypes.has("tickets")) return { skipped: true };
+  if (!cfg.enabled || !graph.syncConfigured() || !cfg.otherLocation || !cfg.docTypes.has("tickets")) return { skipped: true };
 
   let e;
   try {
@@ -138,7 +139,7 @@ async function syncExpenseDoc(db, expenseId) {
 
 async function syncInvoiceDoc(db, invoiceId) {
   const cfg = await getSyncConfig(db);
-  if (!graph.syncConfigured() || !cfg.otherLocation || !cfg.docTypes.has("invoices")) return { skipped: true };
+  if (!cfg.enabled || !graph.syncConfigured() || !cfg.otherLocation || !cfg.docTypes.has("invoices")) return { skipped: true };
 
   let head;
   try {
@@ -193,7 +194,7 @@ async function syncInvoiceDoc(db, invoiceId) {
 async function syncProjectFolder(db, project) {
   // project: { id, code, entityId, name }
   const cfg = await getSyncConfig(db);
-  if (!graph.syncConfigured() || !cfg.projectsLocation) return { skipped: true };
+  if (!cfg.enabled || !graph.syncConfigured() || !cfg.projectsLocation) return { skipped: true };
   if (!project || !project.code || project.entityId == null || project.entityId === "") return { skipped: true };
 
   const folderName = projectFolderName(project.code, project.entityId, project.name);

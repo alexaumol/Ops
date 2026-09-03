@@ -78,11 +78,19 @@ function ensureSettingsSchema() {
 // Configurable values, surfaced on the Settings → Sync and Presence tabs. The
 // server owns this list so the frontend never writes an arbitrary key.
 //
-//   group : "sync" (default) | "presence" — which Settings tab it renders on
-//   type  : "text" (default) | "boolean" ("on"/"") | "multi" (CSV of `options`)
+//   group  : "sync" (default) | "presence" — which Settings tab it renders on
+//   type   : "text" (default) | "boolean" ("on"/"") | "multi" (CSV of `options`)
 //   options (multi only) : [{ value, label }]
+//   master : a boolean that gates the rest of its group in the UI + engine
 const CONFIG_KEYS = {
   // --- Sync tab: external-storage backup ---------------------------------
+  "sync.enabled": {
+    group: "sync",
+    type: "boolean",
+    master: true,
+    label: "Sync documents to an external storage",
+    hint: "Off: the app never touches OneDrive / SharePoint. On: expense tickets, invoices and project folders are backed up as configured below.",
+  },
   "sync.projects_location": {
     group: "sync",
     label: "Projects — external storage location",
