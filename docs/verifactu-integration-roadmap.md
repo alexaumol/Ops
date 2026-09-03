@@ -371,9 +371,16 @@ credentials are treated.
       unchanged for an entity with no series set. *(Finance sign-off on the prefixes + cutover
       date still pending — V0.)*
 
-**V2b — frontend** (follow-up PR): "Issue" button on a draft invoice, the auto-submit checkbox
-in the modal, issued-lock in the UI (hide edit/delete), and a state chip. Touches
-`public/js/invoicing.js` / `invoicing.html` / i18n.
+**V2b — frontend** (`public/js/invoicing.js` / `invoicing.html` / `invoicing.css` / i18n ×3),
+gated on `FEATURES.verifactu`:
+- [x] Project invoice list — Veri*Factu chip on issued rows (sent / pending / error), "Issue"
+      button on drafts, "Retry AEAT" on errored, delete hidden once issued
+- [x] Invoice modal — draft: "Issue invoice" + auto-submit checkbox; issued: form locked,
+      Save/Delete hidden, a status box (AEAT state, queueId, verify link, error + retry)
+- [x] `GET /projects/:id/invoices/verifactu` (bulk state) + `issuedAt`/`autosubmit` on the
+      per-invoice endpoint; both tolerate an un-migrated DB
+- [ ] The cross-project "Invoice view" list still has no chip — folded into **V4** (needs an
+      all-invoices state endpoint); the modal there already shows full state
 
 > VAT-exemption classification (0% → `E1`) is **settled — no advisor sign-off needed**
 > (confirmed 2026-09-03). Exports / reverse charge / intra-community still get their code
