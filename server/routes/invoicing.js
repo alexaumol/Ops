@@ -331,6 +331,53 @@ router.get("/projects/:projectId/invoices", async (req, res) => {
   }
 });
 
+// GET /api/invoicing/projects/:projectId/invoices/verifactu
+// Draft-vs-issued + latest Veri*Factu state per invoice, for the invoice
+// list badges. Kept off the main list query so a not-yet-migrated DB (no
+// issued_at column / no verifactu_records table) just returns {} and the
+// list still renders. Only the frontend with FEATURES.verifactu calls it.
+router.get("/projects/:projectId/invoices/verifactu", requireModuleAccess("invoicing"), async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT i.id,
+              d.issued_at            AS "issuedAt",
+              d.verifactu_autosubmit AS "autosubmit",
+              vf.aeat_state          AS "state",
+              vf.error_text          AS "error",
+              vf.verify_url          AS "verifyUrl",
+              vf.queue_id            AS "queueId"
+         FROM invoices i
+         LEFT JOIN invoicesdetails d ON d.invoiceid = i.id
+         LEFT JOIN LATERAL (
+           SELECT aeat_state, error_text, verify_url, queue_id
+             FROM verifactu_records
+            WHERE invoiceid = i.id AND kind = 'alta'
+            ORDER BY created_at DESC, id DESC
+            LIMIT 1
+         ) vf ON true
+        WHERE i.projectid = $1::double precision`,
+      [req.params.projectId]
+    );
+    const states = {};
+    for (const r of rows) {
+      states[r.id] = {
+        issuedAt: r.issuedAt || null,
+        autosubmit: r.autosubmit == null ? true : !!r.autosubmit,
+        state: r.state || null,
+        error: r.error || null,
+        verifyUrl: r.verifyUrl || null,
+        queueId: r.queueId || null,
+      };
+    }
+    res.json({ states });
+  } catch (err) {
+    // 42P01 undefined_table / 42703 undefined_column → feature not migrated yet.
+    if (err && (err.code === "42P01" || err.code === "42703")) return res.json({ states: {} });
+    console.error("[GET /api/invoicing/projects/:projectId/invoices/verifactu] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
 // GET /api/invoicing/invoices — every invoice across all projects, for the
 // dashboard's "Invoice view" tab. One flat row per invoice with the tax
 // company it's billed to, its project, amount, status, "sent" markers,
@@ -926,6 +973,15 @@ router.post("/invoices/:id/verifactu/retry", requireModuleAccess("invoicing"), a
 // GET /api/invoicing/invoices/:id/verifactu — the latest record for an
 // invoice (state, QR, verification URL, error), for the invoice detail view.
 router.get("/invoices/:id/verifactu", requireModuleAccess("invoicing"), async (req, res) => {
+  let issuedAt = null;
+  let autosubmit = true;
+  try {
+    const d = await pool.query(`SELECT * FROM invoicesdetails WHERE invoiceid = $1`, [req.params.id]);
+    if (d.rows[0]) {
+      issuedAt = d.rows[0].issued_at || null;
+      autosubmit = d.rows[0].verifactu_autosubmit == null ? true : !!d.rows[0].verifactu_autosubmit;
+    }
+  } catch { /* pre-migration — leave defaults */ }
   try {
     const { rows } = await pool.query(
       `SELECT id, kind, environment, queue_id AS "queueId", request_id AS "requestId",
@@ -938,10 +994,10 @@ router.get("/invoices/:id/verifactu", requireModuleAccess("invoicing"), async (r
         ORDER BY created_at DESC, id DESC`,
       [req.params.id]
     );
-    res.json({ records: rows, latest: rows[0] || null });
+    res.json({ issuedAt, autosubmit, records: rows, latest: rows[0] || null });
   } catch (err) {
     // Table missing (migration not run) → feature simply not available yet.
-    if (err && err.code === "42P01") return res.json({ records: [], latest: null });
+    if (err && err.code === "42P01") return res.json({ issuedAt, autosubmit, records: [], latest: null });
     console.error("[GET /api/invoicing/invoices/:id/verifactu] error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });
   }

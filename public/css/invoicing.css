@@ -298,3 +298,53 @@
   background: rgba(92,117,124,0.16); color: #3E5559;
   vertical-align: middle;
 }
+
+/* ── Veri*Factu (Spain e-invoicing) ─────────────────────────────────────
+   Only rendered when HITT_CONFIG.FEATURES.verifactu is on. */
+.inv-vf-chip {
+  display: inline-flex; align-items: center; gap: 0.3em;
+  margin-left: 0.35rem; vertical-align: middle;
+  font-size: 0.66rem; font-weight: 700; white-space: nowrap;
+  padding: 0.12rem 0.5rem; border-radius: 999px;
+  border: 1px solid transparent;
+}
+.inv-vf-chip--draft   { background: rgba(90,86,80,0.12);   color: var(--text-secondary); }
+.inv-vf-chip--issued  { background: rgba(92,117,124,0.16); color: #3E5559; }
+.inv-vf-chip--sent    { background: rgba(47,111,94,0.14);  color: #2F6F5E; }
+.inv-vf-chip--pending { background: rgba(166,102,17,0.14); color: #A66611; }
+.inv-vf-chip--error   { background: rgba(178,74,58,0.14);  color: var(--danger); border-color: rgba(178,74,58,0.4); }
+
+.inv-issue-btn {
+  font-size: 0.7rem; font-weight: 700; white-space: nowrap;
+  padding: 0.2rem 0.6rem; border-radius: 6px;
+  border: 1px solid var(--hitt-teal); background: var(--hitt-teal); color: #fff;
+  cursor: pointer;
+}
+.inv-issue-btn:hover { filter: brightness(1.06); }
+.inv-retry-btn {
+  font-size: 0.7rem; font-weight: 700; white-space: nowrap;
+  padding: 0.2rem 0.6rem; border-radius: 6px;
+  border: 1px solid var(--danger); background: transparent; color: var(--danger);
+  cursor: pointer;
+}
+
+/* modal — auto-submit checkbox + issued status box */
+.inv-vf-autosubmit {
+  display: flex; gap: 0.5rem; align-items: flex-start;
+  margin: 0 0 0.9rem; padding: 0.7rem 0.85rem;
+  border: 1px solid var(--border-subtle); border-radius: 8px;
+  background: var(--surface-sunk, rgba(0,0,0,0.02)); font-size: 0.85rem;
+}
+.inv-vf-autosubmit input { margin-top: 0.15rem; }
+.inv-vf-autosubmit small { display: block; margin-top: 0.15rem; color: var(--text-secondary); font-size: 0.78rem; }
+
+.inv-vf-box {
+  margin: 0 0 1rem; padding: 0.8rem 1rem;
+  border: 1px solid var(--border-subtle); border-left: 3px solid var(--hitt-teal);
+  border-radius: 8px; background: var(--surface-sunk, rgba(0,0,0,0.02));
+  font-size: 0.85rem;
+}
+.inv-vf-box--error { border-left-color: var(--danger); }
+.inv-vf-box h4 { margin: 0 0 0.4rem; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-secondary); }
+.inv-vf-box a { color: var(--hitt-teal); word-break: break-all; }
+.inv-vf-box .inv-vf-err { color: var(--danger); margin-top: 0.35rem; }

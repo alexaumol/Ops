@@ -27,6 +27,10 @@ let PROJECTS = [];
 let LOOKUPS = { statuses: [], scheduleTypes: [], deliveryMethods: [], vatTypes: [], bankAccounts: [], currencies: [] };
 let invLineItems = []; // [{ description, quantity, unitPrice }] for the open invoice modal
 let INVOICES = [];
+// Veri*Factu (Spain) — only active when this instance has the feature on.
+// VF_STATES: invoiceId → { issuedAt, autosubmit, state, error, verifyUrl }
+const VF_ON = !!(window.HITT_CONFIG && window.HITT_CONFIG.FEATURES && window.HITT_CONFIG.FEATURES.verifactu);
+let VF_STATES = {};
 let usingDemoData = false;
 let currentBucket = 'partial';
 let searchTerm = '';
@@ -37,6 +41,7 @@ const projectStatusSel = new Set(); // selected project-status labels; empty = a
 let activeProjectId = null;
 let activeProjectBpId = null;
 let activeInvoiceId = null;
+let modalVf = null; // { issuedAt, autosubmit, latest, records } for the open invoice
 let activeProjectBpTaxCompanies = [];         // the contracting BP's own tax companies
 let activeProjectDefaultTc = null;            // { id, taxcompanyname } — project default for new invoices
 let invTaxCompanyPrev = '';                   // last real value of the invoice-modal select
@@ -589,6 +594,7 @@ async function openInvoiceFromList(inv){
   }
   try { INVOICES = await HITT_API.getProjectInvoices(inv.projectId); }
   catch { INVOICES = []; }
+  await loadVerifactuStates();
   openInvoiceModal(inv.id);
 }
 
@@ -848,7 +854,87 @@ async function loadInvoices(){
     INVOICES = [];
     toast(T('inv.toast.invoicesLoadFail'), 'red');
   }
+  await loadVerifactuStates();
   renderInvoicesTable();
+}
+
+// Draft/issued + AEAT state per invoice, for the list badges. Best-effort:
+// a failure (or the feature being off) just leaves the badges hidden.
+async function loadVerifactuStates(){
+  if (!VF_ON || !activeProjectId) { VF_STATES = {}; return; }
+  try {
+    const { states } = await HITT_API.getProjectInvoiceVerifactu(activeProjectId);
+    VF_STATES = states || {};
+  } catch (err) {
+    console.warn('Could not load Veri*Factu states:', err);
+    VF_STATES = {};
+  }
+}
+
+// Chip for an invoice's Veri*Factu lifecycle, from its VF_STATES entry.
+// '' when the feature is off or the invoice is still an unissued draft with
+// nothing to show.
+function vfChipHtml(invId){
+  if (!VF_ON) return '';
+  const s = VF_STATES[invId];
+  if (!s || !s.issuedAt) return '';
+  const map = {
+    sent:    ['sent',    T('inv.vf.state.sent')],
+    pending: ['pending', T('inv.vf.state.pending')],
+    error:   ['error',   T('inv.vf.state.error')],
+  };
+  const [cls, label] = map[s.state] || ['issued', T('inv.vf.state.issued')];
+  const title = s.state === 'error' && s.error ? ` title="${escapeHtml(s.error)}"` : '';
+  return `<span class="inv-vf-chip inv-vf-chip--${cls}"${title}>${escapeHtml(label)}</span>`;
+}
+function vfIsDraft(invId){ return VF_ON && !(VF_STATES[invId] && VF_STATES[invId].issuedAt); }
+
+// A one-line summary of an issue/retry result for a toast.
+function vfResultTone(r){
+  const st = (r && (r.verifactu?.state || r.state)) || null;
+  if (st === 'error') return 'red';
+  if (st === 'pending' || st === 'skipped') return 'navy';
+  return 'green';
+}
+function vfResultMsg(r){
+  const v = (r && (r.verifactu || r)) || {};
+  if (v.state === 'sent')    return T('inv.toast.vf.sent');
+  if (v.state === 'pending') return T('inv.toast.vf.pending');
+  if (v.state === 'error')   return T('inv.toast.vf.error', { msg: v.message || '' });
+  if (v.state === 'skipped') return T('inv.toast.issued');
+  return T('inv.toast.issued');
+}
+
+async function issueInvoiceFlow(invoiceId, { autosubmit } = {}){
+  const inv = INVOICES.find(x => x.id === invoiceId);
+  const code = inv?.invoicecode || T('inv.draft');
+  if (!confirm(T('inv.vf.confirmIssue', { code }))) return;
+  try {
+    const payload = typeof autosubmit === 'boolean' ? { autosubmit } : {};
+    const r = await HITT_API.issueInvoice(invoiceId, payload);
+    toast(vfResultMsg(r), vfResultTone(r));
+    await refreshAfterInvoiceChange();
+  } catch (err) {
+    console.error(err);
+    toast(err.message || T('inv.toast.issueFail'), 'red');
+  }
+}
+
+async function retryVerifactuFlow(invoiceId){
+  try {
+    const r = await HITT_API.retryInvoiceVerifactu(invoiceId);
+    toast(vfResultMsg(r), vfResultTone(r));
+    await refreshAfterInvoiceChange();
+  } catch (err) {
+    console.error(err);
+    toast(err.message || T('inv.toast.vf.retryFail'), 'red');
+  }
+}
+
+async function refreshAfterInvoiceChange(){
+  await loadInvoices();
+  await loadProjects();
+  maybeRefreshAllInvoices();
 }
 
 function sentBadgeTitle(inv){
@@ -869,30 +955,43 @@ function renderInvoicesTable(){
     return;
   }
   empty.classList.add('hidden');
-  tbody.innerHTML = INVOICES.map((inv, i) => `
+  tbody.innerHTML = INVOICES.map((inv, i) => {
+    const draft = vfIsDraft(inv.id);
+    const errored = VF_ON && VF_STATES[inv.id] && VF_STATES[inv.id].state === 'error';
+    return `
     <tr data-i="${i}" style="cursor:pointer;">
       <td>${escapeHtml(inv.invoicecode || T('inv.draft'))}</td>
       <td>
         <span class="inv-status-pill inv-status-${inv.invoicestatusid}">${escapeHtml(inv.statusLabel || '—')}</span>
         ${inv.emailedAt ? `<span class="inv-sent-badge" title="${escapeHtml(sentBadgeTitle(inv))}">${T('inv.sent.badge')}</span>` : ''}
+        ${vfChipHtml(inv.id)}
       </td>
       <td style="text-align:right;" class="${Number(inv.amount) < 0 ? 'inv-money inv-money--neg' : 'inv-money'}">${formatMoney(inv.amount, inv.currency)}</td>
       <td style="text-align:right;">${formatMoney(inv.vatamount, inv.currency)}</td>
       <td>${formatDateOnly(inv.invoicedate)}</td>
       <td>${escapeHtml(inv.invoicingPartnerLabel || '—')}</td>
       <td style="white-space:nowrap;">
+        ${draft ? `<button class="inv-issue-btn" data-issue title="${T('inv.vf.issueTip')}">${T('inv.vf.issue')}</button>` : ''}
+        ${errored ? `<button class="inv-retry-btn" data-retry title="${T('inv.vf.retryTip')}">${T('inv.vf.retry')}</button>` : ''}
         <button class="ta-remove-btn" data-pdf title="${T('inv.tip.viewPdf')}">📄</button>
         <button class="ta-remove-btn" data-email title="${T('inv.tip.email')}">📧</button>
       </td>
-      <td><button class="ta-remove-btn" data-delete title="${T('inv.tip.delete')}">✕</button></td>
+      <td>${VF_ON && !draft ? '' : `<button class="ta-remove-btn" data-delete title="${T('inv.tip.delete')}">✕</button>`}</td>
     </tr>
-  `).join('');
+  `;
+  }).join('');
 
   tbody.querySelectorAll('tr').forEach((tr, i) => {
     tr.addEventListener('click', (e) => {
-      if (e.target.closest('[data-delete], [data-pdf], [data-email]')) return;
+      if (e.target.closest('[data-delete], [data-pdf], [data-email], [data-issue], [data-retry]')) return;
       openInvoiceModal(INVOICES[i].id);
     });
+  });
+  tbody.querySelectorAll('[data-issue]').forEach((btn, i) => {
+    btn.addEventListener('click', (e) => { e.stopPropagation(); issueInvoiceFlow(INVOICES[i].id); });
+  });
+  tbody.querySelectorAll('[data-retry]').forEach((btn, i) => {
+    btn.addEventListener('click', (e) => { e.stopPropagation(); retryVerifactuFlow(INVOICES[i].id); });
   });
   tbody.querySelectorAll('[data-pdf]').forEach((btn, i) => {
     btn.addEventListener('click', (e) => {
@@ -1146,6 +1245,26 @@ async function openInvoiceModal(invoiceId){
   document.getElementById('invViewPdf').classList.toggle('hidden', !inv);
   document.getElementById('invEmail').classList.toggle('hidden', !inv);
 
+  // Veri*Factu: paint from the list state we already have (so an issued
+  // invoice opens locked, no flash of editable fields), then confirm with a
+  // fresh fetch. No-op unless FEATURES.verifactu is on.
+  modalVf = (VF_ON && inv && VF_STATES[inv.id]) ? { ...VF_STATES[inv.id] } : null;
+  applyVerifactuToModal(modalVf, !!inv);
+  if (VF_ON && inv) {
+    HITT_API.getInvoiceVerifactu(inv.id).then((vf) => {
+      if (activeInvoiceId !== invoiceId) return;
+      modalVf = {
+        issuedAt: vf.issuedAt || null,
+        autosubmit: vf.autosubmit == null ? true : !!vf.autosubmit,
+        state: vf.latest ? vf.latest.state : null,
+        error: vf.latest ? vf.latest.errorText : null,
+        verifyUrl: vf.latest ? vf.latest.verifyUrl : null,
+        queueId: vf.latest ? vf.latest.queueId : null,
+      };
+      applyVerifactuToModal(modalVf, true);
+    }).catch((err) => console.warn('Could not load invoice Veri*Factu state:', err));
+  }
+
   // Reset the unsaved-edits badge; show "last updated by" when we have it.
   document.getElementById('invChangedBadge').classList.add('hidden');
   const updatedInfo = document.getElementById('invUpdatedInfo');
@@ -1245,7 +1364,98 @@ document.getElementById('invTaxCompany').addEventListener('change', (e) => {
 function closeInvoiceModal(){
   invoiceOverlay.classList.add('hidden');
   activeInvoiceId = null;
+  modalVf = null;
+  setModalLocked(false);
 }
+
+/* ── Veri*Factu in the invoice modal ─────────────────────────────────── */
+
+// Lock (issued invoice) / unlock the modal body. Only touches fields this
+// function itself disabled — marked with data-vf-locked — so it never fights
+// the corrective-flag / tax-company-select disabled states openInvoiceModal
+// manages.
+function setModalLocked(locked){
+  const body = document.querySelector('#invoiceOverlay .modal-body');
+  if (!body) return;
+  if (locked) {
+    body.querySelectorAll('input, select, textarea, button').forEach((el) => {
+      if (el.id === 'invAutosubmit') return;
+      if (!el.disabled) { el.disabled = true; el.dataset.vfLocked = '1'; }
+    });
+  } else {
+    body.querySelectorAll('[data-vf-locked]').forEach((el) => {
+      el.disabled = false;
+      delete el.dataset.vfLocked;
+    });
+  }
+}
+
+// vf: normalised { issuedAt, autosubmit, state, error, verifyUrl, queueId } | null
+function applyVerifactuToModal(vf, isExisting){
+  const box = document.getElementById('invVerifactuBox');
+  const autoRow = document.getElementById('invAutosubmitRow');
+  const issueBtn = document.getElementById('invIssue');
+  const retryBtn = document.getElementById('invRetryVf');
+  const saveBtn = document.getElementById('invSave');
+  const delBtn = document.getElementById('invDelete');
+
+  if (!VF_ON) {
+    box.classList.add('hidden');
+    autoRow.classList.add('hidden');
+    issueBtn.classList.add('hidden');
+    retryBtn.classList.add('hidden');
+    return;
+  }
+
+  const issued = !!(vf && vf.issuedAt);
+  const isDraftExisting = isExisting && !issued;
+
+  autoRow.classList.toggle('hidden', !isDraftExisting);
+  document.getElementById('invAutosubmit').checked = vf ? vf.autosubmit !== false : true;
+
+  issueBtn.classList.toggle('hidden', !isDraftExisting);
+  issueBtn.disabled = false;
+  retryBtn.disabled = false;
+  saveBtn.classList.toggle('hidden', issued);
+  delBtn.classList.toggle('hidden', issued || !isExisting);
+  retryBtn.classList.toggle('hidden', !(issued && vf && vf.state === 'error'));
+
+  setModalLocked(issued);
+
+  if (!issued) { box.classList.add('hidden'); box.innerHTML = ''; return; }
+
+  const stateKey = vf.state || 'issued';
+  const stateLabel = ({
+    sent: T('inv.vf.state.sent'), pending: T('inv.vf.state.pending'),
+    error: T('inv.vf.state.error'), issued: T('inv.vf.state.issued'),
+  })[stateKey] || stateKey;
+  box.classList.toggle('inv-vf-box--error', stateKey === 'error');
+  box.innerHTML = `
+    <h4>${T('inv.vf.boxTitle')}</h4>
+    <div><strong>${escapeHtml(stateLabel)}</strong>${vf.queueId ? ` · <span class="inv-vf-chip inv-vf-chip--${stateKey === 'error' ? 'error' : (stateKey === 'sent' ? 'sent' : 'issued')}">#${escapeHtml(String(vf.queueId))}</span>` : ''}</div>
+    ${vf.verifyUrl ? `<div style="margin-top:0.3rem;"><a href="${escapeHtml(vf.verifyUrl)}" target="_blank" rel="noopener">${T('inv.vf.verifyLink')}</a></div>` : ''}
+    ${vf.state === 'error' && vf.error ? `<div class="inv-vf-err">${escapeHtml(vf.error)}</div>` : ''}
+    ${vf.state === 'pending' ? `<div style="margin-top:0.3rem; color:var(--text-secondary);">${T('inv.vf.pendingHint')}</div>` : ''}
+  `;
+  box.classList.remove('hidden');
+}
+
+document.getElementById('invIssue').addEventListener('click', async () => {
+  if (!activeInvoiceId) return;
+  const autosubmit = document.getElementById('invAutosubmit').checked;
+  document.getElementById('invIssue').disabled = true;
+  await issueInvoiceFlow(activeInvoiceId, { autosubmit });
+  closeInvoiceModal();
+});
+
+document.getElementById('invRetryVf').addEventListener('click', async () => {
+  if (!activeInvoiceId) return;
+  document.getElementById('invRetryVf').disabled = true;
+  const id = activeInvoiceId;
+  await retryVerifactuFlow(id);
+  // reopen so the refreshed status shows
+  if (INVOICES.find((x) => x.id === id)) openInvoiceModal(id); else closeInvoiceModal();
+});
 document.getElementById('invClose').addEventListener('click', closeInvoiceModal);
 document.getElementById('invCancel').addEventListener('click', closeInvoiceModal);
 invoiceOverlay.addEventListener('click', (e) => { if (e.target === invoiceOverlay) closeInvoiceModal(); });

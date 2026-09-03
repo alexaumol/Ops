@@ -315,6 +315,15 @@ const HITT_API = (() => {
     getInvoiceEmailDefaults: (id) => request(`/api/invoicing/invoices/${id}/email`),
     sendInvoiceEmail: (id, payload) =>
       request(`/api/invoicing/invoices/${id}/email`, { method: "POST", body: JSON.stringify(payload) }),
+    // Veri*Factu (Spain) — see server/lib/verifactu/issue.js. Only called
+    // from the invoicing UI when HITT_CONFIG.FEATURES.verifactu is on.
+    getProjectInvoiceVerifactu: (projectId) =>
+      request(`/api/invoicing/projects/${projectId}/invoices/verifactu`),
+    getInvoiceVerifactu: (id) => request(`/api/invoicing/invoices/${id}/verifactu`),
+    issueInvoice: (id, payload = {}) =>
+      request(`/api/invoicing/invoices/${id}/issue`, { method: "POST", body: JSON.stringify(payload) }),
+    retryInvoiceVerifactu: (id) =>
+      request(`/api/invoicing/invoices/${id}/verifactu/retry`, { method: "POST" }),
     createProject: (payload) =>
       request("/api/projects", { method: "POST", body: JSON.stringify(payload) }),
     updateProjectStage: (id, stage, employeeId) =>
