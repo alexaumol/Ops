@@ -5,6 +5,10 @@
  *
  *   npm run verifactu:test        (runs this + the mapping suite)
  */
+// issue.js transitively pulls in config/db.js (for its non-pure functions);
+// load .env first so that module doesn't warn about missing PG* vars. The
+// tests below never touch the DB.
+require("../lib/loadEnv");
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { toOpsInvoice, madridDate } = require("../lib/verifactu/issue");
