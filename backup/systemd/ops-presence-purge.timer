@@ -1,0 +1,10 @@
+[Unit]
+Description=Run the Ops presence-register retention purge monthly
+
+[Timer]
+OnCalendar=*-*-01 03:30:00
+RandomizedDelaySec=3600
+Persistent=true
+
+[Install]
+WantedBy=timers.target

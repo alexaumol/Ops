@@ -31,6 +31,7 @@ const MODULE_LABELS = {
   "invoicing": "Invoicing",
   "expenses": "Expenses",
   "reports": "Reports",
+  "presence": "Presence",
   "chat": "Ops assistant",
 };
 
@@ -88,6 +89,18 @@ function renderRow(emp) {
       <td>
         <label class="switch" title="Time-off approver">
           <input type="checkbox" class="approverToggle" data-emp="${emp.id}" ${emp.isTimeOffApprover ? "checked" : ""} ${deactivated ? "disabled" : ""} />
+          <span class="switch-track"></span>
+        </label>
+      </td>
+      <td>
+        <label class="switch" title="Presence admin — configure the working-time register + record clock entries on someone's behalf">
+          <input type="checkbox" class="presenceRoleToggle" data-emp="${emp.id}" data-role="admin" ${emp.isPresenceAdmin ? "checked" : ""} ${deactivated ? "disabled" : ""} />
+          <span class="switch-track"></span>
+        </label>
+      </td>
+      <td>
+        <label class="switch" title="Presence viewer — read + export every register (worker representatives / labour inspector)">
+          <input type="checkbox" class="presenceRoleToggle" data-emp="${emp.id}" data-role="viewer" ${emp.isPresenceViewer ? "checked" : ""} ${deactivated ? "disabled" : ""} />
           <span class="switch-track"></span>
         </label>
       </td>
@@ -314,6 +327,12 @@ document.getElementById("empTableBody").addEventListener("change", async (e) => 
       await HITT_API.setEmployeeTimeOffApprover(empId, isApprover);
       emp.isTimeOffApprover = isApprover;
       toast(`${emp.name}: ${isApprover ? "granted" : "removed"} time-off approver.`, "green");
+    } else if (e.target.classList.contains("presenceRoleToggle")) {
+      const role = e.target.dataset.role;
+      const granted = e.target.checked;
+      await HITT_API.setEmployeePresenceRole(empId, role, granted);
+      if (role === "admin") emp.isPresenceAdmin = granted; else emp.isPresenceViewer = granted;
+      toast(`${emp.name}: ${granted ? "granted" : "removed"} presence ${role}.`, "green");
     } else if (e.target.classList.contains("moduleAccessToggle")) {
       const chip = e.target.closest(".module-chip");
       const moduleKey = chip.dataset.module;

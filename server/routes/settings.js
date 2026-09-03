@@ -83,6 +83,43 @@ const CONFIG_KEYS = {
     hint: "Each employee's document folder is this path plus their username. Used to fill employeesinfo.employeedocumentpath when a user is added or edited.",
     placeholder: "/HITT Shared/HR/Employees",
   },
+  // Presence register (Time allocation → Presence). Also editable by a
+  // "Presence admin" via PUT /api/presence/config.
+  "presence.timezone": {
+    label: "Presence — timezone",
+    hint: "IANA timezone the working-day is recorded in (Spanish law: local wall-clock). Default Europe/Madrid.",
+    placeholder: "Europe/Madrid",
+  },
+  "presence.default_daily_minutes": {
+    label: "Presence — default working minutes per day",
+    hint: "Used when an employee has no specific working-time contract row. 480 = 8 h.",
+    placeholder: "480",
+  },
+  "presence.workdays": {
+    label: "Presence — default working weekdays",
+    hint: "ISO day numbers, comma-separated. 1 = Monday … 7 = Sunday. Default 1,2,3,4,5.",
+    placeholder: "1,2,3,4,5",
+  },
+  "presence.method_doc": {
+    label: "Presence — register method (consultation record)",
+    hint: "The collective agreement / company agreement / employer decision (after consulting worker representatives) that establishes this register. Text or a link. Printed on the exported PDF.",
+    placeholder: "Acuerdo de empresa de DD/MM/AAAA",
+  },
+  "presence.retention_months": {
+    label: "Presence — retention (months)",
+    hint: "Records are kept this long, then hard-deleted by `npm run presence:purge`. Legal minimum is 48 (four years).",
+    placeholder: "48",
+  },
+  "presence.legal_hold": {
+    label: "Presence — legal hold",
+    hint: "Set to 'on' during a labour dispute or inspection to stop the retention purge from deleting anything. 'off' otherwise.",
+    placeholder: "off",
+  },
+  "presence.privacy_notice": {
+    label: "Presence — privacy notice",
+    hint: "Short text shown to employees from the Presence tab (purpose, legal basis, retention, rights). Optional.",
+    placeholder: "",
+  },
 };
 
 async function getConfig(key) {
@@ -112,15 +149,19 @@ const EMPLOYEE_ROW_SELECT = `
          TRIM(CONCAT(e.employeefirstname, ' ', e.employeelastname)) AS name,
          (a.employeeid IS NOT NULL) AS "isAdmin",
          (t.employeeid IS NOT NULL) AS "isTimeOffApprover",
+         (pa.employee_id IS NOT NULL) AS "isPresenceAdmin",
+         (pv.employee_id IS NOT NULL) AS "isPresenceViewer",
          COALESCE(ARRAY_AGG(mr.modulekey) FILTER (WHERE mr.modulekey IS NOT NULL), '{}') AS "restrictedModules"
   FROM employees e
   LEFT JOIN admins a ON a.employeeid = e.id
   LEFT JOIN timeoffapprovers t ON t.employeeid = e.id
+  LEFT JOIN presence_admins pa ON pa.employee_id = e.id
+  LEFT JOIN presence_viewers pv ON pv.employee_id = e.id
   LEFT JOIN modulerestrictions mr ON mr.employeeid = e.id
 `;
 const EMPLOYEE_ROW_GROUP_BY = `
   GROUP BY e.id, e.username, e.emailid, e.deactivated, e.employeefirstname, e.employeelastname,
-           a.employeeid, t.employeeid
+           a.employeeid, t.employeeid, pa.employee_id, pv.employee_id
 `;
 
 async function employeeRow(id) {
@@ -377,6 +418,35 @@ router.patch("/employees/:id/timeoff-approver", async (req, res) => {
       logAudit(req, { kind: "settings.approver", desc: `${isTimeOffApprover ? "Granted" : "Removed"} time-off approver: ${name}` }));
   } catch (err) {
     console.error("[PATCH /employees/:id/timeoff-approver] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
+// PATCH /api/settings/employees/:id/presence-role   { role: 'admin'|'viewer', granted: boolean }
+// Presence admin  — configure the register + record fichajes on someone's behalf.
+// Presence viewer — read + export EVERY register (worker legal representatives /
+//                   Inspección de Trabajo); no edit.
+router.patch("/employees/:id/presence-role", async (req, res) => {
+  const employeeId = Number(req.params.id);
+  const { role, granted } = req.body || {};
+  const table = role === "admin" ? "presence_admins" : role === "viewer" ? "presence_viewers" : null;
+  if (!Number.isInteger(employeeId) || !table || typeof granted !== "boolean") {
+    return res.status(400).json({ error: "bad_request", message: "role ('admin'|'viewer') and granted (boolean) are required." });
+  }
+  try {
+    if (granted) {
+      await pool.query(
+        `INSERT INTO ${table} (employee_id, grantedby) VALUES ($1, $2) ON CONFLICT (employee_id) DO NOTHING`,
+        [employeeId, req.hittUser.employeeId]
+      );
+    } else {
+      await pool.query(`DELETE FROM ${table} WHERE employee_id = $1`, [employeeId]);
+    }
+    res.json({ employeeId, role, granted });
+    employeeName(employeeId).then((name) =>
+      logAudit(req, { kind: "settings.presence-role", desc: `${granted ? "Granted" : "Removed"} presence ${role}: ${name}` }));
+  } catch (err) {
+    console.error("[PATCH /employees/:id/presence-role] DB error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });
   }
 });

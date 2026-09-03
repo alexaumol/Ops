@@ -1,0 +1,18 @@
+[Unit]
+Description=Ops — presence register retention purge (RDL 8/2019, 4-year retention)
+Wants=network-online.target
+After=network-online.target postgresql.service
+
+[Service]
+Type=oneshot
+User=root
+# Reads the same DB env the API uses (PGHOST/PGPORT/PGDATABASE/PGUSER/PGPASSWORD).
+EnvironmentFile=/opt/ops/server/.env
+WorkingDirectory=/opt/ops/server
+ExecStart=/usr/bin/npm run presence:purge
+TimeoutStartSec=1800
+Nice=10
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
