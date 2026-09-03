@@ -66,36 +66,40 @@ document.getElementById("mxRetake").addEventListener("click", () => {
   previewEl.classList.add("hidden");
 });
 
-// A phone camera photo easily runs 8-20+ MB — well past the server's 15 MB
-// evidence-upload cap (server/routes/expenses.js) and slow over cellular
-// data for what's just a receipt. Downscale + re-encode as JPEG before it
-// ever leaves the phone; a 1920px-long-edge JPEG is plenty to read a ticket
-// and typically lands under 1 MB. Falls back to the original file untouched
-// if decoding fails (e.g. a format the browser's <img> can't open) so a
-// photo is never silently dropped.
-function compressImage(file, { maxDim = 1920, quality = 0.82 } = {}) {
-  return new Promise((resolve) => {
-    if (!/^image\//.test(file.type)) { resolve(file); return; }
-    const url = URL.createObjectURL(file);
-    const img = new Image();
-    img.onload = () => {
-      URL.revokeObjectURL(url);
-      const scale = Math.min(1, maxDim / Math.max(img.naturalWidth, img.naturalHeight));
-      const w = Math.round(img.naturalWidth * scale) || img.naturalWidth;
-      const h = Math.round(img.naturalHeight * scale) || img.naturalHeight;
-      const canvas = document.createElement("canvas");
-      canvas.width = w;
-      canvas.height = h;
-      canvas.getContext("2d").drawImage(img, 0, 0, w, h);
-      canvas.toBlob((blob) => {
-        if (!blob || blob.size >= file.size) { resolve(file); return; }
-        const name = (file.name || "receipt").replace(/\.\w+$/, "") + ".jpg";
-        resolve(new File([blob], name, { type: "image/jpeg" }));
-      }, "image/jpeg", quality);
-    };
-    img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
-    img.src = url;
-  });
+// A phone camera photo easily runs 8-20+ MB at 12-50 megapixels — well past
+// the server's 15 MB evidence-upload cap (server/routes/expenses.js) and
+// slow over cellular data for what's just a receipt.
+//
+// This deliberately uses createImageBitmap's resize option rather than the
+// more obvious new Image() + canvas approach: decoding a large photo into
+// an <img>/Image first materializes its FULL-resolution pixel buffer in
+// memory before anything gets scaled down (a 48 MP photo is ~180 MB of raw
+// RGBA) — that's exactly what was crashing mobile browsers with an
+// "insufficient memory" error right after taking the photo. Asking
+// createImageBitmap to resize during decode lets the browser use a scaled
+// decode (e.g. JPEG's DCT-based downscaling), so the full-resolution buffer
+// is never allocated at all. Falls back to the original file, untouched, if
+// anything here fails or isn't supported — a photo should never be
+// silently dropped by a client-side optimization.
+async function compressImage(file, { maxDim = 1600, quality = 0.82 } = {}) {
+  if (!/^image\//.test(file.type) || typeof createImageBitmap !== "function") return file;
+  let bitmap = null;
+  try {
+    bitmap = await createImageBitmap(file, { resizeWidth: maxDim, resizeQuality: "medium" });
+    const canvas = document.createElement("canvas");
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    canvas.getContext("2d").drawImage(bitmap, 0, 0);
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
+    if (!blob || blob.size >= file.size) return file;
+    const name = (file.name || "receipt").replace(/\.\w+$/, "") + ".jpg";
+    return new File([blob], name, { type: "image/jpeg" });
+  } catch (err) {
+    console.warn("[mobile-expenses] photo compression skipped:", err?.message || err);
+    return file;
+  } finally {
+    if (bitmap) bitmap.close();
+  }
 }
 
 const MAX_UPLOAD_BYTES = 15 * 1024 * 1024;
