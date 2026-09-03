@@ -319,7 +319,10 @@ const HITT_API = (() => {
     // from the invoicing UI when HITT_CONFIG.FEATURES.verifactu is on.
     getProjectInvoiceVerifactu: (projectId) =>
       request(`/api/invoicing/projects/${projectId}/invoices/verifactu`),
+    getAllInvoiceVerifactu: () => request("/api/invoicing/invoices/verifactu"),
     getInvoiceVerifactu: (id) => request(`/api/invoicing/invoices/${id}/verifactu`),
+    refreshInvoiceVerifactu: (id) =>
+      request(`/api/invoicing/invoices/${id}/verifactu/refresh`, { method: "POST" }),
     issueInvoice: (id, payload = {}) =>
       request(`/api/invoicing/invoices/${id}/issue`, { method: "POST", body: JSON.stringify(payload) }),
     cancelInvoice: (id) =>

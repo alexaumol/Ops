@@ -72,6 +72,7 @@ const { smtpConfigured, sendSmtpMail } = require("../lib/mailer");
 const { logAudit } = require("../lib/audit");
 const externalSync = require("../lib/externalSync");
 const { issueInvoice, cancelInvoice, retryRecord, featureEnabled: verifactuOn, IssueError } = require("../lib/verifactu/issue");
+const { refreshInvoice } = require("../lib/verifactu/poll");
 const { VerifactuError } = require("../lib/verifactu/errors");
 
 const router = express.Router();
@@ -492,6 +493,25 @@ async function loadInvoiceForPdf(invoiceId) {
   const zipCity = [row.taxCompanyZip, row.taxCompanyCity].filter(Boolean).join(" ");
   row.taxCompanyZipCity = row.taxCompanyCountry ? `${zipCity}, (${row.taxCompanyCountry})` : zipCity;
   row.labels = await invoiceLabels(row.languageId);
+
+  // Veri*Factu QR + verification URL for the PDF (latest alta record).
+  // Best-effort: absent on a non-Spanish instance, before the invoice is
+  // issued, or on a DB without the verifactu_records table.
+  try {
+    const vf = await pool.query(
+      `SELECT qr_png, verify_url FROM verifactu_records
+        WHERE invoiceid = $1 AND kind = 'alta' AND qr_png IS NOT NULL
+        ORDER BY created_at DESC, id DESC LIMIT 1`,
+      [invoiceId]
+    );
+    if (vf.rows[0]) {
+      row.verifactuQr = vf.rows[0].qr_png || null;
+      row.verifactuUrl = vf.rows[0].verify_url || null;
+    }
+  } catch (err) {
+    if (err.code !== "42P01") console.warn("[loadInvoiceForPdf] verifactu lookup:", err.message);
+  }
+
   return row;
 }
 
@@ -999,6 +1019,58 @@ router.post("/invoices/:id/verifactu/retry", requireModuleAccess("invoicing"), a
     res.json(rec);
   } catch (err) {
     sendIssueError(res, err, "POST /api/invoicing/invoices/:id/verifactu/retry");
+  }
+});
+
+// POST /api/invoicing/invoices/:id/verifactu/refresh
+// Re-read this invoice's AEAT state from BOLD (no webhooks) and re-send any
+// submission that never reached BOLD. Backs the "Refresh AEAT status" button.
+router.post("/invoices/:id/verifactu/refresh", requireModuleAccess("invoicing"), async (req, res) => {
+  try {
+    const r = await refreshInvoice(req.params.id, { employeeId: req.hittUser?.employeeId || null });
+    res.json(r);
+  } catch (err) {
+    sendIssueError(res, err, "POST /api/invoicing/invoices/:id/verifactu/refresh");
+  }
+});
+
+// GET /api/invoicing/invoices/verifactu — issued-invoice states across every
+// project, for the flat "Invoice view" list badges. Bounded by issued count.
+router.get("/invoices/verifactu", requireModuleAccess("invoicing"), async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT i.id,
+              d.issued_at   AS "issuedAt",
+              alta.aeat_state AS "state", alta.error_text AS "error",
+              alta.verify_url AS "verifyUrl", alta.queue_id AS "queueId",
+              an.aeat_state AS "cancelState"
+         FROM invoices i
+         JOIN invoicesdetails d ON d.invoiceid = i.id AND d.issued_at IS NOT NULL
+         LEFT JOIN LATERAL (
+           SELECT aeat_state, error_text, verify_url, queue_id FROM verifactu_records
+            WHERE invoiceid = i.id AND kind = 'alta' ORDER BY created_at DESC, id DESC LIMIT 1
+         ) alta ON true
+         LEFT JOIN LATERAL (
+           SELECT aeat_state FROM verifactu_records
+            WHERE invoiceid = i.id AND kind = 'anulacion' ORDER BY created_at DESC, id DESC LIMIT 1
+         ) an ON true`
+    );
+    const states = {};
+    for (const r of rows) {
+      states[r.id] = {
+        issuedAt: r.issuedAt || null,
+        state: r.state || null,
+        error: r.error || null,
+        verifyUrl: r.verifyUrl || null,
+        queueId: r.queueId || null,
+        cancelState: r.cancelState || null,
+      };
+    }
+    res.json({ states });
+  } catch (err) {
+    if (err && (err.code === "42P01" || err.code === "42703")) return res.json({ states: {} });
+    console.error("[GET /api/invoicing/invoices/verifactu] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
   }
 });
 
