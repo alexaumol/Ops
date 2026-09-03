@@ -176,6 +176,22 @@
                 <input id="mTcVat" type="text" placeholder="VAT number…" class="field-input" data-i18n-placeholder="bp.tc.vat" />
                 <input id="mTcEmail" type="text" placeholder="Invoicing email…" class="field-input" data-i18n-placeholder="bp.tc.email" />
               </div>
+              <div id="mTcFiscalRow" class="tc-fiscal-row hidden">
+                <label class="field-label" for="mTcFiscalIdType" data-i18n="bp.tc.fiscalIdType">How the AEAT identifies this client (Veri*Factu)</label>
+                <div class="tc-fiscal-grid">
+                  <select id="mTcFiscalIdType" class="field-input">
+                    <option value="nif" data-i18n="bp.tc.fit.nif">Spanish NIF / NIE / CIF</option>
+                    <option value="02" data-i18n="bp.tc.fit.02">EU VAT number</option>
+                    <option value="03" data-i18n="bp.tc.fit.03">Passport</option>
+                    <option value="04" data-i18n="bp.tc.fit.04">Official ID document (their country)</option>
+                    <option value="05" data-i18n="bp.tc.fit.05">Residence certificate</option>
+                    <option value="06" data-i18n="bp.tc.fit.06">Other document</option>
+                    <option value="07" data-i18n="bp.tc.fit.07">NIF, not census-registered</option>
+                  </select>
+                  <input id="mTcFiscalCountry" type="text" maxlength="2" class="field-input" placeholder="ES" data-i18n-placeholder="bp.tc.fiscalCountry" />
+                </div>
+                <p class="tc-fiscal-hint" data-i18n="bp.tc.fiscalHint">For anything other than a Spanish NIF, the 2-letter country code is required.</p>
+              </div>
               <label class="tc-same-addr">
                 <input id="mTcSameAddress" type="checkbox" checked /> <span data-i18n="bp.tc.sameAddress">Same address as the business partner</span>
               </label>

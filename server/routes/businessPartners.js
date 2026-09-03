@@ -553,10 +553,25 @@ async function writeTaxCompanyAddress(client, tcId, bpId, sameAddress, address) 
 }
 
 // GET /api/business-partners/:id/tax-companies
+// Veri*Factu recipient identification (used only when the feature is on).
+//   fiscalidtype  NULL/'nif' → Spanish NIF form; '02'..'07' → foreign / doc form
+//   fiscalcountry ISO-3166-1 alpha-2 (required for a non-'nif' type)
+const FISCAL_ID_TYPES = new Set(["nif", "02", "03", "04", "05", "06", "07"]);
+function fiscalFields(body) {
+  const b = body || {};
+  let type = typeof b.fiscalIdType === "string" ? b.fiscalIdType.trim().toLowerCase() : null;
+  if (type === "" || type === "nif") type = null;              // store NULL for the default
+  if (type && !FISCAL_ID_TYPES.has(type)) type = null;
+  let country = typeof b.fiscalCountry === "string" ? b.fiscalCountry.trim().toUpperCase() : null;
+  if (country && !/^[A-Z]{2}$/.test(country)) country = null;
+  return { fiscalidtype: type, fiscalcountry: country };
+}
+
 router.get("/:id/tax-companies", async (req, res) => {
   try {
     const { rows } = await pool.query(
       `SELECT tc.id, tc.taxcompanyname, tc.vatnumber, tc.emailinvoicing,
+              tc.fiscalidtype, tc.fiscalcountry,
               tca.id AS "addressId", COALESCE(tca.sameaddress, true) AS "sameAddress",
               tca.streetname, tca.city, tca.state, tca.zipcode,
               tca.phonenumber, tca.phonenumber2, tca.countryid,
@@ -585,14 +600,15 @@ router.post("/:id/tax-companies", async (req, res) => {
   if (!taxcompanyname || !taxcompanyname.trim()) {
     return res.status(400).json({ error: "validation_error", message: "taxcompanyname is required" });
   }
+  const fiscal = fiscalFields(req.body);
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
     const { rows } = await client.query(
-      `INSERT INTO taxcompanies (businesspartnerid, taxcompanyname, vatnumber, emailinvoicing)
-       VALUES ($1, $2, $3, $4)
-       RETURNING id, taxcompanyname, vatnumber, emailinvoicing`,
-      [req.params.id, taxcompanyname.trim(), vatnumber || null, emailinvoicing || null]
+      `INSERT INTO taxcompanies (businesspartnerid, taxcompanyname, vatnumber, emailinvoicing, fiscalidtype, fiscalcountry)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING id, taxcompanyname, vatnumber, emailinvoicing, fiscalidtype, fiscalcountry`,
+      [req.params.id, taxcompanyname.trim(), vatnumber || null, emailinvoicing || null, fiscal.fiscalidtype, fiscal.fiscalcountry]
     );
     const taxCompany = rows[0];
     await writeTaxCompanyAddress(client, taxCompany.id, req.params.id, sameAddress, address);
@@ -616,13 +632,16 @@ router.patch("/:id/tax-companies/:tcId", async (req, res) => {
   if (!taxcompanyname || !taxcompanyname.trim()) {
     return res.status(400).json({ error: "validation_error", message: "taxcompanyname is required" });
   }
+  const fiscal = fiscalFields(req.body);
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
     const { rowCount } = await client.query(
-      `UPDATE taxcompanies SET taxcompanyname = $1, vatnumber = $2, emailinvoicing = $3
+      `UPDATE taxcompanies SET taxcompanyname = $1, vatnumber = $2, emailinvoicing = $3,
+              fiscalidtype = $6, fiscalcountry = $7
        WHERE id = $4 AND businesspartnerid = $5::double precision`,
-      [taxcompanyname.trim(), vatnumber || null, emailinvoicing || null, req.params.tcId, req.params.id]
+      [taxcompanyname.trim(), vatnumber || null, emailinvoicing || null, req.params.tcId, req.params.id,
+       fiscal.fiscalidtype, fiscal.fiscalcountry]
     );
     if (!rowCount) {
       await client.query("ROLLBACK");

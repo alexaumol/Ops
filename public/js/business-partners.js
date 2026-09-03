@@ -336,6 +336,20 @@ function renderNotes(rows){
 let TAX_COMPANIES = [];
 let editingTcId = null;
 
+// Veri*Factu recipient-identification fields on the tax-company form —
+// shown only when this instance has the feature on.
+const VF_ON = !!(window.HITT_CONFIG && window.HITT_CONFIG.FEATURES && window.HITT_CONFIG.FEATURES.verifactu);
+if (VF_ON) document.getElementById('mTcFiscalRow')?.classList.remove('hidden');
+
+function syncTcFiscalCountry(){
+  const type = document.getElementById('mTcFiscalIdType');
+  const country = document.getElementById('mTcFiscalCountry');
+  if (!type || !country) return;
+  const foreign = type.value && type.value !== 'nif';
+  country.disabled = !foreign;
+  country.placeholder = foreign ? 'IT' : 'ES';
+}
+
 function renderTaxCompanies(rows){
   if (rows) TAX_COMPANIES = rows;
   const list = document.getElementById('mTaxCompanyList');
@@ -383,6 +397,8 @@ function tcFormInputs(){
     country: document.getElementById('mTcCountry'),
     phone1: document.getElementById('mTcPhone1'),
     phone2: document.getElementById('mTcPhone2'),
+    fiscalIdType: document.getElementById('mTcFiscalIdType'),
+    fiscalCountry: document.getElementById('mTcFiscalCountry'),
   };
 }
 
@@ -397,9 +413,12 @@ function resetTaxCompanyForm(){
   [f.name, f.vat, f.email, f.street, f.city, f.state, f.zip, f.phone1, f.phone2].forEach(el => { el.value = ''; });
   f.same.checked = true;
   f.country.innerHTML = lookupOptionsHtml(LOOKUPS.countries, null, true);
+  if (f.fiscalIdType) f.fiscalIdType.value = 'nif';
+  if (f.fiscalCountry) f.fiscalCountry.value = '';
   document.getElementById('mTcSave').textContent = T('form.add');
   document.getElementById('mTcCancel').style.display = 'none';
   syncTcAddressVisibility();
+  syncTcFiscalCountry();
 }
 
 function startEditTaxCompany(id){
@@ -418,9 +437,12 @@ function startEditTaxCompany(id){
   f.phone1.value = tc.phonenumber || '';
   f.phone2.value = tc.phonenumber2 || '';
   f.country.innerHTML = lookupOptionsHtml(LOOKUPS.countries, tc.countryid, true);
+  if (f.fiscalIdType) f.fiscalIdType.value = tc.fiscalidtype || 'nif';
+  if (f.fiscalCountry) f.fiscalCountry.value = tc.fiscalcountry || '';
   document.getElementById('mTcSave').textContent = T('form.save');
   document.getElementById('mTcCancel').style.display = '';
   syncTcAddressVisibility();
+  syncTcFiscalCountry();
   renderTaxCompanies();
   f.name.focus();
 }
@@ -432,6 +454,8 @@ function taxCompanyPayload(){
     taxcompanyname: f.name.value.trim(),
     vatnumber: f.vat.value.trim() || null,
     emailinvoicing: f.email.value.trim() || null,
+    fiscalIdType: f.fiscalIdType ? f.fiscalIdType.value : 'nif',
+    fiscalCountry: f.fiscalCountry ? f.fiscalCountry.value.trim().toUpperCase() : null,
     sameAddress: same,
     address: same ? null : {
       streetname: f.street.value.trim() || null,
@@ -857,6 +881,7 @@ document.getElementById('mNotesSearch').addEventListener('input', (e) => {
 });
 
 document.getElementById('mTcSameAddress').addEventListener('change', syncTcAddressVisibility);
+document.getElementById('mTcFiscalIdType')?.addEventListener('change', syncTcFiscalCountry);
 document.getElementById('mTcCancel').addEventListener('click', () => { resetTaxCompanyForm(); renderTaxCompanies(); });
 
 document.getElementById('mTcSave').addEventListener('click', async () => {
@@ -864,6 +889,9 @@ document.getElementById('mTcSave').addEventListener('click', async () => {
   if (usingDemoData) { toast(T('bp.demo.noTaxCompanies'), 'navy'); return; }
   const payload = taxCompanyPayload();
   if (!payload.taxcompanyname) { toast(T('bp.tcNameRequired'), 'red'); return; }
+  if (VF_ON && payload.fiscalIdType && payload.fiscalIdType !== 'nif' && !/^[A-Z]{2}$/.test(payload.fiscalCountry || '')) {
+    toast(T('bp.tc.fiscalCountryRequired'), 'red'); return;
+  }
   const wasEditing = editingTcId;
   const btn = document.getElementById('mTcSave');
   btn.disabled = true;
