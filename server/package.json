@@ -14,7 +14,7 @@
     "presence:verify": "node scripts/presence-verify.js",
     "presence:purge": "node scripts/presence-purge.js",
     "sync:external": "node scripts/sync-external.js",
-    "verifactu:test": "node --test scripts/verifactu-mapping.test.js",
+    "verifactu:test": "node --test scripts/verifactu-mapping.test.js scripts/verifactu-issue.test.js",
     "verifactu:smoke": "node scripts/verifactu-smoke.js"
   },
   "dependencies": {

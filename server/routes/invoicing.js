@@ -71,6 +71,8 @@ const { graphMailConfigured, sendMail } = require("../lib/graph");
 const { smtpConfigured, sendSmtpMail } = require("../lib/mailer");
 const { logAudit } = require("../lib/audit");
 const externalSync = require("../lib/externalSync");
+const { issueInvoice, retryRecord, IssueError } = require("../lib/verifactu/issue");
+const { VerifactuError } = require("../lib/verifactu/errors");
 
 const router = express.Router();
 
@@ -765,6 +767,16 @@ router.patch("/invoices/:id", async (req, res) => {
     }
     const row = current.rows[0];
 
+    // Once issued, an invoice is immutable (Veri*Factu). Correct it with a
+    // corrective/rectificativa or cancel it — never an in-place edit.
+    if (row.issued_at) {
+      await client.query("ROLLBACK");
+      return res.status(409).json({
+        error: "invoice_issued",
+        message: "This invoice has been issued and can't be edited. Raise a corrective invoice or cancel it instead.",
+      });
+    }
+
     const items = normalizeLineItems(body.lineItems); // null if not sent
 
     const merged = {
@@ -830,6 +842,20 @@ router.delete("/invoices/:id", async (req, res) => {
   try {
     await ensureInvoicingSchema();
     await client.query("BEGIN");
+
+    // An issued invoice can't be deleted — it exists at the AEAT (or is
+    // queued to). Cancel it (anulación) instead; that lands in phase V3.
+    // SELECT * so a not-yet-migrated DB (no issued_at column) just reads
+    // undefined rather than erroring.
+    const lock = await client.query(`SELECT * FROM invoicesdetails WHERE invoiceid = $1`, [req.params.id]);
+    if (lock.rows[0]?.issued_at) {
+      await client.query("ROLLBACK");
+      return res.status(409).json({
+        error: "invoice_issued",
+        message: "This invoice has been issued and can't be deleted. Cancel it instead.",
+      });
+    }
+
     await client.query(`DELETE FROM invoicelineitems WHERE invoiceid = $1`, [req.params.id]);
     await client.query(`DELETE FROM invoicesdetails WHERE invoiceid = $1`, [req.params.id]);
     const { rows: delRows } = await client.query(`DELETE FROM invoices WHERE id = $1 RETURNING invoicecode`, [req.params.id]);
@@ -844,6 +870,80 @@ router.delete("/invoices/:id", async (req, res) => {
     res.status(502).json({ error: "database_unreachable", message: err.message });
   } finally {
     client.release();
+  }
+});
+
+/* ===================== VERI*FACTU — ISSUE FLOW (phase V2) ============= */
+// See server/lib/verifactu/issue.js. All three are no-ops on a non-Spanish
+// instance except "issue", which still assigns the fiscal number + locks
+// the row (the registration step is simply skipped when the feature/entity
+// is off).
+
+function sendIssueError(res, err, where) {
+  if (err instanceof IssueError) {
+    return res.status(err.status).json({ error: err.code, message: err.message });
+  }
+  if (err && err.name === "MappingError") {
+    return res.status(422).json({ error: "invoice_incomplete", message: err.message });
+  }
+  if (err instanceof VerifactuError) {
+    return res.status(502).json({ error: `verifactu_${err.category}`, code: err.code, message: err.message });
+  }
+  console.error(`[${where}] error:`, err && err.message);
+  return res.status(502).json({ error: "database_unreachable", message: err && err.message });
+}
+
+// POST /api/invoicing/invoices/:id/issue   { autosubmit?: boolean }
+// Assigns the definitive fiscal number, locks the invoice, and (when
+// Veri*Factu is on for its entity and autosubmit is left true) registers it
+// with the AEAT via BOLD.
+router.post("/invoices/:id/issue", requireModuleAccess("invoicing"), async (req, res) => {
+  try {
+    const result = await issueInvoice(req.params.id, {
+      employeeId: req.hittUser?.employeeId || null,
+      autosubmit: req.body && typeof req.body.autosubmit === "boolean" ? req.body.autosubmit : undefined,
+      req,
+    });
+    res.json(result);
+    externalSync.syncInvoiceDoc(pool, Number(req.params.id)).catch(() => {});
+  } catch (err) {
+    sendIssueError(res, err, "POST /api/invoicing/invoices/:id/issue");
+  }
+});
+
+// POST /api/invoicing/invoices/:id/verifactu/retry
+// Re-send a pending / errored registration (uses isFix so BOLD accepts the
+// same number). Used after a data fix, or a BOLD/AEAT outage.
+router.post("/invoices/:id/verifactu/retry", requireModuleAccess("invoicing"), async (req, res) => {
+  try {
+    const rec = await retryRecord(req.params.id, { employeeId: req.hittUser?.employeeId || null, req });
+    res.json(rec);
+  } catch (err) {
+    sendIssueError(res, err, "POST /api/invoicing/invoices/:id/verifactu/retry");
+  }
+});
+
+// GET /api/invoicing/invoices/:id/verifactu — the latest record for an
+// invoice (state, QR, verification URL, error), for the invoice detail view.
+router.get("/invoices/:id/verifactu", requireModuleAccess("invoicing"), async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, kind, environment, queue_id AS "queueId", request_id AS "requestId",
+              aeat_state AS "state", error_code AS "errorCode", error_text AS "errorText",
+              qr_png AS "qrPng", verify_url AS "verifyUrl", chain_hash AS "chainHash",
+              submit_attempts AS "attempts", submitted_at AS "submittedAt",
+              state_checked_at AS "stateCheckedAt"
+         FROM verifactu_records
+        WHERE invoiceid = $1
+        ORDER BY created_at DESC, id DESC`,
+      [req.params.id]
+    );
+    res.json({ records: rows, latest: rows[0] || null });
+  } catch (err) {
+    // Table missing (migration not run) → feature simply not available yet.
+    if (err && err.code === "42P01") return res.json({ records: [], latest: null });
+    console.error("[GET /api/invoicing/invoices/:id/verifactu] error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
   }
 });
 
