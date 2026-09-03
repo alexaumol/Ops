@@ -4,8 +4,8 @@
  * A floating chat panel that talks to POST /api/chat (server/routes/chat.js).
  * The server does all the model + tool work; this file is just UI + history.
  *
- * Loaded on every module page (after js/api.js). It self-injects only when:
- *   - HITT_CONFIG.FEATURES.chatEnabled is true, AND
+ * Loaded on every module page (after js/api.js). It builds itself only when:
+ *   - FEATURES.chatEnabled is not explicitly false, AND
  *   - there's a signed-in session, AND
  *   - GET /api/chat/status reports { enabled: true, configured: true }
  * so it stays invisible until Azure OpenAI is actually wired up server-side.
@@ -220,7 +220,10 @@
     // assistant configured (and the user has access) UNLESS an instance
     // explicitly sets FEATURES.chatEnabled = false. A missing flag = on.
     if (window.HITT_CONFIG?.FEATURES?.chatEnabled === false) return;
-    if (!window.HITT_API || !window.HITT_AUTH?.getSession?.()) return;
+    // HITT_API / HITT_AUTH are top-level `const`s in their scripts — global
+    // identifiers, NOT window properties — so check them by bare name.
+    if (typeof HITT_API === "undefined" || typeof HITT_AUTH === "undefined") return;
+    if (!HITT_AUTH.getSession || !HITT_AUTH.getSession()) return;
     try {
       const status = await HITT_API.getChatStatus();
       if (status?.enabled && status?.configured) {
