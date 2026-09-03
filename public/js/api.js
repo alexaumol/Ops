@@ -330,6 +330,8 @@ const HITT_API = (() => {
     getInvoiceVerifactu: (id) => request(`/api/invoicing/invoices/${id}/verifactu`),
     refreshInvoiceVerifactu: (id) =>
       request(`/api/invoicing/invoices/${id}/verifactu/refresh`, { method: "POST" }),
+    checkInvoiceRecipient: (id) =>
+      request(`/api/invoicing/invoices/${id}/verifactu/check-recipient`, { method: "POST" }),
     issueInvoice: (id, payload = {}) =>
       request(`/api/invoicing/invoices/${id}/issue`, { method: "POST", body: JSON.stringify(payload) }),
     cancelInvoice: (id) =>

@@ -71,7 +71,7 @@ const { graphMailConfigured, sendMail } = require("../lib/graph");
 const { smtpConfigured, sendSmtpMail } = require("../lib/mailer");
 const { logAudit } = require("../lib/audit");
 const externalSync = require("../lib/externalSync");
-const { issueInvoice, cancelInvoice, retryRecord, featureEnabled: verifactuOn, IssueError } = require("../lib/verifactu/issue");
+const { issueInvoice, cancelInvoice, retryRecord, checkRecipient, featureEnabled: verifactuOn, IssueError } = require("../lib/verifactu/issue");
 const { refreshInvoice } = require("../lib/verifactu/poll");
 const { VerifactuError } = require("../lib/verifactu/errors");
 
@@ -1007,6 +1007,17 @@ router.post("/invoices/:id/cancel", requireModuleAccess("invoicing"), async (req
     if (result.cancelled) externalSync.syncInvoiceDoc(pool, Number(req.params.id)).catch(() => {});
   } catch (err) {
     sendIssueError(res, err, "POST /api/invoicing/invoices/:id/cancel");
+  }
+});
+
+// POST /api/invoicing/invoices/:id/verifactu/check-recipient
+// Contrast the recipient NIF + name against the AEAT (BOLD /id_check).
+// Returns { valid: true|false|null, message }. null = not applicable.
+router.post("/invoices/:id/verifactu/check-recipient", requireModuleAccess("invoicing"), async (req, res) => {
+  try {
+    res.json(await checkRecipient(req.params.id));
+  } catch (err) {
+    sendIssueError(res, err, "POST /api/invoicing/invoices/:id/verifactu/check-recipient");
   }
 });
 

@@ -1,6 +1,6 @@
 # Veri*Factu integration — roadmap
 
-Status: **draft / proposal · V1 in progress** · Owner: Alex · Target provider: **BOLD Software** (`apiverifactu.boldsoftware.es`)
+Status: **code complete (V1–V5) · go-live pending** — see [`verifactu-golive.md`](verifactu-golive.md) · Owner: Alex · Provider: **BOLD Software** (`apiverifactu.boldsoftware.es`)
 Reference: [`docs/verifactu-boldsoftware-openapi.yaml`](verifactu-boldsoftware-openapi.yaml) (OpenAPI 3.1, v1.2.0, downloaded 2026-09-01)
 
 ### V0 decisions locked — 2026-09-03
@@ -430,12 +430,17 @@ gated on `FEATURES.verifactu`:
       form, shown only when `FEATURES.verifactu`; country required for a non-NIF type
 - `toOpsInvoice` now produces the `{ id, idType, country }` recipient form for foreign clients
 
-**V5c — go-live** (follow-up):
-- [ ] `/id_check` recipient pre-flight on issue (`verifactu.id_check` option already defined)
-- [ ] Full sandbox E2E (`EMPRESA DE PRUEBAS (PI4)`); cross-check QRs on
-      `prewww2.aeat.es/wlpl/TIKE-CONT/ValidarQR`
-- [ ] Switch one entity to a production key; one real invoice; verify on the prod validator
-- [ ] `docs/0B-config-inventory.md` + `.env.example` + deploy notes (the `verifactu:poll` timer)
+**V5c — go-live prep** (code done; the rest is operational — see
+[`verifactu-golive.md`](verifactu-golive.md)):
+- [x] `/id_check` recipient pre-flight — auto on issue when the `verifactu.id_check` option is
+      on (Spanish NIF recipients; an outage doesn't block, a genuine mismatch keeps the invoice
+      a draft) + a manual **"Check recipient"** button on a draft
+      (`POST /invoices/:id/verifactu/check-recipient`)
+- [x] `backup/systemd/ops-verifactu-poll.{service,timer}` — a 15-min timer for `verifactu:poll`
+- [x] [`docs/verifactu-golive.md`](verifactu-golive.md) — the full sandbox-E2E → advisor →
+      production-cutover checklist
+- [ ] *(operational)* run the sandbox E2E, sign the BOLD production agreement + POA, publish
+      Ops' *declaración responsable*, cut entities over to production keys
 
 ---
 
