@@ -250,6 +250,8 @@ router.get("/me/today", requireModuleAccess("presence"), async (req, res) => {
     const openEvent = stack[stack.length - 1] || null;
     const todaySummary = P.summariseByDay(eff.filter((e) => isoDate(e.local_date) === t))[t] ||
       { segments: [], workedMinutes: 0 };
+    const expected = await expectedByDate(me, t, t, cfg);
+    const context = await contextByDate(me, t, t);
     res.json({
       timezone: cfg.timezone,
       today: t,
@@ -258,6 +260,9 @@ router.get("/me/today", requireModuleAccess("presence"), async (req, res) => {
       locationLabel: openEvent ? openEvent.location_label : null,
       segments: todaySummary.segments,
       workedMinutes: todaySummary.workedMinutes,
+      expectedMinutes: expected[t] || 0,
+      leave: context[t]?.leave || null,
+      holiday: context[t]?.holiday || null,
     });
   } catch (err) {
     console.error("[GET /api/presence/me/today] error:", err.message);

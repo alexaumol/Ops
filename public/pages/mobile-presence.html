@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Presence · HITT Ops</title>
+<meta name="theme-color" content="#171717" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Ops" />
+<link rel="manifest" href="../manifest.json" />
+<link rel="apple-touch-icon" href="../assets/ops-mark.svg" />
+<link rel="icon" href="../assets/ops-mark.svg" />
+<link rel="stylesheet" href="../css/styles.css" />
+<link rel="stylesheet" href="../css/mobile-presence.css" />
+</head>
+<body>
+  <header class="app-header mp-header">
+    <a class="mp-header__back" href="../mobile.html">‹ <span data-i18n="mx.backToMenu">Menu</span></a>
+    <div class="app-header__user">
+      <div class="avatar" id="userAvatar">?</div>
+    </div>
+  </header>
+
+  <main class="mp-shell">
+    <h1 class="mp-title" data-i18n="mp.title">Presence</h1>
+    <p class="mp-legal" data-i18n="ta.pr.legal">
+      Working-time register kept under art. 34.9 of the Estatuto de los Trabajadores (RDL 8/2019).
+      <a id="mpPrivacyLink" href="#" hidden data-i18n="ta.pr.privacyLink">Privacy notice</a>
+    </p>
+
+    <section class="mp-card" id="mpCard" aria-live="polite">
+      <div class="mp-state">
+        <span class="mp-dot" id="mpDot"></span>
+        <span id="mpState" data-i18n="ta.pr.loading">Loading…</span>
+      </div>
+
+      <div class="mp-note hidden" id="mpDayNote"></div>
+
+      <div class="mp-stats">
+        <div class="mp-stat">
+          <span class="mp-stat__label" data-i18n="mp.expected">Expected today</span>
+          <strong class="mp-stat__value" id="mpExpected">—</strong>
+        </div>
+        <div class="mp-stat">
+          <span class="mp-stat__label" data-i18n="mp.committed">Done so far</span>
+          <strong class="mp-stat__value" id="mpCommitted">—</strong>
+        </div>
+        <div class="mp-stat">
+          <span class="mp-stat__label" data-i18n="mp.left">Left</span>
+          <strong class="mp-stat__value" id="mpLeft">—</strong>
+        </div>
+      </div>
+
+      <label class="mp-loc" id="mpLocWrap">
+        <span data-i18n="ta.pr.location">Location</span>
+        <select id="mpLocation">
+          <option value="" data-i18n="ta.pr.loc.none">—</option>
+          <option value="office" data-i18n="ta.pr.loc.office">Office</option>
+          <option value="remote" data-i18n="ta.pr.loc.remote">Remote</option>
+          <option value="client" data-i18n="ta.pr.loc.client">Client site</option>
+        </select>
+      </label>
+
+      <button type="button" class="mp-clock-btn" id="mpClockBtn" disabled data-i18n="ta.pr.clockIn">Clock in</button>
+
+      <div class="mp-today" id="mpToday"></div>
+    </section>
+
+    <p class="mp-foot" data-i18n="mp.foot">
+      Times are recorded on the server in the company time zone. Entries can't be edited here —
+      use a computer to review or correct your register.
+    </p>
+  </main>
+
+  <div id="toastHost" class="toast-host"></div>
+
+  <script src="../js/config.js"></script>
+  <script src="../js/branding.js"></script>
+  <script src="../js/i18n-dict.js"></script>
+  <script src="../js/i18n.js"></script>
+  <script src="../vendor/oidc-client-ts.min.js"></script>
+  <script src="../vendor/msal-browser.min.js"></script>
+  <script src="../js/auth.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/permissions.js"></script>
+  <script src="../js/avatar.js"></script>
+  <script src="../js/mobile-presence.js"></script>
+</body>
+</html>

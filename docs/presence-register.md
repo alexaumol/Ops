@@ -67,6 +67,18 @@ period → **Exportar PDF** (or CSV). Or hit
 carries the legal basis, the method-doc, day-by-day times, and daily +
 period totals; the CSV is the same data for spreadsheet analysis.
 
+## Mobile
+
+`public/mobile.html` → **Fichar entrada / salida** opens `pages/mobile-presence.html`
+— a phone-first screen with one clock in/out button and today's expected /
+done / remaining hours. It is a thin client over the same `/api/presence`
+endpoints (same append-only chain, same server-side timestamping in the org
+timezone, same audit). No editing on mobile — corrections stay on the desktop
+tab. **No device geolocation** is captured (the "Ubicación" field is the same
+self-declared office/remote/client label as the desktop); art. 34.9 ET requires
+times, not location, and adding GPS would move the processing off the
+legal-obligation basis and trigger a DPIA — decided against.
+
 ## Not built (deliberately)
 
 Biometric / kiosk clock-in; geofencing; real-time push to an Inspección
