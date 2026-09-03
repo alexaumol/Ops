@@ -412,12 +412,26 @@ gated on `FEATURES.verifactu`:
 - [ ] Optional `/id_check` pre-flight in the invoice modal — deferred to V5
 
 ### Phase V5 — Settings tab + go-live
-- [ ] Settings → Veri\*Factu tab (§7) + `server/routes/verifactu.js` + entity API-key field + i18n ×3
-- [ ] Full sandbox E2E; cross-check QRs against the AEAT sandbox validator
-      (`prewww2.aeat.es/wlpl/TIKE-CONT/ValidarQR`)
-- [ ] Switch one entity to a production key; issue one real invoice; verify on the AEAT prod
-      validator; then enable the rest
-- [ ] Update [`docs/0B-config-inventory.md`](0B-config-inventory.md) + `.env.example` + deploy notes
+
+**V5a — Settings → Veri\*Factu tab** (`server/routes/verifactu.js`, `settings.html` /
+`settings.js`, mounted at `/api/verifactu`):
+- [x] Status banner (feature on/off, migrated, provider, count ready, PRODUCTION flag)
+- [x] Per-entity table — name, NIF, enabled, environment, series prefix, "API key ✓/✗",
+      issued / pending / error counts — with a per-entity config modal (enable toggle,
+      environment, series, **write-only API key** + "clear key"; the key is never returned)
+- [x] `verifactu.declaracion_url` option (Ops' *declaración responsable* URL)
+- [x] Whole tab + modal removed on the client when `FEATURES.verifactu` is off; i18n ×3
+
+**V5b — BP fiscal-id fields** (follow-up PR): `taxcompanies.fiscalidtype` + `fiscalcountry`
+(columns exist) on the BP → tax-company form, so foreign recipients map to the `id` + `idType`
++ `country` form. Until then only Spanish-NIF recipients register cleanly.
+
+**V5c — go-live** (follow-up):
+- [ ] `/id_check` recipient pre-flight on issue (`verifactu.id_check` option already defined)
+- [ ] Full sandbox E2E (`EMPRESA DE PRUEBAS (PI4)`); cross-check QRs on
+      `prewww2.aeat.es/wlpl/TIKE-CONT/ValidarQR`
+- [ ] Switch one entity to a production key; one real invoice; verify on the prod validator
+- [ ] `docs/0B-config-inventory.md` + `.env.example` + deploy notes (the `verifactu:poll` timer)
 
 ---
 

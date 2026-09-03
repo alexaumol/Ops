@@ -340,7 +340,17 @@ let syncLoaded = false;
 let expCatsLoaded = false;
 let currenciesLoaded = false;
 let entitiesLoaded = false;
+let verifactuLoaded = false;
 let customizationsLoaded = false;
+
+// Veri*Factu is a Spain-only feature — hide its tab entirely unless the
+// instance has it switched on (mirrors server FEATURE_VERIFACTU).
+const VERIFACTU_ON = !!(window.HITT_CONFIG && window.HITT_CONFIG.FEATURES && window.HITT_CONFIG.FEATURES.verifactu);
+if (!VERIFACTU_ON) {
+  document.querySelector('[data-stab="verifactu"]')?.remove();
+  document.getElementById("paneVerifactu")?.remove();
+  document.getElementById("verifactuModal")?.remove();
+}
 
 document.querySelectorAll("[data-stab]").forEach((btn) => {
   btn.addEventListener("click", () => {
@@ -354,6 +364,7 @@ document.querySelectorAll("[data-stab]").forEach((btn) => {
     document.getElementById("paneExpCats").classList.toggle("hidden", tab !== "expcats");
     document.getElementById("paneCurrencies").classList.toggle("hidden", tab !== "currencies");
     document.getElementById("paneEntities").classList.toggle("hidden", tab !== "entities");
+    document.getElementById("paneVerifactu")?.classList.toggle("hidden", tab !== "verifactu");
     document.getElementById("paneCustomizations").classList.toggle("hidden", tab !== "customizations");
     document.getElementById("paneAudit").classList.toggle("hidden", tab !== "audit");
     if (tab === "calendar" && !calendarLoaded) {
@@ -380,6 +391,10 @@ document.querySelectorAll("[data-stab]").forEach((btn) => {
     if (tab === "entities" && !entitiesLoaded) {
       entitiesLoaded = true;
       loadEntities();
+    }
+    if (tab === "verifactu" && !verifactuLoaded) {
+      verifactuLoaded = true;
+      loadVerifactu();
     }
     if (tab === "customizations" && !customizationsLoaded) {
       customizationsLoaded = true;
@@ -1578,6 +1593,138 @@ entEls.del.addEventListener("click", async () => {
 window.addEventListener("hitt:langchange", () => {
   if (entitiesLoaded) renderEntities();
   if (!entModal.classList.contains("hidden")) setEntityTitle();
+  if (verifactuLoaded && VF) renderVerifactu();
 });
+
+/* ============================== VERI*FACTU (Spain) =================== */
+
+let VF = null;             // last GET /api/verifactu payload
+let vfEditingEntityId = null;
+
+async function loadVerifactu() {
+  const body = document.getElementById("vfEntityBody");
+  body.innerHTML = `<tr><td colspan="8" class="settings-emp-sub" style="padding:1rem;">Loading…</td></tr>`;
+  try {
+    VF = await HITT_API.getVerifactu();
+  } catch (err) {
+    console.error("[settings] verifactu:", err.message);
+    body.innerHTML = `<tr><td colspan="8" class="settings-emp-sub" style="padding:1rem;">Could not load Veri*Factu settings.</td></tr>`;
+    return;
+  }
+  document.getElementById("vfDeclUrl").value = (VF.options && VF.options["verifactu.declaracion_url"]) || "";
+  renderVerifactu();
+}
+
+function vfBannerHtml() {
+  if (!VF) return "";
+  if (!VF.migrated) {
+    return `<div class="vf-banner vf-banner--warn">${escapeHtml(TI("vf.banner.notMigrated"))}</div>`;
+  }
+  if (!VF.featureEnabled) {
+    return `<div class="vf-banner vf-banner--warn">${escapeHtml(TI("vf.banner.featureOff"))}</div>`;
+  }
+  const live = VF.entities.filter((e) => e.enabled && e.hasKey).length;
+  const prod = VF.entities.some((e) => e.enabled && e.environment === "production");
+  return `<div class="vf-banner ${prod ? "vf-banner--live" : "vf-banner--ok"}">${
+    escapeHtml(TI("vf.banner.on", { provider: VF.provider, count: live }))
+  }${prod ? " · " + escapeHtml(TI("vf.banner.production")) : ""}</div>`;
+}
+
+function renderVerifactu() {
+  document.getElementById("vfStatusBanner").innerHTML = vfBannerHtml();
+  const body = document.getElementById("vfEntityBody");
+  const empty = document.getElementById("vfEmpty");
+  const rows = (VF && VF.entities) || [];
+  empty.classList.toggle("hidden", rows.length > 0);
+  body.innerHTML = rows.map((e) => {
+    const recs = e.issued
+      ? `${e.issued}${e.pending ? ` · <span style="color:var(--warn,#a66611);">${e.pending} ${escapeHtml(TI("vf.pending"))}</span>` : ""}${e.errored ? ` · <span style="color:var(--danger);">${e.errored} ${escapeHtml(TI("vf.errored"))}</span>` : ""}`
+      : "—";
+    return `
+    <tr>
+      <td><span class="settings-emp-name">${escapeHtml(e.name || "—")}</span></td>
+      <td>${escapeHtml(e.nif || "—")}</td>
+      <td>${e.enabled ? `<span class="settings-badge settings-badge--ok">${escapeHtml(TI("vf.on"))}</span>` : `<span class="settings-emp-sub">${escapeHtml(TI("vf.off"))}</span>`}</td>
+      <td>${escapeHtml(TI(e.environment === "production" ? "vf.env.production" : "vf.env.sandbox"))}</td>
+      <td>${e.series ? `<code>${escapeHtml(e.series)}</code>` : "—"}</td>
+      <td>${e.hasKey ? `<span class="settings-badge settings-badge--ok">✓</span>` : `<span class="settings-emp-sub">✗</span>`}</td>
+      <td class="settings-emp-sub">${recs}</td>
+      <td style="text-align:right;"><button class="settings-emp-edit" data-vf-edit="${e.id}" title="${escapeHtml(TI("vf.configure"))}">✎</button></td>
+    </tr>`;
+  }).join("");
+  body.querySelectorAll("[data-vf-edit]").forEach((btn) =>
+    btn.addEventListener("click", () => openVfModal(btn.dataset.vfEdit)));
+}
+
+const vfModal = document.getElementById("verifactuModal");
+
+function openVfModal(entityId) {
+  const e = (VF.entities || []).find((x) => String(x.id) === String(entityId));
+  if (!e) return;
+  vfEditingEntityId = entityId;
+  document.getElementById("vfModalTitle").textContent = `Veri*Factu — ${e.name || ""}`;
+  document.getElementById("vfEnabled").checked = !!e.enabled;
+  document.getElementById("vfEnv").value = e.environment === "production" ? "production" : "sandbox";
+  document.getElementById("vfSeries").value = e.series || "";
+  document.getElementById("vfApiKey").value = "";
+  document.getElementById("vfKeyStatus").textContent = e.hasKey
+    ? TI("vf.f.keySet") : TI("vf.f.keyNone");
+  document.getElementById("vfClearKey").classList.toggle("hidden", !e.hasKey);
+  document.getElementById("vfModalError").textContent = "";
+  vfModal.classList.remove("hidden");
+}
+function closeVfModal() {
+  vfModal.classList.add("hidden");
+  vfEditingEntityId = null;
+}
+// All of the above DOM lives only when Veri*Factu is on for this instance
+// (the pane + modal are removed otherwise) — so wire it up conditionally.
+if (VERIFACTU_ON && vfModal) {
+  document.getElementById("vfModalClose").addEventListener("click", closeVfModal);
+  document.getElementById("vfModalCancel").addEventListener("click", closeVfModal);
+  vfModal.addEventListener("click", (ev) => { if (ev.target === vfModal) closeVfModal(); });
+  document.addEventListener("keydown", (ev) => {
+    if (ev.key === "Escape" && !vfModal.classList.contains("hidden")) closeVfModal();
+  });
+
+  document.getElementById("vfClearKey").addEventListener("click", () => {
+    document.getElementById("vfApiKey").value = "";
+    document.getElementById("vfApiKey").dataset.clear = "1";
+    document.getElementById("vfKeyStatus").textContent = TI("vf.f.keyWillClear");
+  });
+  document.getElementById("vfApiKey").addEventListener("input", () => {
+    delete document.getElementById("vfApiKey").dataset.clear;
+  });
+
+  document.getElementById("vfModalSave").addEventListener("click", async () => {
+    if (!vfEditingEntityId) return;
+    const keyEl = document.getElementById("vfApiKey");
+    const payload = {
+      enabled: document.getElementById("vfEnabled").checked,
+      environment: document.getElementById("vfEnv").value,
+      series: document.getElementById("vfSeries").value,
+    };
+    if (keyEl.dataset.clear === "1") payload.apiKey = "";
+    else if (keyEl.value.trim()) payload.apiKey = keyEl.value.trim();
+
+    const err = document.getElementById("vfModalError");
+    err.textContent = "";
+    try {
+      await HITT_API.patchVerifactuEntity(vfEditingEntityId, payload);
+      closeVfModal();
+      await loadVerifactu();
+    } catch (e) {
+      err.textContent = e.message || "Could not save.";
+    }
+  });
+
+  document.getElementById("vfDeclUrl").addEventListener("change", async (ev) => {
+    try {
+      await HITT_API.setVerifactuOption("verifactu.declaracion_url", ev.target.value.trim());
+    } catch (e) {
+      console.error("[settings] verifactu option:", e.message);
+    }
+  });
+}
 
 loadEmployees();

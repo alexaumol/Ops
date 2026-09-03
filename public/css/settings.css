@@ -528,3 +528,20 @@
 .entity-logo-frame img { max-width: 92%; max-height: 84%; object-fit: contain; }
 .entity-logo-frame img:not([src]), .entity-logo-frame img[src=""] { display: none; }
 .entity-logo-actions { display: flex; flex-direction: column; gap: 0.5rem; }
+
+/* ── Veri*Factu tab ─────────────────────────────────────────────────── */
+.settings-badge--ok { background: rgba(47,111,94,0.15); color: #2F6F5E; }
+
+.vf-status-banner { margin: 0.75rem 0 1rem; }
+.vf-banner {
+  padding: 0.6rem 0.9rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  border: 1px solid transparent;
+}
+.vf-banner--ok   { background: rgba(47,111,94,0.10);  color: #2F6F5E; border-color: rgba(47,111,94,0.30); }
+.vf-banner--live { background: rgba(178,74,58,0.10);  color: var(--danger); border-color: rgba(178,74,58,0.35); font-weight: 600; }
+.vf-banner--warn { background: rgba(166,102,17,0.12); color: #8a5a12; border-color: rgba(166,102,17,0.35); }
+
+.settings-field-row { display: flex; flex-direction: column; gap: 0.3rem; margin-bottom: 0.9rem; }
+.settings-field-row .field-input { max-width: 100%; }
