@@ -215,6 +215,7 @@ window.HITT_I18N_DICT = {
     "exp.f.from": "From",
     "exp.f.to": "To",
     "exp.new": "+ New expense",
+    "exp.mobileCapture": "📷 Quick capture (mobile)",
     "exp.bulk.edit": "Edit selected…",
     "exp.bulk.delete": "Delete selected",
     "exp.bulk.clear": "Clear",
@@ -273,6 +274,18 @@ window.HITT_I18N_DICT = {
     "exp.toast.bulkDeleteFail": "Bulk delete failed.",
     "exp.anyCategory": "Any category",
     "exp.noneOption": "— none —",
+
+    // mobile expense capture
+    "mx.sub": "Snap a photo of your receipt, fill in the details, and bind it to the project.",
+    "mx.photo.take": "Take photo",
+    "mx.photo.choose": "Choose file",
+    "mx.photo.retake": "Retake photo",
+    "mx.project.mine": "Your assigned projects",
+    "mx.project.allAdmin": "All alive projects (admin)",
+    "mx.project.empty": "You're not assigned as a resource on any alive project yet — ask an admin, or mark this as internal.",
+    "mx.project.loadFail": "Could not load your projects.",
+    "mx.addAnother": "Save & add another",
+    "mx.viewAll": "View all expenses →",
 
     // time allocation
     "ta.tab.tracking": "Project time tracking",
@@ -1257,6 +1270,7 @@ window.HITT_I18N_DICT = {
     "exp.f.from": "Desde",
     "exp.f.to": "Hasta",
     "exp.new": "+ Nuevo gasto",
+    "exp.mobileCapture": "📷 Captura rápida (móvil)",
     "exp.bulk.edit": "Editar selección…",
     "exp.bulk.delete": "Eliminar selección",
     "exp.bulk.clear": "Limpiar",
@@ -1315,6 +1329,18 @@ window.HITT_I18N_DICT = {
     "exp.toast.bulkDeleteFail": "La eliminación en bloque falló.",
     "exp.anyCategory": "Cualquier categoría",
     "exp.noneOption": "— ninguna —",
+
+    // captura de gastos móvil
+    "mx.sub": "Haz una foto del ticket, rellena los datos y vincúlalo al proyecto.",
+    "mx.photo.take": "Hacer foto",
+    "mx.photo.choose": "Elegir archivo",
+    "mx.photo.retake": "Repetir foto",
+    "mx.project.mine": "Tus proyectos asignados",
+    "mx.project.allAdmin": "Todos los proyectos vivos (admin)",
+    "mx.project.empty": "Todavía no estás asignado como recurso a ningún proyecto vivo — pídeselo a un admin, o márcalo como interno.",
+    "mx.project.loadFail": "No se han podido cargar tus proyectos.",
+    "mx.addAnother": "Guardar y añadir otro",
+    "mx.viewAll": "Ver todos los gastos →",
 
     "ta.tab.tracking": "Imputación de horas por proyecto",
     "ta.tab.timeoff": "Solicitudes de ausencia",
@@ -2290,6 +2316,7 @@ window.HITT_I18N_DICT = {
     "exp.f.from": "Des de",
     "exp.f.to": "Fins a",
     "exp.new": "+ Nova despesa",
+    "exp.mobileCapture": "📷 Captura ràpida (mòbil)",
     "exp.bulk.edit": "Editar selecció…",
     "exp.bulk.delete": "Eliminar selecció",
     "exp.bulk.clear": "Netejar",
@@ -2348,6 +2375,18 @@ window.HITT_I18N_DICT = {
     "exp.toast.bulkDeleteFail": "L'eliminació en bloc ha fallat.",
     "exp.anyCategory": "Qualsevol categoria",
     "exp.noneOption": "— cap —",
+
+    // captura de despeses mòbil
+    "mx.sub": "Fes una foto del tiquet, omple les dades i vincula'l al projecte.",
+    "mx.photo.take": "Fer foto",
+    "mx.photo.choose": "Triar arxiu",
+    "mx.photo.retake": "Repetir foto",
+    "mx.project.mine": "Els teus projectes assignats",
+    "mx.project.allAdmin": "Tots els projectes vius (admin)",
+    "mx.project.empty": "Encara no estàs assignat com a recurs a cap projecte viu — demana-ho a un admin, o marca-ho com a intern.",
+    "mx.project.loadFail": "No s'han pogut carregar els teus projectes.",
+    "mx.addAnother": "Desar i afegir-ne una altra",
+    "mx.viewAll": "Veure totes les despeses →",
 
     "ta.tab.tracking": "Imputació d'hores per projecte",
     "ta.tab.timeoff": "Sol·licituds d'absència",
