@@ -98,9 +98,9 @@ window.HITT_CONFIG = {
     businessPartnersLive: true,
     timeAllocationLive: true,
     invoicingLive: true,
-    // Ops assistant (js/chat.js). Even when true, the widget only appears
-    // if the server reports GET /api/chat/status as configured — so this
-    // can ship on before Azure OpenAI is wired up.
+    // Ops assistant (js/chat.js). Opt-OUT: the widget shows whenever the
+    // server reports GET /api/chat/status as configured and the user has
+    // access. Set to false to hide it on this instance regardless.
     chatEnabled: true,
     // Veri*Factu (Spain e-invoicing). Off here — HITT is not on it yet.
     // Mirror server FEATURE_VERIFACTU when turning it on.

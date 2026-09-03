@@ -216,7 +216,10 @@
   }
 
   async function init() {
-    if (!window.HITT_CONFIG?.FEATURES?.chatEnabled) return;
+    // Opt-out flag: the widget shows whenever the server reports the
+    // assistant configured (and the user has access) UNLESS an instance
+    // explicitly sets FEATURES.chatEnabled = false. A missing flag = on.
+    if (window.HITT_CONFIG?.FEATURES?.chatEnabled === false) return;
     if (!window.HITT_API || !window.HITT_AUTH?.getSession?.()) return;
     try {
       const status = await HITT_API.getChatStatus();

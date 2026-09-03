@@ -177,14 +177,18 @@ the fixed read-only tools in
 `search_projects`, `list_projects` — each a parameterised query run inside
 a `READ ONLY` transaction on a SELECT-only pool. The model never sees the
 database and never emits SQL; every figure in an answer comes from a tool
-result. Access is gated by the `chat` module permission (Settings), a
-per-user rate limit, and the `chatEnabled` feature flag.
+result. Access is gated by the `chat` module permission (Settings) and a
+per-user rate limit. The widget shows automatically once the server reports
+the assistant configured; set `FEATURES.chatEnabled = false` in
+`public/js/config.js` to hide it on an instance regardless.
 
 **Turn it on:**
 
-1. Create an **Azure OpenAI** resource in an EU region, deploy a chat model
-   (e.g. `gpt-4.1`), and set `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_API_KEY`,
-   `AZURE_OPENAI_DEPLOYMENT` in `server/.env`.
+1. Create an **Azure OpenAI** resource in an EU region, deploy a GPT-5-family
+   model (e.g. `gpt-5-mini` — `gpt-4.1` is legacy), and set
+   `AZURE_OPENAI_ENDPOINT` (the `…/openai/v1` endpoint), `AZURE_OPENAI_API_KEY`,
+   `AZURE_OPENAI_DEPLOYMENT` (the deployment name) in `server/.env`. Verify
+   with `npm run chat:smoke`.
 2. Create the read-only DB role and set `PG_READONLY_USER` /
    `PG_READONLY_PASSWORD` (SQL in `server/.env.example`). Until you do, the
    tools run on the main pool — fine for a first test, not for production.
