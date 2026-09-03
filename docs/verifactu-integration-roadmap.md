@@ -1,7 +1,23 @@
 # Veri*Factu integration — roadmap
 
-Status: **draft / proposal** · Owner: Alex · Target provider: **BOLD Software** (`apiverifactu.boldsoftware.es`)
+Status: **draft / proposal · V1 in progress** · Owner: Alex · Target provider: **BOLD Software** (`apiverifactu.boldsoftware.es`)
 Reference: [`docs/verifactu-boldsoftware-openapi.yaml`](verifactu-boldsoftware-openapi.yaml) (OpenAPI 3.1, v1.2.0, downloaded 2026-09-01)
+
+### V0 decisions locked — 2026-09-03
+
+- **API keys:** assume **one BOLD API-Key per issuing NIF** (conservative; BOLD asked, answer
+  pending). Key lives on `entity.verifactu_api_key`, server-side only.
+- **Auto-submit to AEAT:** **on by default, per invoice.** A checkbox in the invoice modal
+  (checked) — unchecking it issues the invoice without registering, to be sent later.
+  No global toggle.
+- **When BOLD/AEAT is unreachable at issue time:** **never block issuing.** The AEAT developer
+  FAQ is explicit — invoicing continues, the record is queued and re-sent periodically until it
+  goes through (BOLD sets the *Incidencia* flag on the delayed submission; there is no maximum
+  deadline during an incident). So: the invoice is issued and locked, its `verifactu_records`
+  row stays `pending`, a background job retries. Applies equally to a `503` from BOLD and a
+  network error. See [AEAT FAQ – Sistemas VERI\*FACTU](https://sede.agenciatributaria.gob.es/Sede/iva/sistemas-informaticos-facturacion-verifactu/preguntas-frecuentes/sistemas-verifactu.html)
+  and the [developer FAQ PDF](https://sede.agenciatributaria.gob.es/static_files/AEAT_Desarrolladores/EEDD/IVA/VERI-FACTU/FAQs-Desarrolladores.pdf).
+- **Invoice numbering:** confirmed changeable to per-NIF gap-free series with a visible prefix.
 
 ---
 
@@ -191,8 +207,12 @@ to `Europe/Madrid`; guard against a server in UTC pushing an evening invoice to 
 
 ## 5 · Data model changes
 
-Runtime-idempotent top-ups (the repo's pattern — mirror in
-[`server/db/schema-changes.sql`](../server/db/schema-changes.sql)):
+Since this roadmap was drafted the repo adopted **node-pg-migrate** (Phase 0C), so schema
+changes are now ordered SQL migrations under `server/migrations/`, created with
+`npm run migrate:create` — **not** runtime `ensure*Schema()` + `schema-changes.sql`. V1 ships
+[`server/migrations/1788448547623_verifactu-foundations.sql`](../server/migrations/1788448547623_verifactu-foundations.sql)
+with the columns below (plus `invoicesdetails.verifactu_autosubmit` for the per-invoice
+checkbox, and `entity.verifactu_environment`):
 
 ```sql
 -- per-invoice Veri*Factu record (1:1 with an issued invoice; a cancellation adds a 2nd row)
@@ -294,8 +314,8 @@ additions to `server/routes/entities.js`. i18n keys in all three languages
 **Behaviour options (per deployment, `appconfig`)**
 | Option | Default | Notes |
 |---|---|---|
-| Register automatically when an invoice is issued | **on** | off = an explicit "Send to AEAT" button per invoice |
-| If BOLD/AEAT is unreachable at issue time | **block issuing** | alt: allow issue + queue for retry |
+| Register automatically when an invoice is issued | **on** | this is the **per-invoice** default (checkbox in the invoice modal, checked); no global override needed |
+| If BOLD/AEAT is unreachable at issue time | **issue anyway + queue** | not configurable — the AEAT requires issuing to continue; the record retries in the background (V0 decision, 2026-09-03) |
 | Show QR + Veri\*Factu legend on invoice PDFs | **on** | warn if turned off |
 | Pre-check recipient NIF via `/id_check` before issuing | off | |
 | Background status-poll interval | 30 min | polls `pending` records via `/invoice_state` |
@@ -319,15 +339,20 @@ credentials are treated.
       required); invoice types in use (F1 only?); VAT/operation & exemption mapping table;
       cancel-vs-rectify policy; exact PDF legend wording.
 - [ ] Draft & publish **Ops' *declaración responsable***.
-- [ ] Decide auto-submit vs manual; unreachable-at-issue behaviour.
+- [x] Decide auto-submit vs manual; unreachable-at-issue behaviour — see *V0 decisions locked* above.
 
 ### Phase V1 — Foundations  *(sandbox only, no user-visible change)*
-- [ ] `server/lib/verifactu/*` — adapter + payload mapping + error translation
-- [ ] Schema top-ups (§5); `FEATURE_VERIFACTU` flag wired through server + `config.js`
-- [ ] `taxcompanies.fiscalidtype`, `invoices_vattypes.verifactu_*` + seed defaults + BP/Settings UI
-- [ ] Mapping test harness: real Ops invoice rows → BOLD sandbox (`recipient` NIF `B13674197`
-      test cases), covering F1, R1 (por diferencias), exempt, foreign recipient, multi-rate
+- [x] `server/lib/verifactu/*` — `bold.js` adapter, `mapping.js` payload transform, `errors.js`
+      translation, `index.js` feature gate + per-entity config
+- [x] Schema migration `1788448547623_verifactu-foundations.sql`; `FEATURE_VERIFACTU` +
+      `FEATURES.verifactu` flags wired through `.env.example` / `config.example.js`
+- [x] `taxcompanies.fiscalidtype`, `invoices_vattypes.verifactu_*` columns + seed defaults *(the
+      BP/Settings **UI** for editing them is V1-follow-up / folded into V5)*
+- [x] Mapping test suite (`npm run verifactu:test`, 17 cases: F1, R1 por diferencias, exempt,
+      foreign recipient, derived VAT, date/rate guards) + a sandbox smoke script
+      (`npm run verifactu:smoke`)
 - [ ] Decide + implement **per-entity numbering** with prefixes; finance sign-off; cutover plan
+      *(carried into V2 — it touches the issue path)*
 
 ### Phase V2 — Issue flow
 - [ ] `draft` / `issued` lifecycle + `issued_at`; "Issue invoice" action in the modal

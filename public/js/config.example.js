@@ -57,6 +57,10 @@ window.HITT_CONFIG = {
     // Ops assistant (js/chat.js) — also gated server-side on GET
     // /api/chat/status, so this can ship on before the LLM is configured.
     chatEnabled: true,
+    // Veri*Factu (Spain e-invoicing). Mirrors FEATURE_VERIFACTU on the
+    // server — keep both in sync. Off for every non-Spanish instance; when
+    // off, the Settings → Veri*Factu tab and the "Issue" action are hidden.
+    verifactu: false,
   },
 
   APP_VERSION: "0.1.0-prototype",
