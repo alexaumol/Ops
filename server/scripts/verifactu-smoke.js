@@ -8,15 +8,18 @@
  *   VERIFACTU_API_KEY=sk_sandbox_xxx npm run verifactu:smoke     # from server/
  *
  * Optional env:
- *   VERIFACTU_ISSUER_NIF   the NIF of your assigned sandbox company. Ours is
- *                          "EMPRESA DE PRUEBAS (PI4)" — set its NIF here, or
- *                          leave unset to skip the Verify-Issuer-Id guard.
- *                          Default B13674197 (the NIF in BOLD's own examples).
+ *   VERIFACTU_ISSUER_NIF   the NIF of the company the API-Key belongs to —
+ *                          your assigned sandbox company, e.g. "EMPRESA DE
+ *                          PRUEBAS (PI4)" (find its NIF in the BOLD console).
+ *                          Sent as the Verify-Issuer-Id guard. LEAVE UNSET to
+ *                          skip the guard entirely (the API-Key still
+ *                          identifies the company). Sending the wrong NIF
+ *                          here is error 000007.
  *   VERIFACTU_BASE_URL     default https://vf1.boldsoftware.es/v1
  *   VERIFACTU_SMOKE_NUMBER default SMOKE-<timestamp>
  *
  * Note: in sandbox BOLD auto-prefixes every invoice number with your test
- * company code — ours is "PI4-". So a number sent as "SMOKE-123" comes back
+ * company code — e.g. "PI4-". So a number sent as "SMOKE-123" comes back
  * (in chainInfo / verifactuUrl) as "PI4-SMOKE-123". Expected.
  * ---------------------------------------------------------------------------
  */
@@ -26,8 +29,12 @@ const { buildAltaPayload } = require("../lib/verifactu/mapping");
 const { VerifactuError } = require("../lib/verifactu/errors");
 
 const apiKey = process.env.VERIFACTU_API_KEY;
-const issuerNif = process.env.VERIFACTU_ISSUER_NIF || "B13674197";
+const issuerNif = process.env.VERIFACTU_ISSUER_NIF || null; // null → guard header omitted
 const number = process.env.VERIFACTU_SMOKE_NUMBER || `SMOKE-${Date.now()}`;
+
+// A safe test recipient — the NIF BOLD uses in its own examples. It is NOT
+// the issuer (that's whatever company your API-Key belongs to).
+const RECIPIENT = { name: "BOLD Software SL", fiscalId: "B13674197", country: "ES" };
 
 if (!apiKey) {
   console.error("Set VERIFACTU_API_KEY (a BOLD sandbox key) and re-run.");
@@ -45,15 +52,14 @@ function short(s, n = 80) {
     number,
     issuedDate: new Date().toISOString().slice(0, 10),
     description: "Veri*Factu integration smoke test — safe to ignore",
-    issuer: { nif: issuerNif },
-    recipient: { name: "BOLD Software SL", fiscalId: issuerNif, country: "ES" },
+    recipient: RECIPIENT,
     net: 100,
     vat: { rate: 21, amount: 21 },
     total: 121,
   });
 
   console.log(`→ base URL   ${bold.baseUrl()}`);
-  console.log(`→ issuer NIF ${issuerNif}`);
+  console.log(`→ issuer NIF ${issuerNif || "(guard not sent — VERIFACTU_ISSUER_NIF unset)"}`);
   console.log(`→ number     ${number}`);
   console.log(`→ payload    ${JSON.stringify(payload)}`);
   console.log();
