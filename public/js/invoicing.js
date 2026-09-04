@@ -928,7 +928,7 @@ function vfResultMsg(r){
   if (v.state === 'sent')    return T('inv.toast.vf.sent');
   if (v.state === 'pending') return T('inv.toast.vf.pending');
   if (v.state === 'error')   return T('inv.toast.vf.error', { msg: v.message || '' });
-  if (v.state === 'skipped') return T('inv.toast.issued');
+  if (v.state === 'skipped') return T('inv.toast.vf.skipped', { msg: v.message || '' });
   return T('inv.toast.issued');
 }
 
@@ -1494,9 +1494,13 @@ function applyVerifactuToModal(vf, isExisting){
   cancelBtn.disabled = false;
   saveBtn.classList.toggle('hidden', issued);
   delBtn.classList.toggle('hidden', issued || !isExisting);
-  // Retry: an alta error, or a failed cancel. Refresh: a queued alta or cancel
-  // (poll the AEAT for the outcome). Check recipient: a draft, pre-issue.
-  retryBtn.classList.toggle('hidden', !(issued && vf && (vf.state === 'error' || vf.cancelState === 'error')));
+  // Retry / send: an alta error or a failed cancel → "Retry AEAT"; an issued
+  // invoice with no record yet (auto-submit was off, or the entity wasn't
+  // enabled at issue) → "Send to AEAT". Refresh: a queued alta/cancel.
+  const neverSent = issued && vf && !vf.state && !cancelled && !cancelPending;
+  const retryable = issued && vf && (vf.state === 'error' || vf.cancelState === 'error');
+  retryBtn.classList.toggle('hidden', !(neverSent || retryable));
+  retryBtn.textContent = neverSent ? T('inv.vf.send') : T('inv.vf.retry');
   refreshBtn.classList.toggle('hidden', !(issued && vf && (vf.state === 'pending' || cancelPending)));
   checkBtn.classList.toggle('hidden', !isDraftExisting);
   cancelBtn.classList.toggle('hidden', !(issued && !cancelled && !cancelPending));

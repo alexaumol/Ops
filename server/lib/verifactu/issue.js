@@ -461,21 +461,30 @@ async function cancelInvoice(invoiceId, opts = {}) {
 }
 
 /**
- * Resend the latest verifactu_records row for an invoice — recovers a
- * `pending` / `error` alta (isFix) or anulación.
+ * Register / resend an issued invoice with the AEAT:
+ *   - never registered yet (auto-submit was off, or the entity wasn't
+ *     enabled at issue time) → a fresh alta, no isFix
+ *   - a `pending` / `error` alta → resend with isFix
+ *   - a `pending` / `error` anulación → resend the cancellation
  */
 async function retryRecord(invoiceId, opts = {}) {
   const client = await pool.connect();
   let r;
   let latest;
+  let hasAlta;
   try {
     r = await loadInvoiceRows(client, invoiceId);
     const q = await client.query(
-      `SELECT kind, queue_id FROM verifactu_records
+      `SELECT kind FROM verifactu_records
         WHERE invoiceid = $1 ORDER BY created_at DESC, id DESC LIMIT 1`,
       [invoiceId]
     );
     latest = q.rows[0] || null;
+    const a = await client.query(
+      `SELECT 1 FROM verifactu_records WHERE invoiceid = $1 AND kind = 'alta' LIMIT 1`,
+      [invoiceId]
+    );
+    hasAlta = a.rows.length > 0;
   } finally {
     client.release();
   }
@@ -498,7 +507,7 @@ async function retryRecord(invoiceId, opts = {}) {
     const ops = toOpsInvoice(r);
     ops.number = r.invoice.invoicecode;
     const payload = buildAltaPayload(ops);
-    rec = await registerNow(invoiceId, payload, cfg, opts.employeeId, { isFix: true });
+    rec = await registerNow(invoiceId, payload, cfg, opts.employeeId, { isFix: hasAlta });
   }
 
   if (opts.req) {
