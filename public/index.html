@@ -4,6 +4,20 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Sign in · HITT Ops</title>
+
+<!-- Warm the connection to Microsoft's login endpoints before the sign-in
+     redirect fires, so DNS + TCP + TLS setup isn't on the critical path of
+     the first /authorize hop (see the slow-first-302 investigation). This is
+     a resource hint only — no request, headers, cookies or tokens are sent,
+     and it's a no-op for the "oidc" provider / stub mode. No `crossorigin`:
+     the sign-in is a top-level navigation, which reuses only a same-cred
+     (non-anonymous) connection. login.live.com is used by MSAL for some
+     SSO-cookie operations. -->
+<link rel="dns-prefetch" href="https://login.microsoftonline.com" />
+<link rel="preconnect" href="https://login.microsoftonline.com" />
+<link rel="dns-prefetch" href="https://login.live.com" />
+<link rel="preconnect" href="https://login.live.com" />
+
 <link rel="stylesheet" href="css/styles.css" />
 <style>
   body.login-body {
