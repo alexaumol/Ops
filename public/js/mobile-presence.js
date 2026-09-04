@@ -55,6 +55,34 @@ function locLabel(v) {
   if (!v) return "";
   return ["office", "remote", "client"].includes(v) ? T("ta.pr.loc." + v) : v;
 }
+// office / remote / client rendered as an icon; free text keeps the word.
+const LOC_ICON = {
+  office: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18"/><path d="M2 22h20M10 6h.01M14 6h.01M10 10h.01M14 10h.01M10 14h.01M14 14h.01M10 18h.01M14 18h.01"/></svg>',
+  remote: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M9 21v-6h6v6"/></svg>',
+  client: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>',
+};
+function locIcon(v) { return LOC_ICON[v] || ""; }
+function locChip(v) {
+  if (!v) return "";
+  const lbl = esc(locLabel(v));
+  return LOC_ICON[v]
+    ? `<span class="mp-loc-ic" role="img" title="${lbl}" aria-label="${lbl}">${LOC_ICON[v]}</span>`
+    : `<span class="mp-seg-loc">${lbl}</span>`;
+}
+let clockLoc = "remote";   // self-declared location for the next clock-in
+function setLocPressed(loc) {
+  if (!el.mpLocation) return;
+  el.mpLocation.querySelectorAll("button[data-loc]").forEach((x) => {
+    x.setAttribute("aria-pressed", String(x.dataset.loc === loc));
+  });
+}
+function setupLocPicker() {
+  if (!el.mpLocation) return;
+  el.mpLocation.querySelectorAll("button[data-loc]").forEach((b) => {
+    b.innerHTML = locIcon(b.dataset.loc);
+    b.addEventListener("click", () => { clockLoc = b.dataset.loc; setLocPressed(clockLoc); });
+  });
+}
 function openMinutes() {
   if (!state || !state.open || !state.since) return 0;
   return Math.max(0, (Date.now() - new Date(state.since).getTime()) / 60000);
@@ -69,10 +97,10 @@ function render() {
   const left = expected - committed;
 
   el.mpDot.className = "mp-dot" + (open ? " is-in" : "");
-  const openLoc = open ? locLabel(state.locationLabel) : "";
-  el.mpState.textContent = (open
+  const openChip = open ? locChip(state.locationLabel) : "";
+  el.mpState.innerHTML = esc(open
     ? T("ta.pr.stateIn", { since: fmtTime(state.since), elapsed: fmtMins(openMinutes()) })
-    : T("ta.pr.stateOut")) + (openLoc ? ` · ${openLoc}` : "");
+    : T("ta.pr.stateOut")) + (openChip ? ` ${openChip}` : "");
 
   el.mpClockBtn.textContent = open ? T("ta.pr.clockOut") : T("ta.pr.clockIn");
   el.mpClockBtn.className = "mp-clock-btn" + (open ? " is-out" : "");
@@ -101,8 +129,8 @@ function render() {
   el.mpToday.innerHTML = segs.length
     ? `<span class="mp-today__label">${T("ta.pr.todayLabel")}</span> ` +
       segs.map((s) => {
-        const loc = locLabel(s.location);
-        return `<span class="mp-seg">${fmtTime(s.in)}–${fmtTime(s.out)}${loc ? ` <span class="mp-seg-loc">${esc(loc)}</span>` : ""}</span>`;
+        const chip = locChip(s.location);
+        return `<span class="mp-seg">${fmtTime(s.in)}–${fmtTime(s.out)}${chip ? ` ${chip}` : ""}</span>`;
       }).join(" ")
     : "";
 }
@@ -125,9 +153,9 @@ async function doClock() {
   busy = true;
   el.mpClockBtn.disabled = true;
   try {
-    await HITT_API.presenceClock({ kind, location: el.mpLocation.value || "remote" });
+    await HITT_API.presenceClock({ kind, location: clockLoc || "remote" });
     toast(kind === "in" ? T("mp.clockedIn") : T("mp.clockedOut"), "green");
-    if (kind === "out") el.mpLocation.value = "remote";
+    if (kind === "out") { clockLoc = "remote"; setLocPressed("remote"); }
   } catch (err) {
     toast(err.message || T("ta.pr.clockFail"), "red");
   } finally {
@@ -148,6 +176,7 @@ async function doClock() {
     el.mpPrivacyLink.hidden = false;
     el.mpPrivacyLink.addEventListener("click", (e) => { e.preventDefault(); alert(cfg.privacyNotice); });
   }
+  setupLocPicker();
   el.mpClockBtn.addEventListener("click", doClock);
   await load();
   // keep the elapsed / done / left figures live while clocked in

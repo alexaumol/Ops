@@ -53,14 +53,14 @@
         </div>
       </div>
 
-      <label class="mp-loc" id="mpLocWrap">
+      <div class="mp-loc" id="mpLocWrap" role="group" data-i18n-aria-label="ta.pr.location">
         <span data-i18n="ta.pr.location">Location</span>
-        <select id="mpLocation">
-          <option value="remote" selected data-i18n="ta.pr.loc.remote">Remote</option>
-          <option value="office" data-i18n="ta.pr.loc.office">Office</option>
-          <option value="client" data-i18n="ta.pr.loc.client">Client site</option>
-        </select>
-      </label>
+        <div class="mp-locpick" id="mpLocation">
+          <button type="button" data-loc="remote" aria-pressed="true"  data-i18n-title="ta.pr.loc.remote" data-i18n-aria-label="ta.pr.loc.remote"></button>
+          <button type="button" data-loc="office" aria-pressed="false" data-i18n-title="ta.pr.loc.office" data-i18n-aria-label="ta.pr.loc.office"></button>
+          <button type="button" data-loc="client" aria-pressed="false" data-i18n-title="ta.pr.loc.client" data-i18n-aria-label="ta.pr.loc.client"></button>
+        </div>
+      </div>
 
       <button type="button" class="mp-clock-btn" id="mpClockBtn" disabled data-i18n="ta.pr.clockIn">Clock in</button>
 
