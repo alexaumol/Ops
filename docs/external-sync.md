@@ -23,7 +23,7 @@ Each **location** has a **provider** and a path:
 
 | Provider | Path | Status |
 |---|---|---|
-| **OneDrive / SharePoint** | a folder path in `GRAPH_ONEDRIVE_USER`'s drive (like `GRAPH_ONEDRIVE_FOLDER`, e.g. `Clients/Backups`) **or** a full SharePoint/OneDrive share URL (`https://…sharepoint.com/…`, resolved once via Graph `/shares`) | **wired** |
+| **OneDrive / SharePoint** | a folder path in `GRAPH_ONEDRIVE_USER`'s drive (like `GRAPH_ONEDRIVE_FOLDER`, e.g. `Clients/Backups`); a **"Copy link"** sharing URL (resolved once via Graph `/shares`); **or** the browser address of the folder in OneDrive (`…/onedrive.aspx?id=/personal/<user>/Documents/…` — accepted when it points at `GRAPH_ONEDRIVE_USER`'s own OneDrive, and turned into the equivalent path) | **wired** |
 | **Google Drive** | a shared-drive folder link or id | **staged** — saved, but a sync attempt records a "not built yet" error row; nothing is copied |
 | **Network server (UNC)** | `\\server\share\Ops` on the corporate LAN/VPN | **staged** — same |
 

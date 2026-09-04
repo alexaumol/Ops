@@ -98,8 +98,8 @@ const SYNC_PROVIDERS = [
   {
     value: "onedrive",
     label: "OneDrive / SharePoint",
-    placeholder: "Clients/Projects   or   https://…sharepoint.com/…",
-    hint: "A folder in the company OneDrive, or a SharePoint/OneDrive share link. Leave the path empty to use the GRAPH_ONEDRIVE_FOLDER default.",
+    placeholder: "Clients/Projects   or   a folder link from OneDrive",
+    hint: "A folder path in the company OneDrive, a \"Copy link\" sharing URL, or the browser address of the folder in OneDrive. Leave empty to use the GRAPH_ONEDRIVE_FOLDER default.",
   },
   {
     value: "gdrive",
