@@ -119,11 +119,19 @@ async function getProject({ query }) {
 // --- tool: get_business_partner ---------------------------------------
 async function getBusinessPartner({ query }) {
   if (!query || !String(query).trim()) return { error: "query is required (a business partner name)" };
+  // Legacy (Access-derived) schema: BP has no country column — it comes via
+  // the addresses table; contacts live in `contacts`; notes in
+  // `businesspartnersnotes` keyed by `bpid`; taxcompanies/projects key the
+  // BP through float-ish columns that need ::bigint.
   const rows = await q(
-    `SELECT bp.id, bp.bpname AS name, ct.companytypedesc AS "companyType", co.countrydesc AS country, bp.webpage
+    `SELECT bp.id, bp.bpname AS name, ct.companytypedesc AS "companyType",
+            co.countrydesc AS country, bp.webpage
      FROM businesspartners bp
-     LEFT JOIN companytypes ct ON ct.id = bp.companytypeid::bigint
-     LEFT JOIN countries co ON co.id = bp.countryid::bigint
+     LEFT JOIN companytypes ct ON ct.id = bp.companytypeid
+     LEFT JOIN LATERAL (
+       SELECT countryid FROM addresses WHERE businesspartnerid = bp.id ORDER BY id LIMIT 1
+     ) a ON true
+     LEFT JOIN countries co ON co.id = a.countryid::bigint
      WHERE bp.bpname ILIKE $1
      ORDER BY (bp.bpname ILIKE $1) DESC, bp.bpname
      LIMIT 1`,
@@ -131,27 +139,28 @@ async function getBusinessPartner({ query }) {
   );
   if (!rows.length) return { found: false, message: `No business partner matches "${query}".` };
   const bp = rows[0];
+  const id = String(bp.id);
   const [contacts, projects, taxCompanies, notes] = await Promise.all([
     q(
-      `SELECT contactname AS name, contactposition AS position, contactemail AS email, contactphone AS phone
-       FROM businesspartnercontacts WHERE businesspartnerid = $1 ORDER BY id LIMIT 25`,
-      [bp.id]
+      `SELECT contactname AS name, position, emailaddress AS email, phonenumber AS phone
+       FROM contacts WHERE businesspartnerid = $1 ORDER BY contactname LIMIT 25`,
+      [id]
     ),
     q(
       `SELECT p.projectnumber AS code, p.projectname AS name, ps.projectstatusdesc AS status
        FROM projects p LEFT JOIN projectstatus ps ON ps.id = p.projectstatusid::bigint
-       WHERE p.busspartnerid = $1 ORDER BY p.projectnumber DESC LIMIT 50`,
-      [bp.id]
+       WHERE p.busspartnerid::bigint = $1::bigint ORDER BY p.projectnumber DESC LIMIT 50`,
+      [id]
     ),
     q(
       `SELECT taxcompanyname AS name, vatnumber AS vat, emailinvoicing AS "invoicingEmail"
-       FROM taxcompanies WHERE businesspartnerid = $1 ORDER BY taxcompanyname LIMIT 25`,
-      [bp.id]
+       FROM taxcompanies WHERE businesspartnerid::bigint = $1::bigint ORDER BY taxcompanyname LIMIT 25`,
+      [id]
     ),
     q(
       `SELECT notes AS text, commentsts AS "at"
-       FROM businesspartnernotes WHERE businesspartnerid = $1 ORDER BY commentsts DESC NULLS LAST, id DESC LIMIT 5`,
-      [bp.id]
+       FROM businesspartnersnotes WHERE bpid = $1 ORDER BY commentsts DESC NULLS LAST, id DESC LIMIT 5`,
+      [id]
     ),
   ]);
   return {
