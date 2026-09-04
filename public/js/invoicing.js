@@ -631,11 +631,18 @@ function openProjectPicker(){
   setTimeout(() => document.getElementById('projPickerSearch').focus(), 50);
 }
 function closeProjectPicker(){ projPickerOverlay.classList.add('hidden'); }
+// Only projects far enough along to invoice: Guanyat (won) / WIP / Delivered.
+// Not Lead/Oferta (not won yet) or Closed/Cancelled (done with).
+const INVOICEABLE_STATUSES = new Set(['guanyat', 'wip', 'delivered']);
+function isInvoiceableStatus(label){
+  return INVOICEABLE_STATUSES.has(String(label || '').trim().toLowerCase());
+}
 function renderProjectPicker(term){
   const tbody = document.getElementById('projPickerBody');
   const empty = document.getElementById('projPickerEmpty');
   const t = (term || '').trim().toLowerCase();
   const rows = PROJECTS
+    .filter(p => isInvoiceableStatus(p.projectStatusLabel))
     .filter(p => !t || `${p.code || ''} ${p.name || ''} ${p.bpName || ''}`.toLowerCase().includes(t))
     .sort((a, b) => String(a.code || '').localeCompare(String(b.code || '')))
     .slice(0, 200);
