@@ -580,19 +580,17 @@ function renderInvoiceViewTable(){
   });
 }
 
-// Open the New/Edit invoice modal for an invoice picked from the flat list.
-// The modal expects the owning project's invoicing context (default tax
-// company, the BP's tax companies, that project's invoice list for the
-// corrective-source dropdown), so load it first — same as openProjectModal.
-async function openInvoiceFromList(inv){
-  if (usingDemoData) { toast(T('common.notAvailableDemo'), 'navy'); return; }
-  if (!inv.projectId) { toast(T('inv.toast.invoicesLoadFail'), 'red'); return; }
-  activeProjectId = inv.projectId;
+// Load a project's invoicing context into the module-level activeProject*
+// vars — the default tax company, the BP's tax companies, that project's
+// invoice list (for the corrective-source dropdown) + Veri*Factu states.
+// Shared by the flat-list edit path and the "+ New invoice" flow.
+async function loadProjectInvoiceContext(projectId){
+  activeProjectId = projectId;
   activeProjectBpId = null;
   activeProjectBpTaxCompanies = [];
   activeProjectDefaultTc = null;
   try {
-    const detail = await HITT_API.getProject(inv.projectId);
+    const detail = await HITT_API.getProject(projectId);
     activeProjectBpId = detail.busspartnerid || null;
     if (detail.busspartnertoinvoiceid) {
       activeProjectDefaultTc = { id: detail.busspartnertoinvoiceid, taxcompanyname: detail.invoicingPartnerLabel || T('inv.tc.generic') };
@@ -604,11 +602,71 @@ async function openInvoiceFromList(inv){
     try { activeProjectBpTaxCompanies = await HITT_API.getBusinessPartnerTaxCompanies(activeProjectBpId); }
     catch { activeProjectBpTaxCompanies = []; }
   }
-  try { INVOICES = await HITT_API.getProjectInvoices(inv.projectId); }
+  try { INVOICES = await HITT_API.getProjectInvoices(projectId); }
   catch { INVOICES = []; }
   await loadVerifactuStates();
+}
+
+// Open the New/Edit invoice modal for an invoice picked from the flat list.
+async function openInvoiceFromList(inv){
+  if (usingDemoData) { toast(T('common.notAvailableDemo'), 'navy'); return; }
+  if (!inv.projectId) { toast(T('inv.toast.invoicesLoadFail'), 'red'); return; }
+  await loadProjectInvoiceContext(inv.projectId);
   openInvoiceModal(inv.id);
 }
+
+// "+ New invoice" on the Invoice view → pick a project → new-invoice form.
+async function startNewInvoiceForProject(projectId){
+  if (usingDemoData) { toast(T('common.notAvailableDemo'), 'navy'); return; }
+  await loadProjectInvoiceContext(projectId);
+  openInvoiceModal(null);
+}
+
+const projPickerOverlay = document.getElementById('projPickerOverlay');
+let projPickerDebounce = null;
+function openProjectPicker(){
+  document.getElementById('projPickerSearch').value = '';
+  renderProjectPicker('');
+  projPickerOverlay.classList.remove('hidden');
+  setTimeout(() => document.getElementById('projPickerSearch').focus(), 50);
+}
+function closeProjectPicker(){ projPickerOverlay.classList.add('hidden'); }
+function renderProjectPicker(term){
+  const tbody = document.getElementById('projPickerBody');
+  const empty = document.getElementById('projPickerEmpty');
+  const t = (term || '').trim().toLowerCase();
+  const rows = PROJECTS
+    .filter(p => !t || `${p.code || ''} ${p.name || ''} ${p.bpName || ''}`.toLowerCase().includes(t))
+    .sort((a, b) => String(a.code || '').localeCompare(String(b.code || '')))
+    .slice(0, 200);
+  empty.classList.toggle('hidden', rows.length > 0);
+  tbody.innerHTML = rows.map((p, i) => `
+    <tr data-pi="${i}" style="cursor:pointer;">
+      <td><span style="font-weight:600;">${escapeHtml(p.code || '—')}</span> — ${escapeHtml(p.name || '')}</td>
+      <td>${escapeHtml(p.entityLabel || '—')}</td>
+      <td>${p.bpName ? escapeHtml(p.bpName) : '—'}</td>
+      <td>${escapeHtml(p.projectStatusLabel || '—')}</td>
+    </tr>`).join('');
+  tbody.querySelectorAll('tr[data-pi]').forEach(tr => {
+    tr.addEventListener('click', () => {
+      const p = rows[Number(tr.dataset.pi)];
+      if (!p) return;
+      closeProjectPicker();
+      startNewInvoiceForProject(p.id);
+    });
+  });
+}
+document.getElementById('projPickerClose').addEventListener('click', closeProjectPicker);
+projPickerOverlay.addEventListener('click', (e) => { if (e.target === projPickerOverlay) closeProjectPicker(); });
+document.getElementById('projPickerSearch').addEventListener('input', (e) => {
+  clearTimeout(projPickerDebounce);
+  const v = e.target.value;
+  projPickerDebounce = setTimeout(() => renderProjectPicker(v), 200);
+});
+document.getElementById('ivNewInvoiceBtn').addEventListener('click', () => {
+  if (usingDemoData) { toast(T('common.notAvailableDemo'), 'navy'); return; }
+  openProjectPicker();
+});
 
 const ivStatusBtn = document.getElementById('ivStatusBtn');
 const ivStatusMenu = document.getElementById('ivStatusMenu');
