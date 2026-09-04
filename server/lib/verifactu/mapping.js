@@ -30,6 +30,44 @@ function normalizeFiscalId(raw) {
   return (m ? m[1] : s) || null;
 }
 
+const _DNI_LETTERS = "TRWAGMYFPDXBNJZSQVHLCKE";
+
+/**
+ * Checksum-validate a Spanish NIF (persona física), NIE, or CIF (entidad).
+ * Input is normalised first, so `"es b-1234.567 z"` etc. work.
+ * @returns {boolean}
+ */
+function isValidSpanishTaxId(raw) {
+  const id = String(raw == null ? "" : raw).toUpperCase().replace(/[\s.\-/]/g, "").replace(/^ES/, "");
+  if (!id) return false;
+
+  // NIF — 8 digits + control letter
+  let m = /^(\d{8})([A-Z])$/.exec(id);
+  if (m) return _DNI_LETTERS[Number(m[1]) % 23] === m[2];
+
+  // NIE — X/Y/Z + 7 digits + control letter (X→0, Y→1, Z→2)
+  m = /^([XYZ])(\d{7})([A-Z])$/.exec(id);
+  if (m) {
+    const n = Number(String("XYZ".indexOf(m[1])) + m[2]);
+    return _DNI_LETTERS[n % 23] === m[3];
+  }
+
+  // CIF — org letter + 7 digits + control (a digit or a letter)
+  m = /^([ABCDEFGHJNPQRSUVW])(\d{7})([0-9A-J])$/.exec(id);
+  if (m) {
+    let sum = 0;
+    for (let i = 0; i < 7; i++) {
+      let d = Number(m[2][i]);
+      if (i % 2 === 0) { d *= 2; if (d > 9) d -= 9; }
+      sum += d;
+    }
+    const ctrl = (10 - (sum % 10)) % 10;
+    return m[3] === String(ctrl) || m[3] === "JABCDEFGHI"[ctrl];
+  }
+
+  return false;
+}
+
 /** 2-decimal round that avoids binary-fp surprises (1.005 → 1.01). */
 function money(n) {
   return Math.round((Number(n) + Number.EPSILON) * 100) / 100;
@@ -110,6 +148,12 @@ function buildAltaPayload(inv) {
     const idType = r.fiscalIdType == null || r.fiscalIdType === "nif" ? null : String(r.fiscalIdType);
 
     if (idType == null) {
+      if (!isValidSpanishTaxId(fiscalId)) {
+        throw new MappingError(
+          `The recipient's VAT number "${fiscalId}" is not a valid Spanish NIF/NIE/CIF. ` +
+          `If "${name}" is a foreign client, set its fiscal-ID type on the tax company; otherwise correct the number.`
+        );
+      }
       recipient = { irsId: fiscalId, name, country: (r.country || "ES").toUpperCase() };
     } else {
       const country = String(r.country || "").toUpperCase();
@@ -175,4 +219,4 @@ function buildAltaPayload(inv) {
   return { invoice };
 }
 
-module.exports = { buildAltaPayload, normalizeFiscalId, money, MappingError, MIN_ISSUE_DATE };
+module.exports = { buildAltaPayload, normalizeFiscalId, isValidSpanishTaxId, money, MappingError, MIN_ISSUE_DATE };
