@@ -46,11 +46,12 @@ const READONLY_CONFIGURED = !!(process.env.PG_READONLY_USER && process.env.PG_RE
 
 let readerPool;
 if (READONLY_CONFIGURED) {
+  const roUser = process.env.PG_READONLY_USER;
   readerPool = new Pool({
     host: process.env.PG_READONLY_HOST || process.env.PGHOST,
     port: Number(process.env.PG_READONLY_PORT || process.env.PGPORT) || 5432,
     database: process.env.PG_READONLY_DATABASE || process.env.PGDATABASE,
-    user: process.env.PG_READONLY_USER,
+    user: roUser,
     password: process.env.PG_READONLY_PASSWORD,
     ssl,
     max: 5,
@@ -59,6 +60,7 @@ if (READONLY_CONFIGURED) {
   readerPool.on("error", (err) => {
     console.error("[db] Unexpected error on idle read-only PostgreSQL client", err);
   });
+  console.log(`[db] chat assistant uses the dedicated read-only role "${roUser}"`);
 } else {
   readerPool = pool;
   if (process.env.AZURE_OPENAI_ENDPOINT) {
