@@ -355,6 +355,19 @@
 }
 .path-item .btn { padding: 0.45rem 0.9rem; font-size: 0.82rem; }
 
+/* location row: provider <select> + path box + Save */
+.path-item .path-row--loc { flex-wrap: wrap; }
+.path-item .path-row--loc select {
+  flex: 0 0 auto;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-size: 0.88rem;
+}
+.path-item .path-row--loc input { min-width: 12rem; }
+
 /* boolean / multi config rows */
 .settings-checkgroup { display: flex; flex-direction: column; gap: 0.35rem; }
 .settings-checkline {

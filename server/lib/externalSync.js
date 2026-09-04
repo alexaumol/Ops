@@ -2,11 +2,15 @@
  * Settings → Sync — back up app documents to the company's external storage.
  * ---------------------------------------------------------------------------
  * Microsoft only for v1 (reuses lib/graph.js, app-only). Config keys:
- *   sync.projects_location    folder where per-project folders live
- *   sync.other_docs_location  base folder for the document backup
+ *   sync.projects_location    {"provider","path"} — folder for per-project folders
+ *   sync.other_docs_location  {"provider","path"} — base folder for the backup
  *   sync.backup_doc_types     CSV of "tickets" / "invoices"
  *   sync.backup_under_project "on" -> file a document under its project's
  *                             folder instead of a per-type folder
+ *
+ * A location's `provider` is "onedrive" (wired), "gdrive" or "network"
+ * (staged — a sync attempt records a "not built yet" error). A bare string
+ * value (pre-provider config) is read as { provider: "onedrive", path: <string> }.
  *
  * Every entry point is BEST-EFFORT: it never throws to its caller. Outcomes
  * are recorded in the external_sync table (status 'ok' | 'error'); the
@@ -23,16 +27,34 @@ const { renderInvoicePdfBuffer } = require("./invoicePdf");
 
 const ENV_PROJECT_FOLDER = process.env.GRAPH_ONEDRIVE_FOLDER || "";
 
+const PROVIDER_LABEL = { onedrive: "OneDrive", gdrive: "Google Drive", network: "Network server" };
+
+// A location value is JSON {"provider","path"} or (legacy) a bare path string.
+function parseLocation(raw) {
+  const s = String(raw || "").trim();
+  if (s.startsWith("{")) {
+    try {
+      const o = JSON.parse(s);
+      return { provider: o.provider || "onedrive", path: String(o.path || "").trim() };
+    } catch { /* fall through to bare-string handling */ }
+  }
+  return { provider: "onedrive", path: s };
+}
+
 async function getSyncConfig(db) {
   let m = {};
   try {
     const { rows } = await db.query(`SELECT configkey, configvalue FROM appconfig WHERE configkey LIKE 'sync.%'`);
     m = Object.fromEntries(rows.map((r) => [r.configkey, r.configvalue]));
   } catch { /* table missing / DB down — treat as unconfigured */ }
+  const projects = parseLocation(m["sync.projects_location"]);
+  const other = parseLocation(m["sync.other_docs_location"]);
   return {
     enabled: m["sync.enabled"] === "on",
-    projectsLocation: (m["sync.projects_location"] || "").trim() || ENV_PROJECT_FOLDER,
-    otherLocation: (m["sync.other_docs_location"] || "").trim(),
+    projectsLocation: projects.path || ENV_PROJECT_FOLDER,
+    projectsProvider: projects.path ? projects.provider : "onedrive",
+    otherLocation: other.path,
+    otherProvider: other.provider,
     docTypes: new Set(String(m["sync.backup_doc_types"] || "").split(",").map((s) => s.trim()).filter(Boolean)),
     underProject: m["sync.backup_under_project"] === "on",
   };
@@ -57,6 +79,10 @@ function projectFolderName(code, entityId, name) {
 
 const typeFolder = (type) => (type === "invoices" ? "Invoices" : "Tickets");
 
+// The provider a document backup would use, from cfg alone (under-project mode
+// files under the projects location, otherwise the other-docs location).
+const docProvider = (cfg) => (cfg.underProject ? cfg.projectsProvider : cfg.otherProvider);
+
 // Where a document's backup goes: { location, folder }.
 //   underProject ON  -> inside the project's folder, under the project
 //                       location (same place the folders are created). No
@@ -66,12 +92,19 @@ function backupTarget(cfg, type, project) {
   if (cfg.underProject) {
     return {
       location: cfg.projectsLocation,
+      provider: cfg.projectsProvider,
       folder: project && project.code
         ? projectFolderName(project.code, project.entityId, project.name)
         : `_Unassigned/${typeFolder(type)}`,
     };
   }
-  return { location: cfg.otherLocation, folder: typeFolder(type) };
+  return { location: cfg.otherLocation, provider: cfg.otherProvider, folder: typeFolder(type) };
+}
+
+// null when the provider is wired; otherwise a message to store as the error.
+function unsupportedProvider(provider) {
+  if (!provider || provider === "onedrive") return null;
+  return `${PROVIDER_LABEL[provider] || provider} sync is not built yet — see docs/external-sync.md`;
 }
 
 async function record(db, kind, refId, fields) {
@@ -103,7 +136,10 @@ async function record(db, kind, refId, fields) {
 
 async function syncExpenseDoc(db, expenseId) {
   const cfg = await getSyncConfig(db);
-  if (!cfg.enabled || !graph.syncConfigured() || !cfg.docTypes.has("tickets")) return { skipped: true };
+  if (!cfg.enabled || !cfg.docTypes.has("tickets")) return { skipped: true };
+  const unsup = unsupportedProvider(docProvider(cfg));
+  if (unsup) { await record(db, "expense_doc", expenseId, { status: "error", error: unsup }); return { skipped: true }; }
+  if (!graph.syncConfigured()) return { skipped: true };
 
   let e;
   try {
@@ -147,7 +183,10 @@ async function syncExpenseDoc(db, expenseId) {
 
 async function syncInvoiceDoc(db, invoiceId) {
   const cfg = await getSyncConfig(db);
-  if (!cfg.enabled || !graph.syncConfigured() || !cfg.docTypes.has("invoices")) return { skipped: true };
+  if (!cfg.enabled || !cfg.docTypes.has("invoices")) return { skipped: true };
+  const unsup = unsupportedProvider(docProvider(cfg));
+  if (unsup) { await record(db, "invoice_doc", invoiceId, { status: "error", error: unsup }); return { skipped: true }; }
+  if (!graph.syncConfigured()) return { skipped: true };
 
   let head;
   try {
@@ -165,6 +204,10 @@ async function syncInvoiceDoc(db, invoiceId) {
   }
   if (!head) return { skipped: true };
 
+  const proj0 = head.projectid ? { code: head.code, entityId: head.entityId, name: head.name } : null;
+  const t0 = backupTarget(cfg, "invoices", proj0);
+  if (!t0.location) return { skipped: true };
+
   // loadInvoiceForPdf lives on the invoicing route module — lazy-require so
   // the route ↔ lib hook doesn't form a load-time cycle.
   let buffer;
@@ -178,9 +221,7 @@ async function syncInvoiceDoc(db, invoiceId) {
     return { error: err.message };
   }
 
-  const project = head.projectid ? { code: head.code, entityId: head.entityId, name: head.name } : null;
-  const { location, folder } = backupTarget(cfg, "invoices", project);
-  if (!location) return { skipped: true };
+  const { location, folder } = t0;
   const filename = `invoice_${sanitize(head.invoicecode || `#${head.id}`)}.pdf`;
   const sig = crypto.createHash("sha256").update(buffer).digest("hex").slice(0, 16);
 
@@ -203,10 +244,17 @@ async function syncInvoiceDoc(db, invoiceId) {
 async function syncProjectFolder(db, project) {
   // project: { id, code, entityId, name }
   const cfg = await getSyncConfig(db);
-  if (!cfg.enabled || !graph.syncConfigured() || !cfg.projectsLocation) return { skipped: true };
+  if (!cfg.enabled || !cfg.projectsLocation) return { skipped: true };
   if (!project || !project.code || project.entityId == null || project.entityId === "") return { skipped: true };
 
   const folderName = projectFolderName(project.code, project.entityId, project.name);
+
+  const unsupported = unsupportedProvider(cfg.projectsProvider);
+  if (unsupported) {
+    await record(db, "project_folder", project.id, { sourceSig: folderName, target: cfg.projectsLocation, status: "error", error: unsupported });
+    return { skipped: true };
+  }
+  if (!graph.syncConfigured()) return { skipped: true };
   try {
     const created = await graph.createProjectFolder(folderName, cfg.projectsLocation);
     await record(db, "project_folder", project.id, {

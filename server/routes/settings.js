@@ -83,9 +83,38 @@ function ensureSettingsSchema() {
 //
 //   group  : "sync" (default) | "presence" — which Settings tab it renders on
 //   type   : "text" (default) | "boolean" ("on"/"") | "multi" (CSV of `options`)
-//   options (multi only) : [{ value, label }]
+//            | "location" (a provider <select> + a path box; the stored value
+//              is JSON {"provider","path"}; a bare string is read as
+//              {provider:"onedrive", path:<string>})
+//   options   (multi only)   : [{ value, label }]
+//   providers (location only): [{ value, label, placeholder, hint }]
 //   master  : a boolean that gates the rest of its group in the UI + engine
 //   hideWhen: { key, equals } — grey this row out when that key holds `equals`
+
+// Storage providers offered for each Sync location. Only "onedrive" is wired
+// into the engine (server/lib/externalSync.js); the others save fine but a
+// sync attempt records a "not built yet" error until their backend lands.
+const SYNC_PROVIDERS = [
+  {
+    value: "onedrive",
+    label: "OneDrive / SharePoint",
+    placeholder: "Clients/Projects   or   https://…sharepoint.com/…",
+    hint: "A folder in the company OneDrive, or a SharePoint/OneDrive share link. Leave the path empty to use the GRAPH_ONEDRIVE_FOLDER default.",
+  },
+  {
+    value: "gdrive",
+    label: "Google Drive",
+    placeholder: "Shared-drive folder link   or   folder ID",
+    hint: "Saved, but Google Drive sync isn't built yet — nothing is copied there.",
+  },
+  {
+    value: "network",
+    label: "Network server (UNC)",
+    placeholder: "\\\\server\\share\\Ops",
+    hint: "A UNC path on the corporate LAN/VPN. Saved, but network-server sync isn't built yet.",
+  },
+];
+
 const CONFIG_KEYS = {
   // --- Sync tab: external-storage backup ---------------------------------
   "sync.enabled": {
@@ -97,9 +126,10 @@ const CONFIG_KEYS = {
   },
   "sync.projects_location": {
     group: "sync",
+    type: "location",
     label: "Create project folder on a remote location",
-    hint: "A folder in the company OneDrive (or a SharePoint/OneDrive share link). When a project is created the app adds a subfolder here named \"PROJECTNUMBER_ENTITYID PROJECT NAME\". Leave empty to keep using the GRAPH_ONEDRIVE_FOLDER default.",
-    placeholder: "Clients/Projects   or   https://…sharepoint.com/…",
+    hint: "When a project is created the app adds a subfolder here named \"PROJECTNUMBER_ENTITYID PROJECT NAME\". The catch-up job backfills any project missing one.",
+    providers: SYNC_PROVIDERS,
   },
   "sync.backup_doc_types": {
     group: "sync",
@@ -119,9 +149,10 @@ const CONFIG_KEYS = {
   },
   "sync.other_docs_location": {
     group: "sync",
+    type: "location",
     label: "Backup other documents",
-    hint: "Base folder (OneDrive path or share link) where the selected document types are backed up, grouped by type (Tickets / Invoices).",
-    placeholder: "Clients/Backups   or   https://…sharepoint.com/…",
+    hint: "Base folder where the selected document types are backed up, grouped by type (Tickets / Invoices).",
+    providers: SYNC_PROVIDERS,
     hideWhen: { key: "sync.backup_under_project", equals: "on" },
   },
 

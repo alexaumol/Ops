@@ -430,6 +430,19 @@ document.querySelectorAll("[data-stab]").forEach((btn) => {
 // decides which tab it belongs to; "master" is a boolean that gates the whole
 // group; "hideWhen" {key,equals} greys this row out while another key holds a
 // value (see loadConfigGroup / refreshGroupState).
+// A "location" config value is JSON {"provider","path"}; a bare string
+// (pre-provider config) is read as an OneDrive path.
+function parseLoc(raw) {
+  const s = String(raw || "").trim();
+  if (s.startsWith("{")) {
+    try {
+      const o = JSON.parse(s);
+      return { provider: o.provider || "onedrive", path: String(o.path || "") };
+    } catch { /* fall through */ }
+  }
+  return { provider: "onedrive", path: s };
+}
+
 function renderConfigItem(k, i) {
   const key = escapeHtml(k.key);
   const label = escapeHtml(k.label || k.key);
@@ -447,6 +460,24 @@ function renderConfigItem(k, i) {
         <span>${label}</span>
       </label>
       ${hint}`, k.master ? " path-item--master" : "");
+  }
+  if (k.type === "location") {
+    const loc = parseLoc(k.value);
+    const provs = k.providers || [{ value: "onedrive", label: "OneDrive" }];
+    const cur = provs.find((p) => p.value === loc.provider) || provs[0];
+    const opts = provs.map((p) =>
+      `<option value="${escapeHtml(p.value)}"${p.value === cur.value ? " selected" : ""}>${escapeHtml(p.label)}</option>`
+    ).join("");
+    const provHint = `<p class="path-hint" data-loc-hint>${escapeHtml(cur.hint || "")}</p>`;
+    return wrap(`
+      <label>${label}</label>
+      <div class="path-row path-row--loc">
+        <select data-loc-provider aria-label="Storage provider">${opts}</select>
+        <input type="text" data-loc-path value="${escapeHtml(loc.path)}" placeholder="${escapeHtml(cur.placeholder || "")}" />
+        <button type="button" class="btn btn-primary" data-save-path>Save</button>
+      </div>
+      ${provHint}
+      ${hint}`);
   }
   if (k.type === "multi") {
     const set = new Set(String(k.value || "").split(",").map((s) => s.trim()).filter(Boolean));
@@ -481,6 +512,9 @@ async function loadConfigGroup(group, hostId) {
     return;
   }
   const items = data.keys.filter((k) => (k.group || "sync") === group);
+  // provider metadata per "location" key, for the dropdown-change handler
+  const provByKey = {};
+  items.forEach((k) => { if (k.type === "location") provByKey[k.key] = k.providers || []; });
   host.innerHTML = items.length
     ? items.map(renderConfigItem).join("")
     : `<div class="settings-pane-empty">Nothing to configure here.</div>`;
@@ -521,7 +555,25 @@ async function loadConfigGroup(group, hostId) {
   host.querySelectorAll("[data-save-path]").forEach((btn) => {
     btn.addEventListener("click", () => {
       const item = btn.closest(".path-item");
-      save(item.dataset.key, item.querySelector("input").value.trim(), btn);
+      const locRow = item.querySelector(".path-row--loc");
+      if (locRow) {
+        const provider = locRow.querySelector("[data-loc-provider]").value;
+        const path = locRow.querySelector("[data-loc-path]").value.trim();
+        save(item.dataset.key, JSON.stringify({ provider, path }), btn);
+      } else {
+        save(item.dataset.key, item.querySelector("input").value.trim(), btn);
+      }
+    });
+  });
+  // Provider dropdown: swap the path box's placeholder + the provider hint.
+  host.querySelectorAll("[data-loc-provider]").forEach((sel) => {
+    sel.addEventListener("change", () => {
+      const item = sel.closest(".path-item");
+      const row = sel.closest(".path-row--loc");
+      const p = (provByKey[item.dataset.key] || []).find((x) => x.value === sel.value) || {};
+      row.querySelector("[data-loc-path]").placeholder = p.placeholder || "";
+      const hintEl = item.querySelector("[data-loc-hint]");
+      if (hintEl) hintEl.textContent = p.hint || "";
     });
   });
   host.querySelectorAll("[data-config-bool]").forEach((cb) => {

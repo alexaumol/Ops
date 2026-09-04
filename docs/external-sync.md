@@ -19,10 +19,17 @@ project-folder creation on project creation must turn this on.)
 | **File backups under each document's project folder** (`sync.backup_under_project`) | **On** — a document is filed inside its project's folder (under the project location above): `<projects location>/PROJECTNUMBER_ENTITYID NAME/…`; documents with no project go to `<projects location>/_Unassigned/Tickets\|Invoices/…`. A separate backup location isn't used, so **"Backup other documents" is hidden**. **Off** — documents are grouped by type at the backup location below: `<backup location>/Tickets/…`, `<backup location>/Invoices/…`. Either way file names carry a `ticket_<id>_…` / `invoice_<code>.pdf` prefix. |
 | **Backup other documents** (`sync.other_docs_location`) | Base folder for the by-type backup. Only used when "file under project folder" is **off**. |
 
-A **location** is either a plain folder path in `GRAPH_ONEDRIVE_USER`'s drive
-(like `GRAPH_ONEDRIVE_FOLDER`, e.g. `Clients/Backups`) **or** a full
-SharePoint / OneDrive share URL (`https://…sharepoint.com/…`). A share URL is
-resolved once via Graph `/shares`.
+Each **location** has a **provider** and a path:
+
+| Provider | Path | Status |
+|---|---|---|
+| **OneDrive / SharePoint** | a folder path in `GRAPH_ONEDRIVE_USER`'s drive (like `GRAPH_ONEDRIVE_FOLDER`, e.g. `Clients/Backups`) **or** a full SharePoint/OneDrive share URL (`https://…sharepoint.com/…`, resolved once via Graph `/shares`) | **wired** |
+| **Google Drive** | a shared-drive folder link or id | **staged** — saved, but a sync attempt records a "not built yet" error row; nothing is copied |
+| **Network server (UNC)** | `\\server\share\Ops` on the corporate LAN/VPN | **staged** — same |
+
+The stored value is JSON `{"provider":"…","path":"…"}`. A bare string left over
+from before the provider picker is read as `{provider:"onedrive", path:<string>}`
+and upgrades on the next Save.
 
 ## Trigger
 
@@ -60,8 +67,12 @@ the last status. `actionsaudit` gets a `sync.run` row per job run.
 
 ## Not built (v1)
 
-Google Drive; cross-tenant auth (writes go to the drive the current
-`Sites.Selected` grant covers); mirroring deletes or renames (removing a
+Google Drive **and network-server (UNC) upload** — the provider can be picked
+and the path saved, but nothing is copied until each backend lands (Google
+Drive needs `googleapis` + a service account; network-server needs an SMB
+client or a mounted path on the server). Cross-tenant auth (writes go to the
+drive the current `Sites.Selected` grant covers); mirroring deletes or renames
+(removing a
 document in Ops leaves the backup copy in place); copying project working
 files into project folders (only the backup of tickets / invoices);
 per-invoice letterhead accuracy for non-HiTT entities (the PDF still renders,
