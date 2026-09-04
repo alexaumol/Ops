@@ -555,6 +555,9 @@ router.get("/export", requireModuleAccess("presence"), async (req, res) => {
     const fmt = (iso) => (iso ? new Intl.DateTimeFormat("es-ES", { timeZone: cfg.timezone, hour: "2-digit", minute: "2-digit" }).format(new Date(iso)) : "");
     const hhmm = (min) => { const a = Math.abs(min); return `${Math.floor(a / 60)}:${String(a % 60).padStart(2, "0")}`; };
     const signed = (min) => (min < 0 ? "-" : "") + hhmm(min);
+    const LOC_ES = { office: "Oficina", remote: "Teletrabajo", client: "Cliente" };
+    const locEs = (v) => (v ? (LOC_ES[v] || v) : "");
+    const segTxt = (s) => `${fmt(s.in)}-${fmt(s.out)}${s.location ? ` (${locEs(s.location)})` : ""}`;
     const lines = [
       `Registro de jornada — ${name}`,
       `Periodo: ${from} a ${to}`,
@@ -567,7 +570,7 @@ router.get("/export", requireModuleAccess("presence"), async (req, res) => {
     for (const d of reg.days) {
       lines.push([
         d.date, fmt(d.firstIn), fmt(d.lastOut),
-        d.segments.map((s) => `${fmt(s.in)}-${fmt(s.out)}`).join(" "),
+        d.segments.map(segTxt).join(" "),
         hhmm(d.workedMinutes), hhmm(d.expectedMinutes), signed(d.balanceMinutes),
         d.hasManual ? "sí" : "", d.leave || d.holiday || "",
       ].join(";"));

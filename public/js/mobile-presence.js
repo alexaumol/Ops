@@ -18,6 +18,7 @@ HITT_PERMS.guardModule("presence", "../mobile.html");
 const T = (k, v) => (window.HITT_I18N ? HITT_I18N.t(k, v) : k);
 HITT_PERMS.applyRealName();
 
+function esc(s) { const d = document.createElement("div"); d.textContent = s ?? ""; return d.innerHTML; }
 function toast(msg, tone = "navy") {
   const host = document.getElementById("toastHost");
   const elx = document.createElement("div");
@@ -49,6 +50,10 @@ function fmtMins(m) {
   const neg = m < 0;
   const a = Math.abs(Math.round(m));
   return `${neg ? "−" : ""}${Math.floor(a / 60)} h ${String(a % 60).padStart(2, "0")} m`;
+}
+function locLabel(v) {
+  if (!v) return "";
+  return ["office", "remote", "client"].includes(v) ? T("ta.pr.loc." + v) : v;
 }
 function openMinutes() {
   if (!state || !state.open || !state.since) return 0;
@@ -94,7 +99,10 @@ function render() {
   const segs = state.segments || [];
   el.mpToday.innerHTML = segs.length
     ? `<span class="mp-today__label">${T("ta.pr.todayLabel")}</span> ` +
-      segs.map((s) => `<span class="mp-seg">${fmtTime(s.in)}–${fmtTime(s.out)}</span>`).join(" ")
+      segs.map((s) => {
+        const loc = locLabel(s.location);
+        return `<span class="mp-seg">${fmtTime(s.in)}–${fmtTime(s.out)}${loc ? ` <span class="mp-seg-loc">${esc(loc)}</span>` : ""}</span>`;
+      }).join(" ")
     : "";
 }
 

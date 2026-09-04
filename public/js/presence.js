@@ -51,6 +51,11 @@ window.HITT_PRESENCE = (function () {
     const neg = m < 0; const a = Math.abs(Math.round(m));
     return `${neg ? "−" : ""}${Math.floor(a / 60)} h ${String(a % 60).padStart(2, "0")} m`;
   }
+  // office/remote/client -> localised; free text stays as-is; null -> ""
+  function locLabel(v) {
+    if (!v) return "";
+    return ["office", "remote", "client"].includes(v) ? T("ta.pr.loc." + v) : v;
+  }
   function fmtElapsed(sinceIso) {
     const s = Math.max(0, Math.floor((Date.now() - new Date(sinceIso)) / 1000));
     return `${Math.floor(s / 3600)} h ${String(Math.floor((s % 3600) / 60)).padStart(2, "0")} m`;
@@ -172,7 +177,10 @@ window.HITT_PRESENCE = (function () {
     const segs = todayState.segments || [];
     el.prToday.innerHTML = segs.length
       ? `<span class="ta-pr-today-label">${esc(T("ta.pr.todayLabel"))}</span> ` +
-        segs.map((s) => `<span class="ta-pr-seg">${fmtTime(s.in)}–${fmtTime(s.out)}</span>`).join(" ") +
+        segs.map((s) => {
+          const loc = locLabel(s.location);
+          return `<span class="ta-pr-seg">${fmtTime(s.in)}–${fmtTime(s.out)}${loc ? ` <span class="ta-pr-seg-loc">${esc(loc)}</span>` : ""}</span>`;
+        }).join(" ") +
         ` · <strong>${fmtMins(todayState.workedMinutes)}</strong>`
       : "";
   }
@@ -232,7 +240,9 @@ window.HITT_PRESENCE = (function () {
         ? `<span class="ta-pr-open">${esc(T("ta.pr.inProgress"))}</span>`
         : (d.workedMinutes ? fmtMins(d.workedMinutes) : (badge || "—"));
       const balClass = d.balanceMinutes < 0 ? ' style="color:var(--danger);"' : "";
-      const segs = d.segments.map((s) => `${fmtTime(s.in)}–${fmtTime(s.out)}`).join("  ");
+      const segs = d.segments
+        .map((s) => { const l = locLabel(s.location); return `${fmtTime(s.in)}–${fmtTime(s.out)}${l ? ` · ${l}` : ""}`; })
+        .join("   ");
       const future = d.date > today;
       return `<tr${d.date === today ? ' class="ta-pr-row-today"' : ""}>
         <td>${esc(weekdayLabel(d.date))} ${esc(d.date.slice(8))}${d.hasManual ? ` <span class="ta-pr-m" title="${esc(T('ta.pr.manualTip'))}">M</span>` : ""}</td>
