@@ -26,7 +26,7 @@ HITT_PERMS.applyRealName();
 
 const MODULE_LABELS = {
   "projects": "Projects",
-  "business-partners": "Business partners",
+  "customers-partners": "Customers & partners",
   "time-allocation": "Time allocation",
   "invoicing": "Invoicing",
   "expenses": "Expenses",
@@ -1029,7 +1029,7 @@ let auditDir = "desc";
 const AUDIT_CATEGORY = {
   project: "Project",
   timetracking: "Time tracking",
-  bp: "Business partner",
+  bp: "Customer/partner",
   invoice: "Invoicing",
   expense: "Expenses",
   timeoff: "Time off",

@@ -133,7 +133,7 @@ function cardBadgesHtml(p){
   const badges = [];
   if (p.notInvoiceable) badges.push(`<span class="text-hitt-red" title="Not invoiceable">${iconNotInvoiceable()}</span>`);
   if (!p.hasBudget) badges.push(`<span class="text-hitt-amber" title="Missing budget">${iconMissingBudget()}</span>`);
-  if (!p.hasBusinessPartner) badges.push(`<span class="text-hitt-amber" title="Missing business partner">${iconMissingBP()}</span>`);
+  if (!p.hasBusinessPartner) badges.push(`<span class="text-hitt-amber" title="Missing customer/partner">${iconMissingBP()}</span>`);
   return badges.length ? `<div class="flex items-center gap-1 shrink-0">${badges.join('')}</div>` : '';
 }
 

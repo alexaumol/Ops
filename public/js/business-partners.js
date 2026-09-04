@@ -11,7 +11,7 @@
 
 const session = HITT_AUTH.requireSession("../index.html");
 const T = (k, v) => (window.HITT_I18N ? HITT_I18N.t(k, v) : k);
-HITT_PERMS.guardModule("business-partners", "../welcome.html");
+HITT_PERMS.guardModule("customers-partners", "../welcome.html");
 document.getElementById("userName").textContent = session.displayName;
 document.getElementById("userAvatar").textContent = HITT_AUTH.initials(session);
 HITT_PERMS.applyRealName();
@@ -454,7 +454,7 @@ function renderTaxCompanies(rows){
   }
   list.innerHTML = TAX_COMPANIES.map(tc => {
     const addrParts = tc.sameAddress
-      ? ['Same address as the business partner']
+      ? ['Same address as the customer/partner']
       : [tc.streetname, tc.zipcode, tc.city, tc.state, tc.countryLabel].filter(Boolean);
     return `
       <div class="sub-item ${String(editingTcId) === String(tc.id) ? 'is-editing' : ''}">
@@ -921,7 +921,7 @@ async function requestCloseDetailModal(){
   if (!bpModalHasUnsaved()) { closeDetailModal(); return; }
   const msg = bpHasSessionChanges()
     ? 'Discard your changes? Contacts, notes and tax companies you added, edited or deleted will be reverted.'
-    : 'Discard your unsaved changes to this business partner?';
+    : 'Discard your unsaved changes to this customer/partner?';
   if (!confirm(msg)) return;
   if (bpHasSessionChanges()) await discardBpSessionChanges();
   clearBpModalTransient();

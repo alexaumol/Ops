@@ -45,10 +45,16 @@
  *           secure — anyone who can reach the API can forge it. Dev /
  *           offline / stub-login / rollback only.
  *
- * MODULE_KEYS: 'projects' | 'business-partners' | 'time-allocation' |
- * 'invoicing' | 'expenses' | 'reports' | 'chat'. 'time-allocation' covers
- * both routes/timeTracking.js and routes/timeOff.js — they're one module in
- * the frontend menu. 'chat' gates the Ops assistant (routes/chat.js).
+ * MODULE_KEYS: 'projects' | 'customers-partners' | 'time-allocation' |
+ * 'invoicing' | 'expenses' | 'reports' | 'presence' | 'chat'.
+ * 'customers-partners' was 'business-partners' until the Customers &
+ * partners rename (see docs/customers-crm-roadmap.md §4) — renamed here,
+ * in modulerestrictions (migration), and in every requireModuleAccess() /
+ * guardModule() call; the route itself stays mounted at both
+ * /api/customers-partners (canonical) and /api/business-partners (kept
+ * working, server.js). 'time-allocation' covers both routes/timeTracking.js
+ * and routes/timeOff.js — they're one module in the frontend menu. 'chat'
+ * gates the Ops assistant (routes/chat.js).
  * ---------------------------------------------------------------------------
  */
 const { pool } = require("../config/db");
@@ -65,7 +71,7 @@ if (!["bearer", "hybrid", "header"].includes(AUTH_MODE)) {
 }
 const RESOLVED_AUTH_MODE = ["bearer", "hybrid", "header"].includes(AUTH_MODE) ? AUTH_MODE : "header";
 
-const MODULE_KEYS = ["projects", "business-partners", "time-allocation", "invoicing", "expenses", "reports", "presence", "chat"];
+const MODULE_KEYS = ["projects", "customers-partners", "time-allocation", "invoicing", "expenses", "reports", "presence", "chat"];
 
 // Resolves the X-HITT-User header (a stub-mode short username OR a real
 // MSAL UPN/email — this app supports both auth modes) to an employees row.

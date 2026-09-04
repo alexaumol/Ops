@@ -101,6 +101,11 @@ app.use("/api/branding", brandingRouter);
 app.use("/api", requireAuth);
 
 app.use("/api/projects", projectsRouter);
+// Canonical path for the Customers & partners module (renamed from
+// "Business partners" — docs/customers-crm-roadmap.md §4). /api/business-
+// partners is kept mounted on the same router so nothing that still calls
+// the old path breaks; drop it once nothing does.
+app.use("/api/customers-partners", businessPartnersRouter);
 app.use("/api/business-partners", businessPartnersRouter);
 app.use("/api/time-tracking", timeTrackingRouter);
 app.use("/api/time-off", timeOffRouter);

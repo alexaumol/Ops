@@ -181,7 +181,7 @@
       document.body.classList.add("opsc-open");
       if (!els.log.children.length) {
         if (messages.length) messages.forEach((m) => addBubble(m.role, m.content));
-        else addBubble("assistant", "Hi — ask me about any project or business partner, or how budgeted compares to invoiced.");
+        else addBubble("assistant", "Hi — ask me about any project or customer/partner, or how budgeted compares to invoiced.");
       }
       els.input.focus();
     };

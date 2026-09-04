@@ -119,39 +119,39 @@ const HITT_API = (() => {
       const params = new URLSearchParams();
       Object.entries(opts).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== "") params.set(k, v); });
       const qs = params.toString();
-      return request(`/api/business-partners${qs ? `?${qs}` : ""}`);
+      return request(`/api/customers-partners${qs ? `?${qs}` : ""}`);
     },
-    getBusinessPartnerLookups: () => request("/api/business-partners/lookups"),
-    getBusinessPartner: (id) => request(`/api/business-partners/${id}`),
+    getBusinessPartnerLookups: () => request("/api/customers-partners/lookups"),
+    getBusinessPartner: (id) => request(`/api/customers-partners/${id}`),
     createBusinessPartner: (payload) =>
-      request("/api/business-partners", { method: "POST", body: JSON.stringify(payload) }),
+      request("/api/customers-partners", { method: "POST", body: JSON.stringify(payload) }),
     updateBusinessPartner: (id, payload) =>
-      request(`/api/business-partners/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
-    getBusinessPartnerContacts: (id) => request(`/api/business-partners/${id}/contacts`),
+      request(`/api/customers-partners/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
+    getBusinessPartnerContacts: (id) => request(`/api/customers-partners/${id}/contacts`),
     addBusinessPartnerContact: (id, payload) =>
-      request(`/api/business-partners/${id}/contacts`, { method: "POST", body: JSON.stringify(payload) }),
+      request(`/api/customers-partners/${id}/contacts`, { method: "POST", body: JSON.stringify(payload) }),
     updateBusinessPartnerContact: (id, contactId, payload) =>
-      request(`/api/business-partners/${id}/contacts/${contactId}`, { method: "PATCH", body: JSON.stringify(payload) }),
+      request(`/api/customers-partners/${id}/contacts/${contactId}`, { method: "PATCH", body: JSON.stringify(payload) }),
     deleteBusinessPartnerContact: (id, contactId, employeeId) =>
-      request(`/api/business-partners/${id}/contacts/${contactId}`, { method: "DELETE", body: JSON.stringify({ employeeId }) }),
-    getBusinessPartnerNotes: (id) => request(`/api/business-partners/${id}/notes`),
-    getBusinessPartnerHistory: (id) => request(`/api/business-partners/${id}/history`),
-    getBusinessPartnerProjects: (id) => request(`/api/business-partners/${id}/projects`),
+      request(`/api/customers-partners/${id}/contacts/${contactId}`, { method: "DELETE", body: JSON.stringify({ employeeId }) }),
+    getBusinessPartnerNotes: (id) => request(`/api/customers-partners/${id}/notes`),
+    getBusinessPartnerHistory: (id) => request(`/api/customers-partners/${id}/history`),
+    getBusinessPartnerProjects: (id) => request(`/api/customers-partners/${id}/projects`),
     addBusinessPartnerNote: (id, payload) =>
-      request(`/api/business-partners/${id}/notes`, { method: "POST", body: JSON.stringify(payload) }),
+      request(`/api/customers-partners/${id}/notes`, { method: "POST", body: JSON.stringify(payload) }),
     deleteBusinessPartnerNote: (id, noteId) =>
-      request(`/api/business-partners/${id}/notes/${noteId}`, { method: "DELETE" }),
-    getBusinessPartnerTaxCompanies: (id) => request(`/api/business-partners/${id}/tax-companies`),
+      request(`/api/customers-partners/${id}/notes/${noteId}`, { method: "DELETE" }),
+    getBusinessPartnerTaxCompanies: (id) => request(`/api/customers-partners/${id}/tax-companies`),
     addBusinessPartnerTaxCompany: (id, payload) =>
-      request(`/api/business-partners/${id}/tax-companies`, { method: "POST", body: JSON.stringify(payload) }),
+      request(`/api/customers-partners/${id}/tax-companies`, { method: "POST", body: JSON.stringify(payload) }),
     updateBusinessPartnerTaxCompany: (id, tcId, payload) =>
-      request(`/api/business-partners/${id}/tax-companies/${tcId}`, { method: "PATCH", body: JSON.stringify(payload) }),
+      request(`/api/customers-partners/${id}/tax-companies/${tcId}`, { method: "PATCH", body: JSON.stringify(payload) }),
     deleteBusinessPartnerTaxCompany: (id, tcId) =>
-      request(`/api/business-partners/${id}/tax-companies/${tcId}`, { method: "DELETE" }),
+      request(`/api/customers-partners/${id}/tax-companies/${tcId}`, { method: "DELETE" }),
     archiveBusinessPartner: (id, reason) =>
-      request(`/api/business-partners/${id}/archive`, { method: "POST", body: JSON.stringify({ reason }) }),
+      request(`/api/customers-partners/${id}/archive`, { method: "POST", body: JSON.stringify({ reason }) }),
     unarchiveBusinessPartner: (id) =>
-      request(`/api/business-partners/${id}/unarchive`, { method: "POST" }),
+      request(`/api/customers-partners/${id}/unarchive`, { method: "POST" }),
 
     getEmployees: () => request("/api/employees"),
     getTimeTracking: (userId, weekStart) =>
