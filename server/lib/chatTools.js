@@ -118,7 +118,7 @@ async function getProject({ query }) {
 
 // --- tool: get_business_partner ---------------------------------------
 async function getBusinessPartner({ query }) {
-  if (!query || !String(query).trim()) return { error: "query is required (a business partner name)" };
+  if (!query || !String(query).trim()) return { error: "query is required (a customer/partner name)" };
   // Legacy (Access-derived) schema: BP has no country column — it comes via
   // the addresses table; contacts live in `contacts`; notes in
   // `businesspartnersnotes` keyed by `bpid`; taxcompanies/projects key the
@@ -137,7 +137,7 @@ async function getBusinessPartner({ query }) {
      LIMIT 1`,
     [like(query)]
   );
-  if (!rows.length) return { found: false, message: `No business partner matches "${query}".` };
+  if (!rows.length) return { found: false, message: `No customer/partner matches "${query}".` };
   const bp = rows[0];
   const id = String(bp.id);
   const [contacts, projects, taxCompanies, notes] = await Promise.all([
@@ -357,7 +357,7 @@ const tools = [
     function: {
       name: "get_project",
       description:
-        "Full snapshot of ONE project by code (e.g. '24-118') or name: status, owner, entity, business partner, budget (latest quotation), invoiced-to-date, % invoiced, hours (PO/RES), expenses, recent status changes, deliverables and the latest notes.",
+        "Full snapshot of ONE project by code (e.g. '24-118') or name: status, owner, entity, customer/partner, budget (latest quotation), invoiced-to-date, % invoiced, hours (PO/RES), expenses, recent status changes, deliverables and the latest notes.",
       parameters: {
         type: "object",
         properties: { query: { type: "string", description: "Project code or name" } },
@@ -370,10 +370,10 @@ const tools = [
     function: {
       name: "get_business_partner",
       description:
-        "Snapshot of ONE business partner by name: company type, country, contacts, linked projects (with status), tax companies, and latest notes.",
+        "Snapshot of ONE customer/partner by name: company type, country, contacts, linked projects (with status), tax companies, and latest notes.",
       parameters: {
         type: "object",
-        properties: { query: { type: "string", description: "Business partner name" } },
+        properties: { query: { type: "string", description: "Customer/partner name" } },
         required: ["query"],
       },
     },

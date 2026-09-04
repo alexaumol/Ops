@@ -221,22 +221,22 @@
             <div class="bg-hitt-teal px-3 py-1.5"><h3 class="text-white text-xs font-bold tracking-wide" data-i18n="proj.section.bp">BUSINESS PARTNER</h3></div>
             <div class="p-3 grid grid-cols-2 gap-3">
               <div class="col-span-2">
-                <label class="field-label" data-i18n="proj.f.contractingBp">Contracting Business Partner</label>
+                <label class="field-label" data-i18n="proj.f.contractingBp">Contracting customer/partner</label>
                 <div class="flex items-center gap-1.5 mt-1">
                   <div id="mBusinessPartner" class="field-input" style="background:#F5F4EE; color:#5C757C; flex:1;">—</div>
-                  <button id="mBPSearch" type="button" title="Search and assign a business partner" class="shrink-0 w-8 h-8 rounded-md border border-slate-200 bg-white hover:bg-hitt-mist text-hitt-teal flex items-center justify-center">
+                  <button id="mBPSearch" type="button" title="Search and assign a customer/partner" class="shrink-0 w-8 h-8 rounded-md border border-slate-200 bg-white hover:bg-hitt-mist text-hitt-teal flex items-center justify-center">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M17 10a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
                   </button>
-                  <a id="mBPEdit" href="#" title="Edit this business partner" class="hidden shrink-0 w-8 h-8 rounded-md border border-slate-200 bg-white hover:bg-hitt-mist text-hitt-teal flex items-center justify-center">
+                  <a id="mBPEdit" href="#" title="Edit this customer/partner" class="hidden shrink-0 w-8 h-8 rounded-md border border-slate-200 bg-white hover:bg-hitt-mist text-hitt-teal flex items-center justify-center">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11 4H6a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2v-5M18.5 2.5a2.12 2.12 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                   </a>
                 </div>
               </div>
               <div>
-                <label class="field-label" data-i18n="proj.f.bpToInvoice">Business Partner to invoice</label>
+                <label class="field-label" data-i18n="proj.f.bpToInvoice">Customer/partner to invoice</label>
                 <div class="flex items-center gap-1.5 mt-1">
                   <select id="mInvoicingPartner" class="field-input" style="flex:1;" disabled></select>
-                  <button id="mInvoicingPartnerAdd" type="button" title="Add a new tax company for this business partner" disabled class="shrink-0 w-8 h-8 rounded-md border border-slate-200 bg-white hover:bg-hitt-mist text-hitt-teal flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed">+</button>
+                  <button id="mInvoicingPartnerAdd" type="button" title="Add a new tax company for this customer/partner" disabled class="shrink-0 w-8 h-8 rounded-md border border-slate-200 bg-white hover:bg-hitt-mist text-hitt-teal flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed">+</button>
                 </div>
               </div>
               <div>
@@ -244,7 +244,7 @@
                 <input id="mBPRunningName" type="text" class="field-input mt-1" />
               </div>
             </div>
-            <div id="mInvoicingPartnerHint" class="px-2.5 pb-2.5 text-[11px] text-slate-400" data-i18n="proj.f.bpHint">Assign a Contracting Business Partner first to pick who gets invoiced.</div>
+            <div id="mInvoicingPartnerHint" class="px-2.5 pb-2.5 text-[11px] text-slate-400" data-i18n="proj.f.bpHint">Assign a contracting customer/partner first to pick who gets invoiced.</div>
           </section>
         </div>
 
@@ -386,7 +386,7 @@
 <div id="bpPickerOverlay" class="modal-overlay hidden fixed inset-0 z-[60] bg-hitt-ink/40 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6">
   <div class="modal-panel bg-white w-full max-w-md max-h-[80vh] rounded-xl shadow-lift flex flex-col overflow-hidden">
     <div class="shrink-0 px-4 sm:px-5 py-3 flex items-center gap-3" style="background:#5C757C">
-      <h2 class="flex-1 text-white font-bold text-base" data-i18n="proj.bpPicker.title">Search and assign a business partner</h2>
+      <h2 class="flex-1 text-white font-bold text-base" data-i18n="proj.bpPicker.title">Search and assign a customer/partner</h2>
       <button id="bpPickerClose" title="Close" class="w-8 h-8 rounded-md bg-hitt-red hover:brightness-110 flex items-center justify-center transition shrink-0">
         <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
       </button>
@@ -394,7 +394,7 @@
     <div class="shrink-0 p-3 border-b border-slate-200">
       <input id="bpPickerSearch" type="text" placeholder="Type at least two characters to start searching…" class="field-input" autocomplete="off" data-i18n-placeholder="proj.bpPicker.search" />
       <div class="pt-2 flex items-center gap-1.5">
-        <input id="bpPickerNewName" type="text" placeholder="…or type a new business partner name" class="field-input flex-1 italic text-hitt-teal" data-i18n-placeholder="proj.bpPicker.newName" />
+        <input id="bpPickerNewName" type="text" placeholder="…or type a new customer/partner name" class="field-input flex-1 italic text-hitt-teal" data-i18n-placeholder="proj.bpPicker.newName" />
         <button id="bpPickerAddNew" class="shrink-0 bg-hitt-teal text-white text-[11px] font-semibold px-3 py-2 rounded-md hover:bg-hitt-ink transition" data-i18n="proj.bpPicker.createAssign">+ Create &amp; assign</button>
       </div>
     </div>
@@ -429,7 +429,7 @@
       </div>
       <label class="flex items-center gap-2 text-sm text-hitt-ink">
         <input id="tcSameAddress" type="checkbox" class="w-4 h-4" checked />
-        <span data-i18n="bp.tc.sameAddress">Same address as the business partner</span>
+        <span data-i18n="bp.tc.sameAddress">Same address as the customer/partner</span>
       </label>
     </div>
     <div class="shrink-0 border-t border-slate-200 px-4 py-3 flex items-center justify-end gap-2">
@@ -486,10 +486,10 @@
         </div>
       </div>
       <div>
-        <label class="field-label" data-i18n="proj.f.contractingBp">Contracting Business Partner</label>
+        <label class="field-label" data-i18n="proj.f.contractingBp">Contracting customer/partner</label>
         <div class="flex items-center gap-1.5 mt-1">
           <div id="npBusinessPartner" class="field-input" style="background:#F5F4EE; color:#5C757C; flex:1;">—</div>
-          <button id="npBPSearch" type="button" title="Search and assign a business partner" class="shrink-0 w-8 h-8 rounded-md border border-slate-200 bg-white hover:bg-hitt-mist text-hitt-teal flex items-center justify-center">
+          <button id="npBPSearch" type="button" title="Search and assign a customer/partner" class="shrink-0 w-8 h-8 rounded-md border border-slate-200 bg-white hover:bg-hitt-mist text-hitt-teal flex items-center justify-center">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M17 10a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
           </button>
         </div>

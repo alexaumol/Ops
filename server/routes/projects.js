@@ -439,8 +439,8 @@ router.patch("/:id/business-partner", async (req, res) => {
     let summary = null;
     if (String(businessPartnerId) !== String(cur.busspartnerid)) {
       summary = cur.busspartnerid
-        ? `Business partner changed from ${cur.businessPartnerLabel || "—"} to ${newLabel || "—"}`
-        : `Business partner assigned: ${newLabel || "—"}`;
+        ? `Customer/partner changed from ${cur.businessPartnerLabel || "—"} to ${newLabel || "—"}`
+        : `Customer/partner assigned: ${newLabel || "—"}`;
       await client.query(
         `INSERT INTO projectchangelog (projectid, changedat, changedby, summary) VALUES ($1, now(), $2, $3)`,
         [id, employeeId || null, summary]
@@ -698,7 +698,7 @@ router.patch("/:id", async (req, res) => {
       if (newBiospectrumLabel !== null) changes.push(`Biotech spectrum changed from ${cur.biospectrumLabel || "—"} to ${newBiospectrumLabel}`);
       if (newProjectTypeLabel !== null) changes.push(`Project type changed from ${cur.projectTypeLabel || "—"} to ${newProjectTypeLabel}`);
       if (bpRunningName !== undefined && (bpRunningName || null) !== (cur.bprunningname || null)) {
-        changes.push(`BP running name changed from "${cur.bprunningname || ""}" to "${bpRunningName || ""}"`);
+        changes.push(`Customer/partner running name changed from "${cur.bprunningname || ""}" to "${bpRunningName || ""}"`);
       }
       if (notInvoiceable !== undefined && !!notInvoiceable !== !!cur.notinvoiceable) {
         changes.push(notInvoiceable ? "Marked as not invoiceable" : "Marked as invoiceable");

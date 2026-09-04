@@ -45,7 +45,7 @@
         <button type="button" class="inv-flag-btn" data-ivflag="aeatIssued" aria-pressed="false" data-i18n="inv.iv.flag.aeatIssued">AEAT issued</button>
         <button type="button" class="inv-flag-btn" data-ivflag="aeatError" aria-pressed="false" data-i18n="inv.iv.flag.aeatError">AEAT error</button>
         <div class="inv-filter-spacer"></div>
-        <input id="ivSearchBox" type="text" placeholder="Search description or business partner…" data-i18n-placeholder="inv.iv.search" />
+        <input id="ivSearchBox" type="text" placeholder="Search description or customer/partner…" data-i18n-placeholder="inv.iv.search" />
         <button type="button" id="ivNewInvoiceBtn" class="btn btn-primary" data-i18n="inv.iv.newInvoice">+ New invoice</button>
       </div>
 
@@ -76,7 +76,7 @@
         <button data-bucket="total" class="inv-filter-btn" aria-selected="false"><span data-i18n="inv.bucket.total">Totally invoiced</span> <span class="inv-filter-count" data-count-for="total"></span></button>
         <button data-bucket="all" class="inv-filter-btn" aria-selected="false"><span data-i18n="exp.scope.all">All</span> <span class="inv-filter-count" data-count-for="all"></span></button>
         <div class="inv-filter-spacer"></div>
-        <input id="searchBox" type="text" placeholder="Search by project code, name or business partner…" data-i18n-placeholder="inv.search" />
+        <input id="searchBox" type="text" placeholder="Search by project code, name or customer/partner…" data-i18n-placeholder="inv.search" />
       </div>
 
       <div class="inv-filters inv-filters--row2">
@@ -101,7 +101,7 @@
               <th class="inv-proceed-col" title="Proceed to invoice"></th>
               <th data-sort="code" data-i18n="bp.col.project">Project<span class="sort-arrow"></span></th>
               <th data-sort="entityLabel" data-i18n="inv.col.entity">Entity<span class="sort-arrow"></span></th>
-              <th data-sort="bpName" data-i18n="page.businessPartners.title">Business partner<span class="sort-arrow"></span></th>
+              <th data-sort="bpName" data-i18n="page.businessPartners.title">Customer/partner<span class="sort-arrow"></span></th>
               <th data-sort="projectStatusLabel" data-i18n="inv.col.projectStatus">Project status<span class="sort-arrow"></span></th>
               <th data-sort="budget" style="text-align:right;" data-i18n="inv.col.budget">Budget<span class="sort-arrow"></span></th>
               <th data-sort="invoicedTotal" style="text-align:right;" data-i18n="inv.col.invoiced">Invoiced<span class="sort-arrow"></span></th>
@@ -304,7 +304,7 @@
           <h3 data-i18n="inv.section.billing">Billing details</h3>
           <div class="field-grid">
             <div>
-              <label class="field-label" data-i18n="inv.f.taxCompany">Tax company (business partner to invoice)</label>
+              <label class="field-label" data-i18n="inv.f.taxCompany">Tax company (customer/partner to invoice)</label>
               <div class="inv-taxco-row">
                 <select id="invTaxCompany" class="field-input" disabled></select>
                 <button type="button" id="invTaxCompanyChange" class="btn btn-secondary" data-i18n="inv.f.change">Change</button>
@@ -402,7 +402,7 @@
         <button id="tcPickerClose" class="modal-head-btn modal-head-btn--close" title="Close">✕</button>
       </div>
       <div style="padding:0.75rem 1.1rem; border-bottom:1px solid var(--border-subtle);">
-        <input id="tcPickerSearch" type="text" class="field-input" placeholder="Search name, VAT, business partner, or invoicing email…" autocomplete="off" data-i18n-placeholder="inv.tcPicker.search" />
+        <input id="tcPickerSearch" type="text" class="field-input" placeholder="Search name, VAT, customer/partner, or invoicing email…" autocomplete="off" data-i18n-placeholder="inv.tcPicker.search" />
       </div>
       <div class="modal-body" style="padding:0;">
         <table class="mini-table tc-picker-table">
@@ -410,7 +410,7 @@
             <tr>
               <th data-i18n="bp.tc.colName">Tax company</th>
               <th data-i18n="bp.tc.colVat">VAT number</th>
-              <th data-i18n="page.businessPartners.title">Business partner</th>
+              <th data-i18n="page.businessPartners.title">Customer/partner</th>
               <th data-i18n="bp.tc.colEmail">Invoicing email</th>
             </tr>
           </thead>
@@ -429,7 +429,7 @@
         <button id="projPickerClose" class="modal-head-btn modal-head-btn--close" title="Close">✕</button>
       </div>
       <div style="padding:0.75rem 1.1rem; border-bottom:1px solid var(--border-subtle);">
-        <input id="projPickerSearch" type="text" class="field-input" placeholder="Search by project code, name or business partner…" autocomplete="off" data-i18n-placeholder="inv.projPicker.search" />
+        <input id="projPickerSearch" type="text" class="field-input" placeholder="Search by project code, name or customer/partner…" autocomplete="off" data-i18n-placeholder="inv.projPicker.search" />
       </div>
       <div class="modal-body" style="padding:0;">
         <table class="mini-table tc-picker-table">
@@ -437,7 +437,7 @@
             <tr>
               <th data-i18n="bp.col.project">Project</th>
               <th data-i18n="inv.col.entity">Entity</th>
-              <th data-i18n="page.businessPartners.title">Business partner</th>
+              <th data-i18n="page.businessPartners.title">Customer/partner</th>
               <th data-i18n="inv.col.projectStatus">Project status</th>
             </tr>
           </thead>
