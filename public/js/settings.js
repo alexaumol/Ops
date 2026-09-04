@@ -1034,6 +1034,7 @@ const AUDIT_CATEGORY = {
   expense: "Expenses",
   timeoff: "Time off",
   settings: "Settings",
+  task: "Task",
 };
 function auditCategory(kind) {
   if (!kind) return "Other";
