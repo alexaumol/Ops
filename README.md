@@ -2,7 +2,7 @@
 
 A web app for managing project lifecycle and invoicing at HITT, replacing
 a legacy MS Access application. Built for **progressive delivery** — each
-module (Projects, Business partners, Time allocation, Invoicing) goes live
+module (Projects, Customers & partners, Time allocation, Invoicing) goes live
 independently while the rest keeps working as static placeholder pages.
 
 ## Features
@@ -14,8 +14,10 @@ independently while the rest keeps working as static placeholder pages.
 - **Project portfolio kanban** — drag-and-drop board across pipeline
   stages, search, project detail modal (deliverables, notes, quotations),
   business-partner and invoicing-partner pickers.
-- **Business partners** — searchable directory with contacts, notes, and
-  tax companies per partner.
+- **Customers & partners** — a CRM directory (Phase C1): searchable, with
+  ownership, lifecycle stage/temperature, contacts (decision role, influence,
+  stance, reporting lines), notes, and tax companies per record. See
+  [`docs/customers-crm-roadmap.md`](docs/customers-crm-roadmap.md).
 - **Time allocation** — weekly project-hours logging and time-off requests
   (submit/view/withdraw/approve/reject).
 - **Permissions & Settings** — admin-only page to manage who's an admin,
@@ -38,7 +40,7 @@ independently while the rest keeps working as static placeholder pages.
   charts (projects by status/entity, projects opened by month), a project
   status-change timeline, and CSV export on every report.
 - **Ops assistant** — an in-app chat widget that answers questions about a
-  project or business partner and gives portfolio insight (budgeted vs
+  project or customer/partner and gives portfolio insight (budgeted vs
   invoiced, trends). Backed by Azure OpenAI with read-only tool calls; off
   until configured. See [Ops assistant](#ops-assistant).
 - Corporate design system with light/dark support and a small set of
@@ -164,7 +166,7 @@ to `false` in `config.js` and run the server with `AUTH_MODE=header`.
 ## Ops assistant
 
 A chat widget (bottom-right on every module page) that answers questions
-about a project or business partner and reads the portfolio for insight —
+about a project or customer/partner and reads the portfolio for insight —
 budgeted vs invoiced, trends, where attention is worth spending.
 
 **How it works.** `public/js/chat.js` posts the conversation to
@@ -201,7 +203,7 @@ widget stays hidden.
 
 ## Status
 
-Early-stage prototype. Projects, Business partners, Time allocation,
+Early-stage prototype. Projects, Customers & partners, Time allocation,
 Invoicing, and Reports are all wired to a real PostgreSQL test database.
 Microsoft 365 sign-in is real (Entra ID via MSAL.js), and the API verifies
 the access token server-side on every request (see
