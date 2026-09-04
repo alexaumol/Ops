@@ -1,5 +1,5 @@
 /**
- * /api/business-partners
+ * /api/customers-partners
  * ---------------------------------------------------------------------------
  * Mirrors the Access "BusinessPartner-New_Edit" form + its Contacts/Notes/
  * TaxCompanies subforms. Real schema (confirmed 2026-08-25):
@@ -41,9 +41,11 @@
  *                           phone; contact_org_roles is the source of truth
  *                           for the relationship fields layered on top.
  *
- * The module itself is still named/mounted as "business partners" — the
- * product rename to "Customers & partners" is a separate, mostly mechanical
- * change (roadmap §4) not yet done.
+ * Mounted at /api/customers-partners (canonical) and /api/business-partners
+ * (kept working, server.js) — the module is "Customers & partners" now
+ * (roadmap §4); this file and its internal table/column names weren't
+ * renamed, since nothing outside this comment reads the file name and the
+ * schema names are a much larger, separate exercise.
  * ---------------------------------------------------------------------------
  */
 const express = require("express");
@@ -126,7 +128,7 @@ async function loadVisiblePartner(req, res, bpId) {
   return bp;
 }
 
-// GET /api/business-partners/lookups
+// GET /api/customers-partners/lookups
 router.get("/lookups", async (req, res) => {
   try {
     const [entities, companyTypes, countries, languages] = await Promise.all([
@@ -142,12 +144,12 @@ router.get("/lookups", async (req, res) => {
       languages: languages.rows,
     });
   } catch (err) {
-    console.error("[GET /api/business-partners/lookups] DB error:", err.message);
+    console.error("[GET /api/customers-partners/lookups] DB error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });
   }
 });
 
-// GET /api/business-partners?q=search — list for the search/browse table.
+// GET /api/customers-partners?q=search — list for the search/browse table.
 // projectsAlive/projectsDead/projectsTotal power the "Number of projects"
 // column (N/M(T) — alive/dead(total)) — "dead" mirrors the Reports/
 // stale-projects convention: projectstatus IN ('Closed','Cancelled').
@@ -158,7 +160,7 @@ router.get("/lookups", async (req, res) => {
 // Per-owner visibility (appconfig "crm.visibility_all", see
 // crmVisibilityAll() above) narrows the result set for non-admins unless
 // the instance has switched to "everyone sees everyone".
-router.get("/", requireModuleAccess("business-partners"), async (req, res) => {
+router.get("/", requireModuleAccess("customers-partners"), async (req, res) => {
   const q = (req.query.q || "").trim();
   const stage = (req.query.stage || "").trim();
   const category = (req.query.category || "").trim();
@@ -239,12 +241,12 @@ router.get("/", requireModuleAccess("business-partners"), async (req, res) => {
     );
     res.json(rows);
   } catch (err) {
-    console.error("[GET /api/business-partners] DB error:", err.message);
+    console.error("[GET /api/customers-partners] DB error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });
   }
 });
 
-// GET /api/business-partners/:id — full detail incl. primary address.
+// GET /api/customers-partners/:id — full detail incl. primary address.
 router.get("/:id", async (req, res) => {
   try {
     if (!(await loadVisiblePartner(req, res, req.params.id))) return;
@@ -286,13 +288,13 @@ router.get("/:id", async (req, res) => {
     if (!rows.length) return res.status(404).json({ error: "not_found" });
     res.json(rows[0]);
   } catch (err) {
-    console.error("[GET /api/business-partners/:id] DB error:", err.message);
+    console.error("[GET /api/customers-partners/:id] DB error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });
   }
 });
 
-// POST /api/business-partners — create (+ optional initial address).
-router.post("/", requireModuleAccess("business-partners"), async (req, res) => {
+// POST /api/customers-partners — create (+ optional initial address).
+router.post("/", requireModuleAccess("customers-partners"), async (req, res) => {
   const {
     name, entityId, companyTypeId, languageId, webpage, address, employeeId,
     roles, category, lifecycleStage, temperature, ownerEmployeeId, leadSource, geoScope,
@@ -331,14 +333,14 @@ router.post("/", requireModuleAccess("business-partners"), async (req, res) => {
     res.status(201).json(bp);
   } catch (err) {
     await client.query("ROLLBACK");
-    console.error("[POST /api/business-partners] DB error:", err.message);
+    console.error("[POST /api/customers-partners] DB error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });
   } finally {
     client.release();
   }
 });
 
-// PATCH /api/business-partners/:id — update core fields + upsert address.
+// PATCH /api/customers-partners/:id — update core fields + upsert address.
 // Logs a human-readable summary per changed field to businesspartnerchangelog
 // (address fields are collapsed into one "Address updated" entry rather than
 // one line per street/city/zip/etc.) — see GET /:id/history, same pattern as
@@ -517,14 +519,14 @@ router.patch("/:id", async (req, res) => {
     res.status(204).end();
   } catch (err) {
     await client.query("ROLLBACK");
-    console.error("[PATCH /api/business-partners/:id] DB error:", err.message);
+    console.error("[PATCH /api/customers-partners/:id] DB error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });
   } finally {
     client.release();
   }
 });
 
-// POST /api/business-partners/:id/archive — archive/deactivate instead of a
+// POST /api/customers-partners/:id/archive — archive/deactivate instead of a
 // hard delete (mirrors the tax-company delete guard: keep the record, hide
 // it from the default list). archived_at is deliberately its own action
 // rather than a PATCH field, so it always gets its own audited changelog
@@ -543,7 +545,7 @@ router.post("/:id/archive", async (req, res) => {
     res.status(204).end();
     logAudit(req, { kind: "bp.archive", desc: `Archived business partner "${rows[0].name}"` + (reason ? `: ${reason}` : "") });
   } catch (err) {
-    console.error("[POST /api/business-partners/:id/archive] DB error:", err.message);
+    console.error("[POST /api/customers-partners/:id/archive] DB error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });
   }
 });
@@ -561,12 +563,12 @@ router.post("/:id/unarchive", async (req, res) => {
     res.status(204).end();
     logAudit(req, { kind: "bp.unarchive", desc: `Unarchived business partner "${rows[0].name}"` });
   } catch (err) {
-    console.error("[POST /api/business-partners/:id/unarchive] DB error:", err.message);
+    console.error("[POST /api/customers-partners/:id/unarchive] DB error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });
   }
 });
 
-// GET /api/business-partners/:id/history — every logged field change,
+// GET /api/customers-partners/:id/history — every logged field change,
 // newest first. Powers the edit modal's collapsible History side panel —
 // same design/pattern as GET /api/projects/:id/history.
 router.get("/:id/history", async (req, res) => {
@@ -582,12 +584,12 @@ router.get("/:id/history", async (req, res) => {
     );
     res.json(rows);
   } catch (err) {
-    console.error("[GET /api/business-partners/:id/history] DB error:", err.message);
+    console.error("[GET /api/customers-partners/:id/history] DB error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });
   }
 });
 
-// GET /api/business-partners/:id/projects — every project with this BP as
+// GET /api/customers-partners/:id/projects — every project with this BP as
 // its contracting business partner. Powers the "Projects" column's
 // drill-down button on the main list.
 router.get("/:id/projects", async (req, res) => {
@@ -603,7 +605,7 @@ router.get("/:id/projects", async (req, res) => {
     );
     res.json(rows);
   } catch (err) {
-    console.error("[GET /api/business-partners/:id/projects] DB error:", err.message);
+    console.error("[GET /api/customers-partners/:id/projects] DB error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });
   }
 });
@@ -676,7 +678,7 @@ router.get("/:id/contacts", async (req, res) => {
     );
     res.json(rows);
   } catch (err) {
-    console.error("[GET /api/business-partners/:id/contacts] DB error:", err.message);
+    console.error("[GET /api/customers-partners/:id/contacts] DB error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });
   }
 });
@@ -709,14 +711,14 @@ router.post("/:id/contacts", async (req, res) => {
       logAudit(req, { kind: "bp.contact.add", desc: `BP "${bp}": contact added "${contactname.trim()}"` }));
   } catch (err) {
     await client.query("ROLLBACK");
-    console.error("[POST /api/business-partners/:id/contacts] DB error:", err.message);
+    console.error("[POST /api/customers-partners/:id/contacts] DB error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });
   } finally {
     client.release();
   }
 });
 
-// PATCH /api/business-partners/:id/contacts/:contactId — edit an existing
+// PATCH /api/customers-partners/:id/contacts/:contactId — edit an existing
 // contact (name/position/email/phone + the contact_org_roles relationship
 // fields). Logs to businesspartnerchangelog.
 router.patch("/:id/contacts/:contactId", async (req, res) => {
@@ -752,14 +754,14 @@ router.patch("/:id/contacts/:contactId", async (req, res) => {
       logAudit(req, { kind: "bp.contact.update", desc: `BP "${bp}": contact updated "${contactname.trim()}"` }));
   } catch (err) {
     await client.query("ROLLBACK");
-    console.error("[PATCH /api/business-partners/:id/contacts/:contactId] DB error:", err.message);
+    console.error("[PATCH /api/customers-partners/:id/contacts/:contactId] DB error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });
   } finally {
     client.release();
   }
 });
 
-// DELETE /api/business-partners/:id/contacts/:contactId
+// DELETE /api/customers-partners/:id/contacts/:contactId
 router.delete("/:id/contacts/:contactId", async (req, res) => {
   const { employeeId } = req.body || {};
   try {
@@ -778,7 +780,7 @@ router.delete("/:id/contacts/:contactId", async (req, res) => {
     bpAuditLabel(req.params.id).then((bp) =>
       logAudit(req, { kind: "bp.contact.delete", desc: `BP "${bp}": contact removed "${rows[0].contactname || "—"}"` }));
   } catch (err) {
-    console.error("[DELETE /api/business-partners/:id/contacts/:contactId] DB error:", err.message);
+    console.error("[DELETE /api/customers-partners/:id/contacts/:contactId] DB error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });
   }
 });
@@ -796,7 +798,7 @@ router.get("/:id/notes", async (req, res) => {
     );
     res.json(rows);
   } catch (err) {
-    console.error("[GET /api/business-partners/:id/notes] DB error:", err.message);
+    console.error("[GET /api/customers-partners/:id/notes] DB error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });
   }
 });
@@ -818,12 +820,12 @@ router.post("/:id/notes", async (req, res) => {
     bpAuditLabel(req.params.id).then((bp) =>
       logAudit(req, { kind: "bp.note.add", desc: `BP "${bp}": note added — "${preview}"` }));
   } catch (err) {
-    console.error("[POST /api/business-partners/:id/notes] DB error:", err.message);
+    console.error("[POST /api/customers-partners/:id/notes] DB error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });
   }
 });
 
-// DELETE /api/business-partners/:id/notes/:noteId — used by the modal's
+// DELETE /api/customers-partners/:id/notes/:noteId — used by the modal's
 // "discard changes" cleanup (revert notes added during this session).
 router.delete("/:id/notes/:noteId", async (req, res) => {
   try {
@@ -837,7 +839,7 @@ router.delete("/:id/notes/:noteId", async (req, res) => {
     bpAuditLabel(req.params.id).then((bp) =>
       logAudit(req, { kind: "bp.note.delete", desc: `BP "${bp}": note deleted — "${preview}"` }));
   } catch (err) {
-    console.error("[DELETE /api/business-partners/:id/notes/:noteId] DB error:", err.message);
+    console.error("[DELETE /api/customers-partners/:id/notes/:noteId] DB error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });
   }
 });
@@ -890,7 +892,7 @@ async function writeTaxCompanyAddress(client, tcId, bpId, sameAddress, address) 
   return vals.slice(0, 7).some((v) => v != null);
 }
 
-// GET /api/business-partners/:id/tax-companies
+// GET /api/customers-partners/:id/tax-companies
 // Veri*Factu recipient identification (used only when the feature is on).
 //   fiscalidtype  NULL/'nif' → Spanish NIF form; '02'..'07' → foreign / doc form
 //   fiscalcountry ISO-3166-1 alpha-2 (required for a non-'nif' type)
@@ -926,12 +928,12 @@ router.get("/:id/tax-companies", async (req, res) => {
     );
     res.json(rows);
   } catch (err) {
-    console.error("[GET /api/business-partners/:id/tax-companies] DB error:", err.message);
+    console.error("[GET /api/customers-partners/:id/tax-companies] DB error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });
   }
 });
 
-// POST /api/business-partners/:id/tax-companies — add an invoicing entity
+// POST /api/customers-partners/:id/tax-companies — add an invoicing entity
 // for this business partner (mirrors TaxCompanies_BP.frm).
 router.post("/:id/tax-companies", async (req, res) => {
   const { taxcompanyname, vatnumber, emailinvoicing, sameAddress, address } = req.body || {};
@@ -957,14 +959,14 @@ router.post("/:id/tax-companies", async (req, res) => {
       logAudit(req, { kind: "bp.taxcompany.add", desc: `BP "${bp}": tax company added "${taxCompany.taxcompanyname}"` }));
   } catch (err) {
     await client.query("ROLLBACK");
-    console.error("[POST /api/business-partners/:id/tax-companies] DB error:", err.message);
+    console.error("[POST /api/customers-partners/:id/tax-companies] DB error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });
   } finally {
     client.release();
   }
 });
 
-// PATCH /api/business-partners/:id/tax-companies/:tcId — edit name/VAT/email
+// PATCH /api/customers-partners/:id/tax-companies/:tcId — edit name/VAT/email
 // and the address (same-as-BP toggle + fields).
 router.patch("/:id/tax-companies/:tcId", async (req, res) => {
   const { taxcompanyname, vatnumber, emailinvoicing, sameAddress, address } = req.body || {};
@@ -1008,14 +1010,14 @@ router.patch("/:id/tax-companies/:tcId", async (req, res) => {
       logAudit(req, { kind: "bp.taxcompany.update", desc: `BP "${bp}": tax company updated "${nm}"` }));
   } catch (err) {
     await client.query("ROLLBACK");
-    console.error("[PATCH /api/business-partners/:id/tax-companies/:tcId] DB error:", err.message);
+    console.error("[PATCH /api/customers-partners/:id/tax-companies/:tcId] DB error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });
   } finally {
     client.release();
   }
 });
 
-// DELETE /api/business-partners/:id/tax-companies/:tcId — blocked while the
+// DELETE /api/customers-partners/:id/tax-companies/:tcId — blocked while the
 // tax company is assigned to a project or referenced by an invoice.
 router.delete("/:id/tax-companies/:tcId", async (req, res) => {
   const client = await pool.connect();
@@ -1050,7 +1052,7 @@ router.delete("/:id/tax-companies/:tcId", async (req, res) => {
       logAudit(req, { kind: "bp.taxcompany.delete", desc: `BP "${bp}": tax company removed "${rows[0].taxcompanyname || "—"}"` }));
   } catch (err) {
     await client.query("ROLLBACK");
-    console.error("[DELETE /api/business-partners/:id/tax-companies/:tcId] DB error:", err.message);
+    console.error("[DELETE /api/customers-partners/:id/tax-companies/:tcId] DB error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });
   } finally {
     client.release();

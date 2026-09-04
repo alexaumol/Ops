@@ -11,7 +11,7 @@
 
 const session = HITT_AUTH.requireSession("../index.html");
 const T = (k, v) => (window.HITT_I18N ? HITT_I18N.t(k, v) : k);
-HITT_PERMS.guardModule("business-partners", "../welcome.html");
+HITT_PERMS.guardModule("customers-partners", "../welcome.html");
 document.getElementById("userName").textContent = session.displayName;
 document.getElementById("userAvatar").textContent = HITT_AUTH.initials(session);
 HITT_PERMS.applyRealName();

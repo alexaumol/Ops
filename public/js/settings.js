@@ -26,7 +26,7 @@ HITT_PERMS.applyRealName();
 
 const MODULE_LABELS = {
   "projects": "Projects",
-  "business-partners": "Customers & partners",
+  "customers-partners": "Customers & partners",
   "time-allocation": "Time allocation",
   "invoicing": "Invoicing",
   "expenses": "Expenses",
