@@ -171,9 +171,10 @@ window.HITT_PRESENCE = (function () {
     el.prClockBtn.textContent = open ? T("ta.pr.clockOut") : T("ta.pr.clockIn");
     el.prClockBtn.className = "btn " + (open ? "btn-secondary" : "btn-primary");
     el.prLocation.parentElement.style.display = open ? "none" : "";
-    el.prClockState.textContent = open
+    const openLoc = open ? locLabel(todayState.locationLabel) : "";
+    el.prClockState.textContent = (open
       ? T("ta.pr.stateIn", { since: fmtTime(todayState.since), elapsed: fmtElapsed(todayState.since) })
-      : T("ta.pr.stateOut");
+      : T("ta.pr.stateOut")) + (openLoc ? ` · ${openLoc}` : "");
     const segs = todayState.segments || [];
     el.prToday.innerHTML = segs.length
       ? `<span class="ta-pr-today-label">${esc(T("ta.pr.todayLabel"))}</span> ` +
