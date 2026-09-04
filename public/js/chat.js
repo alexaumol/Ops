@@ -163,6 +163,8 @@
 
     document.body.appendChild(fab);
     document.body.appendChild(panel);
+    // Lets the toast host (css/chat.css) lift clear of the floating widget.
+    document.body.classList.add("opsc-present");
 
     els = {
       fab,
@@ -176,6 +178,7 @@
     const open = () => {
       panel.classList.remove("opsc-hidden");
       fab.classList.add("opsc-hidden");
+      document.body.classList.add("opsc-open");
       if (!els.log.children.length) {
         if (messages.length) messages.forEach((m) => addBubble(m.role, m.content));
         else addBubble("assistant", "Hi — ask me about any project or business partner, or how budgeted compares to invoiced.");
@@ -185,6 +188,7 @@
     const close = () => {
       panel.classList.add("opsc-hidden");
       fab.classList.remove("opsc-hidden");
+      document.body.classList.remove("opsc-open");
     };
 
     fab.addEventListener("click", open);
