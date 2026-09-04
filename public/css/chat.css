@@ -154,3 +154,16 @@
   cursor: pointer;
 }
 .opsc-form button:disabled { opacity: 0.5; cursor: default; }
+
+/* Keep the toast stack clear of the floating widget.
+   body.opsc-present — the "Ask Ops" pill is showing (bottom-right, ~60px tall)
+                       → lift the toasts above it.
+   body.opsc-open     — the chat panel is open (fills the bottom-right)
+                       → move the toasts to the bottom-left instead. */
+body.opsc-present .toast-host { bottom: 5.25rem; }
+body.opsc-open .toast-host {
+  bottom: 1rem;
+  right: auto;
+  left: 1rem;
+  align-items: flex-start;
+}
