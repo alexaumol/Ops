@@ -24,6 +24,26 @@
  * via its own address subform, which is more workflow than this first
  * pass needs; the finance team can still manage those in Access/DB
  * directly until that's worth building.
+ *
+ * CRM Phase C1 (see docs/customers-crm-roadmap.md, docs/customers-crm-
+ * alignment.md) added, on top of the schema above:
+ *
+ *   businesspartners       + roles (text[]), category, lifecycle_stage,
+ *                           temperature, owner_employeeid, lead_source,
+ *                           geo_scope, archived_at
+ *   businesspartner_stage_history  one row per lifecycle_stage transition
+ *                           (from/to/reason), mirrors businesspartnerchangelog
+ *   contact_org_roles      the person↔organization relationship: position,
+ *                           is_primary, decision_role, influence, stance,
+ *                           reports_to_contactid. contacts.businesspartnerid
+ *                           stays as the legacy "primary org" pointer the
+ *                           routes below still read/write for name/email/
+ *                           phone; contact_org_roles is the source of truth
+ *                           for the relationship fields layered on top.
+ *
+ * The module itself is still named/mounted as "business partners" — the
+ * product rename to "Customers & partners" is a separate, mostly mechanical
+ * change (roadmap §4) not yet done.
  * ---------------------------------------------------------------------------
  */
 const express = require("express");
@@ -52,6 +72,60 @@ async function logBpChange(runner, bpId, req, summary) {
   );
 }
 
+// Records a lifecycle_stage transition (businesspartner_stage_history) and
+// mirrors it into the plain-text change log so it shows up in the same
+// History panel as everything else.
+async function logStageChange(runner, bpId, req, fromStage, toStage, reason) {
+  await runner.query(
+    `INSERT INTO businesspartner_stage_history (businesspartnerid, from_stage, to_stage, changedat, changedby, reason)
+     VALUES ($1, $2, $3, now(), $4, $5)`,
+    [bpId, fromStage || null, toStage, req.hittUser?.employeeId || null, reason || null]
+  );
+  await logBpChange(runner, bpId, req, `Stage changed from ${fromStage || "—"} to ${toStage}` + (reason ? ` — ${reason}` : ""));
+}
+
+// appconfig "crm.visibility_all" (Settings, see routes/settings.js
+// CONFIG_KEYS) — off (default) restricts the list/detail to a caller's own
+// business partners (owner_employeeid) plus unowned ones, on shows everyone
+// to everyone. Same "on"/"off" convention as every other boolean appconfig
+// key (see lib/externalSync.js getSyncConfig). Table-missing / DB hiccup
+// fails to the safer, more restrictive default.
+async function crmVisibilityAll() {
+  try {
+    const { rows } = await pool.query(`SELECT configvalue FROM appconfig WHERE configkey = 'crm.visibility_all'`);
+    return rows[0]?.configvalue === "on";
+  } catch {
+    return false;
+  }
+}
+
+// Loads a partner's owner + archived state and 403s/404s if the caller
+// shouldn't see it under the current visibility setting. Admins and the
+// owner always pass; an unowned partner is visible to anyone (so it can be
+// claimed). Returns the row (owner_employeeid, archived_at) on success, or
+// null after already sending a response.
+async function loadVisiblePartner(req, res, bpId) {
+  const { rows } = await pool.query(
+    `SELECT id, owner_employeeid AS "ownerEmployeeId", archived_at AS "archivedAt" FROM businesspartners WHERE id = $1`,
+    [bpId]
+  );
+  if (!rows.length) {
+    res.status(404).json({ error: "not_found" });
+    return null;
+  }
+  const bp = rows[0];
+  if (req.hittUser?.isAdmin) return bp;
+  const callerId = req.hittUser?.employeeId || null;
+  // No resolved identity (stub/header auth typo) fails open here too, same
+  // as canAccessModule() — an unrecognized caller isn't "someone else",
+  // there's just nothing to restrict against yet.
+  if (callerId && bp.ownerEmployeeId && String(bp.ownerEmployeeId) !== String(callerId) && !(await crmVisibilityAll())) {
+    res.status(403).json({ error: "forbidden", message: "This customer/partner is owned by someone else." });
+    return null;
+  }
+  return bp;
+}
+
 // GET /api/business-partners/lookups
 router.get("/lookups", async (req, res) => {
   try {
@@ -77,13 +151,62 @@ router.get("/lookups", async (req, res) => {
 // projectsAlive/projectsDead/projectsTotal power the "Number of projects"
 // column (N/M(T) — alive/dead(total)) — "dead" mirrors the Reports/
 // stale-projects convention: projectstatus IN ('Closed','Cancelled').
+//
+// CRM Phase C1 filters (all optional):
+//   stage=<lifecycle_stage>  category=<category>  role=<one roles[] value>
+//   owner=me | <employeeId> | none   includeArchived=true (default excludes)
+// Per-owner visibility (appconfig "crm.visibility_all", see
+// crmVisibilityAll() above) narrows the result set for non-admins unless
+// the instance has switched to "everyone sees everyone".
 router.get("/", requireModuleAccess("business-partners"), async (req, res) => {
   const q = (req.query.q || "").trim();
+  const stage = (req.query.stage || "").trim();
+  const category = (req.query.category || "").trim();
+  const role = (req.query.role || "").trim();
+  const ownerParam = (req.query.owner || "").trim();
+  const includeArchived = req.query.includeArchived === "true";
   try {
+    const callerId = req.hittUser?.employeeId || null;
+    const isAdmin = !!req.hittUser?.isAdmin;
+    const visibilityAll = await crmVisibilityAll();
+
+    const conditions = [
+      `($1 = '' OR bp.bpname ILIKE '%' || $1 || '%' OR EXISTS (
+         SELECT 1 FROM taxcompanies t
+         WHERE t.businesspartnerid::bigint = bp.id AND t.taxcompanyname ILIKE '%' || $1 || '%'
+       ))`,
+    ];
+    const params = [q];
+
+    if (!includeArchived) conditions.push(`bp.archived_at IS NULL`);
+    if (stage) { params.push(stage); conditions.push(`bp.lifecycle_stage = $${params.length}`); }
+    if (category) { params.push(category); conditions.push(`bp.category = $${params.length}`); }
+    if (role) { params.push(role); conditions.push(`$${params.length} = ANY(bp.roles)`); }
+
+    if (ownerParam === "me" && callerId) {
+      params.push(callerId);
+      conditions.push(`bp.owner_employeeid = $${params.length}`);
+    } else if (ownerParam === "none") {
+      conditions.push(`bp.owner_employeeid IS NULL`);
+    } else if (ownerParam) {
+      params.push(ownerParam);
+      conditions.push(`bp.owner_employeeid = $${params.length}`);
+    }
+
+    if (!isAdmin && !visibilityAll && callerId) {
+      params.push(callerId);
+      conditions.push(`(bp.owner_employeeid IS NULL OR bp.owner_employeeid = $${params.length})`);
+    }
+
     const { rows } = await pool.query(
       `SELECT bp.id, bp.bpname AS name, bp.webpage,
               ent.entitydesc AS "entityLabel", ct.companytypedesc AS "companyTypeLabel",
               c.countrydesc AS "countryLabel",
+              bp.roles, bp.category, bp.lifecycle_stage AS "lifecycleStage", bp.temperature,
+              bp.owner_employeeid AS "ownerEmployeeId",
+              NULLIF(TRIM(CONCAT(owner.employeefirstname, ' ', owner.employeelastname)), '') AS "ownerName",
+              bp.lead_source AS "leadSource", bp.geo_scope AS "geoScope",
+              bp.archived_at AS "archivedAt",
               COALESCE(proj.alive, 0) AS "projectsAlive",
               COALESCE(proj.dead, 0) AS "projectsDead",
               COALESCE(proj.total, 0) AS "projectsTotal",
@@ -94,6 +217,7 @@ router.get("/", requireModuleAccess("business-partners"), async (req, res) => {
        LEFT JOIN companytypes ct ON ct.id = bp.companytypeid
        LEFT JOIN addresses a ON a.businesspartnerid = bp.id
        LEFT JOIN countries c ON c.id = a.countryid::bigint
+       LEFT JOIN employees owner ON owner.id = bp.owner_employeeid
        LEFT JOIN LATERAL (
          SELECT COUNT(*) AS n,
                 string_agg(NULLIF(TRIM(taxcompanyname), ''), ' · ' ORDER BY taxcompanyname) AS names
@@ -108,16 +232,10 @@ router.get("/", requireModuleAccess("business-partners"), async (req, res) => {
          LEFT JOIN projectstatus ps ON ps.id = p.projectstatusid::bigint
          WHERE p.busspartnerid::bigint = bp.id
        ) proj ON true
-       WHERE $1 = ''
-          OR bp.bpname ILIKE '%' || $1 || '%'
-          OR EXISTS (
-               SELECT 1 FROM taxcompanies t
-               WHERE t.businesspartnerid::bigint = bp.id
-                 AND t.taxcompanyname ILIKE '%' || $1 || '%'
-             )
+       WHERE ${conditions.join(" AND ")}
        ORDER BY bp.bpname
        LIMIT 500`,
-      [q]
+      params
     );
     res.json(rows);
   } catch (err) {
@@ -129,6 +247,7 @@ router.get("/", requireModuleAccess("business-partners"), async (req, res) => {
 // GET /api/business-partners/:id — full detail incl. primary address.
 router.get("/:id", async (req, res) => {
   try {
+    if (!(await loadVisiblePartner(req, res, req.params.id))) return;
     const { rows } = await pool.query(
       `SELECT bp.id, bp.bpname AS name, bp.webpage, bp.finsitcode,
               bp.entityid, ent.entitydesc AS "entityLabel",
@@ -138,14 +257,29 @@ router.get("/:id", async (req, res) => {
               NULLIF(TRIM(CONCAT(emp.employeefirstname, ' ', emp.employeelastname)), '') AS "lastUpdatedByName",
               a.id AS "addressId", a.streetname, a.city, a.state, a.zipcode,
               a.phonenumber, a.phonenumber2, a.countryid,
-              country.countrydesc AS "countryLabel"
+              country.countrydesc AS "countryLabel",
+              bp.roles, bp.category, bp.lifecycle_stage AS "lifecycleStage", bp.temperature,
+              bp.owner_employeeid AS "ownerEmployeeId",
+              NULLIF(TRIM(CONCAT(owner.employeefirstname, ' ', owner.employeelastname)), '') AS "ownerName",
+              bp.lead_source AS "leadSource", bp.geo_scope AS "geoScope",
+              bp.archived_at AS "archivedAt",
+              primary_contact.id AS "primaryContactId", primary_contact.contactname AS "primaryContactName",
+              primary_contact.emailaddress AS "primaryContactEmail", primary_contact.phonenumber AS "primaryContactPhone"
        FROM businesspartners bp
        LEFT JOIN entity ent ON ent.id = bp.entityid::bigint
        LEFT JOIN companytypes ct ON ct.id = bp.companytypeid
        LEFT JOIN languages lang ON lang.id = bp.languageid
        LEFT JOIN employees emp ON emp.id = bp.lastupdatedby
+       LEFT JOIN employees owner ON owner.id = bp.owner_employeeid
        LEFT JOIN addresses a ON a.businesspartnerid = bp.id
        LEFT JOIN countries country ON country.id = a.countryid::bigint
+       LEFT JOIN LATERAL (
+         SELECT c.id, c.contactname, c.emailaddress, c.phonenumber
+         FROM contact_org_roles cor
+         JOIN contacts c ON c.id = cor.contactid
+         WHERE cor.businesspartnerid = bp.id AND cor.is_primary AND cor.ended_at IS NULL
+         LIMIT 1
+       ) primary_contact ON true
        WHERE bp.id = $1`,
       [req.params.id]
     );
@@ -159,7 +293,10 @@ router.get("/:id", async (req, res) => {
 
 // POST /api/business-partners — create (+ optional initial address).
 router.post("/", requireModuleAccess("business-partners"), async (req, res) => {
-  const { name, entityId, companyTypeId, languageId, webpage, address, employeeId } = req.body || {};
+  const {
+    name, entityId, companyTypeId, languageId, webpage, address, employeeId,
+    roles, category, lifecycleStage, temperature, ownerEmployeeId, leadSource, geoScope,
+  } = req.body || {};
   if (!name || !name.trim()) {
     return res.status(400).json({ error: "validation_error", message: "name is required" });
   }
@@ -167,10 +304,14 @@ router.post("/", requireModuleAccess("business-partners"), async (req, res) => {
   try {
     await client.query("BEGIN");
     const { rows } = await client.query(
-      `INSERT INTO businesspartners (bpname, entityid, companytypeid, languageid, webpage, lastupdated, lastupdatedby)
-       VALUES ($1, $2, $3, $4, $5, now(), $6)
+      `INSERT INTO businesspartners
+         (bpname, entityid, companytypeid, languageid, webpage, lastupdated, lastupdatedby,
+          roles, category, lifecycle_stage, temperature, owner_employeeid, lead_source, geo_scope)
+       VALUES ($1, $2, $3, $4, $5, now(), $6, $7, $8, $9, $10, $11, $12, $13)
        RETURNING id, bpname AS name`,
-      [name.trim(), entityId || null, companyTypeId || null, languageId || null, webpage || null, employeeId || null]
+      [name.trim(), entityId || null, companyTypeId || null, languageId || null, webpage || null, employeeId || null,
+       Array.isArray(roles) ? roles : [], category || null, lifecycleStage || "new", temperature || null,
+       ownerEmployeeId || null, leadSource || null, geoScope || null]
     );
     const bp = rows[0];
     if (address && (address.streetname || address.city || address.countryid)) {
@@ -204,7 +345,11 @@ router.post("/", requireModuleAccess("business-partners"), async (req, res) => {
 // projects.js's PATCH /:id.
 router.patch("/:id", async (req, res) => {
   const { id } = req.params;
-  const { name, entityId, companyTypeId, languageId, webpage, address, employeeId } = req.body || {};
+  const {
+    name, entityId, companyTypeId, languageId, webpage, address, employeeId,
+    roles, category, lifecycleStage, stageReason, temperature, ownerEmployeeId, leadSource, geoScope,
+  } = req.body || {};
+  if (!(await loadVisiblePartner(req, res, id))) return;
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
@@ -212,11 +357,15 @@ router.patch("/:id", async (req, res) => {
     const { rows: curRows } = await client.query(
       `SELECT bp.bpname, bp.companytypeid, ct.companytypedesc AS "companyTypeLabel",
               bp.languageid, lang.languagedesc AS "languageLabel", bp.webpage,
-              a.streetname, a.city, a.state, a.zipcode, a.phonenumber, a.phonenumber2, a.countryid
+              a.streetname, a.city, a.state, a.zipcode, a.phonenumber, a.phonenumber2, a.countryid,
+              bp.roles, bp.category, bp.lifecycle_stage, bp.temperature,
+              bp.owner_employeeid, bp.lead_source, bp.geo_scope,
+              NULLIF(TRIM(CONCAT(owner.employeefirstname, ' ', owner.employeelastname)), '') AS "ownerName"
        FROM businesspartners bp
        LEFT JOIN companytypes ct ON ct.id = bp.companytypeid
        LEFT JOIN languages lang ON lang.id = bp.languageid
        LEFT JOIN addresses a ON a.businesspartnerid = bp.id
+       LEFT JOIN employees owner ON owner.id = bp.owner_employeeid
        WHERE bp.id = $1
        FOR UPDATE OF bp`,
       [id]
@@ -224,7 +373,18 @@ router.patch("/:id", async (req, res) => {
     const cur = curRows[0] || {};
     const changes = [];
 
-    let newCompanyTypeLabel = null, newLanguageLabel = null;
+    let newCompanyTypeLabel = null, newLanguageLabel = null, newOwnerName = null;
+    if (ownerEmployeeId !== undefined && String(ownerEmployeeId ?? "") !== String(cur.owner_employeeid ?? "")) {
+      if (ownerEmployeeId) {
+        const r = await client.query(
+          `SELECT TRIM(CONCAT(employeefirstname, ' ', employeelastname)) AS name FROM employees WHERE id = $1`,
+          [ownerEmployeeId]
+        );
+        newOwnerName = r.rows[0]?.name || `#${ownerEmployeeId}`;
+      } else {
+        newOwnerName = "—";
+      }
+    }
     if (companyTypeId != null && String(companyTypeId) !== String(cur.companytypeid)) {
       const r = await client.query(`SELECT companytypedesc AS label FROM companytypes WHERE id = $1`, [companyTypeId]);
       newCompanyTypeLabel = r.rows[0]?.label ?? null;
@@ -234,6 +394,8 @@ router.patch("/:id", async (req, res) => {
       newLanguageLabel = r.rows[0]?.label ?? null;
     }
 
+    const nextStage = lifecycleStage !== undefined && lifecycleStage !== cur.lifecycle_stage ? lifecycleStage : null;
+
     await client.query(
       `UPDATE businesspartners SET
          bpname = COALESCE($1, bpname),
@@ -241,9 +403,20 @@ router.patch("/:id", async (req, res) => {
          companytypeid = COALESCE($3, companytypeid),
          languageid = COALESCE($4, languageid),
          webpage = COALESCE($5, webpage),
-         lastupdated = now(), lastupdatedby = $6
-       WHERE id = $7`,
-      [name || null, entityId ?? null, companyTypeId ?? null, languageId ?? null, webpage ?? null, employeeId || null, id]
+         lastupdated = now(), lastupdatedby = $6,
+         roles = COALESCE($7::text[], roles),
+         category = COALESCE($8, category),
+         lifecycle_stage = COALESCE($9, lifecycle_stage),
+         temperature = CASE WHEN $10 THEN $11 ELSE temperature END,
+         owner_employeeid = CASE WHEN $12 THEN $13 ELSE owner_employeeid END,
+         lead_source = COALESCE($14, lead_source),
+         geo_scope = COALESCE($15, geo_scope)
+       WHERE id = $16`,
+      [name || null, entityId ?? null, companyTypeId ?? null, languageId ?? null, webpage ?? null, employeeId || null,
+       Array.isArray(roles) ? roles : null, category ?? null, nextStage,
+       temperature !== undefined, temperature || null,
+       ownerEmployeeId !== undefined, ownerEmployeeId || null,
+       leadSource ?? null, geoScope ?? null, id]
     );
 
     if (name !== undefined && name !== cur.bpname) {
@@ -253,6 +426,27 @@ router.patch("/:id", async (req, res) => {
     if (newLanguageLabel !== null) changes.push(`Language changed from ${cur.languageLabel || "—"} to ${newLanguageLabel}`);
     if (webpage !== undefined && (webpage || null) !== (cur.webpage || null)) {
       changes.push(`Webpage changed from "${cur.webpage || ""}" to "${webpage || ""}"`);
+    }
+    if (Array.isArray(roles) && roles.join(",") !== (cur.roles || []).join(",")) {
+      changes.push(`Roles changed from ${(cur.roles || []).join(", ") || "—"} to ${roles.join(", ") || "—"}`);
+    }
+    if (category !== undefined && (category || null) !== (cur.category || null)) {
+      changes.push(`Category changed from ${cur.category || "—"} to ${category || "—"}`);
+    }
+    if (temperature !== undefined && (temperature || null) !== (cur.temperature || null)) {
+      changes.push(`Temperature changed from ${cur.temperature || "—"} to ${temperature || "—"}`);
+    }
+    if (newOwnerName !== null) {
+      changes.push(`Owner changed from ${cur.ownerName || "—"} to ${newOwnerName}`);
+    }
+    if (leadSource !== undefined && (leadSource || null) !== (cur.lead_source || null)) {
+      changes.push(`Lead source changed from ${cur.lead_source || "—"} to ${leadSource || "—"}`);
+    }
+    if (geoScope !== undefined && (geoScope || null) !== (cur.geo_scope || null)) {
+      changes.push(`Geographic scope changed from ${cur.geo_scope || "—"} to ${geoScope || "—"}`);
+    }
+    if (nextStage) {
+      await logStageChange(client, id, req, cur.lifecycle_stage, nextStage, stageReason);
     }
 
     if (address) {
@@ -330,6 +524,48 @@ router.patch("/:id", async (req, res) => {
   }
 });
 
+// POST /api/business-partners/:id/archive — archive/deactivate instead of a
+// hard delete (mirrors the tax-company delete guard: keep the record, hide
+// it from the default list). archived_at is deliberately its own action
+// rather than a PATCH field, so it always gets its own audited changelog
+// line with an optional reason.
+router.post("/:id/archive", async (req, res) => {
+  const { id } = req.params;
+  const { reason } = req.body || {};
+  try {
+    if (!(await loadVisiblePartner(req, res, id))) return;
+    const { rows } = await pool.query(
+      `UPDATE businesspartners SET archived_at = now() WHERE id = $1 AND archived_at IS NULL RETURNING bpname AS name`,
+      [id]
+    );
+    if (!rows.length) return res.status(404).json({ error: "not_found", message: "Not found, or already archived" });
+    await logBpChange(pool, id, req, `Archived` + (reason ? ` — ${reason}` : ""));
+    res.status(204).end();
+    logAudit(req, { kind: "bp.archive", desc: `Archived business partner "${rows[0].name}"` + (reason ? `: ${reason}` : "") });
+  } catch (err) {
+    console.error("[POST /api/business-partners/:id/archive] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
+router.post("/:id/unarchive", async (req, res) => {
+  const { id } = req.params;
+  try {
+    if (!(await loadVisiblePartner(req, res, id))) return;
+    const { rows } = await pool.query(
+      `UPDATE businesspartners SET archived_at = NULL WHERE id = $1 AND archived_at IS NOT NULL RETURNING bpname AS name`,
+      [id]
+    );
+    if (!rows.length) return res.status(404).json({ error: "not_found", message: "Not found, or not archived" });
+    await logBpChange(pool, id, req, `Unarchived`);
+    res.status(204).end();
+    logAudit(req, { kind: "bp.unarchive", desc: `Unarchived business partner "${rows[0].name}"` });
+  } catch (err) {
+    console.error("[POST /api/business-partners/:id/unarchive] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
 // GET /api/business-partners/:id/history — every logged field change,
 // newest first. Powers the edit modal's collapsible History side panel —
 // same design/pattern as GET /api/projects/:id/history.
@@ -376,11 +612,66 @@ router.get("/:id/projects", async (req, res) => {
 // Contacts / Notes / Tax companies subforms.
 // ---------------------------------------------------------------------------
 
+// Upserts the contact_org_roles row for (contactId, bpId) — the relationship
+// fields layered on top of the base `contacts` row (see the header comment
+// and docs/customers-crm-alignment.md §4.1). Clears any other active primary
+// contact on the same partner first when isPrimary is set, so the partial
+// unique index (contact_org_roles_one_primary_uq) never trips. Runs on the
+// caller's client/pool — takes either since most contact writes here aren't
+// otherwise transactional.
+async function upsertContactOrgRole(runner, contactId, bpId, body) {
+  const position = body?.position ?? null;
+  const isPrimary = !!body?.isPrimary;
+  const decisionRole = body?.decisionRole || null;
+  const influence = body?.influence || null;
+  const stance = body?.stance || null;
+  const reportsToContactId = body?.reportsToContactId || null;
+
+  if (isPrimary) {
+    await runner.query(
+      `UPDATE contact_org_roles SET is_primary = false
+       WHERE businesspartnerid = $1 AND is_primary AND ended_at IS NULL AND contactid <> $2`,
+      [bpId, contactId]
+    );
+  }
+  const existing = await runner.query(
+    `SELECT id FROM contact_org_roles WHERE contactid = $1 AND businesspartnerid = $2 AND ended_at IS NULL LIMIT 1`,
+    [contactId, bpId]
+  );
+  if (existing.rows.length) {
+    await runner.query(
+      `UPDATE contact_org_roles SET
+         "position" = $1, is_primary = $2, decision_role = $3,
+         influence = $4, stance = $5, reports_to_contactid = $6
+       WHERE id = $7`,
+      [position, isPrimary, decisionRole, influence, stance, reportsToContactId, existing.rows[0].id]
+    );
+  } else {
+    await runner.query(
+      `INSERT INTO contact_org_roles
+         (contactid, businesspartnerid, "position", is_primary, decision_role, influence, stance, reports_to_contactid, started_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CURRENT_DATE)`,
+      [contactId, bpId, position, isPrimary, decisionRole, influence, stance, reportsToContactId]
+    );
+  }
+}
+
+const CONTACT_SELECT = `
+  SELECT c.id, c.contactname, c.emailaddress, c.phonenumber,
+         c.linkedin_url AS "linkedinUrl", c.do_not_contact AS "doNotContact", c.languageid AS "languageId",
+         cor."position", cor.is_primary AS "isPrimary", cor.decision_role AS "decisionRole",
+         cor.influence, cor.stance, cor.reports_to_contactid AS "reportsToContactId",
+         reports_to.contactname AS "reportsToName"
+  FROM contacts c
+  LEFT JOIN contact_org_roles cor
+    ON cor.contactid = c.id AND cor.businesspartnerid = $1::bigint AND cor.ended_at IS NULL
+  LEFT JOIN contacts reports_to ON reports_to.id = cor.reports_to_contactid
+`;
+
 router.get("/:id/contacts", async (req, res) => {
   try {
     const { rows } = await pool.query(
-      `SELECT id, contactname, position, emailaddress, phonenumber
-       FROM contacts WHERE businesspartnerid = $1 ORDER BY contactname`,
+      `${CONTACT_SELECT} WHERE c.businesspartnerid = $1 ORDER BY c.contactname`,
       [req.params.id]
     );
     res.json(rows);
@@ -391,59 +682,80 @@ router.get("/:id/contacts", async (req, res) => {
 });
 
 router.post("/:id/contacts", async (req, res) => {
-  const { contactname, position, emailaddress, phonenumber, employeeId } = req.body || {};
+  const { contactname, position, emailaddress, phonenumber, employeeId, linkedinUrl, doNotContact, languageId } = req.body || {};
   if (!contactname || !contactname.trim()) {
     return res.status(400).json({ error: "validation_error", message: "contactname is required" });
   }
+  const client = await pool.connect();
   try {
-    const { rows } = await pool.query(
-      `INSERT INTO contacts (businesspartnerid, contactname, position, emailaddress, phonenumber)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING id, contactname, position, emailaddress, phonenumber`,
-      [req.params.id, contactname.trim(), position || null, emailaddress || null, phonenumber || null]
+    await client.query("BEGIN");
+    const { rows } = await client.query(
+      `INSERT INTO contacts (businesspartnerid, contactname, position, emailaddress, phonenumber, linkedin_url, do_not_contact, languageid)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       RETURNING id`,
+      [req.params.id, contactname.trim(), position || null, emailaddress || null, phonenumber || null,
+       linkedinUrl || null, !!doNotContact, languageId || null]
     );
-    await pool.query(
+    const contactId = rows[0].id;
+    await upsertContactOrgRole(client, contactId, req.params.id, req.body);
+    await client.query(
       `INSERT INTO businesspartnerchangelog (businesspartnerid, changedat, changedby, summary) VALUES ($1, now(), $2, $3)`,
       [req.params.id, employeeId || null, `Contact added: ${contactname.trim()}`]
     );
-    res.status(201).json(rows[0]);
+    await client.query("COMMIT");
+    const { rows: full } = await pool.query(`${CONTACT_SELECT} WHERE c.id = $2`, [req.params.id, contactId]);
+    res.status(201).json(full[0]);
     bpAuditLabel(req.params.id).then((bp) =>
       logAudit(req, { kind: "bp.contact.add", desc: `BP "${bp}": contact added "${contactname.trim()}"` }));
   } catch (err) {
+    await client.query("ROLLBACK");
     console.error("[POST /api/business-partners/:id/contacts] DB error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });
+  } finally {
+    client.release();
   }
 });
 
 // PATCH /api/business-partners/:id/contacts/:contactId — edit an existing
-// contact (name/position/email/phone). Logs to businesspartnerchangelog.
+// contact (name/position/email/phone + the contact_org_roles relationship
+// fields). Logs to businesspartnerchangelog.
 router.patch("/:id/contacts/:contactId", async (req, res) => {
-  const { contactname, position, emailaddress, phonenumber, employeeId } = req.body || {};
+  const { contactname, position, emailaddress, phonenumber, employeeId, linkedinUrl, doNotContact, languageId } = req.body || {};
   if (!contactname || !contactname.trim()) {
     return res.status(400).json({ error: "validation_error", message: "contactname is required" });
   }
+  const client = await pool.connect();
   try {
-    const { rows } = await pool.query(
+    await client.query("BEGIN");
+    const { rows } = await client.query(
       `UPDATE contacts
-       SET contactname = $1, position = $2, emailaddress = $3, phonenumber = $4
-       WHERE id = $5 AND businesspartnerid = $6
-       RETURNING id, contactname, position, emailaddress, phonenumber`,
+       SET contactname = $1, position = $2, emailaddress = $3, phonenumber = $4,
+           linkedin_url = $5, do_not_contact = $6, languageid = $7
+       WHERE id = $8 AND businesspartnerid = $9
+       RETURNING id`,
       [contactname.trim(), position || null, emailaddress || null, phonenumber || null,
-       req.params.contactId, req.params.id]
+       linkedinUrl || null, !!doNotContact, languageId || null, req.params.contactId, req.params.id]
     );
     if (!rows.length) {
+      await client.query("ROLLBACK");
       return res.status(404).json({ error: "not_found", message: "Contact not found on this business partner" });
     }
-    await pool.query(
+    await upsertContactOrgRole(client, req.params.contactId, req.params.id, req.body);
+    await client.query(
       `INSERT INTO businesspartnerchangelog (businesspartnerid, changedat, changedby, summary) VALUES ($1, now(), $2, $3)`,
       [req.params.id, employeeId || null, `Contact updated: ${contactname.trim()}`]
     );
-    res.json(rows[0]);
+    await client.query("COMMIT");
+    const { rows: full } = await pool.query(`${CONTACT_SELECT} WHERE c.id = $2`, [req.params.id, req.params.contactId]);
+    res.json(full[0]);
     bpAuditLabel(req.params.id).then((bp) =>
       logAudit(req, { kind: "bp.contact.update", desc: `BP "${bp}": contact updated "${contactname.trim()}"` }));
   } catch (err) {
+    await client.query("ROLLBACK");
     console.error("[PATCH /api/business-partners/:id/contacts/:contactId] DB error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });
+  } finally {
+    client.release();
   }
 });
 

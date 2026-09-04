@@ -200,6 +200,14 @@ const CONFIG_KEYS = {
     hint: "Short text shown to employees from the Presence tab (purpose, legal basis, retention, rights). Optional.",
     placeholder: "",
   },
+
+  // --- Customers & partners tab: CRM Phase C1 -----------------------------
+  "crm.visibility_all": {
+    group: "crm",
+    type: "boolean",
+    label: "Everyone sees every customer/partner",
+    hint: "Off (default): each employee sees only the customers/partners they own, plus unowned ones. On: ownership no longer restricts visibility — everyone sees the full list. Admins always see everything either way.",
+  },
 };
 
 // Shared projection for an employee row as the Settings table wants it —
