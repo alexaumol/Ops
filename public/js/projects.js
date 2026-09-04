@@ -1776,7 +1776,9 @@ document.getElementById('npSave').addEventListener('click', async () => {
     populateOwnerFilterOptions();
     toast(T('proj.toast.npCreated', { code: `<span class="font-mono text-xs opacity-80">${code}</span>` }), 'green');
     if (created.oneDriveFolder?.created === false) {
-      toast(T('proj.toast.npNoFolder'), 'red');
+      // The server error (from Settings → Sync misconfig) is actionable —
+      // show it verbatim, falling back to the generic message.
+      toast(created.oneDriveFolder.error || T('proj.toast.npNoFolder'), 'red');
     } else if (created.oneDriveFolder === null && entityVal === '') {
       toast(T('proj.toast.npNoEntity'), 'navy');
     }

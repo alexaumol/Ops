@@ -90,6 +90,43 @@ function syncConfigured() {
 const b64url = (s) =>
   Buffer.from(s, "utf8").toString("base64").replace(/=+$/, "").replace(/\//g, "_").replace(/\+/g, "-");
 
+// The OneDrive personal-site key for a UPN: osola@hittbcn.com -> osola_hittbcn_com
+const oneDriveKey = (upn) => String(upn || "").toLowerCase().replace(/[@.]/g, "_");
+
+// Classify a Sync location string into how Graph should address it:
+//   { kind: "path",  path }   — a folder under GRAPH_ONEDRIVE_USER's drive root
+//   { kind: "share", url }    — a sharing URL, resolved once via /shares
+// A plain string is a path. An "…/onedrive.aspx?id=/personal/<user>/Documents/…"
+// web-UI address (what you get from the browser address bar) is understood when
+// it points at the configured user's own OneDrive; anything else in that shape
+// throws with guidance. Every other http(s) URL is treated as a sharing URL.
+function classifyLocation(loc) {
+  if (!/^https?:\/\//i.test(loc)) return { kind: "path", path: trimSlashes(loc) };
+
+  let u;
+  try { u = new URL(loc); } catch { return { kind: "share", url: loc }; }
+  const id = u.searchParams.get("id");
+  if (!/\.sharepoint\.com$/i.test(u.hostname) || !id) return { kind: "share", url: loc };
+
+  // Web-UI address. id is a server-relative path like
+  // /personal/<key>/Documents/<folder…> (personal OneDrive) or
+  // /sites/<site>/Shared Documents/<…> (a team site).
+  const m = /^\/personal\/([^/]+)\/Documents(?:\/(.*))?$/i.exec(id.trim());
+  if (m) {
+    if (ONEDRIVE_USER && m[1].toLowerCase() !== oneDriveKey(ONEDRIVE_USER)) {
+      throw new Error(
+        `That link points at ${m[1].replace(/_/g, ".")}'s OneDrive, but Ops is configured for ${ONEDRIVE_USER}. ` +
+        `Use a folder path in that account, or a "Copy link" sharing URL.`
+      );
+    }
+    return { kind: "path", path: trimSlashes(m[2] || "") };
+  }
+  throw new Error(
+    `That's a SharePoint web address, not a folder path or a sharing link. ` +
+    `Open the folder, use Share -> Copy link, and paste that — or enter a plain folder path (e.g. Clients/Projects).`
+  );
+}
+
 // Turn a location string into a Graph addressing prefix + a helper that
 // builds the URL for any sub-path beneath it. Memoised per location string
 // for the life of the process (a share URL costs one Graph call to resolve).
@@ -99,16 +136,17 @@ async function resolveLocation(location) {
   if (!loc) throw new Error("no sync location configured");
   if (locationCache.has(loc)) return locationCache.get(loc);
 
+  const c = classifyLocation(loc);
   let resolved;
-  if (/^https?:\/\//i.test(loc)) {
-    const res = await graphFetch(`${GRAPH}/shares/u!${b64url(loc)}/driveItem?$select=id,parentReference,webUrl`);
+  if (c.kind === "share") {
+    const res = await graphFetch(`${GRAPH}/shares/u!${b64url(c.url)}/driveItem?$select=id,parentReference,webUrl`);
     if (!res.ok) throw new Error(`resolve share link failed: ${res.status} ${await res.text().catch(() => "")}`);
     const item = await res.json();
     const driveId = item.parentReference && item.parentReference.driveId;
     if (!driveId || !item.id) throw new Error("share link did not resolve to a drive item");
     resolved = { kind: "item", prefix: `drives/${driveId}/items/${item.id}` };
   } else {
-    resolved = { kind: "path", prefix: `users/${encodeURIComponent(ONEDRIVE_USER)}/drive/root`, base: trimSlashes(loc) };
+    resolved = { kind: "path", prefix: `users/${encodeURIComponent(ONEDRIVE_USER)}/drive/root`, base: c.path };
   }
   locationCache.set(loc, resolved);
   return resolved;
@@ -287,6 +325,7 @@ module.exports = {
   // Settings → Sync backup engine
   syncConfigured,
   resolveLocation,
+  classifyLocation,
   ensureFolderPath,
   uploadFile,
 };
