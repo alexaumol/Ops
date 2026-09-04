@@ -36,6 +36,7 @@
         <button data-stab="calendar" class="settings-tab" role="tab" aria-selected="false" data-i18n="settings.tab.calendar">Calendar</button>
         <button data-stab="presence" class="settings-tab" role="tab" aria-selected="false" data-i18n="settings.tab.presence">Presence</button>
         <button data-stab="sync" class="settings-tab" role="tab" aria-selected="false" data-i18n="settings.tab.sync">Sync</button>
+        <button data-stab="email" class="settings-tab" role="tab" aria-selected="false" data-i18n="settings.tab.email">Email</button>
         <button data-stab="expcats" class="settings-tab" role="tab" aria-selected="false" data-i18n="settings.tab.expcats">Categories</button>
         <button data-stab="currencies" class="settings-tab" role="tab" aria-selected="false" data-i18n="settings.tab.currencies">Currencies</button>
         <button data-stab="entities" class="settings-tab" role="tab" aria-selected="false" data-i18n="settings.tab.entities">Entities</button>
@@ -130,6 +131,36 @@
       <section id="paneSync" class="settings-pane hidden">
         <p class="settings-note" data-i18n="settings.sync.note">Back up app documents to the company's external storage (OneDrive / SharePoint under the customer tenant). Copies happen on the next upload and on the hourly catch-up job; existing files are backfilled on the job's first run.</p>
         <div id="syncList" class="paths-list"></div>
+      </section>
+
+      <!-- ==================== EMAIL TRANSPORTS ==================== -->
+      <section id="paneEmail" class="settings-pane hidden">
+        <p class="settings-note" data-i18n="settings.email.note">Outbound email transports for sending invoices. Each is a Microsoft Graph app (Mail.Send) or an SMTP account; the secret is encrypted in the database. Assign one to each billing entity under the Entities tab.</p>
+        <div id="mailKeyWarn" class="vf-status-banner hidden" data-i18n="settings.email.noKey">The server has no encryption key (APP_ENCRYPTION_KEY) — transports can be listed but not created or edited until it is set.</div>
+        <div class="settings-form-grid" style="max-width:380px; margin:0 0 1rem;">
+          <label class="settings-field span-2">
+            <span class="settings-field__label"><span data-i18n="settings.email.default">Default transport</span> <span class="settings-emp-sub" data-i18n="settings.email.defaultHint">(used by an entity with none set)</span></span>
+            <select id="mailDefaultTransport"></select>
+          </label>
+        </div>
+        <div class="settings-table-wrap">
+          <table class="settings-table">
+            <thead>
+              <tr>
+                <th data-i18n="settings.email.col.name">Name</th>
+                <th data-i18n="settings.email.col.type">Type</th>
+                <th data-i18n="settings.email.col.from">From</th>
+                <th data-i18n="settings.email.col.secret">Secret</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="mailTransportBody"></tbody>
+          </table>
+          <div id="mailTransportEmpty" class="settings-pane-empty hidden" data-i18n="settings.email.empty">No transports yet. Add one, then assign it to your billing entities.</div>
+          <div class="settings-add-row">
+            <button class="btn btn-primary" id="btnAddMailTransport" data-i18n="settings.email.add">+ Add transport</button>
+          </div>
+        </div>
       </section>
 
       <!-- ==================== CATEGORIES (expense / spectrum / project type) ==================== -->
@@ -583,9 +614,7 @@
               <label class="settings-field">
                 <span class="settings-field__label"><span data-i18n="entities.f.mailTransport">Transport</span></span>
                 <select id="entMailTransport">
-                  <option value="" data-i18n="entities.mail.transport.default">Server default</option>
-                  <option value="graph" data-i18n="entities.mail.transport.graph">Microsoft Graph</option>
-                  <option value="smtp" data-i18n="entities.mail.transport.smtp">SMTP</option>
+                  <option value="" data-i18n="entities.mail.transport.default">Default transport</option>
                 </select>
               </label>
               <label class="settings-field">
@@ -593,8 +622,8 @@
                 <input type="email" id="entMailSender" autocomplete="off" placeholder="invoices@company.com" />
               </label>
             </div>
-            <p class="settings-emp-sub" data-i18n="entities.mail.note">How invoices issued by this entity are emailed. Leave the transport on “Server default” unless this entity's mailbox needs a specific one.</p>
-            <p class="settings-emp-sub" data-i18n="entities.mail.senderNote">If blank, the entity's invoicing email is used, then the server default.</p>
+            <p class="settings-emp-sub" data-i18n="entities.mail.note">Which email transport (Settings → Email) sends this entity's invoices. “Default transport” uses the one marked default there.</p>
+            <p class="settings-emp-sub" data-i18n="entities.mail.senderNote">“Send from” overrides the transport's own From address. If blank, the transport's From is used.</p>
           </div>
 
           <div class="settings-modal-section">
@@ -617,6 +646,99 @@
         <button id="btnEntityDelete" class="btn btn-secondary hidden" style="color:var(--danger); margin-right:auto;" data-i18n="entities.delete">Delete entity</button>
         <button id="entityModalCancel" class="btn btn-secondary" data-i18n="entities.cancel">Cancel</button>
         <button id="entityModalSave" class="btn btn-primary" data-i18n="entities.save">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== ADD / EDIT EMAIL TRANSPORT ==================== -->
+  <div id="mailTransportModal" class="settings-modal hidden">
+    <div class="settings-modal-panel">
+      <div class="settings-modal-head">
+        <h2 id="mtModalTitle" data-i18n="settings.email.modal.addTitle">Add email transport</h2>
+        <button id="mtModalClose" class="settings-modal-x" title="Close">✕</button>
+      </div>
+      <div class="settings-modal-body">
+        <div class="settings-modal-section">
+          <div class="settings-form-grid">
+            <label class="settings-field span-2">
+              <span class="settings-field__label"><span data-i18n="settings.email.f.name">Name</span> <span class="req">*</span></span>
+              <input type="text" id="mtName" autocomplete="off" placeholder="HiTT · Microsoft 365" />
+            </label>
+            <label class="settings-field span-2">
+              <span class="settings-field__label"><span data-i18n="settings.email.f.kind">Type</span></span>
+              <div class="mt-kind-toggle">
+                <label><input type="radio" name="mtKind" value="graph" /> <span data-i18n="settings.email.kind.graph">Microsoft Graph</span></label>
+                <label><input type="radio" name="mtKind" value="smtp" /> <span data-i18n="settings.email.kind.smtp">SMTP</span></label>
+              </div>
+            </label>
+            <label class="settings-field span-2">
+              <span class="settings-field__label"><span data-i18n="settings.email.f.from">From address</span> <span class="req">*</span></span>
+              <input type="email" id="mtFrom" autocomplete="off" placeholder="invoices@company.com" />
+            </label>
+          </div>
+        </div>
+
+        <div class="settings-modal-section" id="mtGraphGroup">
+          <h3 data-i18n="settings.email.graph.head">Microsoft Graph app</h3>
+          <p class="settings-emp-sub" data-i18n="settings.email.graph.note">A confidential app registration with the Mail.Send application permission (admin-consented), ideally scoped to the sender mailbox with an application access policy.</p>
+          <div class="settings-form-grid">
+            <label class="settings-field span-2">
+              <span class="settings-field__label"><span data-i18n="settings.email.f.tenant">Directory (tenant) ID</span></span>
+              <input type="text" id="mtGraphTenant" autocomplete="off" />
+            </label>
+            <label class="settings-field span-2">
+              <span class="settings-field__label"><span data-i18n="settings.email.f.client">Application (client) ID</span></span>
+              <input type="text" id="mtGraphClient" autocomplete="off" />
+            </label>
+            <label class="settings-field span-2">
+              <span class="settings-field__label"><span data-i18n="settings.email.f.clientSecret">Client secret</span></span>
+              <input type="password" id="mtGraphSecret" autocomplete="new-password" />
+              <span class="settings-emp-sub" id="mtGraphSecretHint"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="settings-modal-section" id="mtSmtpGroup">
+          <h3 data-i18n="settings.email.smtp.head">SMTP account</h3>
+          <div class="settings-form-grid">
+            <label class="settings-field">
+              <span class="settings-field__label"><span data-i18n="settings.email.f.host">Host</span></span>
+              <input type="text" id="mtSmtpHost" autocomplete="off" placeholder="smtp.ionos.es" />
+            </label>
+            <label class="settings-field">
+              <span class="settings-field__label"><span data-i18n="settings.email.f.port">Port</span></span>
+              <input type="number" id="mtSmtpPort" autocomplete="off" placeholder="587" />
+            </label>
+            <label class="settings-field">
+              <span class="settings-field__label"><span data-i18n="settings.email.f.user">Username</span></span>
+              <input type="text" id="mtSmtpUser" autocomplete="off" placeholder="invoices@company.com" />
+            </label>
+            <label class="settings-field">
+              <span class="settings-field__label"><span data-i18n="settings.email.f.pass">Password</span></span>
+              <input type="password" id="mtSmtpPass" autocomplete="new-password" />
+              <span class="settings-emp-sub" id="mtSmtpPassHint"></span>
+            </label>
+            <label class="settings-field span-2" style="flex-direction:row; align-items:center; gap:0.5rem;">
+              <input type="checkbox" id="mtSmtpSecure" />
+              <span data-i18n="settings.email.f.secure">Implicit TLS (usually port 465)</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="settings-modal-section">
+          <h3 data-i18n="settings.email.test.head">Send a test message</h3>
+          <p class="settings-emp-sub" data-i18n="settings.email.test.note">Saves nothing — sends one message right now with the values above.</p>
+          <div class="settings-add-row">
+            <input type="email" id="mtTestTo" placeholder="you@company.com" data-i18n-placeholder="settings.email.test.to" />
+            <button type="button" class="btn btn-secondary" id="btnMtTest" data-i18n="settings.email.test.send">Send test</button>
+          </div>
+          <p class="settings-emp-sub" id="mtTestResult"></p>
+        </div>
+      </div>
+      <div class="settings-modal-foot">
+        <button id="btnMtDelete" class="btn btn-secondary hidden" style="color:var(--danger); margin-right:auto;" data-i18n="settings.email.delete">Delete transport</button>
+        <button id="mtModalCancel" class="btn btn-secondary" data-i18n="entities.cancel">Cancel</button>
+        <button id="mtModalSave" class="btn btn-primary" data-i18n="entities.save">Save</button>
       </div>
     </div>
   </div>

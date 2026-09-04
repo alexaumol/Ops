@@ -557,3 +557,17 @@
 
 .settings-field-row { display: flex; flex-direction: column; gap: 0.3rem; margin-bottom: 0.9rem; }
 .settings-field-row .field-input { max-width: 100%; }
+
+/* ── Email transports tab ───────────────────────────────────────────── */
+#mailKeyWarn {
+  padding: 0.6rem 0.9rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  margin: 0 0 1rem;
+  background: rgba(166,102,17,0.12);
+  color: #8a5a12;
+  border: 1px solid rgba(166,102,17,0.35);
+}
+.mt-kind-toggle { display: flex; gap: 1.25rem; padding-top: 0.15rem; }
+.mt-kind-toggle label { display: inline-flex; align-items: center; gap: 0.35rem; font-weight: 500; cursor: pointer; }
+#mtTestResult { margin: 0.4rem 0 0; min-height: 1.1em; }

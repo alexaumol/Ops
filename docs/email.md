@@ -39,18 +39,54 @@ Pre-req for step 2: **M365 DKIM enabled** (Defender portal → Email authenticat
 
 ## Invoice mail
 
-**Per-entity SMTP is the default.** Each `entity` row carries:
+**Transports are managed in the app — Settings → Email**, not in `.env`. Each
+row in `email_transports` is one of:
 
-- `mailtransport` — `'smtp'` | `'graph'` | `NULL` (NULL = server default)
-- `mailsender` — the From mailbox; NULL falls back to the entity's invoicing address
+- **Microsoft Graph** — an app registration (`tenant id` / `client id` /
+  `client secret`) with the `Mail.Send` application permission, ideally scoped
+  to the sender mailbox by an application access policy.
+- **SMTP** — `host` / `port` / `user` / `password` / implicit-TLS flag.
 
-(`server/lib/entitySchema.js`, surfaced in Settings → Entities; consumed by `server/routes/invoicing.js` → `invoiceSenderFor()` / `invoiceMailChannel()`.)
+The `client secret` and the SMTP `password` are stored **AES-256-GCM-encrypted**
+(`server/lib/secrets.js`, key `APP_ENCRYPTION_KEY` in the instance env — 32 bytes
+base64/hex). Rotating that key invalidates every stored secret; back it up with
+the DB backup. The API never returns a secret — only a "set / not set" flag —
+and updating a transport leaves its secret alone unless you type a new one.
 
-Rationale: an invoice should come **from the customer's own domain** — better deliverability, the customer's brand, and replies go to the customer, not to us. Each customer configures their own SMTP host/creds (or Microsoft Graph) per legal entity, and manages the SPF/DKIM/DMARC for that domain themselves.
+Each `entity` row carries:
 
-Resend is **not** in the invoice path. If a future customer has no mail infrastructure at all, the fallback would be a dedicated `invoices@<slug>.ops.theaumol.com` sender with its own SPF/DKIM under the `ops.theaumol.com` zone — not built yet, add only on demand.
+- `mail_transport_id` → an `email_transports` row (Settings → Entities →
+  "Invoice email" → Transport). `NULL` → the app-level default in `appconfig`
+  `email.default_transport_id` (Settings → Email → "Default transport").
+- `mailsender` — optional From override; `NULL` → the transport's `from_address`.
+- `mailtransport` (`'graph'`/`'smtp'`) — **legacy, no longer read.**
 
-`DEFAULT_INVOICE_SENDER` (`GRAPH_MAIL_SENDER` / `SMTP_FROM` env) is the last-resort From when an entity has neither `mailsender` nor an invoicing address — keep it empty on customer instances so a misconfigured entity fails loudly instead of sending as the wrong identity.
+Resolved by `server/lib/emailTransport.js` (`resolveForEntity`), consumed by
+`server/routes/invoicing.js`. If neither the entity nor the default names a
+transport, the "email invoice" endpoint returns **503** with a clear message —
+nothing is sent as the wrong identity.
+
+Rationale: an invoice should come **from the customer's own domain** — better
+deliverability, the customer's brand, replies go to the customer. Each customer
+configures their own transports per legal entity and manages the
+SPF/DKIM/DMARC for that domain.
+
+Resend is **not** in the invoice path. If a future customer has no mail
+infrastructure at all, the fallback would be a dedicated
+`invoices@<slug>.ops.theaumol.com` sender with its own SPF/DKIM under the
+`ops.theaumol.com` zone — not built yet, add only on demand.
+
+### Migrating from the old env vars
+
+The old `GRAPH_MAIL_*` / `SMTP_*` / `GRAPH_MAIL_SENDER` vars are **not**
+auto-imported (a secret can't be read back out to seed a row). On each instance:
+
+1. Set `APP_ENCRYPTION_KEY` in the env file, `npm run migrate`, restart.
+2. Settings → Email → **+ Add transport** — re-enter the Graph app or SMTP
+   account. Use **Send test** to confirm it works.
+3. Settings → Email → set the **Default transport** (or assign per entity in
+   Settings → Entities).
+4. Remove the now-dead `GRAPH_MAIL_*` / `SMTP_*` vars from the env file.
 
 ## Monitoring
 
@@ -63,6 +99,7 @@ Resend is **not** in the invoice path. If a future customer has no mail infrastr
 When a customer will send invoices from their own domain `example.com`:
 
 1. Customer creates an SMTP credential (or an app registration for Graph) on their side.
-2. In Ops: Settings → Entities → set `mailtransport` + `mailsender` (`invoices@example.com`) for each legal entity.
-3. Customer confirms `example.com` has SPF authorising that host and, ideally, DKIM + DMARC.
-4. Send one test invoice, check headers for `dkim=pass` / `spf=pass` / `dmarc=pass`.
+2. In Ops: Settings → Email → add the transport, **Send test** to a mailbox you control.
+3. Settings → Email → set it as the default, or Settings → Entities → assign it per legal entity (+ `mailsender` `invoices@example.com` if the From should differ from the transport's own).
+4. Customer confirms `example.com` has SPF authorising that host and, ideally, DKIM + DMARC.
+5. Send one test invoice, check headers for `dkim=pass` / `spf=pass` / `dmarc=pass`.

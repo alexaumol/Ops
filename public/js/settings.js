@@ -345,6 +345,7 @@ let calendarLoaded = false; // covers both holidays + work calendar
 let auditLoaded = false;
 let presenceLoaded = false;
 let syncLoaded = false;
+let emailLoaded = false;
 let expCatsLoaded = false;
 let currenciesLoaded = false;
 let entitiesLoaded = false;
@@ -369,6 +370,7 @@ document.querySelectorAll("[data-stab]").forEach((btn) => {
     document.getElementById("paneCalendar").classList.toggle("hidden", tab !== "calendar");
     document.getElementById("panePresence").classList.toggle("hidden", tab !== "presence");
     document.getElementById("paneSync").classList.toggle("hidden", tab !== "sync");
+    document.getElementById("paneEmail").classList.toggle("hidden", tab !== "email");
     document.getElementById("paneExpCats").classList.toggle("hidden", tab !== "expcats");
     document.getElementById("paneCurrencies").classList.toggle("hidden", tab !== "currencies");
     document.getElementById("paneEntities").classList.toggle("hidden", tab !== "entities");
@@ -387,6 +389,10 @@ document.querySelectorAll("[data-stab]").forEach((btn) => {
     if (tab === "sync" && !syncLoaded) {
       syncLoaded = true;
       loadConfigGroup("sync", "syncList");
+    }
+    if (tab === "email" && !emailLoaded) {
+      emailLoaded = true;
+      loadEmailTransports();
     }
     if (tab === "expcats" && !expCatsLoaded) {
       expCatsLoaded = true;
@@ -1432,10 +1438,25 @@ entModal.querySelectorAll(".settings-modal-tab").forEach((btn) =>
   btn.addEventListener("click", () => showEntityTab(btn.dataset.etab)));
 entEls.name.addEventListener("input", setEntityTitle);
 
+// The transports offered in the entity modal's "Transport" dropdown, kept in
+// sync with Settings → Email.
+function fillEntityTransportOptions(transports) {
+  const sel = entEls.mailTransport;
+  const cur = sel.value;
+  const def = `<option value="">${escapeHtml(TI("entities.mail.transport.default"))}</option>`;
+  sel.innerHTML = def + (transports || []).map((t) =>
+    `<option value="${t.id}">${escapeHtml(t.name)} (${t.kind === "graph" ? "Graph" : "SMTP"})</option>`
+  ).join("");
+  sel.value = cur;
+}
+
 async function loadEntities() {
   entEls.body.innerHTML = `<tr><td colspan="6" class="settings-emp-sub" style="padding:1rem;">Loading…</td></tr>`;
   try {
     ENTITIES = await HITT_API.getEntities();
+    HITT_API.getEmailTransports()
+      .then((r) => fillEntityTransportOptions(r.transports))
+      .catch(() => {});
   } catch (err) {
     console.error("[settings] entities:", err.message);
     ENTITIES = [];
@@ -1485,7 +1506,7 @@ function fillEntityModal(e) {
   entEls.email.value = d.emailinvoicing || "";
   entEls.web.value = d.webpage || "";
   entEls.address.value = d.address || "";
-  entEls.mailTransport.value = d.mailtransport || "";
+  entEls.mailTransport.value = d.mailtransportid ? String(d.mailtransportid) : "";
   entEls.mailSender.value = d.mailsender || "";
   entEls.bankName.value = b.bankname || "";
   entEls.bankAddr1.value = b.bankaddrline1 || "";
@@ -1558,7 +1579,7 @@ document.getElementById("entityModalSave").addEventListener("click", async () =>
     emailinvoicing: entEls.email.value,
     webpage: entEls.web.value,
     address: entEls.address.value,
-    mailtransport: entEls.mailTransport.value,
+    mailtransportid: entEls.mailTransport.value || null,
     mailsender: entEls.mailSender.value,
     bank: {
       bankname: entEls.bankName.value,
@@ -1602,6 +1623,221 @@ window.addEventListener("hitt:langchange", () => {
   if (entitiesLoaded) renderEntities();
   if (!entModal.classList.contains("hidden")) setEntityTitle();
   if (verifactuLoaded && VF) renderVerifactu();
+  if (emailLoaded) renderMailTransports();
+});
+
+/* ========================= EMAIL TRANSPORTS ========================== */
+let MAIL_TRANSPORTS = [];
+let mtDefaultId = null;
+let mtSecretsReady = true;
+let mtEditingId = null;
+
+const mtModal = document.getElementById("mailTransportModal");
+const mt = {
+  title: document.getElementById("mtModalTitle"),
+  name: document.getElementById("mtName"),
+  from: document.getElementById("mtFrom"),
+  kindRadios: Array.from(document.querySelectorAll('input[name="mtKind"]')),
+  graphGroup: document.getElementById("mtGraphGroup"),
+  smtpGroup: document.getElementById("mtSmtpGroup"),
+  graphTenant: document.getElementById("mtGraphTenant"),
+  graphClient: document.getElementById("mtGraphClient"),
+  graphSecret: document.getElementById("mtGraphSecret"),
+  graphSecretHint: document.getElementById("mtGraphSecretHint"),
+  smtpHost: document.getElementById("mtSmtpHost"),
+  smtpPort: document.getElementById("mtSmtpPort"),
+  smtpUser: document.getElementById("mtSmtpUser"),
+  smtpPass: document.getElementById("mtSmtpPass"),
+  smtpPassHint: document.getElementById("mtSmtpPassHint"),
+  smtpSecure: document.getElementById("mtSmtpSecure"),
+  testTo: document.getElementById("mtTestTo"),
+  testBtn: document.getElementById("btnMtTest"),
+  testResult: document.getElementById("mtTestResult"),
+  del: document.getElementById("btnMtDelete"),
+  save: document.getElementById("mtModalSave"),
+};
+
+function mtKind() {
+  const r = mt.kindRadios.find((x) => x.checked);
+  return r ? r.value : "graph";
+}
+function applyMtKindVisibility() {
+  const k = mtKind();
+  mt.graphGroup.classList.toggle("hidden", k !== "graph");
+  mt.smtpGroup.classList.toggle("hidden", k !== "smtp");
+}
+mt.kindRadios.forEach((r) => r.addEventListener("change", applyMtKindVisibility));
+
+async function loadEmailTransports() {
+  const body = document.getElementById("mailTransportBody");
+  body.innerHTML = `<tr><td colspan="5" class="settings-emp-sub" style="padding:1rem;">${escapeHtml(TI("common.loading"))}</td></tr>`;
+  try {
+    const r = await HITT_API.getEmailTransports();
+    MAIL_TRANSPORTS = r.transports || [];
+    mtDefaultId = r.defaultTransportId || null;
+    mtSecretsReady = r.secretsReady !== false;
+  } catch (err) {
+    console.error("[settings] email transports:", err.message);
+    body.innerHTML = `<tr><td colspan="5" class="settings-emp-sub" style="padding:1rem;">${escapeHtml(err.message || "Could not load transports.")}</td></tr>`;
+    return;
+  }
+  document.getElementById("mailKeyWarn").classList.toggle("hidden", mtSecretsReady);
+  renderMailTransports();
+}
+
+function renderMailTransports() {
+  const body = document.getElementById("mailTransportBody");
+  document.getElementById("mailTransportEmpty").classList.toggle("hidden", MAIL_TRANSPORTS.length > 0);
+  body.innerHTML = MAIL_TRANSPORTS.map((t) => {
+    const secretOk = t.kind === "graph" ? t.graphSecretSet : t.smtpPassSet;
+    return `<tr>
+      <td><span class="settings-emp-name">${escapeHtml(t.name)}</span>${
+        t.id === mtDefaultId ? ` <span class="settings-badge" style="margin-left:0.4rem;">${escapeHtml(TI("settings.email.badge.default"))}</span>` : ""
+      }${t.active ? "" : ` <span class="settings-emp-sub">(${escapeHtml(TI("settings.email.disabled"))})</span>`}</td>
+      <td>${t.kind === "graph" ? "Microsoft Graph" : "SMTP"}</td>
+      <td>${escapeHtml(t.fromAddress || "—")}</td>
+      <td>${secretOk
+        ? `<span style="color:var(--success);">${escapeHtml(TI("settings.email.secret.set"))}</span>`
+        : `<span style="color:var(--danger);">${escapeHtml(TI("settings.email.secret.missing"))}</span>`}</td>
+      <td style="text-align:right;">
+        <button class="settings-emp-edit" data-edit-mt="${t.id}" title="${escapeHtml(TI("entities.edit"))}">✎</button>
+      </td>
+    </tr>`;
+  }).join("");
+  body.querySelectorAll("[data-edit-mt]").forEach((b) =>
+    b.addEventListener("click", () => openMtModal(Number(b.dataset.editMt))));
+  renderMailDefaultSelect();
+}
+
+function renderMailDefaultSelect() {
+  const sel = document.getElementById("mailDefaultTransport");
+  sel.innerHTML =
+    `<option value="">${escapeHtml(TI("settings.email.default.none"))}</option>` +
+    MAIL_TRANSPORTS.map((t) => `<option value="${t.id}">${escapeHtml(t.name)}</option>`).join("");
+  sel.value = mtDefaultId ? String(mtDefaultId) : "";
+}
+document.getElementById("mailDefaultTransport").addEventListener("change", async (e) => {
+  const id = e.target.value ? Number(e.target.value) : null;
+  try {
+    const r = await HITT_API.setDefaultEmailTransport(id);
+    mtDefaultId = r.defaultTransportId || null;
+    renderMailTransports();
+    toast(TI("settings.email.saved"), "green");
+  } catch (err) {
+    toast(err.message || "Could not set the default.", "red");
+    renderMailDefaultSelect();
+  }
+});
+
+function openMtModal(id) {
+  mtEditingId = id || null;
+  const t = id ? MAIL_TRANSPORTS.find((x) => x.id === id) : null;
+  mt.title.textContent = t ? TI("settings.email.modal.editTitle", { name: t.name }) : TI("settings.email.modal.addTitle");
+  mt.del.classList.toggle("hidden", !t);
+  mt.testResult.textContent = "";
+  mt.testTo.value = "";
+
+  mt.name.value = t ? t.name : "";
+  mt.from.value = t ? t.fromAddress : "";
+  const kind = t ? t.kind : "graph";
+  mt.kindRadios.forEach((r) => { r.checked = r.value === kind; r.disabled = !!t; });
+  applyMtKindVisibility();
+
+  mt.graphTenant.value = t ? t.graphTenantId : "";
+  mt.graphClient.value = t ? t.graphClientId : "";
+  mt.graphSecret.value = "";
+  mt.graphSecretHint.textContent = t && t.graphSecretSet ? TI("settings.email.secret.keepHint") : "";
+  mt.smtpHost.value = t ? t.smtpHost : "";
+  mt.smtpPort.value = t && t.smtpPort ? t.smtpPort : "";
+  mt.smtpUser.value = t ? t.smtpUser : "";
+  mt.smtpPass.value = "";
+  mt.smtpPassHint.textContent = t && t.smtpPassSet ? TI("settings.email.secret.keepHint") : "";
+  mt.smtpSecure.checked = !!(t && t.smtpSecure);
+
+  mt.testBtn.disabled = !t;
+  mt.testBtn.title = t ? "" : TI("settings.email.test.saveFirst");
+
+  mtModal.classList.remove("hidden");
+  setTimeout(() => mt.name.focus(), 40);
+}
+function closeMtModal() { mtModal.classList.add("hidden"); mtEditingId = null; }
+
+document.getElementById("btnAddMailTransport").addEventListener("click", () => {
+  if (!mtSecretsReady) { toast(TI("settings.email.noKey"), "red"); return; }
+  openMtModal(null);
+});
+document.getElementById("mtModalClose").addEventListener("click", closeMtModal);
+document.getElementById("mtModalCancel").addEventListener("click", closeMtModal);
+mtModal.addEventListener("click", (e) => { if (e.target === mtModal) closeMtModal(); });
+
+function mtPayload() {
+  const kind = mtKind();
+  const p = { name: mt.name.value.trim(), fromAddress: mt.from.value.trim() };
+  if (!mtEditingId) p.kind = kind;
+  if (kind === "graph") {
+    p.graphTenantId = mt.graphTenant.value.trim();
+    p.graphClientId = mt.graphClient.value.trim();
+    if (mt.graphSecret.value) p.graphClientSecret = mt.graphSecret.value;
+  } else {
+    p.smtpHost = mt.smtpHost.value.trim();
+    p.smtpPort = Number(mt.smtpPort.value) || 587;
+    p.smtpUser = mt.smtpUser.value.trim();
+    p.smtpSecure = mt.smtpSecure.checked;
+    if (mt.smtpPass.value) p.smtpPass = mt.smtpPass.value;
+  }
+  return p;
+}
+
+mt.save.addEventListener("click", async () => {
+  const p = mtPayload();
+  if (!p.name) { toast(TI("settings.email.err.name"), "red"); return; }
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(p.fromAddress)) { toast(TI("settings.email.err.from"), "red"); return; }
+  mt.save.disabled = true;
+  try {
+    if (mtEditingId) await HITT_API.updateEmailTransport(mtEditingId, p);
+    else await HITT_API.createEmailTransport(p);
+    toast(TI("settings.email.saved"), "green");
+    closeMtModal();
+    await loadEmailTransports();
+  } catch (err) {
+    toast(err.message || "Could not save the transport.", "red");
+  } finally {
+    mt.save.disabled = false;
+  }
+});
+
+mt.del.addEventListener("click", async () => {
+  if (!mtEditingId) return;
+  const t = MAIL_TRANSPORTS.find((x) => x.id === mtEditingId);
+  if (!confirm(TI("settings.email.deleteConfirm", { name: (t && t.name) || "" }))) return;
+  try {
+    await HITT_API.deleteEmailTransport(mtEditingId);
+    toast(TI("settings.email.deleted"), "green");
+    closeMtModal();
+    await loadEmailTransports();
+  } catch (err) {
+    toast(err.message || "Could not delete the transport.", "red");
+  }
+});
+
+mt.testBtn.addEventListener("click", async () => {
+  if (!mtEditingId) return;
+  const to = mt.testTo.value.trim();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)) { mt.testResult.textContent = TI("settings.email.test.badTo"); return; }
+  mt.testBtn.disabled = true;
+  mt.testResult.textContent = TI("settings.email.test.sending");
+  try {
+    const r = await HITT_API.testEmailTransport(mtEditingId, to);
+    mt.testResult.textContent = r.ok
+      ? TI("settings.email.test.ok", { to })
+      : TI("settings.email.test.failed", { error: r.error || "" });
+    mt.testResult.style.color = r.ok ? "var(--success)" : "var(--danger)";
+  } catch (err) {
+    mt.testResult.textContent = err.message || "Test failed.";
+    mt.testResult.style.color = "var(--danger)";
+  } finally {
+    mt.testBtn.disabled = false;
+  }
 });
 
 /* ============================== VERI*FACTU (Spain) =================== */
