@@ -29,7 +29,7 @@ function rows(over = {}) {
     entity: { id: 3, vatnumber: "ESB12345678", verifactu_enabled: true, verifactu_api_key: "k",
       verifactu_environment: "sandbox", invoice_series: "HITT", ...over.entity },
     taxCompany: over.taxCompany === null ? null : {
-      taxcompanyname: "Client SL", vatnumber: "B87654321", fiscalidtype: null,
+      taxcompanyname: "Client SL", vatnumber: "B13674197", fiscalidtype: null,
       fiscalcountry: null, ...over.taxCompany },
     vatType: { percentage: 21, verifactu_vatoperation: "S1", verifactu_vatkey: "01",
       verifactu_exemption_note: null, ...over.vatType },
@@ -50,7 +50,7 @@ test("toOpsInvoice: taxed F1 with a Spanish recipient", () => {
   assert.equal(ops.type, "F1");
   assert.equal(ops.description, "Consulting — Feb"); // HTML stripped
   assert.deepEqual(ops.recipient, {
-    name: "Client SL", fiscalId: "B87654321", fiscalIdType: "nif", country: "ES",
+    name: "Client SL", fiscalId: "B13674197", fiscalIdType: "nif", country: "ES",
   });
   assert.equal(ops.net, 1000);
   assert.equal(ops.vat.rate, 21);

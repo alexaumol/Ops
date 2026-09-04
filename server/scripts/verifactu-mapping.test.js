@@ -7,7 +7,7 @@
  */
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { buildAltaPayload, normalizeFiscalId, money } = require("../lib/verifactu/mapping");
+const { buildAltaPayload, normalizeFiscalId, isValidSpanishTaxId, money } = require("../lib/verifactu/mapping");
 
 // A date safely in the past but after the Veri*Factu start, reused everywhere.
 const D = "2025-03-10";
@@ -18,7 +18,7 @@ function baseInvoice(overrides = {}) {
     issuedDate: D,
     description: "Consulting services — project 2411",
     issuer: { nif: "B12345678" },
-    recipient: { name: "Client SL", fiscalId: "B87654321", country: "ES" },
+    recipient: { name: "Client SL", fiscalId: "B13674197", country: "ES" },
     net: 100,
     vat: { rate: 21, amount: 21 },
     total: 121,
@@ -28,9 +28,29 @@ function baseInvoice(overrides = {}) {
 
 test("normalizeFiscalId strips ES prefix, punctuation, and cases up", () => {
   assert.equal(normalizeFiscalId("es b-1234.567 z"), "B1234567Z");
-  assert.equal(normalizeFiscalId("B87654321"), "B87654321");
+  assert.equal(normalizeFiscalId("B13674197"), "B13674197");
   assert.equal(normalizeFiscalId(null), null);
   assert.equal(normalizeFiscalId("  "), null);
+});
+
+test("isValidSpanishTaxId — NIF / NIE / CIF checksums", () => {
+  assert.equal(isValidSpanishTaxId("12345678Z"), true);   // NIF — 12345678 % 23 = 14 -> Z
+  assert.equal(isValidSpanishTaxId("00000000T"), true);   // NIF — 0 -> T
+  assert.equal(isValidSpanishTaxId("X0000000T"), true);   // NIE — X -> 0
+  assert.equal(isValidSpanishTaxId("B13674197"), true);   // CIF (BOLD's example)
+  assert.equal(isValidSpanishTaxId("es b-1367.4197"), true); // normalised first
+  assert.equal(isValidSpanishTaxId("B87654321"), false);  // bad CIF control
+  assert.equal(isValidSpanishTaxId("12345678A"), false);  // wrong NIF letter
+  assert.equal(isValidSpanishTaxId("IT00470550013"), false); // not a Spanish form
+  assert.equal(isValidSpanishTaxId(""), false);
+  assert.equal(isValidSpanishTaxId(null), false);
+});
+
+test("an invalid Spanish recipient NIF is rejected with a helpful message", () => {
+  assert.throws(
+    () => buildAltaPayload(baseInvoice({ recipient: { name: "Client SL", fiscalId: "B87654321", country: "ES" } })),
+    /not a valid Spanish NIF\/NIE\/CIF/,
+  );
 });
 
 test("money rounds to 2 decimals without fp drift", () => {
@@ -43,7 +63,7 @@ test("F1 with a Spanish NIF recipient → irsId form", () => {
   const { invoice } = buildAltaPayload(baseInvoice());
   assert.equal(invoice.type, "F1");
   assert.deepEqual(invoice.id, { number: "HITT-2026-014", issuedTime: D });
-  assert.deepEqual(invoice.recipient, { irsId: "B87654321", name: "Client SL", country: "ES" });
+  assert.deepEqual(invoice.recipient, { irsId: "B13674197", name: "Client SL", country: "ES" });
   assert.deepEqual(invoice.description, { text: "Consulting services — project 2411", operationDate: D });
   assert.deepEqual(invoice.vatLines, [{ base: 100, rate: 21, amount: 21, vatOperation: "S1", vatKey: "01" }]);
   assert.equal(invoice.amount, 21);

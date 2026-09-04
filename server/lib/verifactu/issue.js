@@ -20,7 +20,7 @@
  */
 const { pool } = require("../../config/db");
 const { logAudit } = require("../audit");
-const { buildAltaPayload, normalizeFiscalId } = require("./mapping");
+const { buildAltaPayload, normalizeFiscalId, isValidSpanishTaxId } = require("./mapping");
 const { configForEntity, featureEnabled } = require("./index");
 const { VerifactuError } = require("./errors");
 
@@ -54,6 +54,10 @@ async function runRecipientCheck(ops, cfg) {
   if (!rec || (rec.fiscalIdType && rec.fiscalIdType !== "nif")) return; // foreign — /id_check doesn't apply
   const irsId = normalizeFiscalId(rec.fiscalId);
   if (!irsId || !rec.name) return;
+  if (!isValidSpanishTaxId(irsId)) {
+    throw new IssueError(422, "recipient_check_failed",
+      `The recipient's VAT number "${irsId}" is not a valid Spanish NIF/NIE/CIF — fix it on the tax company, or set its fiscal-ID type if the client is foreign.`);
+  }
   try {
     await cfg.provider.idCheck({ irsId, name: rec.name }, { apiKey: cfg.apiKey });
   } catch (err) {
