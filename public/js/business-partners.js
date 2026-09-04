@@ -29,12 +29,26 @@ const DEMO_SEED = [
 
 let PARTNERS = [];
 let LOOKUPS = { entities: [], companyTypes: [], countries: [], languages: [] };
+let EMPLOYEES = []; // CRM Phase C1 — owner picker (reuses the existing /api/employees lookup)
 let usingDemoData = false;
 let searchTerm = "";
 let onlyAliveProjects = false;
+let stageFilter = "";
+let ownerFilter = "";   // "" | "me" | "none"
+let showArchived = false;
 let activeBpId = null;
 let sortColumn = "name";
 let sortDirection = "asc"; // 'asc' | 'desc'
+
+const STAGE_LABEL_KEYS = {
+  new: "bp.stage.new", in_discussion: "bp.stage.inDiscussion", active_partner: "bp.stage.activePartner",
+  on_hold: "bp.stage.onHold", closed: "bp.stage.closed", former_partner: "bp.stage.formerPartner",
+};
+function employeeOptionsHtml(selectedId, includeBlankLabel){
+  const opts = [`<option value="">${includeBlankLabel || "—"}</option>`]
+    .concat((EMPLOYEES || []).map(e => `<option value="${e.id}" ${String(e.id) === String(selectedId) ? 'selected' : ''}>${escapeHtml(e.name || e.username || `#${e.id}`)}</option>`));
+  return opts.join('');
+}
 
 function escapeHtml(s){
   const d = document.createElement('div');
@@ -79,7 +93,15 @@ async function loadPartners(){
     } catch (err) {
       console.warn("Could not load business partner lookups:", err);
     }
-    const data = await HITT_API.getBusinessPartners();
+    try {
+      EMPLOYEES = await HITT_API.getEmployees();
+    } catch (err) {
+      console.warn("Could not load employees (owner picker):", err);
+    }
+    // includeArchived: the list loads once and every filter (search, stage,
+    // owner, archived...) runs client-side, same as the rest of this page —
+    // so "Show archived" just needs the rows already in memory.
+    const data = await HITT_API.getBusinessPartners({ includeArchived: true });
     // projectsAlive/Dead/Total come back as strings — Postgres COUNT()
     // is bigint, and node-pg serializes bigints as strings to avoid
     // precision loss. Coerce to Number so the "Number of projects" column
@@ -112,6 +134,10 @@ function matchesSearch(p){
 function matchesFilters(p){
   if (!matchesSearch(p)) return false;
   if (onlyAliveProjects && Number(p.projectsAlive ?? 0) <= 0) return false;
+  if (!showArchived && p.archivedAt) return false;
+  if (stageFilter && (p.lifecycleStage || 'new') !== stageFilter) return false;
+  if (ownerFilter === 'me' && String(p.ownerEmployeeId ?? '') !== String(currentEmployeeId ?? '')) return false;
+  if (ownerFilter === 'none' && p.ownerEmployeeId) return false;
   return true;
 }
 
@@ -143,7 +169,12 @@ function renderTable(){
   empty.classList.add('hidden');
   tbody.innerHTML = rows.map(p => `
     <tr data-id="${p.id}">
-      <td>${escapeHtml(p.name)}</td>
+      <td>${escapeHtml(p.name)}${p.archivedAt ? ` <span class="stage-pill">${T('bp.archived')}</span>` : ''}</td>
+      <td>
+        <span class="stage-pill stage-pill--${p.lifecycleStage || 'new'}">${T(STAGE_LABEL_KEYS[p.lifecycleStage] || STAGE_LABEL_KEYS.new)}</span>
+        ${p.temperature ? `<span class="temp-badge">${p.temperature === 'hot' ? '🔥' : '☀️'}</span>` : ''}
+        ${p.ownerName ? `<span class="bp-owner-meta">${escapeHtml(p.ownerName)}</span>` : ''}
+      </td>
       <td>${escapeHtml(p.companyTypeLabel || '—')}</td>
       <td>${escapeHtml(p.countryLabel || '—')}</td>
       <td>${p.webpage ? `<a href="${escapeHtml(p.webpage)}" target="_blank" rel="noopener">${escapeHtml(p.webpage.replace(/^https?:\/\//, ''))}</a>` : '—'}</td>
@@ -186,6 +217,21 @@ document.getElementById('filterAliveProjects').addEventListener('change', (e) =>
   renderTable();
 });
 
+document.getElementById('filterStage').addEventListener('change', (e) => {
+  stageFilter = e.target.value;
+  renderTable();
+});
+
+document.getElementById('filterOwner').addEventListener('change', (e) => {
+  ownerFilter = e.target.value;
+  renderTable();
+});
+
+document.getElementById('filterArchived').addEventListener('change', (e) => {
+  showArchived = e.target.checked;
+  renderTable();
+});
+
 document.querySelectorAll('.bp-table th[data-sort]').forEach(th => {
   th.addEventListener('click', () => {
     const col = th.dataset.sort;
@@ -220,16 +266,43 @@ const modalOverlay = document.getElementById('modalOverlay');
 let CONTACTS = [];
 let editingContactId = null;
 
+const DECISION_ROLE_LABEL_KEYS = {
+  decision_maker: 'bp.contact.decisionRole.decisionMaker', influencer: 'bp.contact.decisionRole.influencer',
+  gatekeeper: 'bp.contact.decisionRole.gatekeeper', user: 'bp.contact.decisionRole.user', unknown: 'bp.contact.decisionRole.unknown',
+};
+const STANCE_LABEL_KEYS = {
+  champion: 'bp.contact.stance.champion', supportive: 'bp.contact.stance.supportive', neutral: 'bp.contact.stance.neutral',
+  skeptical: 'bp.contact.stance.skeptical', detractor: 'bp.contact.stance.detractor',
+};
+
+// Populates the "Reports to" picker with every other contact on this
+// partner — called after every contacts fetch, since the option list
+// depends on who's currently on the partner.
+function renderContactReportsToOptions(){
+  const sel = document.getElementById('mNewContactReportsTo');
+  const current = sel.value;
+  const editingId = editingContactId ? String(editingContactId) : null;
+  sel.innerHTML = `<option value="">${T('bp.contact.reportsTo.none')}</option>` +
+    CONTACTS.filter(c => String(c.id) !== editingId)
+      .map(c => `<option value="${c.id}" ${String(c.id) === current ? 'selected' : ''}>${escapeHtml(c.contactname)}</option>`).join('');
+}
+
 // Called with fresh rows (a fetch) or with no argument (re-render after a
 // local edit-state change).
 function renderContacts(rows){
-  if (rows) CONTACTS = rows;
+  if (rows) { CONTACTS = rows; renderContactReportsToOptions(); }
   const list = document.getElementById('mContactsList');
   if (!CONTACTS.length) {
     list.innerHTML = `<div class="sub-empty">${T("bp.empty.contacts")}</div>`;
     return;
   }
-  list.innerHTML = CONTACTS.map(c => `
+  list.innerHTML = CONTACTS.map(c => {
+    const badges = [
+      c.isPrimary ? `<span class="stage-pill stage-pill--active_partner">${T('bp.contact.primary')}</span>` : '',
+      c.decisionRole ? `<span class="stage-pill">${T(DECISION_ROLE_LABEL_KEYS[c.decisionRole] || c.decisionRole)}</span>` : '',
+      c.stance ? `<span class="stage-pill">${T(STANCE_LABEL_KEYS[c.stance] || c.stance)}</span>` : '',
+    ].filter(Boolean).join(' ');
+    return `
     <div class="sub-item ${String(editingContactId) === String(c.id) ? 'is-editing' : ''}">
       <div class="sub-item-row">
         <span class="sub-item-title">${escapeHtml(c.contactname)}</span>
@@ -239,9 +312,11 @@ function renderContacts(rows){
           <button type="button" data-delete-contact="${c.id}" class="sub-item-btn sub-item-btn--danger" title="${T("bp.tip.deleteContact")}">✕</button>
         </span>
       </div>
-      <div class="sub-item-meta">${escapeHtml(c.emailaddress || '—')}${c.phonenumber ? ' · ' + escapeHtml(c.phonenumber) : ''}</div>
+      <div class="sub-item-meta">${escapeHtml(c.emailaddress || '—')}${c.phonenumber ? ' · ' + escapeHtml(c.phonenumber) : ''}${c.reportsToName ? ' · ' + T('bp.contact.reportsToLabel', { name: c.reportsToName }) : ''}</div>
+      ${badges ? `<div style="margin-top:0.3rem;">${badges}</div>` : ''}
     </div>
-  `).join('');
+  `;
+  }).join('');
   list.querySelectorAll('[data-edit-contact]').forEach(btn => {
     btn.addEventListener('click', () => startEditContact(btn.dataset.editContact));
   });
@@ -256,6 +331,11 @@ function contactFormInputs(){
     position: document.getElementById('mNewContactPosition'),
     email: document.getElementById('mNewContactEmail'),
     phone: document.getElementById('mNewContactPhone'),
+    decisionRole: document.getElementById('mNewContactDecisionRole'),
+    influence: document.getElementById('mNewContactInfluence'),
+    stance: document.getElementById('mNewContactStance'),
+    reportsTo: document.getElementById('mNewContactReportsTo'),
+    primary: document.getElementById('mNewContactPrimary'),
   };
 }
 
@@ -268,6 +348,12 @@ function startEditContact(id){
   f.position.value = c.position || '';
   f.email.value = c.emailaddress || '';
   f.phone.value = c.phonenumber || '';
+  f.decisionRole.value = c.decisionRole || '';
+  f.influence.value = c.influence || '';
+  f.stance.value = c.stance || '';
+  f.primary.checked = !!c.isPrimary;
+  renderContactReportsToOptions(); // excludes this contact from its own "reports to" list
+  f.reportsTo.value = c.reportsToContactId || '';
   document.getElementById('mAddContact').textContent = T('form.save');
   document.getElementById('mCancelEditContact').style.display = '';
   renderContacts();
@@ -278,6 +364,12 @@ function cancelEditContact(){
   editingContactId = null;
   const f = contactFormInputs();
   [f.name, f.position, f.email, f.phone].forEach(el => { el.value = ''; });
+  f.decisionRole.value = '';
+  f.influence.value = '';
+  f.stance.value = '';
+  f.reportsTo.value = '';
+  f.primary.checked = false;
+  renderContactReportsToOptions();
   document.getElementById('mAddContact').textContent = T('form.add');
   document.getElementById('mCancelEditContact').style.display = 'none';
   renderContacts();
@@ -296,6 +388,7 @@ async function deleteContact(id){
     }
     const wasEditingThis = String(editingContactId) === String(id);
     CONTACTS = await HITT_API.getBusinessPartnerContacts(activeBpId);
+    renderContactReportsToOptions(); // the deleted contact must drop out of the picker
     if (wasEditingThis) cancelEditContact(); // resets the form + re-renders
     else renderContacts();
     toast(T('toast.contactDeleted'), 'navy');
@@ -513,6 +606,62 @@ function renderHistory(rows){
   `).join('');
 }
 
+// CRM Phase C1 — Account section behaviour ----------------------------------
+// The stage this record loaded at, so the "reason for the change" field only
+// appears once the Stage select actually differs from it.
+let loadedLifecycleStage = 'new';
+
+function syncStageFields(){
+  const stage = document.getElementById('mStage').value;
+  const inDiscussion = stage === 'in_discussion';
+  document.getElementById('mTemperatureField').classList.toggle('hidden', !inDiscussion);
+  if (!inDiscussion) document.getElementById('mTemperature').value = '';
+  const changed = stage !== loadedLifecycleStage;
+  document.getElementById('mStageReasonField').classList.toggle('hidden', !changed);
+  if (!changed) document.getElementById('mStageReason').value = '';
+}
+document.getElementById('mStage').addEventListener('change', syncStageFields);
+
+function updateArchiveButtonUI(archivedAt){
+  const badge = document.getElementById('mArchivedBadge');
+  const btn = document.getElementById('mArchiveToggle');
+  badge.classList.toggle('hidden', !archivedAt);
+  const label = T(archivedAt ? 'bp.unarchive' : 'bp.archive');
+  btn.textContent = label;
+  btn.title = label;
+  btn.dataset.archived = archivedAt ? '1' : '';
+}
+
+document.getElementById('mArchiveToggle').addEventListener('click', async () => {
+  if (!activeBpId) return;
+  if (usingDemoData) { toast(T('bp.demo.notAvailable'), 'navy'); return; }
+  const btn = document.getElementById('mArchiveToggle');
+  const wasArchived = !!btn.dataset.archived;
+  if (!wasArchived && !confirm(T('bp.confirm.archive'))) return;
+  btn.disabled = true;
+  try {
+    if (wasArchived) {
+      await HITT_API.unarchiveBusinessPartner(activeBpId);
+      updateArchiveButtonUI(null);
+      toast(T('toast.bpUnarchived'), 'green');
+    } else {
+      const reason = window.prompt(T('bp.archiveReasonPrompt')) || undefined;
+      await HITT_API.archiveBusinessPartner(activeBpId, reason);
+      updateArchiveButtonUI(new Date().toISOString());
+      toast(T('toast.bpArchived'), 'green');
+    }
+    const p = PARTNERS.find(x => x.id === activeBpId);
+    if (p) p.archivedAt = wasArchived ? null : new Date().toISOString();
+    renderTable();
+    renderHistory(await HITT_API.getBusinessPartnerHistory(activeBpId));
+  } catch (err) {
+    console.error(err);
+    toast(err.message || T('toast.bpArchiveFail'), 'red');
+  } finally {
+    btn.disabled = false;
+  }
+});
+
 async function openDetailModal(id){
   const p = PARTNERS.find(x => x.id === id);
   if (!p) return;
@@ -524,6 +673,20 @@ async function openDetailModal(id){
   document.getElementById('mCountry').innerHTML = lookupOptionsHtml(LOOKUPS.countries, null, true);
   document.getElementById('mWebpage').value = '';
   ['mStreetName', 'mCity', 'mState', 'mZipCode', 'mPhone1', 'mPhone2'].forEach(id2 => document.getElementById(id2).value = '');
+
+  // CRM Phase C1 — Account section
+  document.getElementById('mCategory').value = '';
+  document.getElementById('mOwner').innerHTML = employeeOptionsHtml(null, '—');
+  document.getElementById('mLeadSource').value = '';
+  document.getElementById('mGeoScope').value = '';
+  document.querySelectorAll('#mRoles input[type="checkbox"]').forEach(cb => { cb.checked = false; });
+  document.getElementById('mStage').value = 'new';
+  loadedLifecycleStage = 'new';
+  document.getElementById('mStageReason').value = '';
+  document.getElementById('mTemperature').value = '';
+  syncStageFields();
+  updateArchiveButtonUI(null);
+
   CONTACTS = [];
   editingContactId = null;
   resetBpSessionAdds();
@@ -531,6 +694,11 @@ async function openDetailModal(id){
   document.getElementById('mNewContactPosition').value = '';
   document.getElementById('mNewContactEmail').value = '';
   document.getElementById('mNewContactPhone').value = '';
+  document.getElementById('mNewContactDecisionRole').value = '';
+  document.getElementById('mNewContactInfluence').value = '';
+  document.getElementById('mNewContactStance').value = '';
+  document.getElementById('mNewContactPrimary').checked = false;
+  renderContactReportsToOptions();
   document.getElementById('mAddContact').textContent = T('form.add');
   document.getElementById('mCancelEditContact').style.display = 'none';
   document.getElementById('mNewNote').value = '';
@@ -585,6 +753,19 @@ async function openDetailModal(id){
     document.getElementById('mLastUpdated').textContent = detail.lastupdated
       ? new Date(detail.lastupdated).toLocaleString() : '—';
     document.getElementById('mLastUpdatedBy').textContent = detail.lastUpdatedByName || '—';
+
+    document.getElementById('mCategory').value = detail.category || '';
+    document.getElementById('mOwner').innerHTML = employeeOptionsHtml(detail.ownerEmployeeId, '—');
+    document.getElementById('mLeadSource').value = detail.leadSource || '';
+    document.getElementById('mGeoScope').value = detail.geoScope || '';
+    document.querySelectorAll('#mRoles input[type="checkbox"]').forEach(cb => {
+      cb.checked = Array.isArray(detail.roles) && detail.roles.includes(cb.value);
+    });
+    document.getElementById('mStage').value = detail.lifecycleStage || 'new';
+    loadedLifecycleStage = detail.lifecycleStage || 'new';
+    document.getElementById('mTemperature').value = detail.temperature || '';
+    syncStageFields();
+    updateArchiveButtonUI(detail.archivedAt);
   } catch (err) {
     console.warn(`Could not load full detail for business partner ${id}:`, err);
   }
@@ -616,6 +797,7 @@ async function openDetailModal(id){
 
 const BP_MODAL_TRANSIENT_IDS = [
   'mNewContactName', 'mNewContactPosition', 'mNewContactEmail', 'mNewContactPhone',
+  'mNewContactDecisionRole', 'mNewContactInfluence', 'mNewContactStance', 'mNewContactReportsTo',
   'mNewNote',
   'mTcName', 'mTcVat', 'mTcEmail', 'mTcStreet', 'mTcCity', 'mTcState', 'mTcZip', 'mTcPhone1', 'mTcPhone2',
 ];
@@ -661,6 +843,11 @@ function contactRevertPayload(o){
     emailaddress: o.emailaddress || null,
     phonenumber: o.phonenumber || null,
     employeeId: currentEmployeeId,
+    decisionRole: o.decisionRole || null,
+    influence: o.influence || null,
+    stance: o.stance || null,
+    reportsToContactId: o.reportsToContactId || null,
+    isPrimary: !!o.isPrimary,
   };
 }
 function tcRevertPayload(o){
@@ -780,6 +967,9 @@ document.getElementById('mSave').addEventListener('click', async () => {
   document.getElementById('mChangedBadge').classList.add('hidden');
   resetBpSessionAdds(); // Save commits everything added this session
 
+  const ownerEmployeeId = document.getElementById('mOwner').value;
+  const roles = [...document.querySelectorAll('#mRoles input[type="checkbox"]:checked')].map(cb => cb.value);
+
   const payload = {
     name,
     employeeId: currentEmployeeId,
@@ -795,6 +985,14 @@ document.getElementById('mSave').addEventListener('click', async () => {
       phonenumber2: document.getElementById('mPhone2').value || null,
       countryid: document.getElementById('mCountry').value ? Number(document.getElementById('mCountry').value) : null,
     },
+    category: document.getElementById('mCategory').value.trim() || null,
+    roles,
+    ownerEmployeeId: ownerEmployeeId ? Number(ownerEmployeeId) : null,
+    leadSource: document.getElementById('mLeadSource').value.trim() || null,
+    geoScope: document.getElementById('mGeoScope').value || null,
+    lifecycleStage: document.getElementById('mStage').value,
+    stageReason: document.getElementById('mStageReason').value.trim() || null,
+    temperature: document.getElementById('mTemperature').value || null,
   };
 
   if (usingDemoData) {
@@ -809,7 +1007,15 @@ document.getElementById('mSave').addEventListener('click', async () => {
   try {
     await HITT_API.updateBusinessPartner(activeBpId, payload);
     const p = PARTNERS.find(x => x.id === activeBpId);
-    if (p) p.name = name;
+    if (p) {
+      Object.assign(p, {
+        name, category: payload.category, roles: payload.roles,
+        lifecycleStage: payload.lifecycleStage, temperature: payload.temperature,
+        ownerEmployeeId: payload.ownerEmployeeId,
+        ownerName: (EMPLOYEES.find(e => String(e.id) === String(payload.ownerEmployeeId)) || {}).name || null,
+        leadSource: payload.leadSource, geoScope: payload.geoScope,
+      });
+    }
     renderTable();
     closeDetailModal();
     toast(T('toast.bpSaved'), 'green');
@@ -830,6 +1036,11 @@ document.getElementById('mAddContact').addEventListener('click', async () => {
     emailaddress: f.email.value.trim() || null,
     phonenumber: f.phone.value.trim() || null,
     employeeId: currentEmployeeId,
+    decisionRole: f.decisionRole.value || null,
+    influence: f.influence.value || null,
+    stance: f.stance.value || null,
+    reportsToContactId: f.reportsTo.value ? Number(f.reportsTo.value) : null,
+    isPrimary: f.primary.checked,
   };
   const wasEditing = editingContactId;
   try {
@@ -1022,6 +1233,11 @@ function openNewBpModal(){
   document.getElementById('npCountry').innerHTML = lookupOptionsHtml(LOOKUPS.countries, null, true);
   document.getElementById('npWebpage').value = '';
   ['npStreetName', 'npCity', 'npState', 'npZipCode', 'npPhone1', 'npPhone2'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('npCategory').value = '';
+  document.getElementById('npOwner').innerHTML = employeeOptionsHtml(null, '—');
+  document.getElementById('npLeadSource').value = '';
+  document.getElementById('npGeoScope').value = '';
+  document.querySelectorAll('#npRoles input[type="checkbox"]').forEach(cb => { cb.checked = false; });
   npContacts = [];
   cancelEditNpContact(); // clears the contact inputs, button state, and re-renders the (now empty) list
   newBpOverlay.classList.remove('hidden');
@@ -1045,6 +1261,7 @@ document.getElementById('npSave').addEventListener('click', async () => {
   const languageId = document.getElementById('npLanguage').value;
   if (!languageId) { toast(T('bp.langRequired'), 'red'); return; }
   const companyTypeId = document.getElementById('npCompanyType').value ? Number(document.getElementById('npCompanyType').value) : null;
+  const npOwnerEmployeeId = document.getElementById('npOwner').value;
   const payload = {
     name,
     employeeId: currentEmployeeId,
@@ -1060,6 +1277,11 @@ document.getElementById('npSave').addEventListener('click', async () => {
       phonenumber2: document.getElementById('npPhone2').value || null,
       countryid: document.getElementById('npCountry').value ? Number(document.getElementById('npCountry').value) : null,
     },
+    category: document.getElementById('npCategory').value.trim() || null,
+    roles: [...document.querySelectorAll('#npRoles input[type="checkbox"]:checked')].map(cb => cb.value),
+    ownerEmployeeId: npOwnerEmployeeId ? Number(npOwnerEmployeeId) : null,
+    leadSource: document.getElementById('npLeadSource').value.trim() || null,
+    geoScope: document.getElementById('npGeoScope').value || null,
   };
 
   if (usingDemoData) {
@@ -1186,5 +1408,6 @@ window.addEventListener('hitt:langchange', () => {
     renderContacts();
     renderNotes();
     renderTaxCompanies();
+    updateArchiveButtonUI(document.getElementById('mArchiveToggle').dataset.archived ? new Date().toISOString() : null);
   }
 });

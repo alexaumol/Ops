@@ -35,9 +35,34 @@
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
-  overflow: hidden;
+  overflow-x: auto;
   box-shadow: var(--shadow-sm);
 }
+.bp-filter-select {
+  width: auto; max-width: 11rem; padding: 0.45rem 0.6rem; font-size: 0.82rem;
+}
+
+/* ---------- CRM Phase C1: lifecycle stage / temperature pills ---------- */
+.stage-pill {
+  display: inline-block; font-size: 0.7rem; font-weight: 700;
+  padding: 0.15rem 0.5rem; border-radius: 999px; white-space: nowrap;
+}
+.stage-pill--new            { background: rgba(92,117,124,0.14);  color: var(--hitt-teal); }
+.stage-pill--in_discussion  { background: rgba(188,154,28,0.18);  color: #8A6E12; }
+.stage-pill--active_partner { background: rgba(110,143,90,0.18);  color: #4C6B3A; }
+.stage-pill--on_hold        { background: rgba(160,40,40,0.10);   color: #A02828; }
+.stage-pill--closed         { background: rgba(23,23,23,0.08);    color: var(--text-secondary); }
+.stage-pill--former_partner { background: rgba(23,23,23,0.08);    color: var(--text-secondary); }
+.temp-badge { font-size: 0.68rem; margin-left: 0.3rem; }
+.bp-owner-meta { display: block; font-size: 0.68rem; color: var(--text-secondary); margin-top: 0.15rem; }
+
+.role-checks {
+  display: flex; flex-wrap: wrap; gap: 0.15rem 0.9rem;
+  font-size: 0.8rem; color: var(--text-primary);
+  padding: 0.4rem 0.55rem; border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm); background: var(--bg-surface);
+}
+.role-checks label { display: inline-flex; align-items: center; gap: 0.3rem; cursor: pointer; }
 .bp-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
 .bp-table thead th {
   text-align: left;

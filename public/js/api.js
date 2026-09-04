@@ -113,7 +113,14 @@ const HITT_API = (() => {
     deleteProjectResource: (id, resourceRowId, employeeId) =>
       request(`/api/projects/${id}/resources/${resourceRowId}`, { method: "DELETE", body: JSON.stringify({ employeeId }) }),
 
-    getBusinessPartners: (q) => request(`/api/business-partners${q ? `?q=${encodeURIComponent(q)}` : ""}`),
+    // opts: { q, stage, category, role, owner, includeArchived } — all optional,
+    // see server/routes/businessPartners.js GET / for the filter semantics.
+    getBusinessPartners: (opts = {}) => {
+      const params = new URLSearchParams();
+      Object.entries(opts).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== "") params.set(k, v); });
+      const qs = params.toString();
+      return request(`/api/business-partners${qs ? `?${qs}` : ""}`);
+    },
     getBusinessPartnerLookups: () => request("/api/business-partners/lookups"),
     getBusinessPartner: (id) => request(`/api/business-partners/${id}`),
     createBusinessPartner: (payload) =>
@@ -141,6 +148,10 @@ const HITT_API = (() => {
       request(`/api/business-partners/${id}/tax-companies/${tcId}`, { method: "PATCH", body: JSON.stringify(payload) }),
     deleteBusinessPartnerTaxCompany: (id, tcId) =>
       request(`/api/business-partners/${id}/tax-companies/${tcId}`, { method: "DELETE" }),
+    archiveBusinessPartner: (id, reason) =>
+      request(`/api/business-partners/${id}/archive`, { method: "POST", body: JSON.stringify({ reason }) }),
+    unarchiveBusinessPartner: (id) =>
+      request(`/api/business-partners/${id}/unarchive`, { method: "POST" }),
 
     getEmployees: () => request("/api/employees"),
     getTimeTracking: (userId, weekStart) =>
