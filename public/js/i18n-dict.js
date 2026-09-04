@@ -55,8 +55,6 @@ window.HITT_I18N_DICT = {
     "module.expenses.desc": "Company expenses — travel, meals, materials — with evidence documents, per project or internal.",
     "module.reports.title": "Reports",
     "module.reports.desc": "Hours spent per project, and a calendar of resource leaves and holidays.",
-    "module.patientCrm.title": "Patient programme CRM",
-    "module.patientCrm.desc": "Patient-support programmes: enrolment, follow-up and outcomes tracking.",
     "module.settings.title": "Settings",
     "module.settings.desc": "Manage admin/user roles, module access and time-off approvers.",
 
@@ -1403,8 +1401,6 @@ window.HITT_I18N_DICT = {
     "module.expenses.desc": "Gastos de empresa — viajes, comidas, materiales — con justificantes, por proyecto o internos.",
     "module.reports.title": "Informes",
     "module.reports.desc": "Horas dedicadas por proyecto y un calendario de ausencias y festivos.",
-    "module.patientCrm.title": "CRM de programas de pacientes",
-    "module.patientCrm.desc": "Programas de apoyo a pacientes: inscripción, seguimiento y resultados.",
     "module.settings.title": "Configuración",
     "module.settings.desc": "Gestiona roles de administrador/usuario, acceso a módulos y aprobadores de ausencias.",
 
@@ -2738,8 +2734,6 @@ window.HITT_I18N_DICT = {
     "module.expenses.desc": "Despeses d'empresa — viatges, àpats, materials — amb justificants, per projecte o internes.",
     "module.reports.title": "Informes",
     "module.reports.desc": "Hores dedicades per projecte i un calendari d'absències i festius.",
-    "module.patientCrm.title": "CRM de programes de pacients",
-    "module.patientCrm.desc": "Programes de suport a pacients: inscripció, seguiment i resultats.",
     "module.settings.title": "Configuració",
     "module.settings.desc": "Gestiona rols d'administrador/usuari, accés als mòduls i aprovadors d'absències.",
 
