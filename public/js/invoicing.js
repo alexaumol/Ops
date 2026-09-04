@@ -1263,6 +1263,12 @@ invoiceOverlay.addEventListener('input', () => {
   document.getElementById('invChangedBadge').classList.remove('hidden');
 });
 
+// "Edit partner" leaves this page — warn if the invoice has unsaved edits.
+document.getElementById('invBpEdit').addEventListener('click', (e) => {
+  const dirty = !document.getElementById('invChangedBadge').classList.contains('hidden');
+  if (dirty && !confirm(T('inv.confirm.leaveUnsaved'))) e.preventDefault();
+});
+
 function clientSideStatusPreview(){
   const d = document.getElementById('invDate').value;
   const s = document.getElementById('invSentDate').value;
@@ -1461,8 +1467,10 @@ async function openInvoiceModal(invoiceId){
   });
   invTaxCompanyPrev = taxSel.value;
 
-  // "Edit BP" — opens the project's business partner (owner of these tax
-  // companies) in the Business partners page, in a new tab.
+  // "Edit BP" — navigates to the project's business partner (owner of these
+  // tax companies) in the Business partners page. Same tab: the session lives
+  // in sessionStorage (one identity per tab), so a new tab would open
+  // unauthenticated — this matches the other in-app ?open= deep links.
   const bpEdit = document.getElementById('invBpEdit');
   if (activeProjectBpId) {
     bpEdit.href = `business-partners.html?open=${encodeURIComponent(activeProjectBpId)}`;
