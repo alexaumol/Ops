@@ -195,10 +195,9 @@ ALTER TABLE employeesinfo ADD COLUMN IF NOT EXISTS avatarusephoto boolean NOT NU
 -- email"). Replaces the old routing in routes/invoicing.js that switched the
 -- sender mailbox + transport on the entity's DISPLAY NAME ("HiTT" -> Graph,
 -- "FHiTT" -> SMTP). Added at runtime by ensureEntitySchema().
---   mailtransport  'graph' | 'smtp' | NULL  (NULL -> inferred from which
---                  transport is configured on the server)
---   mailsender     From mailbox; NULL -> entity.emailinvoicing, then
---                  GRAPH_MAIL_SENDER / SMTP_FROM
+--   mailtransport  'graph' | 'smtp' | NULL  — LEGACY, no longer read. The
+--                  transport is now email_transports via mail_transport_id.
+--   mailsender     From mailbox override; NULL -> the transport's from_address
 ALTER TABLE entity ADD COLUMN IF NOT EXISTS mailtransport  varchar(8);
 ALTER TABLE entity ADD COLUMN IF NOT EXISTS mailsender     varchar(255);
 
