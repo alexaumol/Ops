@@ -117,7 +117,8 @@
    alongside the tabs bar's #historyCollapse toggle. */
 .modal-columns { flex: 1; display: flex; overflow: hidden; }
 .modal-columns .modal-body { min-width: 0; }
-#paneGeneral.modal-pane { display: grid; grid-template-columns: 1.5fr 1fr; gap: 0.9rem; align-items: start; }
+#paneGeneral.modal-pane,
+#paneTimeline.modal-pane { display: grid; grid-template-columns: 1.5fr 1fr; gap: 0.9rem; align-items: start; }
 #historyPanel {
   flex-shrink: 0; width: 300px; overflow: hidden;
   border-left: 1px solid var(--border-subtle);
@@ -314,3 +315,11 @@
 }
 .bp-count-btn:hover { background: var(--hitt-teal); color: #fff; border-color: var(--hitt-teal); }
 .bp-count-zero { color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+
+/* ---------- CRM Phase C2: activity timeline / next-actions tasks ---------- */
+.task-item { display: flex; align-items: flex-start; gap: 0.5rem; }
+.task-item input[type="checkbox"] { margin-top: 0.15rem; flex-shrink: 0; }
+.task-item.is-done .task-title { text-decoration: line-through; color: var(--text-secondary); }
+.task-title { font-size: 0.82rem; font-weight: 600; }
+.task-meta { font-size: 0.7rem; color: var(--text-secondary); }
+.task-meta.is-overdue { color: var(--danger); font-weight: 700; }

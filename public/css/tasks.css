@@ -1,0 +1,10 @@
+/* ==========================================================================
+   HITT Ops — Tasks page-specific styles
+   Reuses the generic modal/toast/field-input/table/sub-item classes from
+   business-partners.css (they're not actually BP-specific) — same
+   convention as time-allocation.css/reports.css/expenses.css. Only what's
+   genuinely specific to the task list lives here.
+   ========================================================================== */
+
+.bp-table td.task-title.is-done { text-decoration: line-through; color: var(--text-secondary); }
+.bp-table td input[type="checkbox"] { cursor: pointer; }

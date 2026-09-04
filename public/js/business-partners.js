@@ -312,7 +312,7 @@ function renderContacts(rows){
           <button type="button" data-delete-contact="${c.id}" class="sub-item-btn sub-item-btn--danger" title="${T("bp.tip.deleteContact")}">✕</button>
         </span>
       </div>
-      <div class="sub-item-meta">${escapeHtml(c.emailaddress || '—')}${c.phonenumber ? ' · ' + escapeHtml(c.phonenumber) : ''}${c.reportsToName ? ' · ' + T('bp.contact.reportsToLabel', { name: c.reportsToName }) : ''}</div>
+      <div class="sub-item-meta">${escapeHtml(c.emailaddress || '—')}${c.phonenumber ? ' · ' + escapeHtml(c.phonenumber) : ''}${c.reportsToName ? ' · ' + T('bp.contact.reportsToLabel', { name: escapeHtml(c.reportsToName) }) : ''}</div>
       ${badges ? `<div style="margin-top:0.3rem;">${badges}</div>` : ''}
     </div>
   `;
@@ -426,6 +426,133 @@ function renderNotes(rows){
       <div style="font-size:0.82rem; white-space:pre-wrap;">${escapeHtml(n.notes)}</div>
     </div>
   `).join('');
+}
+
+/* ============================== ACTIVITY TIMELINE (CRM Phase C2) ========= */
+let ACTIVITIES = [];
+
+const ACTIVITY_KIND_LABEL_KEYS = {
+  call: 'bp.activity.kind.call', meeting: 'bp.activity.kind.meeting', email: 'bp.activity.kind.email',
+  note: 'bp.activity.kind.note', site_visit: 'bp.activity.kind.siteVisit', other: 'bp.activity.kind.other',
+};
+const ACTIVITY_OUTCOME_LABEL_KEYS = {
+  positive: 'bp.activity.outcome.positive', neutral: 'bp.activity.outcome.neutral', negative: 'bp.activity.outcome.negative',
+};
+
+// Populates the "With contact" picker on the log-activity form from the
+// partner's current contact list — called after every contacts fetch.
+function renderActivityContactOptions(){
+  const sel = document.getElementById('mNewActivityContact');
+  sel.innerHTML = `<option value="">${T('bp.activity.withContact.none')}</option>` +
+    CONTACTS.map(c => `<option value="${c.id}">${escapeHtml(c.contactname)}</option>`).join('');
+}
+
+// Called with fresh rows (a fetch) or with no argument (a language change).
+function renderActivities(rows){
+  if (rows) ACTIVITIES = rows;
+  const list = document.getElementById('mActivityList');
+  if (!ACTIVITIES.length) {
+    list.innerHTML = `<div class="sub-empty">${T("bp.empty.activities")}</div>`;
+    return;
+  }
+  list.innerHTML = ACTIVITIES.map(a => {
+    const who = [a.contactName, ...(a.participantContactNames || []), ...(a.participantEmployeeNames || [])]
+      .filter(Boolean).map(escapeHtml).join(', ');
+    return `
+    <div class="sub-item">
+      <div class="sub-item-row">
+        <span class="sub-item-title">${T(ACTIVITY_KIND_LABEL_KEYS[a.kind] || a.kind)}</span>
+        <span style="display:flex; align-items:center; gap:0.35rem;">
+          ${a.outcome ? `<span class="stage-pill">${T(ACTIVITY_OUTCOME_LABEL_KEYS[a.outcome] || a.outcome)}</span>` : ''}
+          <span class="sub-item-meta">${formatDateTime(a.occurredAt)}</span>
+          <button type="button" data-delete-activity="${a.id}" class="sub-item-btn sub-item-btn--danger" title="${T("bp.tip.deleteActivity")}">✕</button>
+        </span>
+      </div>
+      <div style="font-size:0.82rem; white-space:pre-wrap;">${escapeHtml(a.summary)}</div>
+      <div class="sub-item-meta">
+        ${a.loggedByName ? T('bp.activity.loggedBy', { name: escapeHtml(a.loggedByName) }) : ''}
+        ${who ? ' · ' + T('bp.activity.withLabel', { names: who }) : ''}
+      </div>
+      ${a.agreedNextStep ? `<div class="sub-item-meta">${T('bp.activity.nextStepLabel', { text: escapeHtml(a.agreedNextStep) })}</div>` : ''}
+    </div>
+  `;
+  }).join('');
+  list.querySelectorAll('[data-delete-activity]').forEach(btn => {
+    btn.addEventListener('click', () => deleteActivity(btn.dataset.deleteActivity));
+  });
+}
+
+async function deleteActivity(id){
+  if (!confirm(T('bp.confirm.deleteActivity'))) return;
+  try {
+    await HITT_API.deleteBusinessPartnerActivity(activeBpId, id);
+    renderActivities(await HITT_API.getBusinessPartnerActivities(activeBpId));
+    toast(T('toast.activityDeleted'), 'navy');
+  } catch (err) {
+    console.error(err);
+    toast(T('toast.activityDeleteFail'), 'red');
+  }
+}
+
+/* ============================== NEXT ACTIONS — TASKS (CRM Phase C2) ====== */
+let BP_TASKS = [];
+
+function formatDueMeta(task){
+  if (!task.dueDate) return '';
+  const isOverdue = task.status === 'open' && new Date(task.dueDate) < new Date(new Date().toDateString());
+  return `<span class="task-meta ${isOverdue ? 'is-overdue' : ''}">${T('bp.task.due', { date: formatDateOnly(task.dueDate) })}</span>`;
+}
+
+function renderBpTasks(rows){
+  if (rows) BP_TASKS = rows;
+  const list = document.getElementById('mTaskList');
+  if (!BP_TASKS.length) {
+    list.innerHTML = `<div class="sub-empty">${T("bp.empty.tasks")}</div>`;
+    return;
+  }
+  list.innerHTML = BP_TASKS.map(t => `
+    <div class="sub-item task-item ${t.status === 'done' ? 'is-done' : ''}">
+      <input type="checkbox" data-toggle-task="${t.id}" ${t.status === 'done' ? 'checked' : ''} title="${T('bp.task.toggle')}" />
+      <div style="flex:1; min-width:0;">
+        <div class="task-title">${escapeHtml(t.title)}</div>
+        <div class="sub-item-meta">
+          ${t.ownerName ? escapeHtml(t.ownerName) : T('bp.task.unassigned')}
+          ${formatDueMeta(t)}
+        </div>
+      </div>
+      <button type="button" data-delete-task="${t.id}" class="sub-item-btn sub-item-btn--danger" title="${T("form.delete")}">✕</button>
+    </div>
+  `).join('');
+  list.querySelectorAll('[data-toggle-task]').forEach(cb => {
+    cb.addEventListener('change', () => toggleBpTask(cb.dataset.toggleTask, cb.checked));
+  });
+  list.querySelectorAll('[data-delete-task]').forEach(btn => {
+    btn.addEventListener('click', () => deleteBpTask(btn.dataset.deleteTask));
+  });
+}
+
+async function toggleBpTask(id, done){
+  try {
+    await HITT_API.updateTask(id, { status: done ? 'done' : 'open' });
+    renderBpTasks(await HITT_API.getTasks({ entityType: 'customer_partner', entityId: activeBpId }));
+  } catch (err) {
+    console.error(err);
+    toast(T('toast.taskSaveFail'), 'red');
+    renderBpTasks(); // revert the checkbox to the last known state
+  }
+}
+
+async function deleteBpTask(id){
+  const t = BP_TASKS.find(x => String(x.id) === String(id));
+  if (!t || !confirm(T('bp.confirm.deleteTask', { title: t.title || '' }))) return;
+  try {
+    await HITT_API.deleteTask(id);
+    renderBpTasks(await HITT_API.getTasks({ entityType: 'customer_partner', entityId: activeBpId }));
+    toast(T('toast.taskDeleted'), 'navy');
+  } catch (err) {
+    console.error(err);
+    toast(T('toast.taskDeleteFail'), 'red');
+  }
 }
 
 let TAX_COMPANIES = [];
@@ -709,16 +836,30 @@ async function openDetailModal(id){
   document.getElementById('mLastUpdatedBy').textContent = '—';
   document.getElementById('mChangedBadge').classList.add('hidden');
 
+  // CRM Phase C2 — activity timeline + next-actions tasks
+  ACTIVITIES = [];
+  document.getElementById('mNewActivityKind').value = 'call';
+  document.getElementById('mNewActivityOutcome').value = '';
+  document.getElementById('mNewActivityContact').innerHTML = '';
+  document.getElementById('mNewActivitySummary').value = '';
+  document.getElementById('mNewActivityNextStep').value = '';
+  BP_TASKS = [];
+  document.getElementById('mNewTaskTitle').value = '';
+  document.getElementById('mNewTaskDue').value = '';
+
   const loadingMsg = usingDemoData ? T('bp.demo.notAvailable') : T('common.loading');
   document.getElementById('mContactsList').innerHTML = `<div class="sub-empty">${loadingMsg}</div>`;
   document.getElementById('mNotesList').innerHTML = `<div class="sub-empty">${loadingMsg}</div>`;
   document.getElementById('mTaxCompanyList').innerHTML = `<div class="sub-empty">${loadingMsg}</div>`;
+  document.getElementById('mActivityList').innerHTML = `<div class="sub-empty">${loadingMsg}</div>`;
+  document.getElementById('mTaskList').innerHTML = `<div class="sub-empty">${loadingMsg}</div>`;
   document.getElementById('historyList').innerHTML = `<div class="sub-empty">${loadingMsg}</div>`;
   TAX_COMPANIES = [];
   resetTaxCompanyForm();
 
   document.querySelectorAll('[data-mtab]').forEach(b => b.setAttribute('aria-selected', b.dataset.mtab === 'general' ? 'true' : 'false'));
   document.getElementById('paneGeneral').classList.remove('hidden');
+  document.getElementById('paneTimeline').classList.add('hidden');
   document.getElementById('paneInvoicing').classList.add('hidden');
 
   // "Data has changed" badge — same pattern as the Projects modal: attach a
@@ -780,9 +921,22 @@ async function openDetailModal(id){
     renderContacts(contacts);
     renderNotes(notes);
     renderTaxCompanies(taxCompanies);
+    renderActivityContactOptions(); // depends on the contacts list just loaded
     snapshotBpSubitems(contacts, taxCompanies); // baseline for discard-revert
   } catch (err) {
     console.warn(`Could not load contacts/notes/tax companies for business partner ${id}:`, err);
+  }
+
+  try {
+    const [activities, tasks] = await Promise.all([
+      HITT_API.getBusinessPartnerActivities(id),
+      HITT_API.getTasks({ entityType: 'customer_partner', entityId: id }),
+    ]);
+    if (activeBpId !== id) return;
+    renderActivities(activities);
+    renderBpTasks(tasks);
+  } catch (err) {
+    console.warn(`Could not load activities/tasks for business partner ${id}:`, err);
   }
 
   try {
@@ -800,6 +954,7 @@ const BP_MODAL_TRANSIENT_IDS = [
   'mNewContactDecisionRole', 'mNewContactInfluence', 'mNewContactStance', 'mNewContactReportsTo',
   'mNewNote',
   'mTcName', 'mTcVat', 'mTcEmail', 'mTcStreet', 'mTcCity', 'mTcState', 'mTcZip', 'mTcPhone1', 'mTcPhone2',
+  'mNewActivitySummary', 'mNewActivityNextStep', 'mNewTaskTitle',
 ];
 
 // Sub-item changes made during the current modal session. Each "Add" /
@@ -954,6 +1109,7 @@ document.querySelectorAll('[data-mtab]').forEach(btn => {
     document.querySelectorAll('[data-mtab]').forEach(b => b.setAttribute('aria-selected', 'false'));
     btn.setAttribute('aria-selected', 'true');
     document.getElementById('paneGeneral').classList.toggle('hidden', btn.dataset.mtab !== 'general');
+    document.getElementById('paneTimeline').classList.toggle('hidden', btn.dataset.mtab !== 'timeline');
     document.getElementById('paneInvoicing').classList.toggle('hidden', btn.dataset.mtab !== 'invoicing');
   });
 });
@@ -1091,6 +1247,69 @@ document.getElementById('mNewContactName').addEventListener('keydown', (e) => {
 document.getElementById('mNotesSearch').addEventListener('input', (e) => {
   notesSearchTerm = e.target.value.trim();
   renderNotes();
+});
+
+// Unlike contacts/notes/tax companies, a logged activity or a created task
+// is NOT reverted by "discard changes" on modal cancel — an activity is a
+// record that something really happened (a call, a meeting), and a task
+// can be platform-wide, so cancelling this modal shouldn't un-log either.
+// The unsaved-text guard (BP_MODAL_TRANSIENT_IDS) still stops a half-typed
+// activity/task from silently vanishing on close.
+document.getElementById('mAddActivity').addEventListener('click', async () => {
+  const summary = document.getElementById('mNewActivitySummary').value.trim();
+  if (!summary || !activeBpId) { if (!summary) toast(T('bp.activity.summaryRequired'), 'red'); return; }
+  if (usingDemoData) { toast(T('bp.demo.notAvailable'), 'navy'); return; }
+  const contactId = document.getElementById('mNewActivityContact').value;
+  const payload = {
+    kind: document.getElementById('mNewActivityKind').value,
+    outcome: document.getElementById('mNewActivityOutcome').value || null,
+    contactId: contactId ? Number(contactId) : null,
+    summary,
+    agreedNextStep: document.getElementById('mNewActivityNextStep').value.trim() || null,
+  };
+  const btn = document.getElementById('mAddActivity');
+  btn.disabled = true;
+  try {
+    await HITT_API.addBusinessPartnerActivity(activeBpId, payload);
+    document.getElementById('mNewActivitySummary').value = '';
+    document.getElementById('mNewActivityNextStep').value = '';
+    document.getElementById('mNewActivityOutcome').value = '';
+    document.getElementById('mNewActivityContact').value = '';
+    renderActivities(await HITT_API.getBusinessPartnerActivities(activeBpId));
+    toast(T('toast.activityAdded'), 'green');
+  } catch (err) {
+    console.error(err);
+    toast(T('toast.activitySaveFail'), 'red');
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+document.getElementById('mAddTask').addEventListener('click', async () => {
+  const title = document.getElementById('mNewTaskTitle').value.trim();
+  if (!title) { toast(T('bp.task.titleRequired'), 'red'); return; }
+  if (!activeBpId || usingDemoData) { if (usingDemoData) toast(T('bp.demo.notAvailable'), 'navy'); return; }
+  const dueDate = document.getElementById('mNewTaskDue').value || null;
+  const btn = document.getElementById('mAddTask');
+  btn.disabled = true;
+  try {
+    await HITT_API.createTask({
+      title, dueDate, ownerEmployeeId: currentEmployeeId,
+      entityType: 'customer_partner', entityId: activeBpId,
+    });
+    document.getElementById('mNewTaskTitle').value = '';
+    document.getElementById('mNewTaskDue').value = '';
+    renderBpTasks(await HITT_API.getTasks({ entityType: 'customer_partner', entityId: activeBpId }));
+    toast(T('toast.taskAdded'), 'green');
+  } catch (err) {
+    console.error(err);
+    toast(T('toast.taskSaveFail'), 'red');
+  } finally {
+    btn.disabled = false;
+  }
+});
+document.getElementById('mNewTaskTitle').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') document.getElementById('mAddTask').click();
 });
 
 document.getElementById('mTcSameAddress').addEventListener('change', syncTcAddressVisibility);
@@ -1408,6 +1627,8 @@ window.addEventListener('hitt:langchange', () => {
     renderContacts();
     renderNotes();
     renderTaxCompanies();
+    renderActivities();
+    renderBpTasks();
     updateArchiveButtonUI(document.getElementById('mArchiveToggle').dataset.archived ? new Date().toISOString() : null);
   }
 });
