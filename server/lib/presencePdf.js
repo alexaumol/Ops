@@ -19,6 +19,15 @@ function hm(min) {
   return `${sign}${Math.floor(a / 60)}h ${String(a % 60).padStart(2, "0")}m`;
 }
 
+const LOC_ES = { office: "Oficina", remote: "Teletrabajo", client: "Cliente" };
+// The self-declared location for a day: the shared label across its
+// segments, "varias" when they differ, "" when none was recorded.
+function dayLocation(segments) {
+  const set = [...new Set((segments || []).map((s) => s.location).filter(Boolean))];
+  if (!set.length) return "";
+  return set.length === 1 ? (LOC_ES[set[0]] || set[0]) : "varias";
+}
+
 function renderPresencePdf(doc, data) {
   const { name, from, to, timezone, generatedAt, days, totals, methodDoc } = data;
   const time = (iso) =>
@@ -35,13 +44,14 @@ function renderPresencePdf(doc, data) {
 
   // table header
   const cols = [
-    { k: "date", w: 78, label: "Fecha" },
-    { k: "in", w: 55, label: "Entrada" },
-    { k: "out", w: 55, label: "Salida" },
-    { k: "seg", w: 150, label: "Tramos" },
-    { k: "worked", w: 65, label: "Trabajado" },
-    { k: "expected", w: 65, label: "Previsto" },
-    { k: "balance", w: 62, label: "Saldo" },
+    { k: "date", w: 70, label: "Fecha" },
+    { k: "in", w: 44, label: "Entrada" },
+    { k: "out", w: 44, label: "Salida" },
+    { k: "seg", w: 140, label: "Tramos" },
+    { k: "loc", w: 64, label: "Ubicación" },
+    { k: "worked", w: 56, label: "Trabajado" },
+    { k: "expected", w: 56, label: "Previsto" },
+    { k: "balance", w: 54, label: "Saldo" },
   ];
   let y = doc.y;
   const rowH = 15;
@@ -65,13 +75,14 @@ function renderPresencePdf(doc, data) {
       in: time(d.firstIn),
       out: time(d.lastOut),
       seg: (d.segments.map((s) => `${time(s.in)}–${time(s.out)}`).join("  ") || obs).slice(0, 60),
+      loc: dayLocation(d.segments),
       worked: hm(d.workedMinutes),
       expected: hm(d.expectedMinutes),
       balance: hm(d.balanceMinutes),
     }, { color: d.balanceMinutes < 0 ? "#B24A3A" : INK });
   }
   drawRow({
-    date: "TOTAL", in: "", out: "", seg: "",
+    date: "TOTAL", in: "", out: "", seg: "", loc: "",
     worked: hm(totals.workedMinutes), expected: hm(totals.expectedMinutes), balance: hm(totals.balanceMinutes),
   }, { bold: true });
 

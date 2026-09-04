@@ -69,9 +69,10 @@ function render() {
   const left = expected - committed;
 
   el.mpDot.className = "mp-dot" + (open ? " is-in" : "");
-  el.mpState.textContent = open
+  const openLoc = open ? locLabel(state.locationLabel) : "";
+  el.mpState.textContent = (open
     ? T("ta.pr.stateIn", { since: fmtTime(state.since), elapsed: fmtMins(openMinutes()) })
-    : T("ta.pr.stateOut");
+    : T("ta.pr.stateOut")) + (openLoc ? ` · ${openLoc}` : "");
 
   el.mpClockBtn.textContent = open ? T("ta.pr.clockOut") : T("ta.pr.clockIn");
   el.mpClockBtn.className = "mp-clock-btn" + (open ? " is-out" : "");
