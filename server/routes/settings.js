@@ -30,6 +30,9 @@ const router = express.Router();
 
 router.use(requireAdmin);
 
+// Settings → Email: DB-managed outbound-mail transports.
+router.use("/email-transports", require("./emailTransports"));
+
 async function employeeName(id) {
   try {
     const { rows } = await pool.query(

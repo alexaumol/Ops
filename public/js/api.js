@@ -218,6 +218,19 @@ const HITT_API = (() => {
     setAppLanguage: (language) =>
       request("/api/branding/language", { method: "PUT", body: JSON.stringify({ language }) }),
 
+    // Settings → Email: DB-managed outbound-mail transports (admin only)
+    getEmailTransports: () => request("/api/settings/email-transports"),
+    createEmailTransport: (payload) =>
+      request("/api/settings/email-transports", { method: "POST", body: JSON.stringify(payload) }),
+    updateEmailTransport: (id, payload) =>
+      request(`/api/settings/email-transports/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
+    deleteEmailTransport: (id) =>
+      request(`/api/settings/email-transports/${id}`, { method: "DELETE" }),
+    testEmailTransport: (id, to) =>
+      request(`/api/settings/email-transports/${id}/test`, { method: "POST", body: JSON.stringify({ to }) }),
+    setDefaultEmailTransport: (id) =>
+      request("/api/settings/email-transports/default", { method: "PUT", body: JSON.stringify({ id }) }),
+
     getEntities: () => request("/api/entities"),
     getEntity: (id) => request(`/api/entities/${id}`),
     createEntity: (payload) =>

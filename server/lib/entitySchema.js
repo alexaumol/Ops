@@ -24,6 +24,11 @@ function ensureEntitySchema() {
       //                  then the env default.
       await pool.query(`ALTER TABLE entity ADD COLUMN IF NOT EXISTS mailtransport varchar(8)`);
       await pool.query(`ALTER TABLE entity ADD COLUMN IF NOT EXISTS mailsender varchar(255)`);
+      // Points at an email_transports row (Settings → Email). NULL → the
+      // app-level default in appconfig 'email.default_transport_id'. The FK is
+      // added by migration 1788518953947; this bare column keeps a
+      // migration-less path working.
+      await pool.query(`ALTER TABLE entity ADD COLUMN IF NOT EXISTS mail_transport_id bigint`);
     })().catch((err) => {
       ready = null;
       throw err;

@@ -48,17 +48,14 @@
  * businesspartners.languageid (tax company's BP first, then the project's).
  *
  * "Send by email" (Access's cmdSendToEmailPDF): GET/POST /invoices/:id/email.
- * The PDF is attached; the sender mailbox + transport come from the billing
- * entity record (Settings -> Entities -> "Invoice email"), via
- * invoiceSenderFor / invoiceMailChannel:
- *   mailsender     the From mailbox (falls back to the entity's invoicing
- *                  email, then GRAPH_MAIL_SENDER / SMTP_FROM)
- *   mailtransport  'graph' (lib/graph.js) or 'smtp' (lib/mailer.js) — pick
- *                  SMTP when the sender mailbox isn't in the M365 tenant, so
- *                  Graph can't send as it. Unset -> inferred from which
- *                  transport is configured.
- * The user confirms From/recipient/subject/body in a dialog before the POST
- * — nothing is sent without that.
+ * The PDF is attached; the transport (a Microsoft Graph app or an SMTP
+ * account, with its secret encrypted at rest) comes from the billing entity
+ * via server/lib/emailTransport.js — entity.mail_transport_id, else the
+ * app-level default (appconfig 'email.default_transport_id'). The From
+ * mailbox is the transport's from_address, overridden by entity.mailsender
+ * when set. If neither the entity nor the default names a transport the
+ * endpoint returns 503. The user confirms From/recipient/subject/body in a
+ * dialog before the POST — nothing is sent without that.
  * ---------------------------------------------------------------------------
  */
 const express = require("express");
@@ -67,8 +64,7 @@ const { requireModuleAccess } = require("../lib/permissions");
 const { streamInvoicePdf, renderInvoicePdfBuffer } = require("../lib/invoicePdf");
 const { invoiceLabels, fillTemplate } = require("../lib/invoiceDocText");
 const { ensureEntitySchema } = require("../lib/entitySchema");
-const { graphMailConfigured, sendMail } = require("../lib/graph");
-const { smtpConfigured, sendSmtpMail } = require("../lib/mailer");
+const emailTransport = require("../lib/emailTransport");
 const { logAudit } = require("../lib/audit");
 const externalSync = require("../lib/externalSync");
 const { issueInvoice, cancelInvoice, retryRecord, checkRecipient, featureEnabled: verifactuOn, IssueError } = require("../lib/verifactu/issue");
@@ -456,7 +452,8 @@ async function loadInvoiceForPdf(invoiceId) {
             ent.legalname AS "entityLegalName", ent.vatnumber AS "entityVat",
             ent.address AS "entityAddress", ent.emailinvoicing AS "entityEmail",
             ent.webpage AS "entityWeb", ent.logo AS "entityLogo",
-            ent.mailtransport AS "entityMailTransport", ent.mailsender AS "entityMailSender",
+            ent.id AS "entityId", ent.mail_transport_id AS "entityMailTransportId",
+            ent.mailsender AS "entityMailSender",
             d.emailedat AS "emailedAt", COALESCE(d.emailedcount, 0) AS "emailedCount", d.emailedto AS "emailedTo",
             COALESCE(tcbp.languageid, pbp.languageid)::int AS "languageId",
             COALESCE(eba.bankname, ba.bankname) AS "bankName",
@@ -533,34 +530,15 @@ const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const splitAddrs = (v) =>
   String(v || "").split(/[;,]/).map((s) => s.trim()).filter(Boolean);
 
-// The mailbox an invoice email is sent from. Per entity (Settings →
-// Entities → "Invoice email"), not by entity name. Preference:
-//   1. the entity's configured sender mailbox
-//   2. the entity's invoicing email
-//   3. a server default (GRAPH_MAIL_SENDER, then SMTP_FROM)
-const DEFAULT_INVOICE_SENDER = process.env.GRAPH_MAIL_SENDER || process.env.SMTP_FROM || "";
-function invoiceSenderFor(data) {
-  const d = data || {};
-  return d.entityMailSender || d.entityEmail || DEFAULT_INVOICE_SENDER || "";
+// Resolve the DB email transport for an invoice (entity.mail_transport_id,
+// else the app-level default). entity.mailsender overrides the From.
+function resolveInvoiceTransport(data) {
+  return emailTransport.resolveForEntity(pool, {
+    entityId: data.entityId,
+    entityMailTransportId: data.entityMailTransportId,
+    entityMailSender: data.entityMailSender,
+  });
 }
-
-// Which transport carries an invoice email — the entity's configured
-// transport (Settings → Entities), else inferred: a sender mailbox that
-// isn't in the M365 tenant can't go through Graph, so fall back to SMTP
-// when only SMTP is configured, otherwise Graph.
-function invoiceMailChannel(data) {
-  const explicit = String((data && data.entityMailTransport) || "").trim().toLowerCase();
-  if (explicit === "smtp" || explicit === "graph") return explicit;
-  if (!graphMailConfigured() && smtpConfigured()) return "smtp";
-  return "graph";
-}
-function invoiceMailReady(channel) {
-  return channel === "smtp" ? smtpConfigured() : graphMailConfigured();
-}
-const MAIL_UNAVAILABLE_MSG = {
-  smtp: "Invoice email over SMTP isn't configured on the server — set SMTP_HOST / SMTP_PORT / SMTP_USER / SMTP_PASS.",
-  graph: "Invoice email over Microsoft Graph isn't configured on the server — the Graph app registration and its Mail.Send permission are required.",
-};
 
 // GET /api/invoicing/invoices/:id/email — the prefilled recipient / subject /
 // body for the "email this invoice" dialog, in the partner's language.
@@ -569,9 +547,19 @@ router.get("/invoices/:id/email", requireModuleAccess("invoicing"), async (req, 
     const data = await loadInvoiceForPdf(req.params.id);
     if (!data) return res.status(404).json({ error: "not_found" });
     const tokens = { InvoiceCode: data.invoicecode || "", Entity: data.entityLabel || data.entityLegalName || "" };
-    const channel = invoiceMailChannel(data);
+
+    let transport = null;
+    let mailError = null;
+    try {
+      transport = await resolveInvoiceTransport(data);
+    } catch (err) {
+      if (err instanceof emailTransport.NoTransportError) mailError = err.message;
+      else throw err;
+    }
+
     res.json({
-      from: invoiceSenderFor(data),
+      from: transport ? transport.from : (data.entityMailSender || data.entityEmail || ""),
+      transportName: transport ? transport.name : null,
       to: data.taxCompanyEmail || "",
       subject: fillTemplate(data.labels.get("strSubject", "[{Entity}] New invoice"), tokens),
       body: fillTemplate(
@@ -580,8 +568,8 @@ router.get("/invoices/:id/email", requireModuleAccess("invoicing"), async (req, 
       ),
       invoiceCode: data.invoicecode || null,
       languageId: data.languageId,
-      channel,
-      mailConfigured: invoiceMailReady(channel),
+      mailConfigured: !!transport,
+      mailError,
       emailedAt: data.emailedAt || null,
       emailedCount: Number(data.emailedCount) || 0,
       emailedTo: data.emailedTo || null,
@@ -593,10 +581,10 @@ router.get("/invoices/:id/email", requireModuleAccess("invoicing"), async (req, 
 });
 
 // POST /api/invoicing/invoices/:id/email  { to, cc, subject, body }
-// Renders the invoice PDF and sends it as an attachment. FHiTT invoices go
-// over SMTP (lib/mailer.js), everything else through Microsoft Graph
-// (lib/graph.js). All four body fields are optional — anything omitted
-// falls back to the language-aware default.
+// Renders the invoice PDF and sends it as an attachment through the entity's
+// email transport (Settings → Email, via lib/emailTransport.js). All four
+// body fields are optional — anything omitted falls back to the
+// language-aware default.
 router.post("/invoices/:id/email", requireModuleAccess("invoicing"), async (req, res) => {
   let data;
   try {
@@ -607,9 +595,15 @@ router.post("/invoices/:id/email", requireModuleAccess("invoicing"), async (req,
   }
   if (!data) return res.status(404).json({ error: "not_found" });
 
-  const channel = invoiceMailChannel(data);
-  if (!invoiceMailReady(channel)) {
-    return res.status(503).json({ error: "mail_unavailable", message: MAIL_UNAVAILABLE_MSG[channel] });
+  let transport;
+  try {
+    transport = await resolveInvoiceTransport(data);
+  } catch (err) {
+    if (err instanceof emailTransport.NoTransportError) {
+      return res.status(503).json({ error: "mail_unavailable", message: err.message });
+    }
+    console.error("[POST /invoices/:id/email] transport resolve failed:", err.message);
+    return res.status(502).json({ error: "mail_unavailable", message: "Could not load the email transport — check Settings → Email and the server logs." });
   }
 
   try {
@@ -642,9 +636,8 @@ router.post("/invoices/:id/email", requireModuleAccess("invoicing"), async (req,
       return res.status(500).json({ error: "pdf_failed", message: "Could not render the invoice PDF." });
     }
 
-    const from = invoiceSenderFor(data);
     const mailArgs = {
-      from,
+      from: transport.from,
       to,
       cc,
       subject,
@@ -654,13 +647,12 @@ router.post("/invoices/:id/email", requireModuleAccess("invoicing"), async (req,
       ],
     };
     try {
-      if (channel === "smtp") await sendSmtpMail(mailArgs);
-      else await sendMail(mailArgs);
+      await emailTransport.sendVia(transport, mailArgs);
     } catch (err) {
-      console.error(`[POST /invoices/:id/email] send failed (${channel}):`, err.message);
+      console.error(`[POST /invoices/:id/email] send failed (${transport.kind} "${transport.name}"):`, err.message);
       return res.status(502).json({
         error: "send_failed",
-        message: "The email could not be sent — check the server's mail configuration and logs.",
+        message: "The email could not be sent — check the transport settings (Settings → Email) and the server logs.",
       });
     }
 
@@ -679,10 +671,10 @@ router.post("/invoices/:id/email", requireModuleAccess("invoicing"), async (req,
       console.error("[POST /invoices/:id/email] could not record the send:", err.message);
     }
 
-    res.json({ sent: true, from, to, cc, emailedAt: sentAt });
+    res.json({ sent: true, from: transport.from, to, cc, emailedAt: sentAt });
     logAudit(req, {
       kind: "invoice.email",
-      desc: `Emailed invoice ${data.invoicecode || `#${req.params.id}`} from ${from} to ${recipients} (${channel})`,
+      desc: `Emailed invoice ${data.invoicecode || `#${req.params.id}`} from ${transport.from} to ${recipients} (transport "${transport.name}")`,
       level: 2,
     });
   } catch (err) {

@@ -13,12 +13,10 @@
  *    Missing any -> graphConfigured() false; callers skip folder creation
  *    rather than fail project creation.
  *
- * 2. Invoice email (sendMail, from routes/invoicing.js) — Mail.Send only,
- *    kept off the OneDrive credential:
- *      GRAPH_MAIL_TENANT_ID  GRAPH_MAIL_CLIENT_ID  GRAPH_MAIL_CLIENT_SECRET
- *    Each falls back to the matching GRAPH_* var when unset, so a single
- *    shared app still works if you don't split them.
- *    Missing all -> graphMailConfigured() false; the email endpoint 503s.
+ * 2. Invoice email (sendMail, from routes/invoicing.js) — Mail.Send only.
+ *    Its credentials now come from a DB-managed email transport
+ *    (server/lib/emailTransport.js, Settings -> Email), passed to sendMail()
+ *    as the second argument — no GRAPH_MAIL_* env vars.
  * ---------------------------------------------------------------------------
  */
 const TENANT_ID = process.env.GRAPH_TENANT_ID;
@@ -27,15 +25,7 @@ const CLIENT_SECRET = process.env.GRAPH_CLIENT_SECRET;
 const ONEDRIVE_USER = process.env.GRAPH_ONEDRIVE_USER;
 const ONEDRIVE_FOLDER = process.env.GRAPH_ONEDRIVE_FOLDER;
 
-// Outbound email uses its OWN app registration (Mail.Send only) — keeping
-// it off the OneDrive app's Sites.Selected credential. Falls back to the
-// GRAPH_* app when the GRAPH_MAIL_* vars aren't set.
-const MAIL_TENANT_ID = process.env.GRAPH_MAIL_TENANT_ID || TENANT_ID;
-const MAIL_CLIENT_ID = process.env.GRAPH_MAIL_CLIENT_ID || CLIENT_ID;
-const MAIL_CLIENT_SECRET = process.env.GRAPH_MAIL_CLIENT_SECRET || CLIENT_SECRET;
-
 const ONEDRIVE_CREDS = { tenantId: TENANT_ID, clientId: CLIENT_ID, clientSecret: CLIENT_SECRET };
-const MAIL_CREDS = { tenantId: MAIL_TENANT_ID, clientId: MAIL_CLIENT_ID, clientSecret: MAIL_CLIENT_SECRET };
 
 function graphConfigured() {
   return !!(TENANT_ID && CLIENT_ID && CLIENT_SECRET && ONEDRIVE_USER && ONEDRIVE_FOLDER);
@@ -225,44 +215,34 @@ async function createProjectFolder(folderName, location) {
  * ------------------------------------------------------------------------
  * Used by the invoicing module's "email this invoice PDF" action.
  *
- * Its OWN confidential app registration — GRAPH_MAIL_CLIENT_ID /
- * GRAPH_MAIL_CLIENT_SECRET / GRAPH_MAIL_TENANT_ID — with only the Mail.Send
- * Application permission (admin-consented), ideally scoped with an
- * application access policy to just invoices@hittbcn.com. Kept separate
- * from the OneDrive app so that Sites.Selected credential doesn't also
- * carry mail rights. If the GRAPH_MAIL_* vars are unset it falls back to
- * the GRAPH_* (OneDrive) app.
+ * Credentials come from a DB-managed transport (Settings -> Email,
+ * server/lib/emailTransport.js) — a confidential app registration with only
+ * the Mail.Send Application permission (admin-consented), ideally scoped
+ * with an application access policy to the sender mailbox. They are passed
+ * as the `creds` argument: { tenantId, clientId, clientSecret, sender }.
  *
- * The sender mailbox is passed per-call (`from`). Only HiTT / HiTT-OSM
- * invoices go through Graph (from invoices@hittbcn.com, a mailbox in the
- * M365 tenant); FHiTT's invoices@fhitt.org is hosted at IONOS and goes over
- * SMTP instead (lib/mailer.js). GRAPH_MAIL_SENDER is only the last-resort
- * fallback when a caller passes no `from`.
+ * The sender mailbox is `from` (per-call override) or `creds.sender`.
  *
  * When Mail.Send isn't granted / the app can't send as that mailbox, the
- * caller gets a clear 5xx — nothing is sent silently.
+ * caller gets a clear error — nothing is sent silently.
  * ===================================================================== */
-const MAIL_SENDER = process.env.GRAPH_MAIL_SENDER || ONEDRIVE_USER || null;
-
-function graphMailConfigured() {
-  return !!(MAIL_TENANT_ID && MAIL_CLIENT_ID && MAIL_CLIENT_SECRET);
-}
 
 // Sends one message.
-//   from        : sender mailbox (UPN / shared-mailbox address). Falls back
-//                 to GRAPH_MAIL_SENDER, then GRAPH_ONEDRIVE_USER.
-//   to / cc     : string or string[] of addresses
-//   subject     : string
-//   text / html : body (text unless html is given)
-//   attachments : [{ filename, contentType, content }] where content is a
-//                 Buffer or a base64 string
-async function sendMail({ from, to, cc, subject, text, html, attachments = [], replyTo }) {
-  if (!graphMailConfigured()) {
-    throw new Error("Graph mail not configured (missing GRAPH_MAIL_CLIENT_ID / GRAPH_MAIL_CLIENT_SECRET / GRAPH_MAIL_TENANT_ID)");
+//   mailArgs.from        : sender mailbox override (else creds.sender)
+//   mailArgs.to / cc     : string or string[] of addresses
+//   mailArgs.subject     : string
+//   mailArgs.text / html : body (text unless html is given)
+//   mailArgs.attachments : [{ filename, contentType, content }] where content
+//                          is a Buffer or a base64 string
+//   creds  : { tenantId, clientId, clientSecret, sender }
+async function sendMail({ from, to, cc, subject, text, html, attachments = [], replyTo }, creds = {}) {
+  const { tenantId, clientId, clientSecret } = creds;
+  if (!tenantId || !clientId || !clientSecret) {
+    throw new Error("Graph mail: transport is missing tenant id / client id / client secret");
   }
-  const sender = (from && String(from).trim()) || MAIL_SENDER;
+  const sender = (from && String(from).trim()) || (creds.sender && String(creds.sender).trim());
   if (!sender) {
-    throw new Error("sendMail: no sender mailbox (pass `from`, or set GRAPH_MAIL_SENDER)");
+    throw new Error("sendMail: no sender mailbox (transport has no From address)");
   }
   const list = (v) => (Array.isArray(v) ? v : v ? [v] : []).map((s) => String(s).trim()).filter(Boolean);
   const recip = (a) => ({ emailAddress: { address: a } });
@@ -285,7 +265,7 @@ async function sendMail({ from, to, cc, subject, text, html, attachments = [], r
   }
   if (!message.toRecipients.length) throw new Error("sendMail: no recipient");
 
-  const token = await getToken(MAIL_CREDS);
+  const token = await getToken({ tenantId, clientId, clientSecret });
   const res = await fetch(
     `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(sender)}/sendMail`,
     {
@@ -303,7 +283,6 @@ async function sendMail({ from, to, cc, subject, text, html, attachments = [], r
 module.exports = {
   graphConfigured,
   createProjectFolder,
-  graphMailConfigured,
   sendMail,
   // Settings → Sync backup engine
   syncConfigured,

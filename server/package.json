@@ -11,6 +11,7 @@
     "migrate": "node scripts/migrate.js up",
     "migrate:down": "node scripts/migrate.js down",
     "migrate:create": "node-pg-migrate create -m migrations --migration-file-language sql --",
+    "secrets:test": "node --test scripts/secrets.test.js",
     "presence:verify": "node scripts/presence-verify.js",
     "presence:purge": "node scripts/presence-purge.js",
     "sync:external": "node scripts/sync-external.js",
