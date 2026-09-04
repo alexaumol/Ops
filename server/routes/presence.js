@@ -277,7 +277,11 @@ router.post("/clock", requireModuleAccess("presence"), async (req, res) => {
   if (kind !== "in" && kind !== "out") {
     return res.status(400).json({ error: "validation_error", message: "kind debe ser 'in' o 'out'." });
   }
-  const location = typeof req.body?.location === "string" ? req.body.location.trim().slice(0, 40) || null : null;
+  // A clock-in always records a location — the frontends send one (web
+  // defaults to "office", mobile to "remote"); "office" is the fallback for
+  // any caller that omits it. A clock-out carries none (it inherits the
+  // open segment's).
+  const location = (typeof req.body?.location === "string" && req.body.location.trim().slice(0, 40)) || "office";
   const client = await pool.connect();
   try {
     await client.query("BEGIN");

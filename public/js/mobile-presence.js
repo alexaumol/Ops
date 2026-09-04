@@ -124,9 +124,9 @@ async function doClock() {
   busy = true;
   el.mpClockBtn.disabled = true;
   try {
-    await HITT_API.presenceClock({ kind, location: el.mpLocation.value || undefined });
+    await HITT_API.presenceClock({ kind, location: el.mpLocation.value || "remote" });
     toast(kind === "in" ? T("mp.clockedIn") : T("mp.clockedOut"), "green");
-    if (kind === "out") el.mpLocation.value = "";
+    if (kind === "out") el.mpLocation.value = "remote";
   } catch (err) {
     toast(err.message || T("ta.pr.clockFail"), "red");
   } finally {
