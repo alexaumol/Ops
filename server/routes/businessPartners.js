@@ -43,6 +43,15 @@ async function bpAuditLabel(id) {
   }
 }
 
+// One line in the edit modal's History panel (GET /:id/history). `changedby`
+// is the authenticated user (req.hittUser), not a body param.
+async function logBpChange(runner, bpId, req, summary) {
+  await runner.query(
+    `INSERT INTO businesspartnerchangelog (businesspartnerid, changedat, changedby, summary) VALUES ($1, now(), $2, $3)`,
+    [bpId, req.hittUser?.employeeId || null, summary]
+  );
+}
+
 // GET /api/business-partners/lookups
 router.get("/lookups", async (req, res) => {
   try {
@@ -78,14 +87,17 @@ router.get("/", requireModuleAccess("business-partners"), async (req, res) => {
               COALESCE(proj.alive, 0) AS "projectsAlive",
               COALESCE(proj.dead, 0) AS "projectsDead",
               COALESCE(proj.total, 0) AS "projectsTotal",
-              COALESCE(tc.n, 0)::int AS "taxCompanyCount"
+              COALESCE(tc.n, 0)::int AS "taxCompanyCount",
+              tc.names AS "taxCompanyNames"
        FROM businesspartners bp
        LEFT JOIN entity ent ON ent.id = bp.entityid::bigint
        LEFT JOIN companytypes ct ON ct.id = bp.companytypeid
        LEFT JOIN addresses a ON a.businesspartnerid = bp.id
        LEFT JOIN countries c ON c.id = a.countryid::bigint
        LEFT JOIN LATERAL (
-         SELECT COUNT(*) AS n FROM taxcompanies WHERE businesspartnerid::bigint = bp.id
+         SELECT COUNT(*) AS n,
+                string_agg(NULLIF(TRIM(taxcompanyname), ''), ' · ' ORDER BY taxcompanyname) AS names
+         FROM taxcompanies WHERE businesspartnerid::bigint = bp.id
        ) tc ON true
        LEFT JOIN LATERAL (
          SELECT
@@ -96,7 +108,13 @@ router.get("/", requireModuleAccess("business-partners"), async (req, res) => {
          LEFT JOIN projectstatus ps ON ps.id = p.projectstatusid::bigint
          WHERE p.busspartnerid::bigint = bp.id
        ) proj ON true
-       WHERE $1 = '' OR bp.bpname ILIKE '%' || $1 || '%'
+       WHERE $1 = ''
+          OR bp.bpname ILIKE '%' || $1 || '%'
+          OR EXISTS (
+               SELECT 1 FROM taxcompanies t
+               WHERE t.businesspartnerid::bigint = bp.id
+                 AND t.taxcompanyname ILIKE '%' || $1 || '%'
+             )
        ORDER BY bp.bpname
        LIMIT 500`,
       [q]
@@ -531,25 +549,33 @@ async function writeTaxCompanyAddress(client, tcId, bpId, sameAddress, address) 
     addr.phonenumber || null, addr.phonenumber2 || null, addr.countryid || null, !!sameAddress,
   ];
   const existing = await client.query(
-    `SELECT id FROM taxcompaniesaddresses WHERE taxcompanyid = $1::double precision ORDER BY id LIMIT 1`,
+    `SELECT id, streetname, city, state, zipcode, phonenumber, phonenumber2, countryid, sameaddress
+       FROM taxcompaniesaddresses WHERE taxcompanyid = $1::double precision ORDER BY id LIMIT 1`,
     [tcId]
   );
   if (existing.rows.length) {
+    const p = existing.rows[0];
+    const changed =
+      (vals[0] || null) !== (p.streetname || null) || (vals[1] || null) !== (p.city || null) ||
+      (vals[2] || null) !== (p.state || null) || (vals[3] || null) !== (p.zipcode || null) ||
+      (vals[4] || null) !== (p.phonenumber || null) || (vals[5] || null) !== (p.phonenumber2 || null) ||
+      String(vals[6] ?? null) !== String(p.countryid ?? null) || vals[7] !== !!p.sameaddress;
     await client.query(
       `UPDATE taxcompaniesaddresses SET
          streetname=$1, city=$2, state=$3, zipcode=$4,
          phonenumber=$5, phonenumber2=$6, countryid=$7, sameaddress=$8
        WHERE id = $9`,
-      [...vals, existing.rows[0].id]
+      [...vals, p.id]
     );
-  } else {
-    await client.query(
-      `INSERT INTO taxcompaniesaddresses
-         (taxcompanyid, streetname, city, state, zipcode, phonenumber, phonenumber2, countryid, sameaddress)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-      [tcId, ...vals]
-    );
+    return changed;
   }
+  await client.query(
+    `INSERT INTO taxcompaniesaddresses
+       (taxcompanyid, streetname, city, state, zipcode, phonenumber, phonenumber2, countryid, sameaddress)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+    [tcId, ...vals]
+  );
+  return vals.slice(0, 7).some((v) => v != null);
 }
 
 // GET /api/business-partners/:id/tax-companies
@@ -612,6 +638,7 @@ router.post("/:id/tax-companies", async (req, res) => {
     );
     const taxCompany = rows[0];
     await writeTaxCompanyAddress(client, taxCompany.id, req.params.id, sameAddress, address);
+    await logBpChange(client, req.params.id, req, `Tax company added: ${taxCompany.taxcompanyname}`);
     await client.query("COMMIT");
     res.status(201).json(taxCompany);
     bpAuditLabel(req.params.id).then((bp) =>
@@ -633,25 +660,40 @@ router.patch("/:id/tax-companies/:tcId", async (req, res) => {
     return res.status(400).json({ error: "validation_error", message: "taxcompanyname is required" });
   }
   const fiscal = fiscalFields(req.body);
+  const nm = taxcompanyname.trim();
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-    const { rowCount } = await client.query(
-      `UPDATE taxcompanies SET taxcompanyname = $1, vatnumber = $2, emailinvoicing = $3,
-              fiscalidtype = $6, fiscalcountry = $7
-       WHERE id = $4 AND businesspartnerid = $5::double precision`,
-      [taxcompanyname.trim(), vatnumber || null, emailinvoicing || null, req.params.tcId, req.params.id,
-       fiscal.fiscalidtype, fiscal.fiscalcountry]
+    const { rows: prevRows } = await client.query(
+      `SELECT taxcompanyname, vatnumber, emailinvoicing
+         FROM taxcompanies WHERE id = $1 AND businesspartnerid = $2::double precision`,
+      [req.params.tcId, req.params.id]
     );
-    if (!rowCount) {
+    if (!prevRows.length) {
       await client.query("ROLLBACK");
       return res.status(404).json({ error: "not_found", message: "Tax company not found on this business partner" });
     }
-    await writeTaxCompanyAddress(client, req.params.tcId, req.params.id, sameAddress, address);
+    const prev = prevRows[0];
+    await client.query(
+      `UPDATE taxcompanies SET taxcompanyname = $1, vatnumber = $2, emailinvoicing = $3,
+              fiscalidtype = $6, fiscalcountry = $7
+       WHERE id = $4 AND businesspartnerid = $5::double precision`,
+      [nm, vatnumber || null, emailinvoicing || null, req.params.tcId, req.params.id,
+       fiscal.fiscalidtype, fiscal.fiscalcountry]
+    );
+    const addrChanged = await writeTaxCompanyAddress(client, req.params.tcId, req.params.id, sameAddress, address);
+
+    const changes = [];
+    if (nm !== (prev.taxcompanyname || "")) changes.push(`Tax company renamed from "${prev.taxcompanyname || ""}" to "${nm}"`);
+    if ((vatnumber || null) !== (prev.vatnumber || null)) changes.push(`Tax company "${nm}": VAT changed from "${prev.vatnumber || ""}" to "${vatnumber || ""}"`);
+    if ((emailinvoicing || null) !== (prev.emailinvoicing || null)) changes.push(`Tax company "${nm}": invoicing email changed from "${prev.emailinvoicing || ""}" to "${emailinvoicing || ""}"`);
+    if (addrChanged) changes.push(`Tax company "${nm}": address updated`);
+    for (const s of changes) await logBpChange(client, req.params.id, req, s);
+
     await client.query("COMMIT");
     res.status(204).end();
     bpAuditLabel(req.params.id).then((bp) =>
-      logAudit(req, { kind: "bp.taxcompany.update", desc: `BP "${bp}": tax company updated "${taxcompanyname.trim()}"` }));
+      logAudit(req, { kind: "bp.taxcompany.update", desc: `BP "${bp}": tax company updated "${nm}"` }));
   } catch (err) {
     await client.query("ROLLBACK");
     console.error("[PATCH /api/business-partners/:id/tax-companies/:tcId] DB error:", err.message);
@@ -689,6 +731,7 @@ router.delete("/:id/tax-companies/:tcId", async (req, res) => {
       await client.query("ROLLBACK");
       return res.status(404).json({ error: "not_found", message: "Tax company not found on this business partner" });
     }
+    await logBpChange(client, req.params.id, req, `Tax company removed: ${rows[0].taxcompanyname || "—"}`);
     await client.query("COMMIT");
     res.status(204).end();
     bpAuditLabel(req.params.id).then((bp) =>

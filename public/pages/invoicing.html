@@ -46,6 +46,7 @@
         <button type="button" class="inv-flag-btn" data-ivflag="aeatError" aria-pressed="false" data-i18n="inv.iv.flag.aeatError">AEAT error</button>
         <div class="inv-filter-spacer"></div>
         <input id="ivSearchBox" type="text" placeholder="Search description or business partner…" data-i18n-placeholder="inv.iv.search" />
+        <button type="button" id="ivNewInvoiceBtn" class="btn btn-primary" data-i18n="inv.iv.newInvoice">+ New invoice</button>
       </div>
 
       <div class="inv-table-wrap">
@@ -307,6 +308,7 @@
               <div class="inv-taxco-row">
                 <select id="invTaxCompany" class="field-input" disabled></select>
                 <button type="button" id="invTaxCompanyChange" class="btn btn-secondary" data-i18n="inv.f.change">Change</button>
+                <a id="invBpEdit" class="btn btn-secondary" target="_blank" rel="noopener" hidden data-i18n="inv.f.editBp">Edit BP</a>
               </div>
               <p id="invTaxCompanyHint" class="inv-taxco-hint" data-i18n="inv.f.taxCompanyHint">Defaults to the project's tax company. “Change” overrides it for this invoice only.</p>
             </div>
@@ -415,6 +417,33 @@
           <tbody id="tcPickerBody"></tbody>
         </table>
         <div id="tcPickerEmpty" class="sub-empty hidden" data-i18n="inv.tcPicker.empty">No tax companies match.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================ PROJECT PICKER (new invoice) ============================ -->
+  <div id="projPickerOverlay" class="modal-overlay hidden">
+    <div class="modal-panel" style="max-width:760px;">
+      <div class="modal-head">
+        <h2 style="flex:1; font-size:1rem; font-weight:700; color:#fff; margin:0;" data-i18n="inv.projPicker.title">Choose a project for the invoice</h2>
+        <button id="projPickerClose" class="modal-head-btn modal-head-btn--close" title="Close">✕</button>
+      </div>
+      <div style="padding:0.75rem 1.1rem; border-bottom:1px solid var(--border-subtle);">
+        <input id="projPickerSearch" type="text" class="field-input" placeholder="Search by project code, name or business partner…" autocomplete="off" data-i18n-placeholder="inv.projPicker.search" />
+      </div>
+      <div class="modal-body" style="padding:0;">
+        <table class="mini-table tc-picker-table">
+          <thead>
+            <tr>
+              <th data-i18n="bp.col.project">Project</th>
+              <th data-i18n="inv.col.entity">Entity</th>
+              <th data-i18n="page.businessPartners.title">Business partner</th>
+              <th data-i18n="inv.col.projectStatus">Project status</th>
+            </tr>
+          </thead>
+          <tbody id="projPickerBody"></tbody>
+        </table>
+        <div id="projPickerEmpty" class="sub-empty hidden" data-i18n="inv.projPicker.empty">No projects match.</div>
       </div>
     </div>
   </div>
