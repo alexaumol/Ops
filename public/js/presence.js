@@ -189,7 +189,7 @@ window.HITT_PRESENCE = (function () {
   async function doClock() {
     const kind = todayState?.open ? "out" : "in";
     try {
-      await HITT_API.presenceClock({ kind, location: el.prLocation.value || undefined });
+      await HITT_API.presenceClock({ kind, location: el.prLocation.value || "office" });
       await loadToday();
       await loadRegister();
     } catch (err) {
