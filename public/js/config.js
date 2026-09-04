@@ -102,9 +102,11 @@ window.HITT_CONFIG = {
     // server reports GET /api/chat/status as configured and the user has
     // access. Set to false to hide it on this instance regardless.
     chatEnabled: true,
-    // Veri*Factu (Spain e-invoicing). Off here — HITT is not on it yet.
-    // Mirror server FEATURE_VERIFACTU when turning it on.
-    verifactu: false,
+    // Veri*Factu (Spain e-invoicing). Mirror server FEATURE_VERIFACTU.
+    // On for sandbox testing — per-entity API keys + environment are set in
+    // Settings → Veri*Factu, so nothing goes to the AEAT until an entity is
+    // configured and enabled there.
+    verifactu: true,
   },
 
   APP_VERSION: "0.1.0-prototype",

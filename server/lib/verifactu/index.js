@@ -56,19 +56,27 @@ function configForEntity(entity) {
   const e = entity || {};
   const environment = (e.verifactu_environment || process.env.VERIFACTU_ENV || "sandbox").trim().toLowerCase();
   const apiKey = e.verifactu_api_key || null;
-  const issuerNif = mapping.normalizeFiscalId(e.vatnumber);
+  const entityNif = mapping.normalizeFiscalId(e.vatnumber);
+
+  // The Verify-Issuer-Id guard (rejects a call whose company NIF doesn't
+  // match the API-Key's) only makes sense in PRODUCTION. In sandbox the
+  // API-Key belongs to a shared test company (e.g. "EMPRESA DE PRUEBAS")
+  // whose NIF is deliberately not the entity's, so sending it would fail
+  // every call with 000007. `null` → bold.js omits the header.
+  const issuerNif = environment === "production" ? entityNif : null;
 
   let reason = null;
   if (!featureEnabled()) reason = "FEATURE_VERIFACTU is off";
   else if (!e.verifactu_enabled) reason = "entity has Veri*Factu disabled";
   else if (!apiKey) reason = "entity has no Veri*Factu API key";
-  else if (!issuerNif) reason = "entity has no VAT number (issuer NIF)";
+  else if (!entityNif) reason = "entity has no VAT number (issuer NIF)";
 
   return {
     provider: getProvider(),
     providerName: providerName(),
     apiKey,
     issuerNif,
+    entityNif,
     environment,
     enabled: reason === null,
     reason,
