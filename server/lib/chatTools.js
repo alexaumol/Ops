@@ -300,12 +300,15 @@ async function searchProjects({ situation, limit }) {
       WHERE i.projectid = p.id::double precision AND i.invoicestatusid IS DISTINCT FROM 6
     ) inv ON true
   `;
+  // "Material" gap: ignore rounding/near-complete — more than €50 AND more
+  // than 2% of the budget.
+  const MATERIAL_GAP = `GREATEST(50, qt.finalquotation * 0.02)`;
   const clauses = {
     closed_not_fully_invoiced: `WHERE LOWER(ps.projectstatusdesc) = 'closed'
       AND qt.finalquotation IS NOT NULL
-      AND COALESCE(inv.total, 0) < qt.finalquotation - 0.5`,
+      AND qt.finalquotation - COALESCE(inv.total, 0) > ${MATERIAL_GAP}`,
     delivered_over_budget: `WHERE qt.finalquotation IS NOT NULL
-      AND COALESCE(inv.total, 0) > qt.finalquotation + 0.5`,
+      AND COALESCE(inv.total, 0) - qt.finalquotation > ${MATERIAL_GAP}`,
     missing_budget: `WHERE p.notinvoiceable IS NOT TRUE AND qt.finalquotation IS NULL
       AND LOWER(COALESCE(ps.projectstatusdesc, '')) NOT IN ('closed', 'cancelled')`,
     no_invoices_yet: `WHERE p.notinvoiceable IS NOT TRUE
