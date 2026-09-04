@@ -104,7 +104,9 @@ async function loadPartners(){
 /* ============================== TABLE =================================== */
 function matchesSearch(p){
   if (!searchTerm) return true;
-  return String(p.name || '').toLowerCase().includes(searchTerm.toLowerCase());
+  const t = searchTerm.toLowerCase();
+  return String(p.name || '').toLowerCase().includes(t)
+      || String(p.taxCompanyNames || '').toLowerCase().includes(t);
 }
 
 function matchesFilters(p){
@@ -151,7 +153,7 @@ function renderTable(){
       </td>
       <td>
         ${p.taxCompanyCount
-          ? `<button data-bp-taxcos="${p.id}" class="bp-count-btn" title="${T("bp.tip.viewTaxCompanies")}">${p.taxCompanyCount}</button>`
+          ? `<button data-bp-taxcos="${p.id}" class="bp-count-btn" title="${escapeHtml(p.taxCompanyNames || T("bp.tip.viewTaxCompanies"))}">${p.taxCompanyCount}</button>`
           : `<span class="bp-count-zero">0</span>`}
       </td>
     </tr>

@@ -158,7 +158,7 @@ window.HITT_I18N_DICT = {
     "bp.createdContactsFailed": "Business partner created, but {count} contact(s) could not be saved — add them from the partner.",
 
     // business partners
-    "bp.search": "Search by name…",
+    "bp.search": "Search by name or tax company…",
     "bp.filter.liveProjects": "Only partners with live projects",
     "bp.new": "+ New business partner",
     "bp.col.name": "Name",
@@ -502,6 +502,7 @@ window.HITT_I18N_DICT = {
     "inv.section.billing": "Billing details",
     "inv.f.taxCompany": "Tax company (business partner to invoice)",
     "inv.f.change": "Change",
+    "inv.f.editBp": "Edit partner",
     "inv.f.taxCompanyHint": "Defaults to the project's tax company. “Change” overrides it for this invoice only.",
     "inv.f.billingAccount": "Billing account",
     "inv.f.purchaseOrder": "Purchase order",
@@ -1431,7 +1432,7 @@ window.HITT_I18N_DICT = {
     "bp.revertFailed": "No se han podido revertir {count} cambio(s); revisa el socio.",
     "bp.createdContactsFailed": "Socio comercial creado, pero no se han podido guardar {count} contacto(s); añádelos desde el socio.",
 
-    "bp.search": "Buscar por nombre…",
+    "bp.search": "Buscar por nombre o empresa fiscal…",
     "bp.filter.liveProjects": "Solo socios con proyectos activos",
     "bp.new": "+ Nuevo socio comercial",
     "bp.col.name": "Nombre",
@@ -1772,6 +1773,7 @@ window.HITT_I18N_DICT = {
     "inv.section.billing": "Datos de facturación",
     "inv.f.taxCompany": "Entidad fiscal (socio comercial a facturar)",
     "inv.f.change": "Cambiar",
+    "inv.f.editBp": "Editar socio",
     "inv.f.taxCompanyHint": "Por defecto es la entidad fiscal del proyecto. «Cambiar» la sustituye solo para esta factura.",
     "inv.f.billingAccount": "Cuenta de cobro",
     "inv.f.purchaseOrder": "Orden de compra",
@@ -2694,7 +2696,7 @@ window.HITT_I18N_DICT = {
     "bp.revertFailed": "No s'han pogut revertir {count} canvi(s); revisa el soci.",
     "bp.createdContactsFailed": "Soci comercial creat, però no s'han pogut desar {count} contacte(s); afegeix-los des del soci.",
 
-    "bp.search": "Cercar per nom…",
+    "bp.search": "Cercar per nom o empresa fiscal…",
     "bp.filter.liveProjects": "Només socis amb projectes actius",
     "bp.new": "+ Nou soci comercial",
     "bp.col.name": "Nom",
@@ -3035,6 +3037,7 @@ window.HITT_I18N_DICT = {
     "inv.section.billing": "Dades de facturació",
     "inv.f.taxCompany": "Entitat fiscal (soci comercial a facturar)",
     "inv.f.change": "Canviar",
+    "inv.f.editBp": "Editar soci",
     "inv.f.taxCompanyHint": "Per defecte és l'entitat fiscal del projecte. «Canviar» la substitueix només per a aquesta factura.",
     "inv.f.billingAccount": "Compte de cobrament",
     "inv.f.purchaseOrder": "Ordre de compra",

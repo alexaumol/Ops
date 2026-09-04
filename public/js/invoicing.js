@@ -1403,6 +1403,16 @@ async function openInvoiceModal(invoiceId){
   });
   invTaxCompanyPrev = taxSel.value;
 
+  // "Edit BP" — opens the project's business partner (owner of these tax
+  // companies) in the Business partners page, in a new tab.
+  const bpEdit = document.getElementById('invBpEdit');
+  if (activeProjectBpId) {
+    bpEdit.href = `business-partners.html?open=${encodeURIComponent(activeProjectBpId)}`;
+    bpEdit.hidden = false;
+  } else {
+    bpEdit.hidden = true;
+  }
+
   invoiceOverlay.classList.remove('hidden');
 }
 
