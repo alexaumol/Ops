@@ -61,9 +61,17 @@ function configForEntity(entity) {
   // The Verify-Issuer-Id guard (rejects a call whose company NIF doesn't
   // match the API-Key's) only makes sense in PRODUCTION. In sandbox the
   // API-Key belongs to a shared test company (e.g. "EMPRESA DE PRUEBAS")
-  // whose NIF is deliberately not the entity's, so sending it would fail
-  // every call with 000007. `null` → bold.js omits the header.
-  const issuerNif = environment === "production" ? entityNif : null;
+  // whose NIF is deliberately not the entity's, so sending it fails every
+  // call with 000007. `null` → bold.js omits the header.
+  //   default:               production → send, sandbox → omit
+  //   VERIFACTU_VERIFY_ISSUER=false → never send (escape hatch)
+  //   VERIFACTU_VERIFY_ISSUER=true  → always send
+  const guardOverride = (process.env.VERIFACTU_VERIFY_ISSUER || "").trim().toLowerCase();
+  const sendGuard =
+    guardOverride === "false" ? false :
+    guardOverride === "true" ? true :
+    environment === "production";
+  const issuerNif = sendGuard ? entityNif : null;
 
   let reason = null;
   if (!featureEnabled()) reason = "FEATURE_VERIFACTU is off";
