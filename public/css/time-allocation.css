@@ -452,6 +452,12 @@
 .ta-pr-badge.is-holiday { background: rgba(188,154,28,0.18); color: #8A6E12; }
 .ta-pr-badge.is-leave { background: rgba(110,143,90,0.18); color: #4C6B3A; }
 
+/* The shared .field-section box has no inner padding of its own — it relies
+   on a .field-grid child for that. This modal puts a bare label + input in
+   each section, so pad the section directly. */
+#prEntryOverlay .field-section { padding: 0.8rem 0.85rem; }
+#prEntryOverlay .field-section:last-child { margin-bottom: 0; }
+
 .ta-pr-entry-row { display: flex; gap: 0.4rem; align-items: center; margin-bottom: 0.4rem; }
 .ta-pr-entry-row .ta-pr-entry-kind { width: 6.5rem; }
 .ta-pr-entry-row .ta-pr-entry-time { width: 8rem; }
