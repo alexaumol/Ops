@@ -79,6 +79,10 @@ function projectFolderName(code, entityId, name) {
 
 const typeFolder = (type) => (type === "invoices" ? "Invoices" : "Tickets");
 
+// The provider a document backup would use, from cfg alone (under-project mode
+// files under the projects location, otherwise the other-docs location).
+const docProvider = (cfg) => (cfg.underProject ? cfg.projectsProvider : cfg.otherProvider);
+
 // Where a document's backup goes: { location, folder }.
 //   underProject ON  -> inside the project's folder, under the project
 //                       location (same place the folders are created). No
@@ -132,7 +136,10 @@ async function record(db, kind, refId, fields) {
 
 async function syncExpenseDoc(db, expenseId) {
   const cfg = await getSyncConfig(db);
-  if (!cfg.enabled || !graph.syncConfigured() || !cfg.docTypes.has("tickets")) return { skipped: true };
+  if (!cfg.enabled || !cfg.docTypes.has("tickets")) return { skipped: true };
+  const unsup = unsupportedProvider(docProvider(cfg));
+  if (unsup) { await record(db, "expense_doc", expenseId, { status: "error", error: unsup }); return { skipped: true }; }
+  if (!graph.syncConfigured()) return { skipped: true };
 
   let e;
   try {
@@ -151,13 +158,8 @@ async function syncExpenseDoc(db, expenseId) {
   if (!e || !e.ticketurl) return { skipped: true };
 
   const project = e.projectid ? { code: e.code, entityId: e.entityId, name: e.name } : null;
-  const { location, provider, folder } = backupTarget(cfg, "tickets", project);
+  const { location, folder } = backupTarget(cfg, "tickets", project);
   if (!location) return { skipped: true };
-  const unsupported = unsupportedProvider(provider);
-  if (unsupported) {
-    await record(db, "expense_doc", e.id, { sourceSig: e.ticketurl, target: location, status: "error", error: unsupported });
-    return { skipped: true };
-  }
   const ext = path.extname(e.ticketurl) || path.extname(e.picturetitle || "");
   const base = sanitize((e.picturetitle || "ticket").replace(/\.[^.]+$/, ""));
   const filename = `ticket_${e.id}_${base}${ext}`;
@@ -181,7 +183,10 @@ async function syncExpenseDoc(db, expenseId) {
 
 async function syncInvoiceDoc(db, invoiceId) {
   const cfg = await getSyncConfig(db);
-  if (!cfg.enabled || !graph.syncConfigured() || !cfg.docTypes.has("invoices")) return { skipped: true };
+  if (!cfg.enabled || !cfg.docTypes.has("invoices")) return { skipped: true };
+  const unsup = unsupportedProvider(docProvider(cfg));
+  if (unsup) { await record(db, "invoice_doc", invoiceId, { status: "error", error: unsup }); return { skipped: true }; }
+  if (!graph.syncConfigured()) return { skipped: true };
 
   let head;
   try {
@@ -199,16 +204,9 @@ async function syncInvoiceDoc(db, invoiceId) {
   }
   if (!head) return { skipped: true };
 
-  // Bail before the (costly) PDF render if this invoice's target provider
-  // isn't wired yet.
   const proj0 = head.projectid ? { code: head.code, entityId: head.entityId, name: head.name } : null;
   const t0 = backupTarget(cfg, "invoices", proj0);
   if (!t0.location) return { skipped: true };
-  const unsupported0 = unsupportedProvider(t0.provider);
-  if (unsupported0) {
-    await record(db, "invoice_doc", head.id, { target: t0.location, status: "error", error: unsupported0 });
-    return { skipped: true };
-  }
 
   // loadInvoiceForPdf lives on the invoicing route module — lazy-require so
   // the route ↔ lib hook doesn't form a load-time cycle.
@@ -246,7 +244,7 @@ async function syncInvoiceDoc(db, invoiceId) {
 async function syncProjectFolder(db, project) {
   // project: { id, code, entityId, name }
   const cfg = await getSyncConfig(db);
-  if (!cfg.enabled || !graph.syncConfigured() || !cfg.projectsLocation) return { skipped: true };
+  if (!cfg.enabled || !cfg.projectsLocation) return { skipped: true };
   if (!project || !project.code || project.entityId == null || project.entityId === "") return { skipped: true };
 
   const folderName = projectFolderName(project.code, project.entityId, project.name);
@@ -256,6 +254,7 @@ async function syncProjectFolder(db, project) {
     await record(db, "project_folder", project.id, { sourceSig: folderName, target: cfg.projectsLocation, status: "error", error: unsupported });
     return { skipped: true };
   }
+  if (!graph.syncConfigured()) return { skipped: true };
   try {
     const created = await graph.createProjectFolder(folderName, cfg.projectsLocation);
     await record(db, "project_folder", project.id, {
