@@ -39,6 +39,7 @@ window.HITT_PRESENCE = (function () {
   let todayState = null;            // GET /me/today
   let monthly = null;
   let ticker = null;
+  let clockLoc = "office";           // self-declared location for the next clock-in
   const el = {};
 
   function fmtTime(iso) {
@@ -55,6 +56,21 @@ window.HITT_PRESENCE = (function () {
   function locLabel(v) {
     if (!v) return "";
     return ["office", "remote", "client"].includes(v) ? T("ta.pr.loc." + v) : v;
+  }
+  // Location shown as an icon (office / remote / client); free text falls back
+  // to the plain word. CSV and PDF exports keep the localised words.
+  const LOC_ICON = {
+    office: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18"/><path d="M2 22h20M10 6h.01M14 6h.01M10 10h.01M14 10h.01M10 14h.01M14 14h.01M10 18h.01M14 18h.01"/></svg>',
+    remote: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M9 21v-6h6v6"/></svg>',
+    client: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>',
+  };
+  function locIcon(v) { return LOC_ICON[v] || ""; }
+  function locChip(v) {
+    if (!v) return "";
+    const lbl = esc(locLabel(v));
+    return LOC_ICON[v]
+      ? `<span class="ta-pr-loc-ic" role="img" title="${lbl}" aria-label="${lbl}">${LOC_ICON[v]}</span>`
+      : `<span class="ta-pr-seg-loc">${lbl}</span>`;
   }
   function fmtElapsed(sinceIso) {
     const s = Math.max(0, Math.floor((Date.now() - new Date(sinceIso)) / 1000));
@@ -106,6 +122,7 @@ window.HITT_PRESENCE = (function () {
       });
     }
 
+    setupLocPicker();
     el.prClockBtn.addEventListener("click", doClock);
     el.prPrevMonth.addEventListener("click", () => shiftMonth(-1));
     el.prNextMonth.addEventListener("click", () => shiftMonth(1));
@@ -157,6 +174,19 @@ window.HITT_PRESENCE = (function () {
   }
 
   /* ---------- clock ---------- */
+  // #prLocation is a 3-button icon toggle (office / remote / client).
+  function setupLocPicker() {
+    if (!el.prLocation) return;
+    const btns = [...el.prLocation.querySelectorAll("button[data-loc]")];
+    btns.forEach((b) => {
+      b.innerHTML = locIcon(b.dataset.loc);
+      b.addEventListener("click", () => {
+        clockLoc = b.dataset.loc;
+        btns.forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+      });
+    });
+  }
+
   async function loadToday() {
     if (viewingEmployee) return;
     try { todayState = await HITT_API.getPresenceToday(); } catch { todayState = null; }
@@ -171,16 +201,16 @@ window.HITT_PRESENCE = (function () {
     el.prClockBtn.textContent = open ? T("ta.pr.clockOut") : T("ta.pr.clockIn");
     el.prClockBtn.className = "btn " + (open ? "btn-secondary" : "btn-primary");
     el.prLocation.parentElement.style.display = open ? "none" : "";
-    const openLoc = open ? locLabel(todayState.locationLabel) : "";
-    el.prClockState.textContent = (open
+    const openChip = open ? locChip(todayState.locationLabel) : "";
+    el.prClockState.innerHTML = esc(open
       ? T("ta.pr.stateIn", { since: fmtTime(todayState.since), elapsed: fmtElapsed(todayState.since) })
-      : T("ta.pr.stateOut")) + (openLoc ? ` · ${openLoc}` : "");
+      : T("ta.pr.stateOut")) + (openChip ? ` ${openChip}` : "");
     const segs = todayState.segments || [];
     el.prToday.innerHTML = segs.length
       ? `<span class="ta-pr-today-label">${esc(T("ta.pr.todayLabel"))}</span> ` +
         segs.map((s) => {
-          const loc = locLabel(s.location);
-          return `<span class="ta-pr-seg">${fmtTime(s.in)}–${fmtTime(s.out)}${loc ? ` <span class="ta-pr-seg-loc">${esc(loc)}</span>` : ""}</span>`;
+          const chip = locChip(s.location);
+          return `<span class="ta-pr-seg">${fmtTime(s.in)}–${fmtTime(s.out)}${chip ? ` ${chip}` : ""}</span>`;
         }).join(" ") +
         ` · <strong>${fmtMins(todayState.workedMinutes)}</strong>`
       : "";
@@ -189,7 +219,7 @@ window.HITT_PRESENCE = (function () {
   async function doClock() {
     const kind = todayState?.open ? "out" : "in";
     try {
-      await HITT_API.presenceClock({ kind, location: el.prLocation.value || "office" });
+      await HITT_API.presenceClock({ kind, location: clockLoc || "office" });
       await loadToday();
       await loadRegister();
     } catch (err) {
@@ -242,14 +272,14 @@ window.HITT_PRESENCE = (function () {
         : (d.workedMinutes ? fmtMins(d.workedMinutes) : (badge || "—"));
       const balClass = d.balanceMinutes < 0 ? ' style="color:var(--danger);"' : "";
       const segs = d.segments
-        .map((s) => { const l = locLabel(s.location); return `${fmtTime(s.in)}–${fmtTime(s.out)}${l ? ` · ${l}` : ""}`; })
+        .map((s) => { const chip = locChip(s.location); return `${fmtTime(s.in)}–${fmtTime(s.out)}${chip ? ` ${chip}` : ""}`; })
         .join("   ");
       const future = d.date > today;
       return `<tr${d.date === today ? ' class="ta-pr-row-today"' : ""}>
         <td>${esc(weekdayLabel(d.date))} ${esc(d.date.slice(8))}${d.hasManual ? ` <span class="ta-pr-m" title="${esc(T('ta.pr.manualTip'))}">M</span>` : ""}</td>
         <td>${fmtTime(d.firstIn)}</td>
         <td>${d.open ? "—" : fmtTime(d.lastOut)}</td>
-        <td class="ta-pr-segcell">${esc(segs)}</td>
+        <td class="ta-pr-segcell">${segs}</td>
         <td style="text-align:right;">${workedCell}</td>
         <td style="text-align:right; color:var(--text-secondary);">${d.expectedMinutes ? fmtMins(d.expectedMinutes) : "—"}</td>
         <td style="text-align:right;"${balClass}>${d.workedMinutes || d.expectedMinutes ? fmtMins(d.balanceMinutes) : "—"}</td>

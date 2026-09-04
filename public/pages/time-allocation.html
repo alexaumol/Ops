@@ -160,14 +160,14 @@
           <span id="prClockState" data-i18n="ta.pr.loading">Loading…</span>
         </div>
         <div class="ta-pr-clock-actions">
-          <label class="ta-pr-loc">
+          <div class="ta-pr-loc" role="group" data-i18n-aria-label="ta.pr.location">
             <span data-i18n="ta.pr.location">Location</span>
-            <select id="prLocation">
-              <option value="office" selected data-i18n="ta.pr.loc.office">Office</option>
-              <option value="remote" data-i18n="ta.pr.loc.remote">Remote</option>
-              <option value="client" data-i18n="ta.pr.loc.client">Client site</option>
-            </select>
-          </label>
+            <div class="ta-pr-locpick" id="prLocation">
+              <button type="button" data-loc="office" aria-pressed="true"  data-i18n-title="ta.pr.loc.office"  data-i18n-aria-label="ta.pr.loc.office"></button>
+              <button type="button" data-loc="remote" aria-pressed="false" data-i18n-title="ta.pr.loc.remote" data-i18n-aria-label="ta.pr.loc.remote"></button>
+              <button type="button" data-loc="client" aria-pressed="false" data-i18n-title="ta.pr.loc.client" data-i18n-aria-label="ta.pr.loc.client"></button>
+            </div>
+          </div>
           <button class="btn btn-primary" id="prClockBtn" data-i18n="ta.pr.clockIn">Clock in</button>
         </div>
         <div class="ta-pr-today" id="prToday"></div>

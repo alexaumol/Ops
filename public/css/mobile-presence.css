@@ -112,17 +112,29 @@
   letter-spacing: 0.02em;
 }
 .mp-loc.hidden { display: none; }
-.mp-loc select {
-  flex: 1;
-  max-width: 60%;
-  font-size: 1rem;
-  padding: 0.6rem 0.7rem;
+.mp-locpick {
+  display: inline-flex;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
+  overflow: hidden;
   background: var(--bg-surface);
-  color: var(--text-primary);
-  min-height: 44px;
 }
+.mp-locpick button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  border-left: 1px solid var(--border-subtle);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.mp-locpick button:first-child { border-left: 0; }
+.mp-locpick button[aria-pressed="true"] { background: var(--hitt-teal, #5C757C); color: #fff; }
+.mp-locpick svg { display: block; width: 20px; height: 20px; }
 
 .mp-clock-btn {
   width: 100%;
@@ -162,6 +174,9 @@
 }
 .mp-seg-loc { color: var(--text-secondary); }
 .mp-seg-loc::before { content: "· "; }
+.mp-loc-ic { color: var(--text-secondary); white-space: nowrap; }
+.mp-loc-ic::before { content: "· "; }
+.mp-loc-ic svg { width: 13px; height: 13px; vertical-align: -2px; }
 
 .mp-foot {
   margin: 1rem 0 0;
