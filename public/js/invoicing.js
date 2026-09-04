@@ -55,6 +55,7 @@ let ALL_INVOICES = [];
 let ALL_VF_STATES = {}; // invoiceId → verifactu state, for the flat "Invoice view"
 let allInvoicesLoaded = false;
 const ivStatusSel = new Set();                // selected invoice-status labels; empty = all
+const ivFlags = new Set();                    // 'emailed' | 'aeatIssued' | 'aeatError' — each an AND filter
 let ivSearch = '';
 let ivSortColumn = 'updated';                 // default: most recently updated on top
 let ivSortDirection = 'desc';
@@ -458,6 +459,12 @@ function updateIvStatusLabel(){
 
 function ivMatches(inv){
   if (ivStatusSel.size && !ivStatusSel.has(String(inv.statusLabel || ''))) return false;
+  if (ivFlags.size) {
+    const vf = ALL_VF_STATES[inv.id] || {};
+    if (ivFlags.has('emailed') && !inv.emailedAt) return false;
+    if (ivFlags.has('aeatIssued') && !vf.issuedAt) return false;
+    if (ivFlags.has('aeatError') && vf.state !== 'error') return false;
+  }
   if (ivSearch) {
     const t = ivSearch.toLowerCase();
     const desc = String(inv.descriptionservice || '').replace(/<[^>]+>/g, ' ');
@@ -618,6 +625,19 @@ document.addEventListener('click', () => {
 document.getElementById('ivSearchBox').addEventListener('input', (e) => {
   ivSearch = e.target.value.trim();
   renderInvoiceViewTable();
+});
+
+// Delivery / AEAT quick filters. The two AEAT chips only make sense with the
+// Veri*Factu feature on.
+document.querySelectorAll('[data-ivflag]').forEach(btn => {
+  if (!VF_ON && btn.dataset.ivflag !== 'emailed') { btn.hidden = true; return; }
+  btn.addEventListener('click', () => {
+    const flag = btn.dataset.ivflag;
+    const on = !ivFlags.has(flag);
+    ivFlags[on ? 'add' : 'delete'](flag);
+    btn.setAttribute('aria-pressed', String(on));
+    renderInvoiceViewTable();
+  });
 });
 
 document.querySelectorAll('.inv-table--invoices th[data-sort]').forEach(th => {

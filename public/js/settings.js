@@ -52,6 +52,21 @@ function toast(msg, tone = "navy") {
   setTimeout(() => el.remove(), 3000);
 }
 
+function empInitials(emp) {
+  const name = (emp.name || emp.username || "").trim();
+  return name && HITT_AUTH?.initials ? HITT_AUTH.initials({ displayName: name }) : (name[0] || "?").toUpperCase();
+}
+
+// One toggle cell: the switch on top, a small state word under it, so every
+// toggle column lines up (label-less cells used to sit at a different height).
+function toggleCell(inner, sublabel) {
+  return `<td class="settings-toggle-col">
+    <div class="settings-toggle-cell">${inner}
+      <span class="settings-emp-sub">${escapeHtml(sublabel)}</span>
+    </div>
+  </td>`;
+}
+
 function renderRow(emp) {
   const deactivated = !!emp.isDeactivated;
   const moduleChips = Object.keys(MODULE_LABELS).map((key) => {
@@ -63,47 +78,40 @@ function renderRow(emp) {
       </label>`;
   }).join("");
 
+  const avatar = emp.avatar
+    ? `<span class="avatar settings-emp-avatar avatar--photo" style="background-image:url('${emp.avatar}')" aria-hidden="true"></span>`
+    : `<span class="avatar settings-emp-avatar" aria-hidden="true">${escapeHtml(empInitials(emp))}</span>`;
+
+  const sw = (cls, extra, title, checked) =>
+    `<label class="switch" title="${escapeHtml(title)}">
+      <input type="checkbox" class="${cls}" data-emp="${emp.id}"${extra} ${checked ? "checked" : ""} ${deactivated ? "disabled" : ""} />
+      <span class="switch-track"></span>
+    </label>`;
+
   return `
     <tr class="${deactivated ? "is-deactivated-row" : ""}">
       <td>
-        <div class="settings-emp-name">
-          <span>${escapeHtml(emp.name || emp.username || "—")}</span>
-          <button type="button" class="settings-emp-edit" data-edit-user="${emp.id}" title="Edit this user">✎</button>
+        <div class="settings-emp-cell">
+          ${avatar}
+          <div class="settings-emp-cell-text">
+            <div class="settings-emp-name">
+              <span>${escapeHtml(emp.name || emp.username || "—")}</span>
+              <button type="button" class="settings-emp-edit" data-edit-user="${emp.id}" title="Edit this user">✎</button>
+            </div>
+            <div class="settings-emp-sub">${escapeHtml(emp.emailid || emp.username || "")}</div>
+          </div>
         </div>
-        <div class="settings-emp-sub">${escapeHtml(emp.emailid || emp.username || "")}</div>
       </td>
-      <td>
-        <label class="switch" title="Deactivate this user">
+      ${toggleCell(
+        `<label class="switch" title="Deactivate this user">
           <input type="checkbox" class="statusToggle" data-emp="${emp.id}" ${deactivated ? "checked" : ""} />
           <span class="switch-track"></span>
-        </label>
-        <span class="settings-emp-sub">${deactivated ? "Deactivated" : "Active"}</span>
-      </td>
-      <td>
-        <label class="switch" title="Admin">
-          <input type="checkbox" class="adminToggle" data-emp="${emp.id}" ${emp.isAdmin ? "checked" : ""} ${deactivated ? "disabled" : ""} />
-          <span class="switch-track"></span>
-        </label>
-        <span class="settings-emp-sub">${emp.isAdmin ? "Admin" : "User"}</span>
-      </td>
-      <td>
-        <label class="switch" title="Time-off approver">
-          <input type="checkbox" class="approverToggle" data-emp="${emp.id}" ${emp.isTimeOffApprover ? "checked" : ""} ${deactivated ? "disabled" : ""} />
-          <span class="switch-track"></span>
-        </label>
-      </td>
-      <td>
-        <label class="switch" title="Presence admin — configure the working-time register + record clock entries on someone's behalf">
-          <input type="checkbox" class="presenceRoleToggle" data-emp="${emp.id}" data-role="admin" ${emp.isPresenceAdmin ? "checked" : ""} ${deactivated ? "disabled" : ""} />
-          <span class="switch-track"></span>
-        </label>
-      </td>
-      <td>
-        <label class="switch" title="Presence viewer — read + export every register (worker representatives / labour inspector)">
-          <input type="checkbox" class="presenceRoleToggle" data-emp="${emp.id}" data-role="viewer" ${emp.isPresenceViewer ? "checked" : ""} ${deactivated ? "disabled" : ""} />
-          <span class="switch-track"></span>
-        </label>
-      </td>
+        </label>`,
+        deactivated ? "Deactivated" : "Active")}
+      ${toggleCell(sw("adminToggle", "", "Admin", emp.isAdmin), emp.isAdmin ? "Admin" : "User")}
+      ${toggleCell(sw("approverToggle", "", "Time-off approver", emp.isTimeOffApprover), emp.isTimeOffApprover ? "Approver" : "—")}
+      ${toggleCell(sw("presenceRoleToggle", ' data-role="admin"', "Presence admin — configure the working-time register + record clock entries on someone's behalf", emp.isPresenceAdmin), emp.isPresenceAdmin ? "Admin" : "—")}
+      ${toggleCell(sw("presenceRoleToggle", ' data-role="viewer"', "Presence viewer — read + export every register (worker representatives / labour inspector)", emp.isPresenceViewer), emp.isPresenceViewer ? "Viewer" : "—")}
       <td><div class="module-chip-row">${moduleChips}</div></td>
     </tr>`;
 }

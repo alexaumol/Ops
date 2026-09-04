@@ -179,6 +179,7 @@ const EMPLOYEE_ROW_SELECT = `
          (t.employeeid IS NOT NULL) AS "isTimeOffApprover",
          (pa.employee_id IS NOT NULL) AS "isPresenceAdmin",
          (pv.employee_id IS NOT NULL) AS "isPresenceViewer",
+         av.avatarimage AS avatar,
          COALESCE(ARRAY_AGG(mr.modulekey) FILTER (WHERE mr.modulekey IS NOT NULL), '{}') AS "restrictedModules"
   FROM employees e
   LEFT JOIN admins a ON a.employeeid = e.id
@@ -186,10 +187,15 @@ const EMPLOYEE_ROW_SELECT = `
   LEFT JOIN presence_admins pa ON pa.employee_id = e.id
   LEFT JOIN presence_viewers pv ON pv.employee_id = e.id
   LEFT JOIN modulerestrictions mr ON mr.employeeid = e.id
+  LEFT JOIN LATERAL (
+    SELECT avatarimage FROM employeesinfo
+    WHERE empid = e.id::double precision AND avatarusephoto = true
+    LIMIT 1
+  ) av ON true
 `;
 const EMPLOYEE_ROW_GROUP_BY = `
   GROUP BY e.id, e.username, e.emailid, e.deactivated, e.employeefirstname, e.employeelastname,
-           a.employeeid, t.employeeid, pa.employee_id, pv.employee_id
+           a.employeeid, t.employeeid, pa.employee_id, pv.employee_id, av.avatarimage
 `;
 
 async function employeeRow(id) {

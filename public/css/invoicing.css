@@ -96,6 +96,21 @@
 .inv-filter-btn[aria-selected="true"] {
   background: var(--hitt-ink); border-color: var(--hitt-ink); color: #fff;
 }
+
+/* Invoice-view quick flag toggles (Emailed / AEAT issued / AEAT error) */
+.inv-flag-btn {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  padding: 0.35rem 0.85rem;
+  font-size: 0.78rem; font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.inv-flag-btn:hover { border-color: var(--hitt-teal); }
+.inv-flag-btn[aria-pressed="true"] {
+  background: var(--hitt-ink); border-color: var(--hitt-ink); color: #fff;
+}
 .inv-filter-spacer { flex: 1; }
 .inv-filters input[type="text"] {
   padding: 0.5rem 0.75rem;

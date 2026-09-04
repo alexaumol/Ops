@@ -206,8 +206,20 @@
 .settings-table tbody tr.is-deactivated-row { opacity: 0.55; }
 .settings-table tbody tr.is-deactivated-row .settings-emp-name { text-decoration: line-through; }
 
+.settings-emp-cell { display: flex; align-items: center; gap: 0.65rem; }
+.settings-emp-avatar { flex: none; width: 34px; height: 34px; font-size: 0.72rem; }
+.settings-emp-cell-text { min-width: 0; }
 .settings-emp-name { font-weight: 600; display: inline-flex; align-items: center; gap: 0.4rem; }
 .settings-emp-sub { font-size: 0.78rem; color: var(--text-secondary); }
+
+/* Toggle columns (Status / Role / approver / presence roles) — centred, with
+   the switch and its state word stacked so every column lines up. */
+.settings-table th.settings-toggle-col { text-align: center; }
+.settings-table td.settings-toggle-col { text-align: center; vertical-align: middle; }
+.settings-toggle-cell {
+  display: inline-flex; flex-direction: column; align-items: center; gap: 0.25rem;
+}
+.settings-toggle-cell .settings-emp-sub { line-height: 1; }
 .settings-emp-edit {
   border: none; background: none; cursor: pointer;
   color: var(--brand); font-size: 0.85rem; line-height: 1;
