@@ -26,7 +26,25 @@ API contract: [`verifactu-boldsoftware-openapi.yaml`](verifactu-boldsoftware-ope
 - [ ] BP → tax companies: set `fiscalidtype` / country on a couple of real clients (Spanish +
       one foreign) so both recipient forms are exercised
 
-## 2 · Sandbox end-to-end (against *EMPRESA DE PRUEBAS (PI4)*)
+### The sandbox issuer NIF
+
+Our BOLD sandbox account is the shared test company **EMPRESA DE PRUEBAS (PI4)**, NIF
+**`A39200019`** (given by BOLD). The `Verify-Issuer-Id` guard compares the *entity's* VAT
+number against the NIF on the API-Key, so in sandbox one of these must be true, or every
+issue fails with `000007`:
+
+- **`VERIFACTU_VERIFY_ISSUER=false`** in `server/.env` — the guard is never sent (records keep
+  the entity's real NIF; harmless in the sandbox). Simplest for a quick pass. *(The default —
+  blank — only sends the guard in `production`, but a per-entity Environment set to
+  `Production` by mistake re-enables it.)*
+- or set the test entity's VAT number to `A39200019` so the guard matches and every artifact
+  (record XML, QR, verify URL) is consistent with the test company.
+
+Do **not** put `A39200019` on a real billing entity on an instance that emails real invoices —
+use a throwaway "… — Veri\*Factu sandbox" entity + a test project, or the `false` override.
+Drop the override and use the real per-entity NIF for the production cutover (§5).
+
+## 2 · Sandbox end-to-end (against *EMPRESA DE PRUEBAS (PI4)*, NIF `A39200019`)
 
 > BOLD's sandbox auto-prefixes every invoice number with `PI4-`, so `chainInfo.number` and the
 > verification URL will read `PI4-<your number>`. Expected.
@@ -73,8 +91,12 @@ journalctl -u ops-verifactu-poll.service -f
 
 ## 5 · Production cutover (one entity at a time)
 
+- [ ] Remove `VERIFACTU_VERIFY_ISSUER=false` from `server/.env` (and revert any test NIF on a
+      real entity back to its real VAT number) — the issuer guard should be live in production
 - [ ] Settings → Veri\*Factu → for the first entity: replace the key with the **production**
       key, switch Environment to `Production`
+- [ ] Confirm that entity's VAT number (Settings → Entities) exactly matches the NIF BOLD
+      registered against its production API-Key — a mismatch is `000007` on every issue
 - [ ] Issue **one real invoice** for that entity → confirm `sent`, verify the QR on the
       **production** validator (`www2.agenciatributaria.gob.es/.../ValidarQR`)
 - [ ] Watch `ops-verifactu-poll` for a day — no unexpected `error` records
