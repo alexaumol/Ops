@@ -28,9 +28,27 @@
 
     <div class="bp-toolbar">
       <input id="searchBox" type="text" placeholder="Search by name or tax company…" data-i18n-placeholder="bp.search" />
+      <select id="filterStage" class="field-input bp-filter-select">
+        <option value="" data-i18n="bp.filter.allStages">All stages</option>
+        <option value="new" data-i18n="bp.stage.new">New</option>
+        <option value="in_discussion" data-i18n="bp.stage.inDiscussion">In discussion</option>
+        <option value="active_partner" data-i18n="bp.stage.activePartner">Active partner</option>
+        <option value="on_hold" data-i18n="bp.stage.onHold">On hold</option>
+        <option value="closed" data-i18n="bp.stage.closed">Closed</option>
+        <option value="former_partner" data-i18n="bp.stage.formerPartner">Former partner</option>
+      </select>
+      <select id="filterOwner" class="field-input bp-filter-select">
+        <option value="" data-i18n="bp.filter.allOwners">All owners</option>
+        <option value="me" data-i18n="bp.filter.myPartners">My partners</option>
+        <option value="none" data-i18n="bp.filter.noOwner">No owner</option>
+      </select>
       <label class="bp-filter-toggle">
         <input type="checkbox" id="filterAliveProjects" />
         <span data-i18n="bp.filter.liveProjects">Only partners with live projects</span>
+      </label>
+      <label class="bp-filter-toggle">
+        <input type="checkbox" id="filterArchived" />
+        <span data-i18n="bp.filter.showArchived">Show archived</span>
       </label>
       <span id="bpCount" class="bp-count"></span>
       <button class="btn btn-primary" id="btnNewBp" data-i18n="bp.new">+ New business partner</button>
@@ -41,6 +59,7 @@
         <thead>
           <tr>
             <th data-sort="name" data-i18n="bp.col.name">Name<span class="sort-arrow"></span></th>
+            <th data-sort="lifecycleStage" data-i18n="bp.col.stage">Stage<span class="sort-arrow"></span></th>
             <th data-sort="companyTypeLabel" data-i18n="bp.col.companyType">Company type<span class="sort-arrow"></span></th>
             <th data-sort="countryLabel" data-i18n="bp.col.country">Country<span class="sort-arrow"></span></th>
             <th data-sort="webpage" data-i18n="bp.col.website">Website<span class="sort-arrow"></span></th>
@@ -55,6 +74,15 @@
   </main>
 
   <div id="toastHost" class="toast-host"></div>
+
+  <datalist id="bpCategoryOptions">
+    <option value="Patient Organizations"></option>
+    <option value="Public &amp; HTA Bodies"></option>
+    <option value="Sponsors &amp; Industry"></option>
+    <option value="Academic &amp; Educational"></option>
+    <option value="Experts, Faculty &amp; Advisors"></option>
+    <option value="Healthcare &amp; Professional"></option>
+  </datalist>
 
   <!-- ============================ DETAIL MODAL ============================ -->
   <div id="modalOverlay" class="modal-overlay hidden">
@@ -72,6 +100,8 @@
           </div>
         </div>
         <span id="mChangedBadge" class="hidden" style="font-size:0.7rem; font-weight:700; color:var(--danger); background:#fff; border-radius:4px; padding:0.2rem 0.5rem; flex-shrink:0;" data-i18n="form.dataChanged">Data has changed</span>
+        <span id="mArchivedBadge" class="hidden" style="font-size:0.7rem; font-weight:700; color:#8A6E12; background:rgba(188,154,28,0.22); border-radius:4px; padding:0.2rem 0.5rem; flex-shrink:0;" data-i18n="bp.archived">Archived</span>
+        <button id="mArchiveToggle" class="modal-head-btn" style="width:auto; padding:0 0.6rem; background:rgba(255,255,255,0.16); font-size:0.72rem;" title="Archive">…</button>
         <button id="mSave" class="modal-head-btn modal-head-btn--save" title="Save">✓</button>
         <button id="mClose" class="modal-head-btn modal-head-btn--close" title="Close">✕</button>
       </div>
@@ -85,6 +115,67 @@
       <div class="modal-body">
         <div id="paneGeneral" class="modal-pane">
           <div>
+          <div class="field-section">
+            <h3 data-i18n="bp.section.account">Account</h3>
+            <div class="field-grid">
+              <div>
+                <label class="field-label" data-i18n="bp.f.category">Category</label>
+                <input id="mCategory" type="text" class="field-input" list="bpCategoryOptions" />
+              </div>
+              <div>
+                <label class="field-label" data-i18n="bp.f.owner">Owner</label>
+                <select id="mOwner" class="field-input"></select>
+              </div>
+              <div>
+                <label class="field-label" data-i18n="bp.f.stage">Stage</label>
+                <select id="mStage" class="field-input">
+                  <option value="new" data-i18n="bp.stage.new">New</option>
+                  <option value="in_discussion" data-i18n="bp.stage.inDiscussion">In discussion</option>
+                  <option value="active_partner" data-i18n="bp.stage.activePartner">Active partner</option>
+                  <option value="on_hold" data-i18n="bp.stage.onHold">On hold</option>
+                  <option value="closed" data-i18n="bp.stage.closed">Closed</option>
+                  <option value="former_partner" data-i18n="bp.stage.formerPartner">Former partner</option>
+                </select>
+              </div>
+              <div id="mTemperatureField">
+                <label class="field-label" data-i18n="bp.f.temperature">Temperature</label>
+                <select id="mTemperature" class="field-input">
+                  <option value="" data-i18n="bp.temp.none">—</option>
+                  <option value="warm" data-i18n="bp.temp.warm">Warm</option>
+                  <option value="hot" data-i18n="bp.temp.hot">Hot</option>
+                </select>
+              </div>
+              <div id="mStageReasonField" class="span-2 hidden">
+                <label class="field-label" data-i18n="bp.f.stageReason">Reason for the stage change</label>
+                <input id="mStageReason" type="text" class="field-input" data-i18n-placeholder="bp.f.stageReasonHint" placeholder="Optional — recorded in History" />
+              </div>
+              <div>
+                <label class="field-label" data-i18n="bp.f.leadSource">Lead source</label>
+                <input id="mLeadSource" type="text" class="field-input" />
+              </div>
+              <div>
+                <label class="field-label" data-i18n="bp.f.geoScope">Geographic scope</label>
+                <select id="mGeoScope" class="field-input">
+                  <option value="" data-i18n="bp.geo.none">—</option>
+                  <option value="local" data-i18n="bp.geo.local">Local</option>
+                  <option value="regional" data-i18n="bp.geo.regional">Regional</option>
+                  <option value="national" data-i18n="bp.geo.national">National</option>
+                  <option value="european" data-i18n="bp.geo.european">European</option>
+                  <option value="global" data-i18n="bp.geo.global">Global</option>
+                </select>
+              </div>
+              <div class="span-2">
+                <label class="field-label" data-i18n="bp.f.roles">Roles</label>
+                <div id="mRoles" class="role-checks">
+                  <label><input type="checkbox" value="customer" /> <span data-i18n="bp.role.customer">Customer</span></label>
+                  <label><input type="checkbox" value="prospect" /> <span data-i18n="bp.role.prospect">Prospect</span></label>
+                  <label><input type="checkbox" value="partner" /> <span data-i18n="bp.role.partner">Partner</span></label>
+                  <label><input type="checkbox" value="supplier" /> <span data-i18n="bp.role.supplier">Supplier</span></label>
+                  <label><input type="checkbox" value="other" /> <span data-i18n="bp.role.other">Other</span></label>
+                </div>
+              </div>
+            </div>
+          </div>
           <div class="field-section">
             <h3 data-i18n="bp.section.generalInfo">General info</h3>
             <div class="field-grid">
@@ -147,6 +238,38 @@
               <input id="mNewContactPhone" type="text" placeholder="Phone…" class="field-input" style="max-width:9rem;" data-i18n-placeholder="bp.contact.phone" />
               <button id="mAddContact" class="btn-icon-add" type="button" data-i18n="form.add">Add</button>
               <button id="mCancelEditContact" class="btn-icon-add" type="button" style="display:none; background:var(--text-secondary);" data-i18n="form.cancel">Cancel</button>
+            </div>
+            <div class="sub-add-row" style="flex-wrap:wrap;">
+              <select id="mNewContactDecisionRole" class="field-input" style="max-width:9.5rem;">
+                <option value="" data-i18n="bp.contact.decisionRole.none">Decision role…</option>
+                <option value="decision_maker" data-i18n="bp.contact.decisionRole.decisionMaker">Decision-maker</option>
+                <option value="influencer" data-i18n="bp.contact.decisionRole.influencer">Influencer</option>
+                <option value="gatekeeper" data-i18n="bp.contact.decisionRole.gatekeeper">Gatekeeper</option>
+                <option value="user" data-i18n="bp.contact.decisionRole.user">User</option>
+                <option value="unknown" data-i18n="bp.contact.decisionRole.unknown">Unknown</option>
+              </select>
+              <select id="mNewContactInfluence" class="field-input" style="max-width:8rem;">
+                <option value="" data-i18n="bp.contact.influence.none">Influence…</option>
+                <option value="high" data-i18n="bp.contact.influence.high">High</option>
+                <option value="medium" data-i18n="bp.contact.influence.medium">Medium</option>
+                <option value="low" data-i18n="bp.contact.influence.low">Low</option>
+                <option value="unknown" data-i18n="bp.contact.influence.unknown">Unknown</option>
+              </select>
+              <select id="mNewContactStance" class="field-input" style="max-width:8.5rem;">
+                <option value="" data-i18n="bp.contact.stance.none">Stance…</option>
+                <option value="champion" data-i18n="bp.contact.stance.champion">Champion</option>
+                <option value="supportive" data-i18n="bp.contact.stance.supportive">Supportive</option>
+                <option value="neutral" data-i18n="bp.contact.stance.neutral">Neutral</option>
+                <option value="skeptical" data-i18n="bp.contact.stance.skeptical">Skeptical</option>
+                <option value="detractor" data-i18n="bp.contact.stance.detractor">Detractor</option>
+              </select>
+              <select id="mNewContactReportsTo" class="field-input" style="max-width:10rem;">
+                <option value="" data-i18n="bp.contact.reportsTo.none">Reports to…</option>
+              </select>
+              <label class="bp-filter-toggle" style="white-space:nowrap;">
+                <input type="checkbox" id="mNewContactPrimary" />
+                <span data-i18n="bp.contact.primary">Primary contact</span>
+              </label>
             </div>
           </div>
           </div>
@@ -237,6 +360,45 @@
         <button id="npClose" class="modal-head-btn modal-head-btn--close" title="Close">✕</button>
       </div>
       <div class="modal-body">
+        <div class="field-section">
+          <h3 data-i18n="bp.section.account">Account</h3>
+          <div class="field-grid">
+            <div>
+              <label class="field-label" data-i18n="bp.f.category">Category</label>
+              <input id="npCategory" type="text" class="field-input" list="bpCategoryOptions" />
+            </div>
+            <div>
+              <label class="field-label" data-i18n="bp.f.owner">Owner</label>
+              <select id="npOwner" class="field-input"></select>
+            </div>
+            <div>
+              <label class="field-label" data-i18n="bp.f.leadSource">Lead source</label>
+              <input id="npLeadSource" type="text" class="field-input" />
+            </div>
+            <div>
+              <label class="field-label" data-i18n="bp.f.geoScope">Geographic scope</label>
+              <select id="npGeoScope" class="field-input">
+                <option value="" data-i18n="bp.geo.none">—</option>
+                <option value="local" data-i18n="bp.geo.local">Local</option>
+                <option value="regional" data-i18n="bp.geo.regional">Regional</option>
+                <option value="national" data-i18n="bp.geo.national">National</option>
+                <option value="european" data-i18n="bp.geo.european">European</option>
+                <option value="global" data-i18n="bp.geo.global">Global</option>
+              </select>
+            </div>
+            <div class="span-2">
+              <label class="field-label" data-i18n="bp.f.roles">Roles</label>
+              <div id="npRoles" class="role-checks">
+                <label><input type="checkbox" value="customer" /> <span data-i18n="bp.role.customer">Customer</span></label>
+                <label><input type="checkbox" value="prospect" /> <span data-i18n="bp.role.prospect">Prospect</span></label>
+                <label><input type="checkbox" value="partner" /> <span data-i18n="bp.role.partner">Partner</span></label>
+                <label><input type="checkbox" value="supplier" /> <span data-i18n="bp.role.supplier">Supplier</span></label>
+                <label><input type="checkbox" value="other" /> <span data-i18n="bp.role.other">Other</span></label>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div class="field-section">
           <h3 data-i18n="bp.section.generalInfo">General info</h3>
           <div class="field-grid">
