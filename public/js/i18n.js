@@ -61,11 +61,22 @@
         if (target !== "textContent") {
           el.setAttribute(target, val);
         } else if (el.children.length) {
-          // Element has child nodes (e.g. a trailing <span class="sort-arrow">
-          // or a "*" required marker) — replace only the leading text so the
-          // children survive.
-          if (el.firstChild && el.firstChild.nodeType === 3) el.firstChild.nodeValue = val;
-          else el.insertBefore(document.createTextNode(val), el.firstChild);
+          // Element has child nodes. The supported pattern is TRAILING markup
+          // after leading text — a <span class="sort-arrow">, a "*" required
+          // marker, a link — so replace only the leading text and let the
+          // markup survive. If a child element is instead followed by more
+          // text (inline markup mid-sentence, e.g. "e.g. <code>X</code>. …"),
+          // that heuristic would leave the tail in place and duplicate it —
+          // so replace the whole content in that case.
+          var lastChild = el.lastChild;
+          var trailingText = lastChild && lastChild.nodeType === 3 && lastChild.nodeValue.trim();
+          if (!trailingText && el.firstChild && el.firstChild.nodeType === 3) {
+            el.firstChild.nodeValue = val;
+          } else if (!trailingText) {
+            el.insertBefore(document.createTextNode(val), el.firstChild);
+          } else {
+            el.textContent = val;
+          }
         } else {
           el.textContent = val;
         }
