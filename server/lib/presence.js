@@ -179,9 +179,10 @@ function effectiveEvents(rows) {
 
 /**
  * Pair effective events (already filtered, any order) into worked segments,
- * grouped by local_date.
- * -> { [localDate]: { segments:[{in,out,minutes}], workedMinutes, firstIn,
- *                     lastOut, open:bool, hasManual:bool } }
+ * grouped by local_date. Each segment carries the self-declared `location`
+ * from its opening `in` event (office / remote / client / free text, or null).
+ * -> { [localDate]: { segments:[{in,out,minutes,location}], workedMinutes,
+ *                     firstIn, lastOut, open:bool, hasManual:bool } }
  */
 function summariseByDay(events) {
   const byDay = {};
@@ -194,20 +195,22 @@ function summariseByDay(events) {
   for (const [d, evs] of Object.entries(groups)) {
     evs.sort((a, b) => new Date(a.event_at) - new Date(b.event_at) || Number(a.id) - Number(b.id));
     const segments = [];
-    let open = null;
+    let openEv = null;
     let hasManual = false;
     let firstIn = null, lastOut = null;
     for (const e of evs) {
       if (e.source && e.source !== "clock") hasManual = true;
       if (e.kind === "in") {
         if (!firstIn) firstIn = e.event_at;
-        open = e.event_at;
+        openEv = e;
       } else { // out
         lastOut = e.event_at;
-        if (open) {
-          const minutes = Math.round((new Date(e.event_at) - new Date(open)) / 60000);
-          if (minutes > 0) segments.push({ in: open, out: e.event_at, minutes });
-          open = null;
+        if (openEv) {
+          const minutes = Math.round((new Date(e.event_at) - new Date(openEv.event_at)) / 60000);
+          if (minutes > 0) {
+            segments.push({ in: openEv.event_at, out: e.event_at, minutes, location: openEv.location_label || null });
+          }
+          openEv = null;
         }
       }
     }
@@ -215,7 +218,7 @@ function summariseByDay(events) {
       segments,
       workedMinutes: segments.reduce((s, x) => s + x.minutes, 0),
       firstIn, lastOut,
-      open: open != null,
+      open: openEv != null,
       hasManual,
     };
   }

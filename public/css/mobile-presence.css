@@ -160,6 +160,8 @@
   margin: 0.1rem 0.15rem 0 0;
   font-variant-numeric: tabular-nums;
 }
+.mp-seg-loc { color: var(--text-secondary); }
+.mp-seg-loc::before { content: "· "; }
 
 .mp-foot {
   margin: 1rem 0 0;
