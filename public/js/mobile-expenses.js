@@ -54,6 +54,8 @@ const previewEl = document.getElementById("mxPhotoPreview");
 const imgEl = document.getElementById("mxPhotoImg");
 const pdfEl = document.getElementById("mxPhotoPdf");
 const pdfNameEl = document.getElementById("mxPhotoPdfName");
+const noPreviewEl = document.getElementById("mxPhotoNoPreview");
+const noPreviewNameEl = document.getElementById("mxPhotoNoPreviewName");
 const cameraInput = document.getElementById("mxFileCamera");
 const galleryInput = document.getElementById("mxFileGallery");
 let selectedFile = null;
@@ -108,7 +110,13 @@ async function handleFile(file) {
   if (!file) return;
   dropEl.classList.add("hidden");
   previewEl.classList.remove("hidden");
-  if (file.type === "application/pdf") {
+  noPreviewEl.classList.add("hidden");
+  // "Choose file" hands back whatever the device's file/photo picker gives
+  // it — unlike a fresh camera capture, that can be a PDF with a generic
+  // MIME type from some document providers, so don't rely on file.type
+  // alone.
+  const isPdf = file.type === "application/pdf" || /\.pdf$/i.test(file.name || "");
+  if (isPdf) {
     selectedFile = file;
     imgEl.classList.add("hidden");
     pdfEl.classList.remove("hidden");
@@ -118,6 +126,19 @@ async function handleFile(file) {
   pdfEl.classList.add("hidden");
   imgEl.classList.remove("hidden");
   if (imgEl.src) URL.revokeObjectURL(imgEl.src);
+  // A photo picked from the gallery (as opposed to a fresh camera capture)
+  // can be in a format the <img> tag can't render on this browser — most
+  // commonly a HEIC/HEIF photo straight from an iPhone's library, which
+  // isn't transcoded to JPEG the way a live camera capture is. The photo is
+  // still attached and will still upload fine either way (or gets
+  // re-encoded to JPEG below if the browser CAN decode it) — this only
+  // covers the on-screen preview failing, so show a clear fallback instead
+  // of a blank/broken image.
+  imgEl.onerror = () => {
+    imgEl.classList.add("hidden");
+    noPreviewEl.classList.remove("hidden");
+    noPreviewNameEl.textContent = file.name || "";
+  };
   imgEl.src = URL.createObjectURL(file); // preview the original right away — no need to wait on compression
   selectedFile = await compressImage(file);
 }
@@ -126,6 +147,8 @@ function clearPhoto() {
   cameraInput.value = "";
   galleryInput.value = "";
   if (imgEl.src) { URL.revokeObjectURL(imgEl.src); imgEl.src = ""; }
+  imgEl.onerror = null;
+  noPreviewEl.classList.add("hidden");
 }
 cameraInput.addEventListener("change", () => handleFile(cameraInput.files[0]));
 galleryInput.addEventListener("change", () => handleFile(galleryInput.files[0]));
