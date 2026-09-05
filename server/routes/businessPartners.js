@@ -47,6 +47,13 @@
  * deliberately not nested here, since a task can attach to a project or
  * (later) a Programme Operations cohort too, not just a customer/partner.
  *
+ * CRM Phase C3 added crm_opportunities + crm_opportunity_stage_history —
+ * the pre-project funnel (/:id/opportunities below), plus
+ * projects.estimated_value/currencyid. "Convert to project" is the one
+ * action that matters: past that point the opportunity is read-only and
+ * the project (Lead/Oferta/Guanyat board) is the record of truth — see
+ * docs/customers-crm-alignment.md §3.5.
+ *
  * Mounted at /api/customers-partners (canonical) and /api/business-partners
  * (kept working, server.js) — the module is "Customers & partners" now
  * (roadmap §4); this file and its internal table/column names weren't
@@ -137,17 +144,21 @@ async function loadVisiblePartner(req, res, bpId) {
 // GET /api/customers-partners/lookups
 router.get("/lookups", async (req, res) => {
   try {
-    const [entities, companyTypes, countries, languages] = await Promise.all([
+    const [entities, companyTypes, countries, languages, currencies] = await Promise.all([
       pool.query(`SELECT id, entitydesc AS label FROM entity ORDER BY entitydesc`),
       pool.query(`SELECT id, companytypedesc AS label FROM companytypes ORDER BY companytypedesc`),
       pool.query(`SELECT id, countrydesc AS label, topofthelist FROM countries ORDER BY topofthelist DESC, countrydesc`),
       pool.query(`SELECT id, languagedesc AS label FROM languages ORDER BY languagedesc`),
+      // CRM Phase C3 — the opportunity form's currency picker, same table
+      // invoicing already uses (server/routes/invoicing.js GET /lookups).
+      pool.query(`SELECT id, code, symbol, label FROM invoicecurrencies ORDER BY sortorder, (code = 'EUR') DESC, code`),
     ]);
     res.json({
       entities: entities.rows,
       companyTypes: companyTypes.rows,
       countries: countries.rows,
       languages: languages.rows,
+      currencies: currencies.rows,
     });
   } catch (err) {
     console.error("[GET /api/customers-partners/lookups] DB error:", err.message);
@@ -949,6 +960,232 @@ router.delete("/:id/activities/:activityId", async (req, res) => {
   } catch (err) {
     console.error("[DELETE /api/customers-partners/:id/activities/:activityId] DB error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Opportunities — CRM Phase C3 pre-project funnel (crm_opportunities). A
+// short, linear stage set (identified -> qualifying -> proposal_pending ->
+// converted/lost) — not a configurable pipeline. "Convert to project" hands
+// the deal to the existing Projects board (Lead/Oferta/Guanyat); a converted
+// opportunity is read-only from then on. See
+// docs/customers-crm-alignment.md §3.5 (revised) and §4.4 Q2.
+// ---------------------------------------------------------------------------
+
+const OPPORTUNITY_STAGES = ["identified", "qualifying", "proposal_pending", "converted", "lost"];
+
+const OPPORTUNITY_SELECT = `
+  SELECT o.id, o.name, o.stage, o.estimated_value AS "estimatedValue",
+         o.currencyid AS "currencyId", cur.code AS "currencyCode",
+         o.owner_employeeid AS "ownerEmployeeId",
+         NULLIF(TRIM(CONCAT(e.employeefirstname, ' ', e.employeelastname)), '') AS "ownerName",
+         o.expected_close AS "expectedClose", o.source, o.lost_reason AS "lostReason",
+         o.projectid AS "projectId", p.projectnumber AS "projectCode",
+         o.created_at AS "createdAt", o.closed_at AS "closedAt"
+  FROM crm_opportunities o
+  LEFT JOIN employees e ON e.id = o.owner_employeeid
+  LEFT JOIN invoicecurrencies cur ON cur.id = o.currencyid
+  LEFT JOIN projects p ON p.id = o.projectid
+`;
+
+router.get("/:id/opportunities", async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `${OPPORTUNITY_SELECT}
+       WHERE o.businesspartnerid = $1
+       ORDER BY (o.stage IN ('converted', 'lost')), o.created_at DESC`,
+      [req.params.id]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error("[GET /api/customers-partners/:id/opportunities] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
+router.post("/:id/opportunities", async (req, res) => {
+  const { name, estimatedValue, currencyId, ownerEmployeeId, expectedClose, source } = req.body || {};
+  if (!name || !name.trim()) {
+    return res.status(400).json({ error: "validation_error", message: "name is required" });
+  }
+  try {
+    const { rows } = await pool.query(
+      `INSERT INTO crm_opportunities
+         (businesspartnerid, name, estimated_value, currencyid, owner_employeeid, expected_close, source, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       RETURNING id`,
+      [req.params.id, name.trim(), estimatedValue || null, currencyId || null, ownerEmployeeId || null,
+       expectedClose || null, source || null, req.hittUser?.employeeId || null]
+    );
+    const oppId = rows[0].id;
+    await logBpChange(pool, req.params.id, req, `Opportunity created: ${name.trim()}`);
+    const { rows: full } = await pool.query(`${OPPORTUNITY_SELECT} WHERE o.id = $1`, [oppId]);
+    res.status(201).json(full[0]);
+    bpAuditLabel(req.params.id).then((bp) =>
+      logAudit(req, { kind: "bp.opportunity.add", desc: `Customer/partner "${bp}": opportunity created "${name.trim()}"` }));
+  } catch (err) {
+    console.error("[POST /api/customers-partners/:id/opportunities] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
+// PATCH /api/customers-partners/:id/opportunities/:oppId — field edits and/or
+// a stage move (logged to crm_opportunity_stage_history + the plain-text
+// change log). Moving to 'lost' expects lostReason and stamps closed_at.
+// A converted opportunity is read-only — use the project it points at.
+router.patch("/:id/opportunities/:oppId", async (req, res) => {
+  const { name, estimatedValue, currencyId, ownerEmployeeId, expectedClose, source, stage, lostReason, stageReason } = req.body || {};
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const { rows: curRows } = await client.query(
+      `SELECT stage FROM crm_opportunities WHERE id = $1 AND businesspartnerid = $2 FOR UPDATE`,
+      [req.params.oppId, req.params.id]
+    );
+    if (!curRows.length) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ error: "not_found", message: "Opportunity not found on this customer/partner" });
+    }
+    const cur = curRows[0];
+    if (cur.stage === "converted") {
+      await client.query("ROLLBACK");
+      return res.status(409).json({ error: "conflict", message: "This opportunity has been converted to a project and is read-only." });
+    }
+    if (stage !== undefined && !OPPORTUNITY_STAGES.includes(stage)) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({ error: "validation_error", message: "Invalid stage." });
+    }
+
+    const nextStage = stage !== undefined && stage !== cur.stage ? stage : null;
+
+    await client.query(
+      `UPDATE crm_opportunities SET
+         name = COALESCE($1, name),
+         estimated_value = CASE WHEN $2 THEN $3 ELSE estimated_value END,
+         currencyid = CASE WHEN $4 THEN $5 ELSE currencyid END,
+         owner_employeeid = CASE WHEN $6 THEN $7 ELSE owner_employeeid END,
+         expected_close = CASE WHEN $8 THEN $9 ELSE expected_close END,
+         source = CASE WHEN $10 THEN $11 ELSE source END,
+         stage = COALESCE($12, stage),
+         lost_reason = CASE WHEN $13 THEN $14 ELSE lost_reason END,
+         closed_at = CASE WHEN $15 THEN now() ELSE closed_at END
+       WHERE id = $16`,
+      [name || null,
+       estimatedValue !== undefined, estimatedValue || null,
+       currencyId !== undefined, currencyId || null,
+       ownerEmployeeId !== undefined, ownerEmployeeId || null,
+       expectedClose !== undefined, expectedClose || null,
+       source !== undefined, source || null,
+       nextStage,
+       nextStage === "lost", lostReason || null,
+       nextStage === "lost",
+       req.params.oppId]
+    );
+
+    if (nextStage) {
+      await client.query(
+        `INSERT INTO crm_opportunity_stage_history (opportunityid, from_stage, to_stage, changedat, changedby, reason)
+         VALUES ($1, $2, $3, now(), $4, $5)`,
+        [req.params.oppId, cur.stage, nextStage, req.hittUser?.employeeId || null, stageReason || lostReason || null]
+      );
+      await logBpChange(client, req.params.id, req,
+        `Opportunity stage changed from ${cur.stage} to ${nextStage}` + (stageReason || lostReason ? ` — ${stageReason || lostReason}` : ""));
+    }
+
+    await client.query("COMMIT");
+    const { rows: full } = await pool.query(`${OPPORTUNITY_SELECT} WHERE o.id = $1`, [req.params.oppId]);
+    res.json(full[0]);
+  } catch (err) {
+    await client.query("ROLLBACK");
+    console.error("[PATCH /api/customers-partners/:id/opportunities/:oppId] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  } finally {
+    client.release();
+  }
+});
+
+router.delete("/:id/opportunities/:oppId", async (req, res) => {
+  try {
+    const { rows: curRows } = await pool.query(
+      `SELECT stage, name FROM crm_opportunities WHERE id = $1 AND businesspartnerid = $2`,
+      [req.params.oppId, req.params.id]
+    );
+    if (!curRows.length) return res.status(404).json({ error: "not_found", message: "Opportunity not found on this customer/partner" });
+    if (curRows[0].stage === "converted") {
+      return res.status(409).json({ error: "conflict", message: "This opportunity has been converted to a project and can't be deleted." });
+    }
+    await pool.query(`DELETE FROM crm_opportunities WHERE id = $1`, [req.params.oppId]);
+    await logBpChange(pool, req.params.id, req, `Opportunity removed: ${curRows[0].name}`);
+    res.status(204).end();
+    bpAuditLabel(req.params.id).then((bp) =>
+      logAudit(req, { kind: "bp.opportunity.delete", desc: `Customer/partner "${bp}": opportunity removed "${curRows[0].name}"` }));
+  } catch (err) {
+    console.error("[DELETE /api/customers-partners/:id/opportunities/:oppId] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
+// POST /api/customers-partners/:id/opportunities/:oppId/convert — hands the
+// deal to the Projects board. Creates a project at "Lead" (default) or
+// "Oferta" (when a quote's already in hand), assigns this customer/partner
+// as its contracting partner, and carries over the estimated value/currency.
+// The project number is left unassigned (null), same as any other
+// freshly-created Lead — see POST /api/projects.
+router.post("/:id/opportunities/:oppId/convert", async (req, res) => {
+  const targetStatus = req.body?.stageName === "Oferta" ? "Oferta" : "Lead";
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const { rows: oppRows } = await client.query(
+      `SELECT * FROM crm_opportunities WHERE id = $1 AND businesspartnerid = $2 FOR UPDATE`,
+      [req.params.oppId, req.params.id]
+    );
+    if (!oppRows.length) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ error: "not_found", message: "Opportunity not found on this customer/partner" });
+    }
+    const opp = oppRows[0];
+    if (opp.stage === "converted") {
+      await client.query("ROLLBACK");
+      return res.status(409).json({ error: "conflict", message: "This opportunity has already been converted." });
+    }
+    const { rows: statusRows } = await client.query(
+      `SELECT id FROM projectstatus WHERE projectstatusdesc = $1 LIMIT 1`,
+      [targetStatus]
+    );
+    if (!statusRows.length) {
+      await client.query("ROLLBACK");
+      return res.status(500).json({ error: "server_error", message: `Project status "${targetStatus}" not found.` });
+    }
+    const { rows: projRows } = await client.query(
+      `INSERT INTO projects
+         (projectname, projectstatusid, busspartnerid, estimated_value, currencyid,
+          projectyear, entrydate, lastupdated, lastupdatedby)
+       VALUES ($1, $2, $3, $4, $5, EXTRACT(YEAR FROM now()), now(), now(), $6)
+       RETURNING id, projectnumber AS code, projectname AS name`,
+      [opp.name, statusRows[0].id, req.params.id, opp.estimated_value, opp.currencyid, req.hittUser?.employeeId || null]
+    );
+    const project = projRows[0];
+    await client.query(
+      `UPDATE crm_opportunities SET stage = 'converted', projectid = $1, closed_at = now() WHERE id = $2`,
+      [project.id, req.params.oppId]
+    );
+    await client.query(
+      `INSERT INTO crm_opportunity_stage_history (opportunityid, from_stage, to_stage, changedat, changedby, reason)
+       VALUES ($1, $2, 'converted', now(), $3, $4)`,
+      [req.params.oppId, opp.stage, req.hittUser?.employeeId || null, `Converted to project ${project.code || "#" + project.id}`]
+    );
+    await logBpChange(client, req.params.id, req, `Opportunity "${opp.name}" converted to project ${project.code || "#" + project.id}`);
+    await client.query("COMMIT");
+    res.status(201).json({ opportunityId: Number(req.params.oppId), project });
+    bpAuditLabel(req.params.id).then((bp) =>
+      logAudit(req, { kind: "bp.opportunity.convert", desc: `Customer/partner "${bp}": opportunity "${opp.name}" converted to project ${project.code || "#" + project.id}` }));
+  } catch (err) {
+    await client.query("ROLLBACK");
+    console.error("[POST /api/customers-partners/:id/opportunities/:oppId/convert] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  } finally {
+    client.release();
   }
 });
 

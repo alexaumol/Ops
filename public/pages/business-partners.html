@@ -108,6 +108,7 @@
       <div class="modal-tabs">
         <button data-mtab="general" class="modal-tab" aria-selected="true" data-i18n="bp.tab.general">General</button>
         <button data-mtab="timeline" class="modal-tab" aria-selected="false" data-i18n="bp.tab.timeline">Timeline</button>
+        <button data-mtab="opportunities" class="modal-tab" aria-selected="false" data-i18n="bp.tab.opportunities">Opportunities</button>
         <button data-mtab="invoicing" class="modal-tab" aria-selected="false" data-i18n="bp.tab.invoicing">Invoicing info</button>
         <div style="flex:1;"></div>
         <button id="historyCollapse" title="Collapse history" style="width:1.75rem; height:1.75rem; border:none; background:none; cursor:pointer; border-radius:var(--radius-sm); color:var(--hitt-teal); font-size:0.85rem;">»</button>
@@ -381,6 +382,25 @@
               <button id="mAddTask" class="btn-icon-add" type="button" data-i18n="form.add">Add</button>
             </div>
           </div>
+          </div>
+        </div>
+
+        <div id="paneOpportunities" class="modal-pane hidden">
+          <div class="field-section">
+            <h3 data-i18n="bp.section.opportunities">Opportunities</h3>
+            <p style="font-size:0.75rem; color:var(--text-secondary); padding:0.5rem 0.75rem 0;" data-i18n="bp.opportunity.intro">Potential deals with this customer/partner, before they're a real project. Convert one once it's ready to kick off.</p>
+            <div id="mOpportunityList" class="sub-list"></div>
+            <div class="sub-add-row" style="flex-wrap:wrap;">
+              <input id="mNewOppName" type="text" class="field-input" style="flex:1; min-width:12rem;" placeholder="Opportunity name…" data-i18n-placeholder="bp.opportunity.namePlaceholder" />
+              <input id="mNewOppValue" type="number" step="0.01" min="0" class="field-input" style="max-width:8rem;" placeholder="Value…" data-i18n-placeholder="bp.opportunity.valuePlaceholder" />
+              <select id="mNewOppCurrency" class="field-input" style="max-width:6rem;"></select>
+            </div>
+            <div class="sub-add-row" style="flex-wrap:wrap;">
+              <select id="mNewOppOwner" class="field-input" style="max-width:10rem;"></select>
+              <input id="mNewOppExpectedClose" type="date" class="field-input" style="max-width:9.5rem;" />
+              <input id="mNewOppSource" type="text" class="field-input" style="flex:1; min-width:9rem;" placeholder="Source (optional)…" data-i18n-placeholder="bp.opportunity.sourcePlaceholder" />
+              <button id="mAddOpportunity" class="btn-icon-add" type="button" data-i18n="form.add">Add</button>
+            </div>
           </div>
         </div>
       </div>

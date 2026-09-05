@@ -555,6 +555,137 @@ async function deleteBpTask(id){
   }
 }
 
+/* ============================== OPPORTUNITIES (CRM Phase C3) ============= */
+let OPPORTUNITIES = [];
+
+// Stages an opportunity can still move between — 'converted'/'lost' are
+// terminal and reached only via the dedicated convert/mark-lost actions,
+// never picked from this select.
+const OPPORTUNITY_OPEN_STAGES = ['identified', 'qualifying', 'proposal_pending'];
+const OPPORTUNITY_STAGE_LABEL_KEYS = {
+  identified: 'bp.opportunity.stage.identified', qualifying: 'bp.opportunity.stage.qualifying',
+  proposal_pending: 'bp.opportunity.stage.proposalPending', converted: 'bp.opportunity.stage.converted',
+  lost: 'bp.opportunity.stage.lost',
+};
+
+function formatMoney(value, currencyCode){
+  if (value == null) return '';
+  const formatted = Number(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return currencyCode ? `${formatted} ${escapeHtml(currencyCode)}` : formatted;
+}
+
+// Populates the currency/owner pickers on the add-opportunity form — called
+// once on modal open (they don't depend on anything fetched per-partner).
+function renderOpportunityPickers(){
+  document.getElementById('mNewOppCurrency').innerHTML =
+    `<option value="">—</option>` + (LOOKUPS.currencies || []).map(c => `<option value="${c.id}">${escapeHtml(c.code)}</option>`).join('');
+  document.getElementById('mNewOppOwner').innerHTML = employeeOptionsHtml(currentEmployeeId, T('bp.opportunity.ownerPlaceholder'));
+}
+
+function renderOpportunities(rows){
+  if (rows) OPPORTUNITIES = rows;
+  const list = document.getElementById('mOpportunityList');
+  if (!OPPORTUNITIES.length) {
+    list.innerHTML = `<div class="sub-empty">${T("bp.empty.opportunities")}</div>`;
+    return;
+  }
+  list.innerHTML = OPPORTUNITIES.map(o => {
+    const isOpen = OPPORTUNITY_OPEN_STAGES.includes(o.stage);
+    const metaParts = [
+      o.estimatedValue != null ? formatMoney(o.estimatedValue, o.currencyCode) : '',
+      o.ownerName ? escapeHtml(o.ownerName) : '',
+      o.expectedClose ? T('bp.opportunity.expectedCloseLabel', { date: formatDateOnly(o.expectedClose) }) : '',
+      o.source ? escapeHtml(o.source) : '',
+    ].filter(Boolean);
+    const stageOptions = OPPORTUNITY_OPEN_STAGES
+      .map(s => `<option value="${s}" ${s === o.stage ? 'selected' : ''}>${T(OPPORTUNITY_STAGE_LABEL_KEYS[s])}</option>`).join('');
+    return `
+    <div class="sub-item">
+      <div class="sub-item-row">
+        <span class="sub-item-title">${escapeHtml(o.name)}</span>
+        <span style="display:flex; align-items:center; gap:0.35rem;">
+          <span class="stage-pill stage-pill--${o.stage}">${T(OPPORTUNITY_STAGE_LABEL_KEYS[o.stage] || o.stage)}</span>
+          ${isOpen ? `<button type="button" data-delete-opp="${o.id}" class="sub-item-btn sub-item-btn--danger" title="${T('form.delete')}">✕</button>` : ''}
+        </span>
+      </div>
+      ${metaParts.length ? `<div class="sub-item-meta">${metaParts.join(' · ')}</div>` : ''}
+      ${o.stage === 'converted' ? `<div class="sub-item-meta">${T('bp.opportunity.convertedTo', { code: escapeHtml(o.projectCode || `#${o.projectId}`) })}</div>` : ''}
+      ${o.stage === 'lost' && o.lostReason ? `<div class="sub-item-meta">${T('bp.opportunity.lostReasonLabel', { reason: escapeHtml(o.lostReason) })}</div>` : ''}
+      ${isOpen ? `
+        <div class="opp-actions">
+          <select class="field-input opp-stage-select" data-stage-opp="${o.id}">${stageOptions}</select>
+          <button type="button" data-convert-opp="${o.id}" class="btn-icon-add">${T('bp.opportunity.convert')}</button>
+          <button type="button" data-lost-opp="${o.id}" class="btn-icon-add" style="background:var(--text-secondary);">${T('bp.opportunity.markLost')}</button>
+        </div>
+      ` : ''}
+    </div>
+  `;
+  }).join('');
+  list.querySelectorAll('[data-stage-opp]').forEach(sel => {
+    sel.addEventListener('change', () => changeOpportunityStage(sel.dataset.stageOpp, sel.value));
+  });
+  list.querySelectorAll('[data-convert-opp]').forEach(btn => {
+    btn.addEventListener('click', () => convertOpportunity(btn.dataset.convertOpp));
+  });
+  list.querySelectorAll('[data-lost-opp]').forEach(btn => {
+    btn.addEventListener('click', () => markOpportunityLost(btn.dataset.lostOpp));
+  });
+  list.querySelectorAll('[data-delete-opp]').forEach(btn => {
+    btn.addEventListener('click', () => deleteOpportunity(btn.dataset.deleteOpp));
+  });
+}
+
+async function changeOpportunityStage(id, stage){
+  try {
+    await HITT_API.updateBusinessPartnerOpportunity(activeBpId, id, { stage });
+    renderOpportunities(await HITT_API.getBusinessPartnerOpportunities(activeBpId));
+    toast(T('toast.opportunitySaved'), 'green');
+  } catch (err) {
+    console.error(err);
+    toast(err.message || T('toast.opportunitySaveFail'), 'red');
+    renderOpportunities(); // revert the select to the last known stage
+  }
+}
+
+async function convertOpportunity(id){
+  const opp = OPPORTUNITIES.find(x => String(x.id) === String(id));
+  if (!opp || !confirm(T('bp.opportunity.convertConfirm', { name: opp.name || '' }))) return;
+  try {
+    const result = await HITT_API.convertBusinessPartnerOpportunity(activeBpId, id, {});
+    renderOpportunities(await HITT_API.getBusinessPartnerOpportunities(activeBpId));
+    toast(T('toast.opportunityConverted', { code: result?.project?.code || `#${result?.project?.id}` }), 'green');
+  } catch (err) {
+    console.error(err);
+    toast(err.message || T('toast.opportunityConvertFail'), 'red');
+  }
+}
+
+async function markOpportunityLost(id){
+  const reason = window.prompt(T('bp.opportunity.lostReasonPrompt'));
+  if (reason === null) return; // cancelled — leave the opportunity untouched
+  try {
+    await HITT_API.updateBusinessPartnerOpportunity(activeBpId, id, { stage: 'lost', lostReason: reason || null });
+    renderOpportunities(await HITT_API.getBusinessPartnerOpportunities(activeBpId));
+    toast(T('toast.opportunityLost'), 'navy');
+  } catch (err) {
+    console.error(err);
+    toast(err.message || T('toast.opportunitySaveFail'), 'red');
+  }
+}
+
+async function deleteOpportunity(id){
+  const opp = OPPORTUNITIES.find(x => String(x.id) === String(id));
+  if (!opp || !confirm(T('bp.confirm.deleteOpportunity', { name: opp.name || '' }))) return;
+  try {
+    await HITT_API.deleteBusinessPartnerOpportunity(activeBpId, id);
+    renderOpportunities(await HITT_API.getBusinessPartnerOpportunities(activeBpId));
+    toast(T('toast.opportunityDeleted'), 'navy');
+  } catch (err) {
+    console.error(err);
+    toast(err.message || T('toast.opportunityDeleteFail'), 'red');
+  }
+}
+
 let TAX_COMPANIES = [];
 let editingTcId = null;
 
@@ -847,12 +978,21 @@ async function openDetailModal(id){
   document.getElementById('mNewTaskTitle').value = '';
   document.getElementById('mNewTaskDue').value = '';
 
+  // CRM Phase C3 — opportunities
+  OPPORTUNITIES = [];
+  document.getElementById('mNewOppName').value = '';
+  document.getElementById('mNewOppValue').value = '';
+  document.getElementById('mNewOppExpectedClose').value = '';
+  document.getElementById('mNewOppSource').value = '';
+  renderOpportunityPickers();
+
   const loadingMsg = usingDemoData ? T('bp.demo.notAvailable') : T('common.loading');
   document.getElementById('mContactsList').innerHTML = `<div class="sub-empty">${loadingMsg}</div>`;
   document.getElementById('mNotesList').innerHTML = `<div class="sub-empty">${loadingMsg}</div>`;
   document.getElementById('mTaxCompanyList').innerHTML = `<div class="sub-empty">${loadingMsg}</div>`;
   document.getElementById('mActivityList').innerHTML = `<div class="sub-empty">${loadingMsg}</div>`;
   document.getElementById('mTaskList').innerHTML = `<div class="sub-empty">${loadingMsg}</div>`;
+  document.getElementById('mOpportunityList').innerHTML = `<div class="sub-empty">${loadingMsg}</div>`;
   document.getElementById('historyList').innerHTML = `<div class="sub-empty">${loadingMsg}</div>`;
   TAX_COMPANIES = [];
   resetTaxCompanyForm();
@@ -860,6 +1000,7 @@ async function openDetailModal(id){
   document.querySelectorAll('[data-mtab]').forEach(b => b.setAttribute('aria-selected', b.dataset.mtab === 'general' ? 'true' : 'false'));
   document.getElementById('paneGeneral').classList.remove('hidden');
   document.getElementById('paneTimeline').classList.add('hidden');
+  document.getElementById('paneOpportunities').classList.add('hidden');
   document.getElementById('paneInvoicing').classList.add('hidden');
 
   // "Data has changed" badge — same pattern as the Projects modal: attach a
@@ -940,6 +1081,14 @@ async function openDetailModal(id){
   }
 
   try {
+    const opportunities = await HITT_API.getBusinessPartnerOpportunities(id);
+    if (activeBpId !== id) return;
+    renderOpportunities(opportunities);
+  } catch (err) {
+    console.warn(`Could not load opportunities for business partner ${id}:`, err);
+  }
+
+  try {
     const history = await HITT_API.getBusinessPartnerHistory(id);
     if (activeBpId !== id) return;
     renderHistory(history);
@@ -955,6 +1104,7 @@ const BP_MODAL_TRANSIENT_IDS = [
   'mNewNote',
   'mTcName', 'mTcVat', 'mTcEmail', 'mTcStreet', 'mTcCity', 'mTcState', 'mTcZip', 'mTcPhone1', 'mTcPhone2',
   'mNewActivitySummary', 'mNewActivityNextStep', 'mNewTaskTitle',
+  'mNewOppName', 'mNewOppValue', 'mNewOppSource',
 ];
 
 // Sub-item changes made during the current modal session. Each "Add" /
@@ -1110,6 +1260,7 @@ document.querySelectorAll('[data-mtab]').forEach(btn => {
     btn.setAttribute('aria-selected', 'true');
     document.getElementById('paneGeneral').classList.toggle('hidden', btn.dataset.mtab !== 'general');
     document.getElementById('paneTimeline').classList.toggle('hidden', btn.dataset.mtab !== 'timeline');
+    document.getElementById('paneOpportunities').classList.toggle('hidden', btn.dataset.mtab !== 'opportunities');
     document.getElementById('paneInvoicing').classList.toggle('hidden', btn.dataset.mtab !== 'invoicing');
   });
 });
@@ -1310,6 +1461,45 @@ document.getElementById('mAddTask').addEventListener('click', async () => {
 });
 document.getElementById('mNewTaskTitle').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') document.getElementById('mAddTask').click();
+});
+
+// Same discard-behavior decision as activities/tasks (see the comment
+// above mAddActivity): an opportunity created or moved from this modal is
+// NOT reverted by "discard changes" on cancel.
+document.getElementById('mAddOpportunity').addEventListener('click', async () => {
+  const name = document.getElementById('mNewOppName').value.trim();
+  if (!name) { toast(T('bp.opportunity.nameRequired'), 'red'); return; }
+  if (!activeBpId || usingDemoData) { if (usingDemoData) toast(T('bp.demo.notAvailable'), 'navy'); return; }
+  const currencyId = document.getElementById('mNewOppCurrency').value;
+  const ownerEmployeeId = document.getElementById('mNewOppOwner').value;
+  const value = document.getElementById('mNewOppValue').value;
+  const payload = {
+    name,
+    estimatedValue: value ? Number(value) : null,
+    currencyId: currencyId ? Number(currencyId) : null,
+    ownerEmployeeId: ownerEmployeeId ? Number(ownerEmployeeId) : null,
+    expectedClose: document.getElementById('mNewOppExpectedClose').value || null,
+    source: document.getElementById('mNewOppSource').value.trim() || null,
+  };
+  const btn = document.getElementById('mAddOpportunity');
+  btn.disabled = true;
+  try {
+    await HITT_API.addBusinessPartnerOpportunity(activeBpId, payload);
+    document.getElementById('mNewOppName').value = '';
+    document.getElementById('mNewOppValue').value = '';
+    document.getElementById('mNewOppExpectedClose').value = '';
+    document.getElementById('mNewOppSource').value = '';
+    renderOpportunities(await HITT_API.getBusinessPartnerOpportunities(activeBpId));
+    toast(T('toast.opportunityAdded'), 'green');
+  } catch (err) {
+    console.error(err);
+    toast(err.message || T('toast.opportunitySaveFail'), 'red');
+  } finally {
+    btn.disabled = false;
+  }
+});
+document.getElementById('mNewOppName').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') document.getElementById('mAddOpportunity').click();
 });
 
 document.getElementById('mTcSameAddress').addEventListener('change', syncTcAddressVisibility);
@@ -1629,6 +1819,8 @@ window.addEventListener('hitt:langchange', () => {
     renderTaxCompanies();
     renderActivities();
     renderBpTasks();
+    renderOpportunities();
+    renderOpportunityPickers();
     updateArchiveButtonUI(document.getElementById('mArchiveToggle').dataset.archived ? new Date().toISOString() : null);
   }
 });

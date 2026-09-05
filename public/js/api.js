@@ -158,6 +158,16 @@ const HITT_API = (() => {
     deleteBusinessPartnerActivity: (id, activityId) =>
       request(`/api/customers-partners/${id}/activities/${activityId}`, { method: "DELETE" }),
 
+    getBusinessPartnerOpportunities: (id) => request(`/api/customers-partners/${id}/opportunities`),
+    addBusinessPartnerOpportunity: (id, payload) =>
+      request(`/api/customers-partners/${id}/opportunities`, { method: "POST", body: JSON.stringify(payload) }),
+    updateBusinessPartnerOpportunity: (id, oppId, payload) =>
+      request(`/api/customers-partners/${id}/opportunities/${oppId}`, { method: "PATCH", body: JSON.stringify(payload) }),
+    deleteBusinessPartnerOpportunity: (id, oppId) =>
+      request(`/api/customers-partners/${id}/opportunities/${oppId}`, { method: "DELETE" }),
+    convertBusinessPartnerOpportunity: (id, oppId, payload) =>
+      request(`/api/customers-partners/${id}/opportunities/${oppId}/convert`, { method: "POST", body: JSON.stringify(payload || {}) }),
+
     // opts: { owner, status, entityType, entityId, dueBefore } — all optional,
     // see server/routes/tasks.js GET / for the filter semantics.
     getTasks: (opts = {}) => {
