@@ -56,6 +56,15 @@
 .temp-badge { font-size: 0.68rem; margin-left: 0.3rem; }
 .bp-owner-meta { display: block; font-size: 0.68rem; color: var(--text-secondary); margin-top: 0.15rem; }
 
+/* ---------- CRM Phase C3: opportunity stage pills ---------- */
+.stage-pill--identified       { background: rgba(92,117,124,0.14);  color: var(--hitt-teal); }
+.stage-pill--qualifying       { background: rgba(188,154,28,0.18);  color: #8A6E12; }
+.stage-pill--proposal_pending { background: rgba(179,176,125,0.28); color: #6B6A3F; }
+.stage-pill--converted        { background: rgba(110,143,90,0.18);  color: #4C6B3A; }
+.stage-pill--lost             { background: rgba(160,40,40,0.10);   color: #A02828; }
+.opp-actions { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.4rem; }
+.opp-stage-select { font-size: 0.72rem; padding: 0.15rem 0.4rem; max-width: 10rem; }
+
 .role-checks {
   display: flex; flex-wrap: wrap; gap: 0.15rem 0.9rem;
   font-size: 0.8rem; color: var(--text-primary);
