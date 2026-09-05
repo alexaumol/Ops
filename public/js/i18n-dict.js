@@ -354,6 +354,14 @@ window.HITT_I18N_DICT = {
     "toast.opportunityConvertFail": "Could not convert the opportunity.",
     "toast.opportunityLost": "Opportunity marked lost",
 
+    // CRM Phase C4 — tags
+    "bp.filter.allTags": "All tags",
+    "bp.f.tags": "Tags",
+    "bp.tag.addPlaceholder": "Add a tag…",
+    "bp.tag.remove": "Remove tag",
+    "toast.tagAdded": "Tag added",
+    "toast.tagSaveFail": "Could not save the tag.",
+
     // Tasks — standalone page (pages/tasks.html, js/tasks.js)
     "tasks.filter.mineOnly": "Only my tasks",
     "tasks.filter.showDone": "Show completed",
@@ -1798,6 +1806,14 @@ window.HITT_I18N_DICT = {
     "toast.opportunityConvertFail": "No se pudo convertir la oportunidad.",
     "toast.opportunityLost": "Oportunidad marcada como perdida",
 
+    // Fase C4 del CRM — etiquetas
+    "bp.filter.allTags": "Todas las etiquetas",
+    "bp.f.tags": "Etiquetas",
+    "bp.tag.addPlaceholder": "Añadir una etiqueta…",
+    "bp.tag.remove": "Quitar etiqueta",
+    "toast.tagAdded": "Etiqueta añadida",
+    "toast.tagSaveFail": "No se pudo guardar la etiqueta.",
+
     // Tareas — página independiente (pages/tasks.html, js/tasks.js)
     "tasks.filter.mineOnly": "Solo mis tareas",
     "tasks.filter.showDone": "Mostrar completadas",
@@ -3231,6 +3247,14 @@ window.HITT_I18N_DICT = {
     "toast.opportunityConverted": "Convertida en el projecte {code}",
     "toast.opportunityConvertFail": "No s'ha pogut convertir l'oportunitat.",
     "toast.opportunityLost": "Oportunitat marcada com a perduda",
+
+    // Fase C4 del CRM — etiquetes
+    "bp.filter.allTags": "Totes les etiquetes",
+    "bp.f.tags": "Etiquetes",
+    "bp.tag.addPlaceholder": "Afegeix una etiqueta…",
+    "bp.tag.remove": "Treu l'etiqueta",
+    "toast.tagAdded": "Etiqueta afegida",
+    "toast.tagSaveFail": "No s'ha pogut desar l'etiqueta.",
 
     // Tasques — pàgina independent (pages/tasks.html, js/tasks.js)
     "tasks.filter.mineOnly": "Només les meves tasques",

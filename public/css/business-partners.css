@@ -65,6 +65,21 @@
 .opp-actions { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.4rem; }
 .opp-stage-select { font-size: 0.72rem; padding: 0.15rem 0.4rem; max-width: 10rem; }
 
+/* ---------- CRM Phase C4: tags ---------- */
+.tag-list { display: flex; flex-wrap: wrap; gap: 0.3rem; min-height: 1.4rem; }
+.tag-chip {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  background: rgba(92,117,124,0.14); color: var(--hitt-teal);
+  font-size: 0.7rem; font-weight: 700; padding: 0.15rem 0.5rem; border-radius: 999px;
+}
+.tag-chip button {
+  border: none; background: none; cursor: pointer; color: inherit;
+  font-size: 0.75rem; line-height: 1; padding: 0; opacity: 0.7;
+}
+.tag-chip button:hover { opacity: 1; }
+.bp-row-tags { display: flex; flex-wrap: wrap; gap: 0.2rem; margin-top: 0.2rem; }
+.bp-row-tags .tag-chip { font-size: 0.62rem; padding: 0.05rem 0.4rem; }
+
 .role-checks {
   display: flex; flex-wrap: wrap; gap: 0.15rem 0.9rem;
   font-size: 0.8rem; color: var(--text-primary);

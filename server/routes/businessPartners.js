@@ -54,6 +54,11 @@
  * the project (Lead/Oferta/Guanyat board) is the record of truth — see
  * docs/customers-crm-alignment.md §3.5.
  *
+ * CRM Phase C4 (first slice) added crm_tags + crm_partner_tags — free,
+ * many-per-partner tags layered on top of the single `category` from
+ * Phase C1 (/tags and /:id/tags below). The rest of Phase C4 (saved
+ * segments, bulk actions, merge-duplicates, CSV import) is not built yet.
+ *
  * Mounted at /api/customers-partners (canonical) and /api/business-partners
  * (kept working, server.js) — the module is "Customers & partners" now
  * (roadmap §4); this file and its internal table/column names weren't
@@ -63,7 +68,7 @@
  */
 const express = require("express");
 const { pool } = require("../config/db");
-const { requireModuleAccess } = require("../lib/permissions");
+const { requireModuleAccess, requireAdmin } = require("../lib/permissions");
 const { logAudit } = require("../lib/audit");
 
 const router = express.Router();
@@ -166,14 +171,114 @@ router.get("/lookups", async (req, res) => {
   }
 });
 
+// ---------------------------------------------------------------------------
+// Tags — CRM Phase C4 (first slice). Free, many-per-partner, global list —
+// registered here (before /:id below) so Express matches "/tags" literally
+// instead of capturing it as an :id. businesspartners.category (Phase C1)
+// stays the single primary category; tags are the flexible layer on top —
+// see docs/customers-crm-alignment.md §3.2.
+// ---------------------------------------------------------------------------
+
+// GET /api/customers-partners/tags — every tag in use, for the picker.
+router.get("/tags", async (req, res) => {
+  try {
+    const { rows } = await pool.query(`SELECT id, label, color FROM crm_tags ORDER BY label`);
+    res.json(rows);
+  } catch (err) {
+    console.error("[GET /api/customers-partners/tags] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
+// DELETE /api/customers-partners/tags/:tagId — removes the tag everywhere
+// (crm_partner_tags rows cascade). Admin-only: this affects every partner
+// that has the tag, not just one.
+router.delete("/tags/:tagId", requireAdmin, async (req, res) => {
+  try {
+    const { rows } = await pool.query(`DELETE FROM crm_tags WHERE id = $1 RETURNING label`, [req.params.tagId]);
+    if (!rows.length) return res.status(404).json({ error: "not_found" });
+    res.status(204).end();
+    logAudit(req, { kind: "bp.tag.delete", desc: `Tag removed everywhere: "${rows[0].label}"` });
+  } catch (err) {
+    console.error("[DELETE /api/customers-partners/tags/:tagId] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
+router.get("/:id/tags", async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT t.id, t.label, t.color
+       FROM crm_partner_tags pt JOIN crm_tags t ON t.id = pt.tagid
+       WHERE pt.businesspartnerid = $1 ORDER BY t.label`,
+      [req.params.id]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error("[GET /api/customers-partners/:id/tags] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
+// POST /api/customers-partners/:id/tags — find-or-create by label, then
+// attach. Keeps the tag picker to one call instead of "create tag" + "attach
+// tag" as two round trips.
+router.post("/:id/tags", async (req, res) => {
+  const label = (req.body?.label || "").trim();
+  if (!label) return res.status(400).json({ error: "validation_error", message: "label is required" });
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const { rows: tagRows } = await client.query(
+      `INSERT INTO crm_tags (label) VALUES ($1)
+       ON CONFLICT (label) DO UPDATE SET label = EXCLUDED.label
+       RETURNING id, label, color`,
+      [label]
+    );
+    const tag = tagRows[0];
+    await client.query(
+      `INSERT INTO crm_partner_tags (businesspartnerid, tagid) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+      [req.params.id, tag.id]
+    );
+    await client.query("COMMIT");
+    res.status(201).json(tag);
+    bpAuditLabel(req.params.id).then((bp) =>
+      logAudit(req, { kind: "bp.tag.add", desc: `Customer/partner "${bp}": tagged "${tag.label}"` }));
+  } catch (err) {
+    await client.query("ROLLBACK");
+    console.error("[POST /api/customers-partners/:id/tags] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  } finally {
+    client.release();
+  }
+});
+
+router.delete("/:id/tags/:tagId", async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `DELETE FROM crm_partner_tags WHERE businesspartnerid = $1 AND tagid = $2
+       RETURNING (SELECT label FROM crm_tags WHERE id = $2) AS label`,
+      [req.params.id, req.params.tagId]
+    );
+    if (!rows.length) return res.status(404).json({ error: "not_found" });
+    res.status(204).end();
+    bpAuditLabel(req.params.id).then((bp) =>
+      logAudit(req, { kind: "bp.tag.remove", desc: `Customer/partner "${bp}": untagged "${rows[0].label}"` }));
+  } catch (err) {
+    console.error("[DELETE /api/customers-partners/:id/tags/:tagId] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
 // GET /api/customers-partners?q=search — list for the search/browse table.
 // projectsAlive/projectsDead/projectsTotal power the "Number of projects"
 // column (N/M(T) — alive/dead(total)) — "dead" mirrors the Reports/
 // stale-projects convention: projectstatus IN ('Closed','Cancelled').
 //
-// CRM Phase C1 filters (all optional):
+// CRM Phase C1/C4 filters (all optional):
 //   stage=<lifecycle_stage>  category=<category>  role=<one roles[] value>
-//   owner=me | <employeeId> | none   includeArchived=true (default excludes)
+//   tag=<one tag label>  owner=me | <employeeId> | none
+//   includeArchived=true (default excludes)
 // Per-owner visibility (appconfig "crm.visibility_all", see
 // crmVisibilityAll() above) narrows the result set for non-admins unless
 // the instance has switched to "everyone sees everyone".
@@ -182,6 +287,7 @@ router.get("/", requireModuleAccess("customers-partners"), async (req, res) => {
   const stage = (req.query.stage || "").trim();
   const category = (req.query.category || "").trim();
   const role = (req.query.role || "").trim();
+  const tag = (req.query.tag || "").trim();
   const ownerParam = (req.query.owner || "").trim();
   const includeArchived = req.query.includeArchived === "true";
   try {
@@ -201,6 +307,13 @@ router.get("/", requireModuleAccess("customers-partners"), async (req, res) => {
     if (stage) { params.push(stage); conditions.push(`bp.lifecycle_stage = $${params.length}`); }
     if (category) { params.push(category); conditions.push(`bp.category = $${params.length}`); }
     if (role) { params.push(role); conditions.push(`$${params.length} = ANY(bp.roles)`); }
+    if (tag) {
+      params.push(tag);
+      conditions.push(`EXISTS (
+        SELECT 1 FROM crm_partner_tags pt JOIN crm_tags t ON t.id = pt.tagid
+        WHERE pt.businesspartnerid = bp.id AND t.label = $${params.length}
+      )`);
+    }
 
     if (ownerParam === "me" && callerId) {
       params.push(callerId);
@@ -230,7 +343,8 @@ router.get("/", requireModuleAccess("customers-partners"), async (req, res) => {
               COALESCE(proj.dead, 0) AS "projectsDead",
               COALESCE(proj.total, 0) AS "projectsTotal",
               COALESCE(tc.n, 0)::int AS "taxCompanyCount",
-              tc.names AS "taxCompanyNames"
+              tc.names AS "taxCompanyNames",
+              COALESCE(tags.labels, '{}') AS "tags"
        FROM businesspartners bp
        LEFT JOIN entity ent ON ent.id = bp.entityid::bigint
        LEFT JOIN companytypes ct ON ct.id = bp.companytypeid
@@ -242,6 +356,11 @@ router.get("/", requireModuleAccess("customers-partners"), async (req, res) => {
                 string_agg(NULLIF(TRIM(taxcompanyname), ''), ' · ' ORDER BY taxcompanyname) AS names
          FROM taxcompanies WHERE businesspartnerid::bigint = bp.id
        ) tc ON true
+       LEFT JOIN LATERAL (
+         SELECT ARRAY_AGG(t.label ORDER BY t.label) AS labels
+         FROM crm_partner_tags pt JOIN crm_tags t ON t.id = pt.tagid
+         WHERE pt.businesspartnerid = bp.id
+       ) tags ON true
        LEFT JOIN LATERAL (
          SELECT
            COUNT(*) FILTER (WHERE ps.projectstatusdesc NOT IN ('Closed', 'Cancelled')) AS alive,
