@@ -35,7 +35,9 @@ let searchTerm = "";
 let onlyAliveProjects = false;
 let stageFilter = "";
 let ownerFilter = "";   // "" | "me" | "none"
+let tagFilter = "";
 let showArchived = false;
+let ALL_TAGS = []; // CRM Phase C4 — { id, label, color }, loaded once at page init
 let activeBpId = null;
 let sortColumn = "name";
 let sortDirection = "asc"; // 'asc' | 'desc'
@@ -48,6 +50,20 @@ function employeeOptionsHtml(selectedId, includeBlankLabel){
   const opts = [`<option value="">${includeBlankLabel || "—"}</option>`]
     .concat((EMPLOYEES || []).map(e => `<option value="${e.id}" ${String(e.id) === String(selectedId) ? 'selected' : ''}>${escapeHtml(e.name || e.username || `#${e.id}`)}</option>`));
   return opts.join('');
+}
+
+// CRM Phase C4 — tags. The filter <select> (list toolbar) and the <datalist>
+// backing the add-tag input (detail modal) both come from the same
+// ALL_TAGS list, refreshed whenever a new tag is created.
+function renderTagFilterOptions(){
+  const sel = document.getElementById('filterTag');
+  const current = sel.value;
+  sel.innerHTML = `<option value="">${T('bp.filter.allTags')}</option>` +
+    ALL_TAGS.map(t => `<option value="${escapeHtml(t.label)}" ${t.label === current ? 'selected' : ''}>${escapeHtml(t.label)}</option>`).join('');
+}
+function renderTagDatalist(){
+  document.getElementById('bpTagOptions').innerHTML =
+    ALL_TAGS.map(t => `<option value="${escapeHtml(t.label)}"></option>`).join('');
 }
 
 function escapeHtml(s){
@@ -98,6 +114,13 @@ async function loadPartners(){
     } catch (err) {
       console.warn("Could not load employees (owner picker):", err);
     }
+    try {
+      ALL_TAGS = await HITT_API.getAllTags();
+      renderTagFilterOptions();
+      renderTagDatalist();
+    } catch (err) {
+      console.warn("Could not load tags:", err);
+    }
     // includeArchived: the list loads once and every filter (search, stage,
     // owner, archived...) runs client-side, same as the rest of this page —
     // so "Show archived" just needs the rows already in memory.
@@ -138,6 +161,7 @@ function matchesFilters(p){
   if (stageFilter && (p.lifecycleStage || 'new') !== stageFilter) return false;
   if (ownerFilter === 'me' && String(p.ownerEmployeeId ?? '') !== String(currentEmployeeId ?? '')) return false;
   if (ownerFilter === 'none' && p.ownerEmployeeId) return false;
+  if (tagFilter && !(p.tags || []).includes(tagFilter)) return false;
   return true;
 }
 
@@ -169,7 +193,10 @@ function renderTable(){
   empty.classList.add('hidden');
   tbody.innerHTML = rows.map(p => `
     <tr data-id="${p.id}">
-      <td>${escapeHtml(p.name)}${p.archivedAt ? ` <span class="stage-pill">${T('bp.archived')}</span>` : ''}</td>
+      <td>
+        ${escapeHtml(p.name)}${p.archivedAt ? ` <span class="stage-pill">${T('bp.archived')}</span>` : ''}
+        ${(p.tags || []).length ? `<div class="bp-row-tags">${p.tags.map(t => `<span class="tag-chip">${escapeHtml(t)}</span>`).join('')}</div>` : ''}
+      </td>
       <td>
         <span class="stage-pill stage-pill--${p.lifecycleStage || 'new'}">${T(STAGE_LABEL_KEYS[p.lifecycleStage] || STAGE_LABEL_KEYS.new)}</span>
         ${p.temperature ? `<span class="temp-badge">${p.temperature === 'hot' ? '🔥' : '☀️'}</span>` : ''}
@@ -229,6 +256,11 @@ document.getElementById('filterOwner').addEventListener('change', (e) => {
 
 document.getElementById('filterArchived').addEventListener('change', (e) => {
   showArchived = e.target.checked;
+  renderTable();
+});
+
+document.getElementById('filterTag').addEventListener('change', (e) => {
+  tagFilter = e.target.value;
   renderTable();
 });
 
@@ -686,6 +718,40 @@ async function deleteOpportunity(id){
   }
 }
 
+/* ============================== TAGS (CRM Phase C4) ======================= */
+let TAGS = [];
+
+function renderTags(rows){
+  if (rows) TAGS = rows;
+  const list = document.getElementById('mTagList');
+  list.innerHTML = TAGS.map(t => `
+    <span class="tag-chip">${escapeHtml(t.label)}
+      <button type="button" data-remove-tag="${t.id}" title="${T('bp.tag.remove')}">✕</button>
+    </span>
+  `).join('');
+  list.querySelectorAll('[data-remove-tag]').forEach(btn => {
+    btn.addEventListener('click', () => removeTag(btn.dataset.removeTag));
+  });
+}
+
+// Keeps the list-view row's tag chips in sync without a full reload —
+// same idea as mSave's Object.assign onto the PARTNERS row.
+function syncPartnerTagsInList(){
+  const p = PARTNERS.find(x => x.id === activeBpId);
+  if (p) { p.tags = TAGS.map(t => t.label); renderTable(); }
+}
+
+async function removeTag(tagId){
+  try {
+    await HITT_API.removeBusinessPartnerTag(activeBpId, tagId);
+    renderTags(await HITT_API.getBusinessPartnerTags(activeBpId));
+    syncPartnerTagsInList();
+  } catch (err) {
+    console.error(err);
+    toast(T('toast.tagSaveFail'), 'red');
+  }
+}
+
 let TAX_COMPANIES = [];
 let editingTcId = null;
 
@@ -986,6 +1052,11 @@ async function openDetailModal(id){
   document.getElementById('mNewOppSource').value = '';
   renderOpportunityPickers();
 
+  // CRM Phase C4 — tags
+  TAGS = [];
+  document.getElementById('mTagList').innerHTML = '';
+  document.getElementById('mNewTagLabel').value = '';
+
   const loadingMsg = usingDemoData ? T('bp.demo.notAvailable') : T('common.loading');
   document.getElementById('mContactsList').innerHTML = `<div class="sub-empty">${loadingMsg}</div>`;
   document.getElementById('mNotesList').innerHTML = `<div class="sub-empty">${loadingMsg}</div>`;
@@ -1089,6 +1160,14 @@ async function openDetailModal(id){
   }
 
   try {
+    const tags = await HITT_API.getBusinessPartnerTags(id);
+    if (activeBpId !== id) return;
+    renderTags(tags);
+  } catch (err) {
+    console.warn(`Could not load tags for business partner ${id}:`, err);
+  }
+
+  try {
     const history = await HITT_API.getBusinessPartnerHistory(id);
     if (activeBpId !== id) return;
     renderHistory(history);
@@ -1105,6 +1184,7 @@ const BP_MODAL_TRANSIENT_IDS = [
   'mTcName', 'mTcVat', 'mTcEmail', 'mTcStreet', 'mTcCity', 'mTcState', 'mTcZip', 'mTcPhone1', 'mTcPhone2',
   'mNewActivitySummary', 'mNewActivityNextStep', 'mNewTaskTitle',
   'mNewOppName', 'mNewOppValue', 'mNewOppSource',
+  'mNewTagLabel',
 ];
 
 // Sub-item changes made during the current modal session. Each "Add" /
@@ -1502,6 +1582,30 @@ document.getElementById('mNewOppName').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') document.getElementById('mAddOpportunity').click();
 });
 
+document.getElementById('mAddTag').addEventListener('click', async () => {
+  const label = document.getElementById('mNewTagLabel').value.trim();
+  if (!label || !activeBpId) return;
+  if (usingDemoData) { toast(T('bp.demo.notAvailable'), 'navy'); return; }
+  try {
+    const tag = await HITT_API.addBusinessPartnerTag(activeBpId, label);
+    document.getElementById('mNewTagLabel').value = '';
+    renderTags(await HITT_API.getBusinessPartnerTags(activeBpId));
+    syncPartnerTagsInList();
+    if (!ALL_TAGS.some(t => t.id === tag.id)) {
+      ALL_TAGS.push(tag);
+      renderTagFilterOptions();
+      renderTagDatalist();
+    }
+    toast(T('toast.tagAdded'), 'green');
+  } catch (err) {
+    console.error(err);
+    toast(err.message || T('toast.tagSaveFail'), 'red');
+  }
+});
+document.getElementById('mNewTagLabel').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); document.getElementById('mAddTag').click(); }
+});
+
 document.getElementById('mTcSameAddress').addEventListener('change', syncTcAddressVisibility);
 document.getElementById('mTcFiscalIdType')?.addEventListener('change', syncTcFiscalCountry);
 document.getElementById('mTcCancel').addEventListener('click', () => { resetTaxCompanyForm(); renderTaxCompanies(); });
@@ -1821,6 +1925,8 @@ window.addEventListener('hitt:langchange', () => {
     renderBpTasks();
     renderOpportunities();
     renderOpportunityPickers();
+    renderTags();
     updateArchiveButtonUI(document.getElementById('mArchiveToggle').dataset.archived ? new Date().toISOString() : null);
   }
+  renderTagFilterOptions();
 });

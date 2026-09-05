@@ -42,6 +42,9 @@
         <option value="me" data-i18n="bp.filter.myPartners">My partners</option>
         <option value="none" data-i18n="bp.filter.noOwner">No owner</option>
       </select>
+      <select id="filterTag" class="field-input bp-filter-select">
+        <option value="" data-i18n="bp.filter.allTags">All tags</option>
+      </select>
       <label class="bp-filter-toggle">
         <input type="checkbox" id="filterAliveProjects" />
         <span data-i18n="bp.filter.liveProjects">Only partners with live projects</span>
@@ -83,6 +86,9 @@
     <option value="Experts, Faculty &amp; Advisors"></option>
     <option value="Healthcare &amp; Professional"></option>
   </datalist>
+
+  <!-- Populated at runtime from GET /api/customers-partners/tags -->
+  <datalist id="bpTagOptions"></datalist>
 
   <!-- ============================ DETAIL MODAL ============================ -->
   <div id="modalOverlay" class="modal-overlay hidden">
@@ -174,6 +180,14 @@
                   <label><input type="checkbox" value="partner" /> <span data-i18n="bp.role.partner">Partner</span></label>
                   <label><input type="checkbox" value="supplier" /> <span data-i18n="bp.role.supplier">Supplier</span></label>
                   <label><input type="checkbox" value="other" /> <span data-i18n="bp.role.other">Other</span></label>
+                </div>
+              </div>
+              <div class="span-2">
+                <label class="field-label" data-i18n="bp.f.tags">Tags</label>
+                <div id="mTagList" class="tag-list"></div>
+                <div class="sub-add-row">
+                  <input id="mNewTagLabel" type="text" class="field-input" list="bpTagOptions" placeholder="Add a tag…" data-i18n-placeholder="bp.tag.addPlaceholder" />
+                  <button id="mAddTag" class="btn-icon-add" type="button" data-i18n="form.add">Add</button>
                 </div>
               </div>
             </div>

@@ -168,6 +168,13 @@ const HITT_API = (() => {
     convertBusinessPartnerOpportunity: (id, oppId, payload) =>
       request(`/api/customers-partners/${id}/opportunities/${oppId}/convert`, { method: "POST", body: JSON.stringify(payload || {}) }),
 
+    getBusinessPartnerTags: (id) => request(`/api/customers-partners/${id}/tags`),
+    addBusinessPartnerTag: (id, label) =>
+      request(`/api/customers-partners/${id}/tags`, { method: "POST", body: JSON.stringify({ label }) }),
+    removeBusinessPartnerTag: (id, tagId) =>
+      request(`/api/customers-partners/${id}/tags/${tagId}`, { method: "DELETE" }),
+    getAllTags: () => request(`/api/customers-partners/tags`),
+
     // opts: { owner, status, entityType, entityId, dueBefore } — all optional,
     // see server/routes/tasks.js GET / for the filter semantics.
     getTasks: (opts = {}) => {
