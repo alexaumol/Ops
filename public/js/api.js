@@ -175,6 +175,12 @@ const HITT_API = (() => {
       request(`/api/customers-partners/${id}/tags/${tagId}`, { method: "DELETE" }),
     getAllTags: () => request(`/api/customers-partners/tags`),
 
+    getBusinessPartnerSegments: () => request(`/api/customers-partners/segments`),
+    saveBusinessPartnerSegment: (payload) =>
+      request(`/api/customers-partners/segments`, { method: "POST", body: JSON.stringify(payload) }),
+    deleteBusinessPartnerSegment: (segmentId) =>
+      request(`/api/customers-partners/segments/${segmentId}`, { method: "DELETE" }),
+
     // opts: { owner, status, entityType, entityId, dueBefore } — all optional,
     // see server/routes/tasks.js GET / for the filter semantics.
     getTasks: (opts = {}) => {
