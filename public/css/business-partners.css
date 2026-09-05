@@ -347,3 +347,18 @@
 .task-title { font-size: 0.82rem; font-weight: 600; }
 .task-meta { font-size: 0.7rem; color: var(--text-secondary); }
 .task-meta.is-overdue { color: var(--danger); font-weight: 700; }
+
+/* ---------- CRM Phase C4: saved segments & bulk actions ---------- */
+.bp-col-check { width: 2rem; }
+.bp-table td:first-child { cursor: default; }
+.bp-bulk-toolbar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem;
+  margin-bottom: 0.85rem; padding: 0.55rem 0.85rem;
+  background: rgba(92,117,124,0.10); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+}
+.bulk-count { font-size: 0.82rem; font-weight: 700; color: var(--hitt-teal); white-space: nowrap; }
+.bp-bulk-toolbar input[type="text"] {
+  padding: 0.4rem 0.6rem; border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle); font-size: 0.8rem; max-width: 12rem;
+}

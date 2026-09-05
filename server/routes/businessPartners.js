@@ -270,6 +270,73 @@ router.delete("/:id/tags/:tagId", async (req, res) => {
   }
 });
 
+// ---------------------------------------------------------------------------
+// Saved segments — CRM Phase C4 (second slice). A named, reusable filter
+// combination for the list page. filter_json stores exactly the query-param
+// object the frontend already builds for GET / above (stage/category/role/
+// tag/owner/q/includeArchived) — applying a segment is just "load these
+// params", no separate filter grammar. Registered here (before /:id) so
+// Express matches "/segments" literally.
+// ---------------------------------------------------------------------------
+
+// GET /api/customers-partners/segments — the caller's own segments plus
+// every shared one.
+router.get("/segments", async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, name, shared, filter_json AS "filterJson",
+              owner_employeeid AS "ownerEmployeeId", created_at AS "createdAt"
+       FROM crm_saved_segments
+       WHERE owner_employeeid = $1 OR shared
+       ORDER BY name`,
+      [req.hittUser?.employeeId || null]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error("[GET /api/customers-partners/segments] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
+router.post("/segments", async (req, res) => {
+  const { name, shared, filterJson } = req.body || {};
+  if (!name || !name.trim()) {
+    return res.status(400).json({ error: "validation_error", message: "name is required" });
+  }
+  try {
+    const { rows } = await pool.query(
+      `INSERT INTO crm_saved_segments (name, owner_employeeid, shared, filter_json)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id, name, shared, filter_json AS "filterJson", owner_employeeid AS "ownerEmployeeId", created_at AS "createdAt"`,
+      [name.trim(), req.hittUser?.employeeId || null, !!shared, JSON.stringify(filterJson || {})]
+    );
+    res.status(201).json(rows[0]);
+    logAudit(req, { kind: "bp.segment.add", desc: `Saved segment created: "${name.trim()}"` + (shared ? " (shared)" : "") });
+  } catch (err) {
+    console.error("[POST /api/customers-partners/segments] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
+// DELETE /api/customers-partners/segments/:segmentId — the owner or an
+// admin only; a shared segment isn't everyone's to delete.
+router.delete("/segments/:segmentId", async (req, res) => {
+  try {
+    const { rows } = await pool.query(`SELECT owner_employeeid AS "ownerEmployeeId", name FROM crm_saved_segments WHERE id = $1`, [req.params.segmentId]);
+    if (!rows.length) return res.status(404).json({ error: "not_found" });
+    const isOwner = String(rows[0].ownerEmployeeId ?? "") === String(req.hittUser?.employeeId ?? "");
+    if (!isOwner && !req.hittUser?.isAdmin) {
+      return res.status(403).json({ error: "forbidden", message: "Only the owner or an admin can delete this segment." });
+    }
+    await pool.query(`DELETE FROM crm_saved_segments WHERE id = $1`, [req.params.segmentId]);
+    res.status(204).end();
+    logAudit(req, { kind: "bp.segment.delete", desc: `Saved segment deleted: "${rows[0].name}"` });
+  } catch (err) {
+    console.error("[DELETE /api/customers-partners/segments/:segmentId] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
 // GET /api/customers-partners?q=search — list for the search/browse table.
 // projectsAlive/projectsDead/projectsTotal power the "Number of projects"
 // column (N/M(T) — alive/dead(total)) — "dead" mirrors the Reports/

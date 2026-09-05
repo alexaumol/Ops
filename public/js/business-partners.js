@@ -38,6 +38,9 @@ let ownerFilter = "";   // "" | "me" | "none"
 let tagFilter = "";
 let showArchived = false;
 let ALL_TAGS = []; // CRM Phase C4 — { id, label, color }, loaded once at page init
+let SEGMENTS = []; // CRM Phase C4 — saved segments (named filter combinations)
+let selectedIds = new Set(); // CRM Phase C4 — bulk-actions row selection
+let visibleIds = []; // ids currently passing matchesFilters(), for "select all"
 let activeBpId = null;
 let sortColumn = "name";
 let sortDirection = "asc"; // 'asc' | 'desc'
@@ -64,6 +67,65 @@ function renderTagFilterOptions(){
 function renderTagDatalist(){
   document.getElementById('bpTagOptions').innerHTML =
     ALL_TAGS.map(t => `<option value="${escapeHtml(t.label)}"></option>`).join('');
+}
+
+// CRM Phase C4 — saved segments. filter_json mirrors the client-side filter
+// state (search/stage/owner/tag/onlyAliveProjects/includeArchived) this page
+// already keeps, so "apply a segment" is just "load these control values".
+function renderSegmentOptions(){
+  const sel = document.getElementById('filterSegment');
+  const current = sel.value;
+  sel.innerHTML = `<option value="">${T('bp.segment.none')}</option>` +
+    SEGMENTS.map(s => `<option value="${s.id}" ${String(s.id) === current ? 'selected' : ''}>${escapeHtml(s.name)}</option>`).join('');
+}
+
+async function loadSegments(){
+  try {
+    SEGMENTS = await HITT_API.getBusinessPartnerSegments();
+  } catch (err) {
+    console.warn("Could not load saved segments:", err);
+    SEGMENTS = [];
+  }
+  renderSegmentOptions();
+}
+
+function applySegmentFilters(f){
+  searchTerm = f.q || '';
+  document.getElementById('searchBox').value = searchTerm;
+  onlyAliveProjects = !!f.onlyAliveProjects;
+  document.getElementById('filterAliveProjects').checked = onlyAliveProjects;
+  stageFilter = f.stage || '';
+  document.getElementById('filterStage').value = stageFilter;
+  ownerFilter = f.owner || '';
+  document.getElementById('filterOwner').value = ownerFilter;
+  tagFilter = f.tag || '';
+  document.getElementById('filterTag').value = tagFilter;
+  showArchived = !!f.includeArchived;
+  document.getElementById('filterArchived').checked = showArchived;
+  renderTable();
+}
+
+// CRM Phase C4 — bulk actions. The owner picker mirrors employeeOptionsHtml
+// but without a blank/dash option, since picking nothing shouldn't be a
+// legal "apply" choice for a bulk update.
+function renderBulkOwnerOptions(){
+  document.getElementById('bulkOwnerSelect').innerHTML =
+    `<option value="">${T('bp.bulk.setOwner')}</option>` +
+    (EMPLOYEES || []).map(e => `<option value="${e.id}">${escapeHtml(e.name || e.username || `#${e.id}`)}</option>`).join('');
+}
+
+function updateBulkToolbar(){
+  const bar = document.getElementById('bulkToolbar');
+  const count = selectedIds.size;
+  bar.classList.toggle('hidden', count === 0);
+  document.getElementById('bulkCount').textContent = T('bp.bulk.count', { count });
+}
+
+function syncSelectAllCheckbox(){
+  const all = document.getElementById('selectAllRows');
+  const visibleSelected = visibleIds.filter(id => selectedIds.has(id));
+  all.checked = visibleIds.length > 0 && visibleSelected.length === visibleIds.length;
+  all.indeterminate = visibleSelected.length > 0 && visibleSelected.length < visibleIds.length;
 }
 
 function escapeHtml(s){
@@ -96,6 +158,7 @@ function setDataSourcePill(){
 
 /* ============================== LOAD DATA =============================== */
 async function loadPartners(){
+  selectedIds.clear(); // any reload (bulk actions included) invalidates a stale selection
   if (!window.HITT_CONFIG?.FEATURES?.businessPartnersLive) {
     PARTNERS = structuredClone(DEMO_SEED);
     usingDemoData = true;
@@ -111,6 +174,7 @@ async function loadPartners(){
     }
     try {
       EMPLOYEES = await HITT_API.getEmployees();
+      renderBulkOwnerOptions();
     } catch (err) {
       console.warn("Could not load employees (owner picker):", err);
     }
@@ -121,6 +185,7 @@ async function loadPartners(){
     } catch (err) {
       console.warn("Could not load tags:", err);
     }
+    await loadSegments();
     // includeArchived: the list loads once and every filter (search, stage,
     // owner, archived...) runs client-side, same as the rest of this page —
     // so "Show archived" just needs the rows already in memory.
@@ -185,14 +250,19 @@ function renderTable(){
     if (arrow) arrow.textContent = active ? (sortDirection === 'asc' ? '▲' : '▼') : '▲';
   });
 
+  visibleIds = rows.map(p => p.id);
+
   if (!rows.length) {
     tbody.innerHTML = '';
     empty.classList.remove('hidden');
+    updateBulkToolbar();
+    syncSelectAllCheckbox();
     return;
   }
   empty.classList.add('hidden');
   tbody.innerHTML = rows.map(p => `
     <tr data-id="${p.id}">
+      <td class="bp-col-check"><input type="checkbox" class="bp-row-check" data-id="${p.id}" ${selectedIds.has(p.id) ? 'checked' : ''} /></td>
       <td>
         ${escapeHtml(p.name)}${p.archivedAt ? ` <span class="stage-pill">${T('bp.archived')}</span>` : ''}
         ${(p.tags || []).length ? `<div class="bp-row-tags">${p.tags.map(t => `<span class="tag-chip">${escapeHtml(t)}</span>`).join('')}</div>` : ''}
@@ -232,7 +302,25 @@ function renderTable(){
       openBpTaxCompaniesModal(btn.dataset.bpTaxcos);
     });
   });
+  tbody.querySelectorAll('.bp-row-check').forEach(cb => {
+    cb.addEventListener('click', (e) => e.stopPropagation()); // don't also open the detail modal
+    cb.addEventListener('change', (e) => {
+      const id = Number(e.target.dataset.id);
+      if (e.target.checked) selectedIds.add(id); else selectedIds.delete(id);
+      updateBulkToolbar();
+      syncSelectAllCheckbox();
+    });
+  });
+  updateBulkToolbar();
+  syncSelectAllCheckbox();
 }
+
+document.getElementById('selectAllRows').addEventListener('click', (e) => e.stopPropagation());
+document.getElementById('selectAllRows').addEventListener('change', (e) => {
+  if (e.target.checked) visibleIds.forEach(id => selectedIds.add(id));
+  else visibleIds.forEach(id => selectedIds.delete(id));
+  renderTable();
+});
 
 document.getElementById('searchBox').addEventListener('input', (e) => {
   searchTerm = e.target.value.trim();
@@ -261,6 +349,101 @@ document.getElementById('filterArchived').addEventListener('change', (e) => {
 
 document.getElementById('filterTag').addEventListener('change', (e) => {
   tagFilter = e.target.value;
+  renderTable();
+});
+
+/* ---------- CRM Phase C4: saved segments ---------- */
+document.getElementById('filterSegment').addEventListener('change', (e) => {
+  const segId = e.target.value;
+  document.getElementById('btnDeleteSegment').classList.toggle('hidden', !segId);
+  if (!segId) return;
+  const seg = SEGMENTS.find(s => String(s.id) === segId);
+  if (seg) applySegmentFilters(seg.filterJson || {});
+});
+
+document.getElementById('btnSaveSegment').addEventListener('click', async () => {
+  const name = window.prompt(T('bp.segment.namePrompt'));
+  if (!name || !name.trim()) return;
+  const shared = confirm(T('bp.segment.sharedConfirm'));
+  const filterJson = {
+    q: searchTerm, onlyAliveProjects, stage: stageFilter, owner: ownerFilter,
+    tag: tagFilter, includeArchived: showArchived,
+  };
+  try {
+    const seg = await HITT_API.saveBusinessPartnerSegment({ name: name.trim(), shared, filterJson });
+    SEGMENTS.push(seg);
+    SEGMENTS.sort((a, b) => a.name.localeCompare(b.name));
+    renderSegmentOptions();
+    document.getElementById('filterSegment').value = seg.id;
+    document.getElementById('btnDeleteSegment').classList.remove('hidden');
+    toast(T('toast.segmentSaved'), 'green');
+  } catch (err) {
+    console.error(err);
+    toast(T('toast.segmentSaveFail'), 'red');
+  }
+});
+
+document.getElementById('btnDeleteSegment').addEventListener('click', async () => {
+  const sel = document.getElementById('filterSegment');
+  const segId = sel.value;
+  if (!segId) return;
+  const seg = SEGMENTS.find(s => String(s.id) === segId);
+  if (!seg || !confirm(T('bp.confirm.deleteSegment', { name: seg.name }))) return;
+  try {
+    await HITT_API.deleteBusinessPartnerSegment(segId);
+    SEGMENTS = SEGMENTS.filter(s => String(s.id) !== segId);
+    renderSegmentOptions();
+    sel.value = '';
+    document.getElementById('btnDeleteSegment').classList.add('hidden');
+    toast(T('toast.segmentDeleted'), 'green');
+  } catch (err) {
+    console.error(err);
+    toast(T('toast.segmentDeleteFail'), 'red');
+  }
+});
+
+/* ---------- CRM Phase C4: bulk actions ---------- */
+// Deliberately no bulk-specific server endpoints: each action is a
+// Promise.allSettled fan-out over the existing per-partner endpoints
+// (PATCH /:id, POST /:id/tags, POST /:id/archive), same as a user clicking
+// through each record by hand, just in parallel.
+document.getElementById('btnBulkOwner').addEventListener('click', async () => {
+  const ownerVal = document.getElementById('bulkOwnerSelect').value;
+  if (!ownerVal || !selectedIds.size) return;
+  const ids = [...selectedIds];
+  const results = await Promise.allSettled(ids.map(id =>
+    HITT_API.updateBusinessPartner(id, { employeeId: currentEmployeeId, ownerEmployeeId: Number(ownerVal) })
+  ));
+  const failed = results.filter(r => r.status === 'rejected').length;
+  document.getElementById('bulkOwnerSelect').value = '';
+  await loadPartners();
+  toast(failed ? T('toast.bulkPartialFail', { count: failed }) : T('toast.bulkOwnerSet', { count: ids.length }), failed ? 'red' : 'green');
+});
+
+document.getElementById('btnBulkTag').addEventListener('click', async () => {
+  const input = document.getElementById('bulkTagInput');
+  const label = input.value.trim();
+  if (!label || !selectedIds.size) return;
+  const ids = [...selectedIds];
+  const results = await Promise.allSettled(ids.map(id => HITT_API.addBusinessPartnerTag(id, label)));
+  const failed = results.filter(r => r.status === 'rejected').length;
+  input.value = '';
+  await loadPartners();
+  toast(failed ? T('toast.bulkPartialFail', { count: failed }) : T('toast.bulkTagAdded', { count: ids.length }), failed ? 'red' : 'green');
+});
+
+document.getElementById('btnBulkArchive').addEventListener('click', async () => {
+  if (!selectedIds.size) return;
+  const ids = [...selectedIds];
+  if (!confirm(T('bp.confirm.bulkArchive', { count: ids.length }))) return;
+  const results = await Promise.allSettled(ids.map(id => HITT_API.archiveBusinessPartner(id)));
+  const failed = results.filter(r => r.status === 'rejected').length;
+  await loadPartners();
+  toast(failed ? T('toast.bulkPartialFail', { count: failed }) : T('toast.bulkArchived', { count: ids.length }), failed ? 'red' : 'green');
+});
+
+document.getElementById('btnBulkClear').addEventListener('click', () => {
+  selectedIds.clear();
   renderTable();
 });
 
@@ -1929,4 +2112,6 @@ window.addEventListener('hitt:langchange', () => {
     updateArchiveButtonUI(document.getElementById('mArchiveToggle').dataset.archived ? new Date().toISOString() : null);
   }
   renderTagFilterOptions();
+  renderSegmentOptions();
+  renderBulkOwnerOptions();
 });

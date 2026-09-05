@@ -53,14 +53,32 @@
         <input type="checkbox" id="filterArchived" />
         <span data-i18n="bp.filter.showArchived">Show archived</span>
       </label>
+      <select id="filterSegment" class="field-input bp-filter-select">
+        <option value="" data-i18n="bp.segment.none">Saved views…</option>
+      </select>
+      <button class="btn btn-secondary" id="btnSaveSegment" data-i18n="bp.segment.save">Save view</button>
+      <button class="btn btn-secondary hidden" id="btnDeleteSegment" data-i18n="bp.segment.delete">Delete view</button>
       <span id="bpCount" class="bp-count"></span>
       <button class="btn btn-primary" id="btnNewBp" data-i18n="bp.new">+ New customer/partner</button>
+    </div>
+
+    <div id="bulkToolbar" class="bp-bulk-toolbar hidden">
+      <span id="bulkCount" class="bulk-count"></span>
+      <select id="bulkOwnerSelect" class="field-input bp-filter-select">
+        <option value="" data-i18n="bp.bulk.setOwner">Set owner…</option>
+      </select>
+      <button class="btn btn-secondary" id="btnBulkOwner" data-i18n="bp.bulk.apply">Apply</button>
+      <input id="bulkTagInput" type="text" list="bpTagOptions" class="field-input" data-i18n-placeholder="bp.bulk.addTagPlaceholder" placeholder="Add tag to selected…" />
+      <button class="btn btn-secondary" id="btnBulkTag" data-i18n="bp.bulk.applyTag">Add tag</button>
+      <button class="btn btn-secondary" id="btnBulkArchive" data-i18n="bp.bulk.archive">Archive selected</button>
+      <button class="btn btn-secondary" id="btnBulkClear" data-i18n="bp.bulk.clear">Clear selection</button>
     </div>
 
     <div class="bp-table-wrap">
       <table class="bp-table">
         <thead>
           <tr>
+            <th class="bp-col-check"><input type="checkbox" id="selectAllRows" /></th>
             <th data-sort="name" data-i18n="bp.col.name">Name<span class="sort-arrow"></span></th>
             <th data-sort="lifecycleStage" data-i18n="bp.col.stage">Stage<span class="sort-arrow"></span></th>
             <th data-sort="companyTypeLabel" data-i18n="bp.col.companyType">Company type<span class="sort-arrow"></span></th>
