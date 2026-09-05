@@ -49,6 +49,7 @@ const reportsRouter = loadRouter("reports");
 const auditRouter = loadRouter("audit");
 const expensesRouter = loadRouter("expenses");
 const chatRouter = loadRouter("chat");
+const tasksRouter = loadRouter("tasks");
 const { attachHittUser, requireAuth, AUTH_MODE } = require("./lib/permissions");
 const { entraConfigured } = require("./lib/entraToken");
 const { oidcConfigured, OIDC_ISSUER } = require("./lib/oidcToken");
@@ -121,6 +122,7 @@ app.use("/api/verifactu", verifactuRouter);
 app.use("/api/reports", reportsRouter);
 app.use("/api/audit", auditRouter);
 app.use("/api/chat", chatRouter);
+app.use("/api/tasks", tasksRouter);
 
 // Fallback 404 for unknown API routes.
 app.use("/api", (req, res) => {

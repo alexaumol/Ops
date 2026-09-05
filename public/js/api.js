@@ -152,6 +152,24 @@ const HITT_API = (() => {
       request(`/api/customers-partners/${id}/archive`, { method: "POST", body: JSON.stringify({ reason }) }),
     unarchiveBusinessPartner: (id) =>
       request(`/api/customers-partners/${id}/unarchive`, { method: "POST" }),
+    getBusinessPartnerActivities: (id) => request(`/api/customers-partners/${id}/activities`),
+    addBusinessPartnerActivity: (id, payload) =>
+      request(`/api/customers-partners/${id}/activities`, { method: "POST", body: JSON.stringify(payload) }),
+    deleteBusinessPartnerActivity: (id, activityId) =>
+      request(`/api/customers-partners/${id}/activities/${activityId}`, { method: "DELETE" }),
+
+    // opts: { owner, status, entityType, entityId, dueBefore } — all optional,
+    // see server/routes/tasks.js GET / for the filter semantics.
+    getTasks: (opts = {}) => {
+      const params = new URLSearchParams();
+      Object.entries(opts).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== "") params.set(k, v); });
+      const qs = params.toString();
+      return request(`/api/tasks${qs ? `?${qs}` : ""}`);
+    },
+    getTask: (id) => request(`/api/tasks/${id}`),
+    createTask: (payload) => request("/api/tasks", { method: "POST", body: JSON.stringify(payload) }),
+    updateTask: (id, payload) => request(`/api/tasks/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
+    deleteTask: (id) => request(`/api/tasks/${id}`, { method: "DELETE" }),
 
     getEmployees: () => request("/api/employees"),
     getTimeTracking: (userId, weekStart) =>

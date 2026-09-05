@@ -107,6 +107,7 @@
       </div>
       <div class="modal-tabs">
         <button data-mtab="general" class="modal-tab" aria-selected="true" data-i18n="bp.tab.general">General</button>
+        <button data-mtab="timeline" class="modal-tab" aria-selected="false" data-i18n="bp.tab.timeline">Timeline</button>
         <button data-mtab="invoicing" class="modal-tab" aria-selected="false" data-i18n="bp.tab.invoicing">Invoicing info</button>
         <div style="flex:1;"></div>
         <button id="historyCollapse" title="Collapse history" style="width:1.75rem; height:1.75rem; border:none; background:none; cursor:pointer; border-radius:var(--radius-sm); color:var(--hitt-teal); font-size:0.85rem;">»</button>
@@ -333,6 +334,53 @@
                 <button id="mTcCancel" class="btn-icon-add" type="button" style="display:none; background:var(--text-secondary);" data-i18n="form.cancel">Cancel</button>
               </div>
             </div>
+          </div>
+        </div>
+
+        <div id="paneTimeline" class="modal-pane hidden">
+          <div>
+          <div class="field-section">
+            <h3 data-i18n="bp.section.timeline">Activity timeline</h3>
+            <div id="mActivityList" class="sub-list"></div>
+            <div class="sub-add-row" style="flex-wrap:wrap;">
+              <select id="mNewActivityKind" class="field-input" style="max-width:8rem;">
+                <option value="call" data-i18n="bp.activity.kind.call">Call</option>
+                <option value="meeting" data-i18n="bp.activity.kind.meeting">Meeting</option>
+                <option value="email" data-i18n="bp.activity.kind.email">Email</option>
+                <option value="note" data-i18n="bp.activity.kind.note">Internal note</option>
+                <option value="site_visit" data-i18n="bp.activity.kind.siteVisit">Site visit</option>
+                <option value="other" data-i18n="bp.activity.kind.other">Other</option>
+              </select>
+              <select id="mNewActivityOutcome" class="field-input" style="max-width:8rem;">
+                <option value="" data-i18n="bp.activity.outcome.none">Outcome…</option>
+                <option value="positive" data-i18n="bp.activity.outcome.positive">Positive</option>
+                <option value="neutral" data-i18n="bp.activity.outcome.neutral">Neutral</option>
+                <option value="negative" data-i18n="bp.activity.outcome.negative">Negative</option>
+              </select>
+              <select id="mNewActivityContact" class="field-input" style="max-width:10rem;">
+                <option value="" data-i18n="bp.activity.withContact.none">With contact…</option>
+              </select>
+            </div>
+            <div class="sub-add-row" style="flex-wrap:wrap;">
+              <textarea id="mNewActivitySummary" class="field-input" rows="2" style="flex:1; min-width:14rem; resize:vertical;" placeholder="What happened…" data-i18n-placeholder="bp.activity.summaryPlaceholder"></textarea>
+            </div>
+            <div class="sub-add-row" style="flex-wrap:wrap;">
+              <input id="mNewActivityNextStep" type="text" class="field-input" style="flex:1;" placeholder="Agreed next step (optional)…" data-i18n-placeholder="bp.activity.nextStepPlaceholder" />
+              <button id="mAddActivity" class="btn-icon-add" type="button" data-i18n="bp.activity.log">Log activity</button>
+            </div>
+          </div>
+          </div>
+
+          <div>
+          <div class="field-section">
+            <h3 data-i18n="bp.section.nextActions">Next actions</h3>
+            <div id="mTaskList" class="sub-list"></div>
+            <div class="sub-add-row" style="flex-wrap:wrap;">
+              <input id="mNewTaskTitle" type="text" class="field-input" placeholder="New task…" data-i18n-placeholder="bp.task.titlePlaceholder" />
+              <input id="mNewTaskDue" type="date" class="field-input" style="max-width:9.5rem;" />
+              <button id="mAddTask" class="btn-icon-add" type="button" data-i18n="form.add">Add</button>
+            </div>
+          </div>
           </div>
         </div>
       </div>

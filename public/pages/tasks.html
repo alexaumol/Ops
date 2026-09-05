@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Tasks · HITT Ops</title>
+<link rel="icon" href="../assets/ops-mark.svg" />
+<link rel="stylesheet" href="../css/styles.css" />
+<!-- Reuses the generic modal/toast/field-input/sub-item classes from
+     business-partners.css (they're not actually BP-specific) — same
+     convention as time-allocation.css/reports.css/expenses.css. -->
+<link rel="stylesheet" href="../css/business-partners.css" />
+<link rel="stylesheet" href="../css/tasks.css" />
+</head>
+<body>
+  <header class="app-header">
+    <a class="app-header__brand" href="../welcome.html"><img class="app-header__logo" src="../assets/ops-mark.svg" alt="" aria-hidden="true" /><span class="app-header__name">Ops</span></a>
+    <nav class="app-header__nav" aria-label="Primary">
+      <a href="../welcome.html" data-i18n="nav.home">Home</a>
+      <a href="tasks.html" class="active" data-i18n="nav.tasks">Tasks</a>
+    </nav>
+    <div class="app-header__user">
+      <div class="avatar" id="userAvatar">?</div>
+      <span id="userName">Signed in</span>
+    </div>
+  </header>
+
+  <main class="page-shell">
+    <h1 class="page-title" data-i18n="page.tasks.title">Tasks</h1>
+    <p class="page-subtitle" data-i18n="page.tasks.sub">Your open tasks and follow-ups, across every module.</p>
+
+    <div class="bp-toolbar">
+      <label class="bp-filter-toggle">
+        <input type="checkbox" id="filterMineOnly" checked />
+        <span data-i18n="tasks.filter.mineOnly">Only my tasks</span>
+      </label>
+      <label class="bp-filter-toggle">
+        <input type="checkbox" id="filterShowDone" />
+        <span data-i18n="tasks.filter.showDone">Show completed</span>
+      </label>
+      <span id="taskCount" class="bp-count"></span>
+      <button class="btn btn-primary" id="btnNewTask" data-i18n="tasks.new">+ New task</button>
+    </div>
+
+    <div class="bp-table-wrap">
+      <table class="bp-table">
+        <thead>
+          <tr>
+            <th style="width:2rem;"></th>
+            <th data-i18n="tasks.col.title">Title</th>
+            <th data-i18n="tasks.col.linkedTo">Linked to</th>
+            <th data-i18n="tasks.col.owner">Owner</th>
+            <th data-i18n="tasks.col.due">Due</th>
+            <th data-i18n="tasks.col.priority">Priority</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="taskTableBody"></tbody>
+      </table>
+      <div id="taskEmpty" class="bp-empty hidden" data-i18n="tasks.empty">No tasks match these filters.</div>
+    </div>
+  </main>
+
+  <div id="toastHost" class="toast-host"></div>
+
+  <!-- ============================ NEW TASK MODAL ============================ -->
+  <div id="newTaskOverlay" class="modal-overlay hidden">
+    <div class="modal-panel modal-panel--sm">
+      <div class="modal-head">
+        <input id="ntTitle" type="text" placeholder="Task title" data-i18n-placeholder="tasks.titlePlaceholder" />
+        <button id="ntClose" class="modal-head-btn modal-head-btn--close" title="Close">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="field-section">
+          <div class="field-grid">
+            <div class="span-2">
+              <label class="field-label" data-i18n="tasks.f.description">Description</label>
+              <textarea id="ntDescription" class="field-input" rows="3" style="resize:vertical;"></textarea>
+            </div>
+            <div>
+              <label class="field-label" data-i18n="tasks.f.owner">Owner</label>
+              <select id="ntOwner" class="field-input"></select>
+            </div>
+            <div>
+              <label class="field-label" data-i18n="tasks.f.priority">Priority</label>
+              <select id="ntPriority" class="field-input">
+                <option value="">—</option>
+                <option value="low" data-i18n="tasks.priority.low">Low</option>
+                <option value="medium" data-i18n="tasks.priority.medium">Medium</option>
+                <option value="high" data-i18n="tasks.priority.high">High</option>
+              </select>
+            </div>
+            <div>
+              <label class="field-label" data-i18n="tasks.f.dueDate">Due date</label>
+              <input id="ntDueDate" type="date" class="field-input" />
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style="flex-shrink:0; border-top:1px solid var(--border-subtle); padding:0.75rem 1.1rem; display:flex; justify-content:flex-end; gap:0.5rem;">
+        <button id="ntCancel" class="btn btn-secondary" data-i18n="form.cancel">Cancel</button>
+        <button id="ntSave" class="btn btn-primary" data-i18n="form.create">Create</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="../js/config.js"></script>
+  <script src="../js/branding.js"></script>
+  <script src="../js/i18n-dict.js"></script>
+  <script src="../js/i18n.js"></script>
+  <script src="../vendor/oidc-client-ts.min.js"></script>
+  <script src="../vendor/msal-browser.min.js"></script>
+  <script src="../js/auth.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/permissions.js"></script>
+  <script src="../js/avatar.js"></script>
+  <script src="../js/usermenu.js"></script>
+  <script src="../js/chat.js"></script>
+  <script src="../js/tasks.js"></script>
+</body>
+</html>

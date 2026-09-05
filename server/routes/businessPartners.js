@@ -41,6 +41,12 @@
  *                           phone; contact_org_roles is the source of truth
  *                           for the relationship fields layered on top.
  *
+ * CRM Phase C2 added crm_activities + crm_activity_participants — the
+ * communication timeline (/:id/activities below). Tasks are a *separate*,
+ * platform-wide module (see routes/tasks.js, mounted at /api/tasks) —
+ * deliberately not nested here, since a task can attach to a project or
+ * (later) a Programme Operations cohort too, not just a customer/partner.
+ *
  * Mounted at /api/customers-partners (canonical) and /api/business-partners
  * (kept working, server.js) — the module is "Customers & partners" now
  * (roadmap §4); this file and its internal table/column names weren't
@@ -840,6 +846,108 @@ router.delete("/:id/notes/:noteId", async (req, res) => {
       logAudit(req, { kind: "bp.note.delete", desc: `Customer/partner "${bp}": note deleted — "${preview}"` }));
   } catch (err) {
     console.error("[DELETE /api/customers-partners/:id/notes/:noteId] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Activities — CRM Phase C2 communication timeline (crm_activities +
+// crm_activity_participants). A logged interaction (call/meeting/email/
+// note/site_visit/other), optionally tied to one contact and/or a set of
+// participants (other contacts and/or employees who were on it).
+// ---------------------------------------------------------------------------
+
+const ACTIVITY_SELECT = `
+  SELECT a.id, a.kind, a.occurred_at AS "occurredAt", a.summary, a.outcome,
+         a.agreed_next_step AS "agreedNextStep",
+         a.contactid AS "contactId", c.contactname AS "contactName",
+         a.logged_by AS "loggedBy",
+         NULLIF(TRIM(CONCAT(e.employeefirstname, ' ', e.employeelastname)), '') AS "loggedByName",
+         a.created_at AS "createdAt",
+         COALESCE(ARRAY_AGG(DISTINCT pc.contactname) FILTER (WHERE pc.contactname IS NOT NULL), '{}')
+           AS "participantContactNames",
+         COALESCE(ARRAY_AGG(DISTINCT NULLIF(TRIM(CONCAT(pe.employeefirstname, ' ', pe.employeelastname)), ''))
+           FILTER (WHERE pe.id IS NOT NULL), '{}') AS "participantEmployeeNames"
+  FROM crm_activities a
+  LEFT JOIN contacts c ON c.id = a.contactid
+  LEFT JOIN employees e ON e.id = a.logged_by
+  LEFT JOIN crm_activity_participants p ON p.activityid = a.id
+  LEFT JOIN contacts pc ON pc.id = p.contactid
+  LEFT JOIN employees pe ON pe.id = p.employeeid
+`;
+const ACTIVITY_GROUP_BY = `GROUP BY a.id, c.contactname, e.employeefirstname, e.employeelastname`;
+
+router.get("/:id/activities", async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `${ACTIVITY_SELECT}
+       WHERE a.businesspartnerid = $1
+       ${ACTIVITY_GROUP_BY}
+       ORDER BY a.occurred_at DESC, a.id DESC
+       LIMIT 200`,
+      [req.params.id]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error("[GET /api/customers-partners/:id/activities] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  }
+});
+
+router.post("/:id/activities", async (req, res) => {
+  const { kind, occurredAt, summary, outcome, agreedNextStep, contactId, participantContactIds, participantEmployeeIds } = req.body || {};
+  if (!kind || !String(kind).trim()) {
+    return res.status(400).json({ error: "validation_error", message: "kind is required" });
+  }
+  if (!summary || !summary.trim()) {
+    return res.status(400).json({ error: "validation_error", message: "summary is required" });
+  }
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const { rows } = await client.query(
+      `INSERT INTO crm_activities (businesspartnerid, contactid, kind, occurred_at, summary, outcome, agreed_next_step, logged_by)
+       VALUES ($1, $2, $3, COALESCE($4, now()), $5, $6, $7, $8)
+       RETURNING id`,
+      [req.params.id, contactId || null, kind.trim(), occurredAt || null, summary.trim(),
+       outcome || null, agreedNextStep || null, req.hittUser?.employeeId || null]
+    );
+    const activityId = rows[0].id;
+    for (const cId of Array.isArray(participantContactIds) ? participantContactIds : []) {
+      await client.query(`INSERT INTO crm_activity_participants (activityid, contactid) VALUES ($1, $2)`, [activityId, cId]);
+    }
+    for (const eId of Array.isArray(participantEmployeeIds) ? participantEmployeeIds : []) {
+      await client.query(`INSERT INTO crm_activity_participants (activityid, employeeid) VALUES ($1, $2)`, [activityId, eId]);
+    }
+    await logBpChange(client, req.params.id, req, `Activity logged (${kind.trim()}): ${summary.trim().slice(0, 80)}`);
+    await client.query("COMMIT");
+    const { rows: full } = await pool.query(`${ACTIVITY_SELECT} WHERE a.id = $1 ${ACTIVITY_GROUP_BY}`, [activityId]);
+    res.status(201).json(full[0]);
+    bpAuditLabel(req.params.id).then((bp) =>
+      logAudit(req, { kind: "bp.activity.add", desc: `Customer/partner "${bp}": activity logged (${kind.trim()})` }));
+  } catch (err) {
+    await client.query("ROLLBACK");
+    console.error("[POST /api/customers-partners/:id/activities] DB error:", err.message);
+    res.status(502).json({ error: "database_unreachable", message: err.message });
+  } finally {
+    client.release();
+  }
+});
+
+// DELETE /api/customers-partners/:id/activities/:activityId — participants
+// cascade automatically (crm_activity_participants.activityid ON DELETE CASCADE).
+router.delete("/:id/activities/:activityId", async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `DELETE FROM crm_activities WHERE id = $1 AND businesspartnerid = $2 RETURNING kind, summary`,
+      [req.params.activityId, req.params.id]
+    );
+    if (!rows.length) return res.status(404).json({ error: "not_found", message: "Activity not found on this customer/partner" });
+    res.status(204).end();
+    bpAuditLabel(req.params.id).then((bp) =>
+      logAudit(req, { kind: "bp.activity.delete", desc: `Customer/partner "${bp}": activity removed (${rows[0].kind})` }));
+  } catch (err) {
+    console.error("[DELETE /api/customers-partners/:id/activities/:activityId] DB error:", err.message);
     res.status(502).json({ error: "database_unreachable", message: err.message });
   }
 });
